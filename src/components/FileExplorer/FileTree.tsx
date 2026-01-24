@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { Project } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
@@ -13,17 +13,18 @@ export function FileTree({ project }: FileTreeProps) {
   const api = useMemo(() => getElectronAPI(), [])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const loadedRef = useRef<string | null>(null)
 
-  const directoryCache = useProjectStore((s) => s.directoryCache)
+  const rootEntries = useProjectStore((s) => s.directoryCache[project.path])
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
 
-  const rootEntries = directoryCache[project.path] ?? []
-
-  // Load root directory on mount
+  // Load root directory on mount or when project changes
   useEffect(() => {
     const loadRoot = async () => {
-      if (directoryCache[project.path]) return // Already cached
+      // Skip if already loaded for this project
+      if (loadedRef.current === project.path || rootEntries) return
 
+      loadedRef.current = project.path
       setIsLoading(true)
       setError(null)
 
@@ -33,13 +34,14 @@ export function FileTree({ project }: FileTreeProps) {
       } catch (err) {
         console.error('Failed to load project directory:', err)
         setError('Failed to load directory')
+        loadedRef.current = null // Allow retry
       } finally {
         setIsLoading(false)
       }
     }
 
     loadRoot()
-  }, [api, project.path, directoryCache, setDirectoryContents])
+  }, [api, project.path, rootEntries, setDirectoryContents])
 
   if (isLoading) {
     return (
@@ -57,10 +59,10 @@ export function FileTree({ project }: FileTreeProps) {
     )
   }
 
-  if (rootEntries.length === 0) {
+  if (!rootEntries || rootEntries.length === 0) {
     return (
       <div className="px-3 py-4 text-sm text-claude-sidebar-muted">
-        Empty directory
+        {rootEntries ? 'Empty directory' : 'Loading...'}
       </div>
     )
   }
