@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Plus, FolderOpen, Sparkles } from 'lucide-react'
+import { Plus, FolderOpen, Sparkles, PanelRightOpen, PanelRightClose } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import type { TerminalSession } from '../../types'
@@ -12,6 +12,8 @@ export function Sidebar() {
   const terminals = useProjectStore((s) => s.terminals)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const activeTerminalId = useProjectStore((s) => s.activeTerminalId)
+  const fileExplorerVisible = useProjectStore((s) => s.fileExplorerVisible)
+  const toggleFileExplorer = useProjectStore((s) => s.toggleFileExplorer)
 
   // Group actions together with useShallow for stable reference
   const {
@@ -166,6 +168,21 @@ export function Sidebar() {
               v0.1.0
             </p>
           </div>
+          <button
+            onClick={toggleFileExplorer}
+            className={`p-2 rounded-lg transition-colors ${
+              fileExplorerVisible
+                ? 'bg-claude-sidebar-hover text-claude-accent-primary'
+                : 'hover:bg-claude-sidebar-hover text-claude-sidebar-muted hover:text-claude-sidebar-text'
+            }`}
+            title={fileExplorerVisible ? 'Hide Files (Ctrl+Alt+B)' : 'Show Files (Ctrl+Alt+B)'}
+          >
+            {fileExplorerVisible ? (
+              <PanelRightClose className="w-5 h-5" />
+            ) : (
+              <PanelRightOpen className="w-5 h-5" />
+            )}
+          </button>
         </div>
       </div>
     </div>
