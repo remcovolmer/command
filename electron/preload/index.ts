@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     selectFolder: (): Promise<string | null> =>
       ipcRenderer.invoke('project:select-folder'),
+
+    reorder: (projectIds: string[]): Promise<Project[]> =>
+      ipcRenderer.invoke('project:reorder', projectIds),
   },
 
   // Notification operations

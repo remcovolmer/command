@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, ipcMain, dialog, Notification } from 'electr
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs/promises'
 import os from 'node:os'
 import { TerminalManager } from './services/TerminalManager'
 import { ProjectPersistence } from './services/ProjectPersistence'
@@ -134,6 +135,14 @@ ipcMain.handle('project:select-folder', async () => {
     title: 'Select Project Folder',
   })
   return result.canceled ? null : result.filePaths[0]
+})
+
+ipcMain.handle('project:reorder', async (_event, projectIds: string[]) => {
+  if (!Array.isArray(projectIds) || !projectIds.every(isValidUUID)) {
+    throw new Error('Invalid project IDs')
+  }
+  projectPersistence?.reorderProjects(projectIds)
+  return projectPersistence?.getProjects() ?? []
 })
 
 // IPC Handlers for Notifications

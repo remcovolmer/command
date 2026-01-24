@@ -19,6 +19,7 @@ interface ProjectStore {
   addProject: (project: Project) => void
   removeProject: (id: string) => void
   setActiveProject: (id: string | null) => void
+  reorderProjects: (projectIds: string[]) => Promise<void>
 
   // Terminal actions
   addTerminal: (terminal: TerminalSession) => void
@@ -104,6 +105,16 @@ export const useProjectStore = create<ProjectStore>()(
             activeTerminalId: newActiveTerminalId,
           }
         }),
+
+      reorderProjects: async (projectIds) => {
+        const api = getElectronAPI()
+        try {
+          const projects = await api.project.reorder(projectIds)
+          set({ projects })
+        } catch (error) {
+          console.error('Failed to reorder projects:', error)
+        }
+      },
 
       // Terminal actions
       addTerminal: (terminal) =>

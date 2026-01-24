@@ -49,8 +49,10 @@
       "Bash(git ls-tree:*)",
       "Bash(git checkout:*)",
       "Bash(git branch:*)",
-      "Bash(python -c \"import os; os.remove\\(r''\\\\\\\\?\\\\C:\\\\Users\\\\RemcoVolmer\\\\Code\\\\command\\\\nul''\\)\")",
-      "Bash(python -c \"import os; os.unlink\\(''nul''\\)\")"
+      "Bash(python -c:*)",
+      "Bash(ls -la:*)",
+      "Bash(node scripts/generate-icons.mjs:*)",
+      "Bash(npx png2icons:*)"
     ]
   }
 }

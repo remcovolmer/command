@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { useMemo, useCallback } from 'react'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
-import { Terminal } from '../Terminal/Terminal'
+import { TerminalTabBar } from '../Terminal/TerminalTabBar'
+import { TerminalViewport } from '../Terminal/TerminalViewport'
 import { TerminalIcon, Plus, Sparkles } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import type { TerminalSession } from '../../types'
@@ -13,14 +13,23 @@ export function TerminalArea() {
     activeTerminalId,
     terminals,
     projects,
+    layouts,
     addTerminal,
     setActiveTerminal,
+    removeTerminal,
+    addToSplit,
+    removeFromSplit,
+    setSplitSizes,
   } = useProjectStore()
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const projectTerminals = Object.values(terminals).filter(
     (t) => t.projectId === activeProjectId
   )
+
+  // Get current layout for the project
+  const currentLayout = activeProjectId ? layouts[activeProjectId] : null
+  const splitTerminalIds = currentLayout?.splitTerminalIds ?? []
 
   const handleCreateTerminal = async () => {
     if (!activeProjectId) return
@@ -44,6 +53,67 @@ export function TerminalArea() {
     }
     addTerminal(terminal)
   }
+
+  const handleCloseTerminal = useCallback(
+    async (terminalId: string) => {
+      api.terminal.close(terminalId)
+      removeTerminal(terminalId)
+    },
+    [api, removeTerminal]
+  )
+
+  const handleUnsplit = useCallback(
+    (terminalId: string) => {
+      if (!activeProjectId) return
+      removeFromSplit(activeProjectId, terminalId)
+    },
+    [activeProjectId, removeFromSplit]
+  )
+
+  const handleDropToSplit = useCallback(
+    (terminalId: string, position: 'left' | 'right') => {
+      if (!activeProjectId) return
+
+      // If there's already a split, just add to it
+      if (splitTerminalIds.length >= 2) {
+        addToSplit(activeProjectId, terminalId)
+        return
+      }
+
+      // Find a terminal to pair with (either the active one, or another one)
+      let pairTerminalId: string | null = null
+
+      if (activeTerminalId && activeTerminalId !== terminalId) {
+        // Use the active terminal as pair
+        pairTerminalId = activeTerminalId
+      } else {
+        // Active terminal is being dragged, find another terminal to pair with
+        const otherTerminal = projectTerminals.find(t => t.id !== terminalId)
+        pairTerminalId = otherTerminal?.id ?? null
+      }
+
+      // Create new split with the dragged terminal and the pair
+      if (pairTerminalId) {
+        if (position === 'left') {
+          addToSplit(activeProjectId, terminalId)
+          addToSplit(activeProjectId, pairTerminalId)
+        } else {
+          addToSplit(activeProjectId, pairTerminalId)
+          addToSplit(activeProjectId, terminalId)
+        }
+      }
+    },
+    [activeProjectId, activeTerminalId, projectTerminals, splitTerminalIds.length, addToSplit]
+  )
+
+  const handleSplitSizesChange = useCallback(
+    (sizes: number[]) => {
+      if (activeProjectId) {
+        setSplitSizes(activeProjectId, sizes)
+      }
+    },
+    [activeProjectId, setSplitSizes]
+  )
 
   // No project selected - show Claude-style welcome
   if (!activeProjectId || !activeProject) {
@@ -100,158 +170,31 @@ export function TerminalArea() {
     )
   }
 
-  // Single terminal
-  if (projectTerminals.length === 1) {
-    return (
-      <div className="h-full w-full relative">
-        <TerminalPane
-          terminal={projectTerminals[0]}
-          isActive={projectTerminals[0].id === activeTerminalId}
-          onSelect={() => setActiveTerminal(projectTerminals[0].id)}
-          canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
-          onAdd={handleCreateTerminal}
-        />
-      </div>
-    )
-  }
-
-  // Multiple terminals with split view
+  // Terminals with tab bar
   return (
-    <PanelGroup
-      direction="horizontal"
-      autoSaveId={`terminals-${activeProjectId}`}
-    >
-      {projectTerminals.map((terminal, index) => (
-        <TerminalPanelWithHandle
-          key={terminal.id}
-          terminal={terminal}
-          isActive={terminal.id === activeTerminalId}
-          onSelect={() => setActiveTerminal(terminal.id)}
-          isLast={index === projectTerminals.length - 1}
-          canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
-          onAdd={handleCreateTerminal}
-        />
-      ))}
-    </PanelGroup>
-  )
-}
-
-interface TerminalPanelWithHandleProps {
-  terminal: TerminalSession
-  isActive: boolean
-  onSelect: () => void
-  isLast: boolean
-  canAdd: boolean
-  onAdd: () => void
-}
-
-function TerminalPanelWithHandle({
-  terminal,
-  isActive,
-  onSelect,
-  isLast,
-  canAdd,
-  onAdd,
-}: TerminalPanelWithHandleProps) {
-  return (
-    <>
-      <Panel
-        id={`terminal-${terminal.id}`}
-        defaultSize={50}
-        minSize={20}
-      >
-        <TerminalPane
-          terminal={terminal}
-          isActive={isActive}
-          onSelect={onSelect}
-          canAdd={canAdd && isLast}
-          onAdd={onAdd}
-        />
-      </Panel>
-      {!isLast && (
-        <PanelResizeHandle className="w-1 bg-terminal-border hover:bg-claude-accent-primary transition-colors" />
-      )}
-    </>
-  )
-}
-
-interface TerminalPaneProps {
-  terminal: TerminalSession
-  isActive: boolean
-  onSelect: () => void
-  canAdd: boolean
-  onAdd: () => void
-}
-
-function TerminalPane({
-  terminal,
-  isActive,
-  onSelect,
-  canAdd,
-  onAdd,
-}: TerminalPaneProps) {
-  const stateLabels = {
-    starting: 'Starting...',
-    running: 'Running',
-    needs_input: 'Waiting for input',
-    stopped: 'Stopped',
-    error: 'Error',
-  }
-
-  const stateColors = {
-    starting: 'text-terminal-warning',
-    running: 'text-claude-info',
-    needs_input: 'text-claude-accent-primary',
-    stopped: 'text-terminal-muted',
-    error: 'text-claude-error',
-  }
-
-  const stateDots = {
-    starting: 'bg-terminal-warning',
-    running: 'bg-claude-info',
-    needs_input: 'bg-claude-accent-primary',
-    stopped: 'bg-terminal-muted',
-    error: 'bg-claude-error',
-  }
-
-  return (
-    <div
-      className={`h-full flex flex-col bg-terminal-bg ${
-        isActive ? 'ring-2 ring-claude-accent-primary ring-inset' : ''
-      }`}
-      onClick={onSelect}
-    >
-      {/* Terminal Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-terminal-surface border-b border-terminal-border">
-        <div className="flex items-center gap-3">
-          <TerminalIcon className="w-4 h-4 text-terminal-muted" />
-          <span className="text-sm font-medium text-terminal-text">{terminal.title}</span>
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${stateDots[terminal.state]} ${terminal.state === 'needs_input' ? 'needs-input-indicator' : ''}`} />
-            <span className={`text-xs ${stateColors[terminal.state]}`}>
-              {stateLabels[terminal.state]}
-            </span>
-          </div>
-        </div>
-
-        {canAdd && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onAdd()
-            }}
-            className="p-1.5 rounded-lg hover:bg-terminal-border transition-colors"
-            title="Add Terminal"
-          >
-            <Plus className="w-4 h-4 text-terminal-muted" />
-          </button>
-        )}
-      </div>
-
-      {/* Terminal Content */}
+    <div className="h-full w-full flex flex-col bg-terminal-bg">
+      <TerminalTabBar
+        terminals={projectTerminals}
+        activeTerminalId={activeTerminalId}
+        splitTerminalIds={splitTerminalIds}
+        onSelect={setActiveTerminal}
+        onClose={handleCloseTerminal}
+        onUnsplit={handleUnsplit}
+        onAdd={handleCreateTerminal}
+        canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
+      />
       <div className="flex-1 overflow-hidden">
-        <Terminal id={terminal.id} isActive={isActive} />
+        <TerminalViewport
+          terminals={projectTerminals}
+          activeTerminalId={activeTerminalId}
+          splitTerminalIds={splitTerminalIds}
+          projectId={activeProjectId!}
+          onSplitSizesChange={handleSplitSizesChange}
+          onDropToSplit={handleDropToSplit}
+          onSelect={setActiveTerminal}
+        />
       </div>
     </div>
   )
 }
+

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Gradient for the main C shape -->
+    <linearGradient id="cGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8845C"/>
+      <stop offset="100%" stop-color="#D4634B"/>
+    </linearGradient>
+    <!-- Subtle glow for sparkle -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle (optional, for app icon visibility) -->
+  <circle cx="256" cy="256" r="240" fill="#1A1A1A"/>
+
+  <!-- Main "C" shape with terminal-like opening -->
+  <path
+    d="M 340 120
+       C 420 140, 460 200, 460 256
+       C 460 340, 400 420, 300 440
+       C 200 460, 100 400, 80 300
+       C 60 200, 120 100, 220 80
+       C 280 68, 320 80, 340 120"
+    fill="none"
+    stroke="url(#cGradient)"
+    stroke-width="48"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Terminal prompt ">" integrated into the C opening -->
+  <path
+    d="M 320 200 L 380 256 L 320 312"
+    fill="none"
+    stroke="url(#cGradient)"
+    stroke-width="32"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Cursor/underscore -->
+  <line
+    x1="390" y1="310"
+    x2="430" y2="310"
+    stroke="url(#cGradient)"
+    stroke-width="28"
+    stroke-linecap="round"
+  />
+
+  <!-- Sparkle accent -->
+  <g filter="url(#glow)">
+    <!-- Main sparkle star -->
+    <path
+      d="M 400 120
+         L 406 138 L 424 144 L 406 150 L 400 168
+         L 394 150 L 376 144 L 394 138 Z"
+      fill="#FFD6A5"
+    />
+    <!-- Small sparkle dots -->
+    <circle cx="360" cy="100" r="6" fill="#E8845C" opacity="0.8"/>
+    <circle cx="430" cy="160" r="4" fill="#FFD6A5" opacity="0.6"/>
+  </g>
+</svg>

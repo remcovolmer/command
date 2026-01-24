@@ -29,6 +29,14 @@ export interface TerminalSession {
   title: string;
 }
 
+// File system types
+export interface FileSystemEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  extension?: string;
+}
+
 // Layout types
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -66,6 +74,7 @@ export interface ElectronAPI {
     add: (path: string, name?: string) => Promise<Project>;
     remove: (id: string) => Promise<void>;
     selectFolder: () => Promise<string | null>;
+    reorder: (projectIds: string[]) => Promise<Project[]>;
   };
   notification: {
     show: (title: string, body: string) => void;
@@ -74,6 +83,9 @@ export interface ElectronAPI {
     onCloseRequest: (callback: () => void) => Unsubscribe;
     confirmClose: () => void;
     cancelClose: () => void;
+  };
+  fs: {
+    readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;
   };
   removeAllListeners: (channel: string) => void;
 }
