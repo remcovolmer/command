@@ -115,26 +115,26 @@ export function TerminalArea() {
     [activeProjectId, setSplitSizes]
   )
 
-  // No project selected - show Claude-style welcome
+  // No project selected - show welcome
   if (!activeProjectId || !activeProject) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-claude-main-bg">
+      <div className="flex flex-col items-center justify-center h-full bg-background">
         <div className="text-center max-w-md mx-auto px-8">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <Sparkles className="w-10 h-10 text-claude-accent-primary" />
+            <Sparkles className="w-10 h-10 text-primary" />
           </div>
-          <h2 className="text-2xl font-semibold text-claude-main-text mb-3">
+          <h2 className="text-2xl font-semibold text-foreground mb-3">
             Welcome to Command
           </h2>
-          <p className="text-claude-main-muted mb-8">
+          <p className="text-muted-foreground mb-8">
             Select a project from the sidebar to start managing your Claude Code terminals.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-claude-main-surface border border-claude-main-border text-claude-main-muted text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-muted-foreground text-sm">
               <TerminalIcon className="w-4 h-4" />
               Multi-terminal support
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-claude-main-surface border border-claude-main-border text-claude-main-muted text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-muted-foreground text-sm">
               <Plus className="w-4 h-4" />
               Up to {MAX_TERMINALS_PER_PROJECT} per project
             </div>
@@ -147,20 +147,20 @@ export function TerminalArea() {
   // No terminals in project
   if (projectTerminals.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-terminal-bg">
+      <div className="flex flex-col items-center justify-center h-full bg-sidebar">
         <div className="text-center max-w-md mx-auto px-8">
-          <div className="w-16 h-16 rounded-2xl bg-terminal-surface flex items-center justify-center mx-auto mb-6">
-            <TerminalIcon className="w-8 h-8 text-claude-accent-primary" />
+          <div className="w-16 h-16 rounded-2xl bg-sidebar-accent flex items-center justify-center mx-auto mb-6">
+            <TerminalIcon className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-xl font-semibold text-terminal-text mb-2">
+          <h2 className="text-xl font-semibold text-sidebar-foreground mb-2">
             {activeProject.name}
           </h2>
-          <p className="text-terminal-muted mb-6">
+          <p className="text-muted-foreground mb-6">
             No terminals running. Start a new terminal to begin.
           </p>
           <button
             onClick={handleCreateTerminal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-claude-accent-primary text-white rounded-xl font-medium hover:bg-claude-accent-hover transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             New Terminal
@@ -172,7 +172,7 @@ export function TerminalArea() {
 
   // Terminals with tab bar
   return (
-    <div className="h-full w-full flex flex-col bg-terminal-bg">
+    <div className="h-full w-full flex flex-col bg-sidebar">
       <TerminalTabBar
         terminals={projectTerminals}
         activeTerminalId={activeTerminalId}
@@ -197,4 +197,3 @@ export function TerminalArea() {
     </div>
   )
 }
-

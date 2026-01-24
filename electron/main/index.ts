@@ -6,6 +6,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import { TerminalManager } from './services/TerminalManager'
 import { ProjectPersistence } from './services/ProjectPersistence'
+import { GitService } from './services/GitService'
 
 // Validation helpers
 const isValidUUID = (id: string): boolean =>
@@ -41,6 +42,7 @@ if (!app.requestSingleInstanceLock()) {
 let win: BrowserWindow | null = null
 let terminalManager: TerminalManager | null = null
 let projectPersistence: ProjectPersistence | null = null
+let gitService: GitService | null = null
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
@@ -66,6 +68,7 @@ async function createWindow() {
   // Initialize services
   terminalManager = new TerminalManager(win)
   projectPersistence = new ProjectPersistence()
+  gitService = new GitService()
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -173,6 +176,14 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
     console.error('Failed to read directory:', dirPath, error)
     throw error
   }
+})
+
+// IPC Handlers for Git operations
+ipcMain.handle('git:status', async (_event, projectPath: string) => {
+  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
+    throw new Error('Invalid project path')
+  }
+  return gitService?.getStatus(projectPath)
 })
 
 // IPC Handlers for Notifications

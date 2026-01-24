@@ -28,6 +28,30 @@ interface FileSystemEntry {
   extension?: string
 }
 
+interface GitFileChange {
+  path: string
+  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted'
+  staged: boolean
+}
+
+interface GitBranchInfo {
+  name: string
+  upstream: string | null
+  ahead: number
+  behind: number
+}
+
+interface GitStatus {
+  isGitRepo: boolean
+  branch: GitBranchInfo | null
+  staged: GitFileChange[]
+  modified: GitFileChange[]
+  untracked: GitFileChange[]
+  conflicted: GitFileChange[]
+  isClean: boolean
+  error?: string
+}
+
 // Unsubscribe function type
 type Unsubscribe = () => void
 
@@ -110,6 +134,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fs: {
     readDirectory: (dirPath: string): Promise<FileSystemEntry[]> =>
       ipcRenderer.invoke('fs:readDirectory', dirPath),
+  },
+
+  // Git operations
+  git: {
+    getStatus: (projectPath: string): Promise<GitStatus> =>
+      ipcRenderer.invoke('git:status', projectPath),
   },
 
   // Cleanup helper - only allows whitelisted channels (#003 fix)

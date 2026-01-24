@@ -7,6 +7,7 @@ function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const terminals = useProjectStore((s) => s.terminals)
   const toggleFileExplorer = useProjectStore((s) => s.toggleFileExplorer)
+  const theme = useProjectStore((s) => s.theme)
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
 
@@ -40,6 +41,15 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleFileExplorer])
 
+  // Sync theme class with html element (only add 'dark' class when dark mode)
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+
   // Remove loading screen
   useEffect(() => {
     postMessage({ payload: 'removeLoading' }, '*')
@@ -62,11 +72,11 @@ function App() {
       {/* Close Confirmation Dialog */}
       {showCloseDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-claude-main-surface border border-claude-main-border rounded-xl p-6 max-w-md mx-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-claude-main-text mb-2">
+          <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-card-foreground mb-2">
               Close Application?
             </h2>
-            <p className="text-sm text-claude-main-muted mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               You have {Object.keys(terminals).length} active terminal
               {Object.keys(terminals).length > 1 ? 's' : ''}. Closing the
               application will terminate all running sessions.
@@ -74,13 +84,13 @@ function App() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={handleCancelClose}
-                className="px-4 py-2 text-sm text-claude-main-muted hover:text-claude-main-text rounded-lg hover:bg-claude-main-border transition-colors"
+                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmClose}
-                className="px-4 py-2 text-sm bg-claude-error text-white rounded-lg hover:opacity-90 transition-opacity"
+                className="px-4 py-2 text-sm bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity"
               >
                 Close Anyway
               </button>

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus } from '../types'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
@@ -19,12 +19,27 @@ interface ProjectStore {
   expandedPaths: Record<string, string[]>
   directoryCache: Record<string, FileSystemEntry[]>
 
+  // Theme state
+  theme: 'light' | 'dark'
+
+  // Git status state (not persisted)
+  gitStatus: Record<string, GitStatus>
+  gitStatusLoading: Record<string, boolean>
+
   // File explorer actions
   toggleFileExplorer: () => void
   setFileExplorerVisible: (visible: boolean) => void
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string) => void
+
+  // Theme actions
+  toggleTheme: () => void
+  setTheme: (theme: 'light' | 'dark') => void
+
+  // Git status actions
+  setGitStatus: (projectId: string, status: GitStatus) => void
+  setGitStatusLoading: (projectId: string, loading: boolean) => void
 
   // Project actions
   setProjects: (projects: Project[]) => void
@@ -64,6 +79,13 @@ export const useProjectStore = create<ProjectStore>()(
       fileExplorerVisible: false,
       expandedPaths: {},
       directoryCache: {},
+
+      // Theme state (light is default)
+      theme: 'light',
+
+      // Git status state (not persisted)
+      gitStatus: {},
+      gitStatusLoading: {},
 
       // File explorer actions
       toggleFileExplorer: () =>
@@ -109,6 +131,23 @@ export const useProjectStore = create<ProjectStore>()(
           })
           return { directoryCache: newCache }
         }),
+
+      // Theme actions
+      toggleTheme: () =>
+        set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+
+      setTheme: (theme) => set({ theme }),
+
+      // Git status actions
+      setGitStatus: (projectId, status) =>
+        set((state) => ({
+          gitStatus: { ...state.gitStatus, [projectId]: status },
+        })),
+
+      setGitStatusLoading: (projectId, loading) =>
+        set((state) => ({
+          gitStatusLoading: { ...state.gitStatusLoading, [projectId]: loading },
+        })),
 
       // Project actions
       setProjects: (projects) => set({ projects }),
@@ -387,6 +426,8 @@ export const useProjectStore = create<ProjectStore>()(
         // File explorer state
         fileExplorerVisible: state.fileExplorerVisible,
         expandedPaths: state.expandedPaths,
+        // Theme state
+        theme: state.theme,
       }),
     }
   )

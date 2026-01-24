@@ -1,4 +1,5 @@
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { useEffect, useRef } from 'react'
+import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { Sidebar } from '../Sidebar/Sidebar'
 import { TerminalArea } from './TerminalArea'
 import { FileExplorer } from '../FileExplorer/FileExplorer'
@@ -6,9 +7,22 @@ import { useProjectStore } from '../../stores/projectStore'
 
 export function MainLayout() {
   const fileExplorerVisible = useProjectStore((s) => s.fileExplorerVisible)
+  const fileExplorerRef = useRef<ImperativePanelHandle>(null)
+
+  // Sync panel collapse state with store
+  useEffect(() => {
+    const panel = fileExplorerRef.current
+    if (!panel) return
+
+    if (fileExplorerVisible) {
+      panel.expand()
+    } else {
+      panel.collapse()
+    }
+  }, [fileExplorerVisible])
 
   return (
-    <div className="h-screen w-screen bg-claude-main-bg">
+    <div className="h-screen w-screen bg-background">
       <PanelGroup direction="horizontal" autoSaveId="main-layout">
         {/* Sidebar */}
         <Panel
@@ -16,34 +30,35 @@ export function MainLayout() {
           defaultSize={20}
           minSize={15}
           maxSize={35}
-          className="bg-claude-sidebar-bg"
+          className="bg-sidebar"
         >
           <Sidebar />
         </Panel>
 
         {/* Resize Handle */}
-        <PanelResizeHandle className="w-1 bg-claude-sidebar-border hover:bg-claude-accent-primary transition-colors" />
+        <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
 
         {/* Terminal Area */}
-        <Panel id="terminals" defaultSize={fileExplorerVisible ? 60 : 80} minSize={30}>
+        <Panel id="terminals" defaultSize={60} minSize={30}>
           <TerminalArea />
         </Panel>
 
-        {/* File Explorer (conditional) */}
-        {fileExplorerVisible && (
-          <>
-            <PanelResizeHandle className="w-1 bg-claude-sidebar-border hover:bg-claude-accent-primary transition-colors" />
-            <Panel
-              id="file-explorer"
-              defaultSize={20}
-              minSize={15}
-              maxSize={35}
-              className="bg-claude-sidebar-bg"
-            >
-              <FileExplorer />
-            </Panel>
-          </>
-        )}
+        {/* Resize Handle for File Explorer */}
+        <PanelResizeHandle className={`w-1 bg-border hover:bg-primary transition-colors ${!fileExplorerVisible ? 'hidden' : ''}`} />
+
+        {/* File Explorer (always rendered, but collapsible) */}
+        <Panel
+          ref={fileExplorerRef}
+          id="file-explorer"
+          defaultSize={20}
+          minSize={15}
+          maxSize={35}
+          collapsible
+          collapsedSize={0}
+          className="bg-sidebar"
+        >
+          <FileExplorer />
+        </Panel>
       </PanelGroup>
     </div>
   )

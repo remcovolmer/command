@@ -37,6 +37,31 @@ export interface FileSystemEntry {
   extension?: string;
 }
 
+// Git types
+export interface GitFileChange {
+  path: string;
+  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted';
+  staged: boolean;
+}
+
+export interface GitBranchInfo {
+  name: string;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+}
+
+export interface GitStatus {
+  isGitRepo: boolean;
+  branch: GitBranchInfo | null;
+  staged: GitFileChange[];
+  modified: GitFileChange[];
+  untracked: GitFileChange[];
+  conflicted: GitFileChange[];
+  isClean: boolean;
+  error?: string;
+}
+
 // Layout types
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -86,6 +111,9 @@ export interface ElectronAPI {
   };
   fs: {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;
+  };
+  git: {
+    getStatus: (projectPath: string) => Promise<GitStatus>;
   };
   removeAllListeners: (channel: string) => void;
 }
