@@ -247,7 +247,27 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
-      setActiveTerminal: (id) => set({ activeTerminalId: id }),
+      setActiveTerminal: (id) =>
+        set((state) => {
+          if (id === null) {
+            return { activeTerminalId: null }
+          }
+
+          const terminal = state.terminals[id]
+          if (!terminal) {
+            return { activeTerminalId: id }
+          }
+
+          // Als terminal in ander project zit, wissel ook van project
+          if (terminal.projectId !== state.activeProjectId) {
+            return {
+              activeProjectId: terminal.projectId,
+              activeTerminalId: id,
+            }
+          }
+
+          return { activeTerminalId: id }
+        }),
 
       getProjectTerminals: (projectId) => {
         const state = get()
