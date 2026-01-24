@@ -26,6 +26,20 @@ function App() {
     return unsubscribe
   }, [api])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Alt+B to toggle file explorer
+      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        toggleFileExplorer()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleFileExplorer])
+
   // Remove loading screen
   useEffect(() => {
     postMessage({ payload: 'removeLoading' }, '*')
