@@ -15,14 +15,18 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
   const api = useMemo(() => getElectronAPI(), [])
   const [isLoading, setIsLoading] = useState(false)
 
-  const expandedPaths = useProjectStore((s) => s.expandedPaths[projectId] ?? [])
-  const directoryCache = useProjectStore((s) => s.directoryCache)
+  // Use specific selectors to avoid creating new references
+  const isExpanded = useProjectStore(
+    (s) => s.expandedPaths[projectId]?.includes(entry.path) ?? false
+  )
+  const children = useProjectStore(
+    (s) => s.directoryCache[entry.path]
+  )
   const toggleExpandedPath = useProjectStore((s) => s.toggleExpandedPath)
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
+  const directoryCache = useProjectStore((s) => s.directoryCache)
 
   const isDirectory = entry.type === 'directory'
-  const isExpanded = expandedPaths.includes(entry.path)
-  const children = directoryCache[entry.path] ?? []
 
   const handleClick = async () => {
     if (!isDirectory) return
@@ -90,7 +94,7 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
       </button>
 
       {/* Children (expanded directories) */}
-      {isDirectory && isExpanded && children.length > 0 && (
+      {isDirectory && isExpanded && children && children.length > 0 && (
         <div className="overflow-hidden">
           {children.map((child) => (
             <FileTreeNode
