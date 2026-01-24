@@ -6,6 +6,7 @@ import { getElectronAPI } from './utils/electron'
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const terminals = useProjectStore((s) => s.terminals)
+  const toggleFileExplorer = useProjectStore((s) => s.toggleFileExplorer)
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
 
