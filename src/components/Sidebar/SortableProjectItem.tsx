@@ -47,18 +47,18 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   }
 
   const stateColors = {
-    starting: 'text-claude-warning',
-    running: 'text-claude-info',
-    needs_input: 'text-claude-accent-primary',
-    stopped: 'text-claude-sidebar-muted',
-    error: 'text-claude-error',
+    starting: 'text-yellow-500',
+    running: 'text-blue-500',
+    needs_input: 'text-primary',
+    stopped: 'text-muted-foreground',
+    error: 'text-destructive',
   }
 
   return (
     <li ref={setNodeRef} style={style} className="relative">
       {/* Drop indicator line */}
       {isOver && (
-        <div className="absolute inset-x-0 -top-0.5 h-0.5 bg-claude-accent-primary rounded-full" />
+        <div className="absolute inset-x-0 -top-0.5 h-0.5 bg-primary rounded-full" />
       )}
 
       {/* Project Header */}
@@ -70,13 +70,13 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing
           transition-colors duration-150
           ${isActive
-            ? 'bg-claude-sidebar-hover text-claude-sidebar-text'
-            : 'text-claude-sidebar-muted hover:bg-claude-sidebar-surface hover:text-claude-sidebar-text'}
+            ? 'bg-sidebar-accent text-sidebar-foreground'
+            : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
         `}
       >
         <FolderOpen
           className={`w-4 h-4 flex-shrink-0 ${
-            isActive ? 'text-claude-accent-primary' : ''
+            isActive ? 'text-primary' : ''
           }`}
         />
         <span className="flex-1 text-sm truncate" title={project.path}>
@@ -85,7 +85,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
         {/* Notification indicator */}
         {hasNeedsInput && (
-          <span className="w-2 h-2 rounded-full bg-claude-accent-primary needs-input-indicator" />
+          <span className="w-2 h-2 rounded-full bg-primary needs-input-indicator" />
         )}
 
         {/* Actions */}
@@ -96,7 +96,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               onCreateTerminal()
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-claude-sidebar-border"
+            className="p-1 rounded hover:bg-border"
             title="New Terminal"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -104,7 +104,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           <button
             onClick={onRemove}
             onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-claude-sidebar-border"
+            className="p-1 rounded hover:bg-border"
             title="Remove Project"
           >
             <X className="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
       {/* Terminal List */}
       {terminals.length > 0 && (
-        <ul className="ml-6 mt-1 space-y-0.5 border-l border-claude-sidebar-border">
+        <ul className="ml-6 mt-1 space-y-0.5 border-l border-border">
           {terminals.map((terminal) => (
             <li
               key={terminal.id}
@@ -123,8 +123,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                 group flex items-center gap-2 px-3 py-1.5 cursor-pointer
                 transition-colors duration-150
                 ${terminal.id === activeTerminalId
-                  ? 'text-claude-sidebar-text'
-                  : 'text-claude-sidebar-muted hover:text-claude-sidebar-text'}
+                  ? 'text-sidebar-foreground'
+                  : 'text-muted-foreground hover:text-sidebar-foreground'}
               `}
             >
               <TerminalIcon
@@ -134,13 +134,13 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
               {/* Needs input indicator */}
               {terminal.state === 'needs_input' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-claude-accent-primary needs-input-indicator" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary needs-input-indicator" />
               )}
 
               {/* Close button */}
               <button
                 onClick={(e) => onCloseTerminal(e, terminal.id)}
-                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-claude-sidebar-border transition-opacity"
+                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
                 title="Close Terminal"
               >
                 <X className="w-3 h-3" />
@@ -152,10 +152,10 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
       {/* Empty state for active project */}
       {isActive && terminals.length === 0 && (
-        <div className="ml-6 pl-3 py-2 border-l border-claude-sidebar-border">
+        <div className="ml-6 pl-3 py-2 border-l border-border">
           <button
             onClick={onCreateTerminal}
-            className="flex items-center gap-2 text-xs text-claude-sidebar-muted hover:text-claude-accent-primary transition-colors"
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="w-3 h-3" />
             New Terminal

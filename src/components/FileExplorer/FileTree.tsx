@@ -46,14 +46,14 @@ export function FileTree({ project }: FileTreeProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 animate-spin text-claude-sidebar-muted" />
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="px-3 py-4 text-sm text-claude-error">
+      <div className="px-3 py-4 text-sm text-destructive">
         {error}
       </div>
     )
@@ -61,7 +61,7 @@ export function FileTree({ project }: FileTreeProps) {
 
   if (!rootEntries || rootEntries.length === 0) {
     return (
-      <div className="px-3 py-4 text-sm text-claude-sidebar-muted">
+      <div className="px-3 py-4 text-sm text-muted-foreground">
         {rootEntries ? 'Empty directory' : 'Loading...'}
       </div>
     )

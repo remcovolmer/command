@@ -178,14 +178,14 @@ function SplitPanel({ terminal, isActive, isLast, onSelect }: SplitPanelProps) {
     <>
       <Panel id={`split-${terminal.id}`} defaultSize={50} minSize={20}>
         <div
-          className={`h-full ${isActive ? 'ring-2 ring-claude-accent-primary ring-inset' : ''}`}
+          className={`h-full ${isActive ? 'ring-2 ring-primary ring-inset' : ''}`}
           onClick={onSelect}
         >
           <Terminal id={terminal.id} isActive={true} />
         </div>
       </Panel>
       {!isLast && (
-        <PanelResizeHandle className="w-1 bg-terminal-border hover:bg-claude-accent-primary transition-colors" />
+        <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
       )}
     </>
   )
@@ -208,7 +208,7 @@ function DropZone({ position, isActive, onDragOver, onDragLeave, onDrop }: DropZ
         flex items-center ${position === 'left' ? 'justify-start pl-2' : 'justify-end pr-2'}
         pointer-events-auto
         transition-all duration-200
-        ${isActive ? 'bg-claude-accent-primary/30' : 'bg-transparent'}
+        ${isActive ? 'bg-primary/30' : 'bg-transparent'}
       `}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -218,7 +218,7 @@ function DropZone({ position, isActive, onDragOver, onDragLeave, onDrop }: DropZ
         className={`
           w-1 h-[80%] rounded-full
           transition-all duration-200
-          ${isActive ? 'bg-claude-accent-primary' : 'bg-terminal-border/50'}
+          ${isActive ? 'bg-primary' : 'bg-border/50'}
         `}
       />
     </div>

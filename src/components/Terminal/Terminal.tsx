@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useCallback } from 'react'
-import { Terminal as XTerm } from '@xterm/xterm'
+import { Terminal as XTerm, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useProjectStore } from '../../stores/projectStore'
@@ -11,6 +11,62 @@ interface TerminalProps {
   isActive: boolean
 }
 
+// Helper to get computed CSS variable value as hex
+function getCssVar(name: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  // If it's already hex, return it
+  if (value.startsWith('#')) return value
+  // If it's oklch, we need to convert it
+  // Create a temporary element to compute the color
+  const temp = document.createElement('div')
+  temp.style.color = value
+  document.body.appendChild(temp)
+  const computed = getComputedStyle(temp).color
+  document.body.removeChild(temp)
+  // Convert rgb(r, g, b) to hex
+  const match = computed.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+  if (match) {
+    const r = parseInt(match[1]).toString(16).padStart(2, '0')
+    const g = parseInt(match[2]).toString(16).padStart(2, '0')
+    const b = parseInt(match[3]).toString(16).padStart(2, '0')
+    return `#${r}${g}${b}`
+  }
+  return value
+}
+
+// Build terminal theme from CSS variables
+function buildTerminalTheme(): ITheme {
+  const bg = getCssVar('--sidebar')
+  const fg = getCssVar('--sidebar-foreground')
+  const primary = getCssVar('--primary')
+  const muted = getCssVar('--muted-foreground')
+  const accent = getCssVar('--sidebar-accent')
+
+  return {
+    background: bg,
+    foreground: fg,
+    cursor: primary,
+    cursorAccent: bg,
+    selectionBackground: accent,
+    black: getCssVar('--background'),
+    red: '#f7768e',
+    green: '#9ece6a',
+    yellow: '#e0af68',
+    blue: '#7aa2f7',
+    magenta: '#bb9af7',
+    cyan: '#7dcfff',
+    white: fg,
+    brightBlack: muted,
+    brightRed: '#f7768e',
+    brightGreen: '#9ece6a',
+    brightYellow: '#e0af68',
+    brightBlue: '#7aa2f7',
+    brightMagenta: '#bb9af7',
+    brightCyan: '#7dcfff',
+    brightWhite: '#ffffff',
+  }
+}
+
 export function Terminal({ id, isActive }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
@@ -18,6 +74,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
   const isDisposedRef = useRef(false)
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
+  const theme = useProjectStore((s) => s.theme)
   const api = useMemo(() => getElectronAPI(), [])
 
   // Safe fit function that checks all prerequisites
@@ -57,30 +114,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
       fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace",
       lineHeight: 1.2,
       scrollback: 5000,
-      theme: {
-        // Claude warm brown theme - matches app colors
-        background: '#1a1714',
-        foreground: '#f5f0eb',
-        cursor: '#da7756',
-        cursorAccent: '#1a1714',
-        selectionBackground: '#35302b',
-        black: '#1a1714',
-        red: '#f7768e',
-        green: '#9ece6a',
-        yellow: '#e0af68',
-        blue: '#7aa2f7',
-        magenta: '#bb9af7',
-        cyan: '#7dcfff',
-        white: '#f5f0eb',
-        brightBlack: '#6b6560',
-        brightRed: '#f7768e',
-        brightGreen: '#9ece6a',
-        brightYellow: '#e0af68',
-        brightBlue: '#7aa2f7',
-        brightMagenta: '#bb9af7',
-        brightCyan: '#7dcfff',
-        brightWhite: '#ffffff',
-      },
+      theme: buildTerminalTheme(),
     })
 
     // Load addons
@@ -145,7 +179,15 @@ export function Terminal({ id, isActive }: TerminalProps) {
       terminalRef.current = null
       fitAddonRef.current = null
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, updateTerminalState, api, safeFit])
+
+  // Update terminal theme when app theme changes
+  useEffect(() => {
+    if (terminalRef.current && !isDisposedRef.current) {
+      terminalRef.current.options.theme = buildTerminalTheme()
+    }
+  }, [theme])
 
   // Focus terminal when active and refit
   useEffect(() => {
@@ -162,7 +204,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
   return (
     <div
       ref={containerRef}
-      className="terminal-container w-full h-full bg-terminal-bg"
+      className="terminal-container w-full h-full bg-sidebar"
       style={{ display: isActive ? 'block' : 'none' }}
     />
   )

@@ -59,8 +59,8 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
         onClick={handleClick}
         className={`
           w-full flex items-center gap-1.5 py-1 px-2 rounded text-left
-          text-sm text-claude-sidebar-text
-          hover:bg-claude-sidebar-hover transition-colors
+          text-sm text-sidebar-foreground
+          hover:bg-sidebar-accent transition-colors
           ${isDirectory ? 'cursor-pointer' : 'cursor-default'}
         `}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -69,10 +69,10 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
         {isDirectory && (
           <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
             {isLoading ? (
-              <Loader2 className="w-3 h-3 animate-spin text-claude-sidebar-muted" />
+              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
             ) : (
               <ChevronRight
-                className={`w-3 h-3 text-claude-sidebar-muted transition-transform duration-150 ${
+                className={`w-3 h-3 text-muted-foreground transition-transform duration-150 ${
                   isExpanded ? 'rotate-90' : ''
                 }`}
               />

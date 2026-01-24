@@ -13,11 +13,11 @@ interface TerminalTabBarProps {
 }
 
 const stateDots: Record<TerminalState, string> = {
-  starting: 'bg-terminal-warning',
-  running: 'bg-claude-info',
-  needs_input: 'bg-claude-accent-primary',
-  stopped: 'bg-terminal-muted',
-  error: 'bg-claude-error',
+  starting: 'bg-yellow-500',
+  running: 'bg-blue-500',
+  needs_input: 'bg-primary',
+  stopped: 'bg-muted-foreground',
+  error: 'bg-destructive',
 }
 
 export function TerminalTabBar({
@@ -35,7 +35,7 @@ export function TerminalTabBar({
     e.dataTransfer.effectAllowed = 'move'
   }
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 bg-terminal-surface border-b border-terminal-border overflow-x-auto">
+    <div className="flex items-center gap-1 px-2 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto">
       {terminals.map((terminal) => {
         const isActive = terminal.id === activeTerminalId
         const isInSplit = splitTerminalIds.includes(terminal.id)
@@ -51,8 +51,8 @@ export function TerminalTabBar({
               transition-colors select-none
               ${
                 isActive
-                  ? 'bg-terminal-bg text-terminal-text'
-                  : 'text-terminal-muted hover:text-terminal-text hover:bg-terminal-border/50'
+                  ? 'bg-sidebar text-sidebar-foreground'
+                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
               }
             `}
           >
@@ -71,10 +71,10 @@ export function TerminalTabBar({
                   e.stopPropagation()
                   onUnsplit(terminal.id)
                 }}
-                className="p-0.5 rounded hover:bg-terminal-border transition-all"
+                className="p-0.5 rounded hover:bg-border transition-all"
                 title="Remove from split"
               >
-                <LayoutGrid className="w-3 h-3 text-claude-accent-primary" />
+                <LayoutGrid className="w-3 h-3 text-primary" />
               </button>
             )}
             <button
@@ -82,7 +82,7 @@ export function TerminalTabBar({
                 e.stopPropagation()
                 onClose(terminal.id)
               }}
-              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-terminal-border transition-all"
+              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-all"
             >
               <X className="w-3 h-3" />
             </button>
@@ -93,7 +93,7 @@ export function TerminalTabBar({
       {canAdd && (
         <button
           onClick={onAdd}
-          className="p-1.5 rounded-lg text-terminal-muted hover:text-terminal-text hover:bg-terminal-border/50 transition-colors"
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 transition-colors"
           title="New Terminal"
         >
           <Plus className="w-4 h-4" />
