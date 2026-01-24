@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry } from '../types'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
@@ -13,6 +13,18 @@ interface ProjectStore {
   layouts: Record<string, TerminalLayout>
   activeProjectId: string | null
   activeTerminalId: string | null
+
+  // File explorer state
+  fileExplorerVisible: boolean
+  expandedPaths: Record<string, string[]>
+  directoryCache: Record<string, FileSystemEntry[]>
+
+  // File explorer actions
+  toggleFileExplorer: () => void
+  setFileExplorerVisible: (visible: boolean) => void
+  toggleExpandedPath: (projectId: string, path: string) => void
+  setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
+  clearDirectoryCache: (projectId?: string) => void
 
   // Project actions
   setProjects: (projects: Project[]) => void
@@ -47,6 +59,56 @@ export const useProjectStore = create<ProjectStore>()(
       layouts: {},
       activeProjectId: null,
       activeTerminalId: null,
+
+      // File explorer state
+      fileExplorerVisible: false,
+      expandedPaths: {},
+      directoryCache: {},
+
+      // File explorer actions
+      toggleFileExplorer: () =>
+        set((state) => ({ fileExplorerVisible: !state.fileExplorerVisible })),
+
+      setFileExplorerVisible: (visible) =>
+        set({ fileExplorerVisible: visible }),
+
+      toggleExpandedPath: (projectId, path) =>
+        set((state) => {
+          const currentPaths = state.expandedPaths[projectId] ?? []
+          const isExpanded = currentPaths.includes(path)
+          return {
+            expandedPaths: {
+              ...state.expandedPaths,
+              [projectId]: isExpanded
+                ? currentPaths.filter((p) => p !== path)
+                : [...currentPaths, path],
+            },
+          }
+        }),
+
+      setDirectoryContents: (path, entries) =>
+        set((state) => ({
+          directoryCache: {
+            ...state.directoryCache,
+            [path]: entries,
+          },
+        })),
+
+      clearDirectoryCache: (projectId) =>
+        set((state) => {
+          if (!projectId) {
+            return { directoryCache: {} }
+          }
+          const project = state.projects.find((p) => p.id === projectId)
+          if (!project) return state
+          const newCache = { ...state.directoryCache }
+          Object.keys(newCache).forEach((path) => {
+            if (path.startsWith(project.path)) {
+              delete newCache[path]
+            }
+          })
+          return { directoryCache: newCache }
+        }),
 
       // Project actions
       setProjects: (projects) => set({ projects }),
@@ -302,6 +364,9 @@ export const useProjectStore = create<ProjectStore>()(
         // Only persist layouts, not terminals (they need to be recreated)
         layouts: state.layouts,
         activeProjectId: state.activeProjectId,
+        // File explorer state
+        fileExplorerVisible: state.fileExplorerVisible,
+        expandedPaths: state.expandedPaths,
       }),
     }
   )

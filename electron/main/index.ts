@@ -145,6 +145,36 @@ ipcMain.handle('project:reorder', async (_event, projectIds: string[]) => {
   return projectPersistence?.getProjects() ?? []
 })
 
+// IPC Handlers for File System operations
+ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
+  if (typeof dirPath !== 'string' || dirPath.length === 0 || dirPath.length > 1000) {
+    throw new Error('Invalid directory path')
+  }
+
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true })
+
+    const result = entries
+      .filter(entry => !entry.name.startsWith('.')) // Hide hidden files
+      .map(entry => ({
+        name: entry.name,
+        path: path.join(dirPath, entry.name),
+        type: entry.isDirectory() ? 'directory' : 'file',
+        extension: entry.isFile() ? path.extname(entry.name).slice(1).toLowerCase() : undefined,
+      }))
+      .sort((a, b) => {
+        // Directories first, then alphabetically
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+        return a.name.localeCompare(b.name, undefined, { numeric: true })
+      })
+
+    return result
+  } catch (error) {
+    console.error('Failed to read directory:', dirPath, error)
+    throw error
+  }
+})
+
 // IPC Handlers for Notifications
 ipcMain.on('notification:show', (_event, title: string, body: string) => {
   new Notification({ title, body }).show()

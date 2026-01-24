@@ -52,7 +52,8 @@
       "Bash(python -c:*)",
       "Bash(ls -la:*)",
       "Bash(node scripts/generate-icons.mjs:*)",
-      "Bash(npx png2icons:*)"
+      "Bash(npx png2icons:*)",
+      "Bash(npm run test)"
     ]
   }
 }

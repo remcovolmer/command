@@ -21,6 +21,13 @@ interface Project {
   sortOrder: number
 }
 
+interface FileSystemEntry {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  extension?: string
+}
+
 // Unsubscribe function type
 type Unsubscribe = () => void
 
@@ -97,6 +104,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     cancelClose: (): void =>
       ipcRenderer.send('app:cancel-close'),
+  },
+
+  // File system operations
+  fs: {
+    readDirectory: (dirPath: string): Promise<FileSystemEntry[]> =>
+      ipcRenderer.invoke('fs:readDirectory', dirPath),
   },
 
   // Cleanup helper - only allows whitelisted channels (#003 fix)
