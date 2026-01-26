@@ -46,13 +46,31 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     opacity: isDragging ? 0.4 : 1,
   }
 
+  // Claude Code specific state colors
   const stateColors = {
     starting: 'text-yellow-500',
-    running: 'text-blue-500',
-    needs_input: 'text-primary',
+    busy: 'text-blue-500',
+    question: 'text-purple-500',
+    permission: 'text-orange-500',
+    ready: 'text-green-500',
     stopped: 'text-muted-foreground',
     error: 'text-destructive',
   }
+
+  // State-specific dot colors for terminal indicators
+  const stateDots = {
+    starting: 'bg-yellow-500',
+    busy: 'bg-blue-500',
+    question: 'bg-purple-500',
+    permission: 'bg-orange-500',
+    ready: 'bg-green-500',
+    stopped: 'bg-muted-foreground',
+    error: 'bg-destructive',
+  }
+
+  // States that require user input (show blinking indicator)
+  const inputStates = ['ready', 'question', 'permission'] as const
+  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
 
   return (
     <li ref={setNodeRef} style={style} className="relative">
@@ -132,9 +150,11 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               />
               <span className="flex-1 text-xs truncate">{terminal.title}</span>
 
-              {/* Needs input indicator */}
-              {terminal.state === 'needs_input' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-primary needs-input-indicator" />
+              {/* Input required indicator - shows for ready, question, permission states */}
+              {isInputState(terminal.state) && (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${stateDots[terminal.state]} needs-input-indicator state-${terminal.state}`}
+                />
               )}
 
               {/* Close button */}

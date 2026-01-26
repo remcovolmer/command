@@ -163,19 +163,58 @@ body {
   overflow-y: auto !important;
 }
 
-/* Notification indicator animation */
+/* Notification indicator animations - Claude Code specific states */
+
+/* Default animation (fallback) */
 .needs-input-indicator {
-  animation: blink-glow 1.5s ease-in-out infinite;
+  animation: blink-glow-green 1.5s ease-in-out infinite;
 }
 
-@keyframes blink-glow {
+/* Ready state - green glow (Claude finished, waiting for input) */
+.needs-input-indicator.state-ready {
+  animation: blink-glow-green 1.5s ease-in-out infinite;
+}
+
+@keyframes blink-glow-green {
   0%, 100% {
     opacity: 1;
-    box-shadow: 0 0 8px var(--primary);
+    box-shadow: 0 0 8px oklch(0.72 0.19 142.5); /* green-500 */
   }
   50% {
     opacity: 0.6;
-    box-shadow: 0 0 4px var(--primary);
+    box-shadow: 0 0 4px oklch(0.72 0.19 142.5);
+  }
+}
+
+/* Question state - purple slow blink (Claude asking a question) */
+.needs-input-indicator.state-question {
+  animation: blink-glow-purple 1.5s ease-in-out infinite;
+}
+
+@keyframes blink-glow-purple {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px oklch(0.59 0.22 292.3); /* purple-500 */
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 4px oklch(0.59 0.22 292.3);
+  }
+}
+
+/* Permission state - orange fast blink (Claude needs permission - more urgent) */
+.needs-input-indicator.state-permission {
+  animation: blink-glow-orange 1s ease-in-out infinite;
+}
+
+@keyframes blink-glow-orange {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 10px oklch(0.75 0.18 55.0); /* orange-500 */
+  }
+  50% {
+    opacity: 0.5;
+    box-shadow: 0 0 4px oklch(0.75 0.18 55.0);
   }
 }
 

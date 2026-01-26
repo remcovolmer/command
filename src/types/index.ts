@@ -7,11 +7,20 @@ export interface Project {
   sortOrder: number;
 }
 
-// Terminal types
-export type TerminalState = 'starting' | 'running' | 'needs_input' | 'stopped' | 'error';
+// Terminal types - Claude Code specific states
+export type TerminalState =
+  | 'starting'    // Terminal starting up
+  | 'busy'        // Claude is working (spinner/activity detected)
+  | 'question'    // Claude asking a question
+  | 'permission'  // Claude needs permission for tool/command
+  | 'ready'       // Claude waiting for user input
+  | 'stopped'     // Terminal stopped
+  | 'error';      // Error occurred
 
 // Valid terminal states for runtime validation
-export const VALID_TERMINAL_STATES: readonly TerminalState[] = ['starting', 'running', 'needs_input', 'stopped', 'error'] as const;
+export const VALID_TERMINAL_STATES: readonly TerminalState[] = [
+  'starting', 'busy', 'question', 'permission', 'ready', 'stopped', 'error'
+] as const;
 
 // Type guard for terminal state
 export function isValidTerminalState(state: string): state is TerminalState {

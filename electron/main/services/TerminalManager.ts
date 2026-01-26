@@ -2,22 +2,57 @@ import { BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { accessSync } from 'node:fs'
 import * as pty from 'node-pty'
+import { ClaudeStatusDetector, ClaudeStatus } from './ClaudeStatusDetector'
 
-type TerminalState = 'starting' | 'running' | 'needs_input' | 'stopped' | 'error'
+// Claude Code specific terminal states
+type TerminalState = 'starting' | 'busy' | 'question' | 'permission' | 'ready' | 'stopped' | 'error'
 
 interface TerminalInstance {
   id: string
   projectId: string
   pty: pty.IPty
   state: TerminalState
+  statusDetector: ClaudeStatusDetector
+  lastOutputTime: number
 }
 
 export class TerminalManager {
   private terminals: Map<string, TerminalInstance> = new Map()
   private window: BrowserWindow
+  private idleCheckInterval: NodeJS.Timeout | null = null
+  private readonly idleTimeoutMs = 2000 // 2 seconds of no output = potentially ready
+  private readonly stateDebounceMs = 300 // Debounce state changes
 
   constructor(window: BrowserWindow) {
     this.window = window
+    this.startIdleChecker()
+  }
+
+  /**
+   * Start periodic idle check for terminals
+   * If a terminal is "busy" but has no output for idleTimeoutMs, mark as "ready"
+   */
+  private startIdleChecker(): void {
+    this.idleCheckInterval = setInterval(() => {
+      const now = Date.now()
+      for (const [id, terminal] of this.terminals) {
+        if (terminal.state === 'busy' && now - terminal.lastOutputTime > this.idleTimeoutMs) {
+          // Terminal was busy but idle now - likely finished
+          this.updateTerminalState(id, 'ready')
+        }
+      }
+    }, 1000)
+  }
+
+  /**
+   * Update terminal state with debouncing to avoid flicker
+   */
+  private updateTerminalState(terminalId: string, newState: TerminalState): void {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal || terminal.state === newState) return
+
+    terminal.state = newState
+    this.sendToRenderer('terminal:state', terminalId, newState)
   }
 
   createTerminal(cwd: string): string {
@@ -37,13 +72,28 @@ export class TerminalManager {
       projectId: cwd,
       pty: ptyProcess,
       state: 'starting',
+      statusDetector: new ClaudeStatusDetector(),
+      lastOutputTime: Date.now(),
     }
 
     ptyProcess.onData((data) => {
+      // Update last output time
+      terminal.lastOutputTime = Date.now()
+
+      // Analyze output for Claude status
+      const detectedStatus = terminal.statusDetector.analyzeOutput(data)
+
+      // Update state if a clear status was detected
+      if (detectedStatus !== null) {
+        this.updateTerminalState(id, detectedStatus)
+      }
+
+      // Always forward data to renderer
       this.sendToRenderer('terminal:data', id, data)
     })
 
     ptyProcess.onExit(({ exitCode }) => {
+      terminal.statusDetector.clearBuffer()
       terminal.state = 'stopped'
       this.sendToRenderer('terminal:state', id, 'stopped')
       this.sendToRenderer('terminal:exit', id, exitCode)
@@ -54,8 +104,8 @@ export class TerminalManager {
 
     // Start Claude Code after shell is ready
     setTimeout(() => {
-      terminal.state = 'running'
-      this.sendToRenderer('terminal:state', id, 'running')
+      terminal.state = 'busy'
+      this.sendToRenderer('terminal:state', id, 'busy')
       ptyProcess.write('claude\r')
     }, 100)
 
@@ -78,8 +128,11 @@ export class TerminalManager {
 
   closeTerminal(terminalId: string): void {
     const terminal = this.terminals.get(terminalId)
-    if (terminal?.pty) {
-      terminal.pty.kill()
+    if (terminal) {
+      terminal.statusDetector.clearBuffer()
+      if (terminal.pty) {
+        terminal.pty.kill()
+      }
       this.terminals.delete(terminalId)
     }
   }
@@ -92,6 +145,17 @@ export class TerminalManager {
 
   hasActiveTerminals(): boolean {
     return this.terminals.size > 0
+  }
+
+  /**
+   * Clean up resources when manager is destroyed
+   */
+  destroy(): void {
+    if (this.idleCheckInterval) {
+      clearInterval(this.idleCheckInterval)
+      this.idleCheckInterval = null
+    }
+    this.closeAllTerminals()
   }
 
   private sendToRenderer(channel: string, ...args: unknown[]): void {

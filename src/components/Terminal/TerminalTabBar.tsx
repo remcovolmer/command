@@ -12,13 +12,20 @@ interface TerminalTabBarProps {
   canAdd: boolean
 }
 
+// Claude Code specific state dot colors
 const stateDots: Record<TerminalState, string> = {
   starting: 'bg-yellow-500',
-  running: 'bg-blue-500',
-  needs_input: 'bg-primary',
+  busy: 'bg-blue-500',
+  question: 'bg-purple-500',
+  permission: 'bg-orange-500',
+  ready: 'bg-green-500',
   stopped: 'bg-muted-foreground',
   error: 'bg-destructive',
 }
+
+// States that require user input (show blinking indicator)
+const inputStates = ['ready', 'question', 'permission'] as const
+const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
 
 export function TerminalTabBar({
   terminals,
@@ -62,7 +69,7 @@ export function TerminalTabBar({
             </span>
             <span
               className={`w-2 h-2 rounded-full flex-shrink-0 ${stateDots[terminal.state]} ${
-                terminal.state === 'needs_input' ? 'needs-input-indicator' : ''
+                isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
               }`}
             />
             {isInSplit && (
