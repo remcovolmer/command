@@ -3,7 +3,7 @@
  *
  * Analyzes PTY output to determine Claude's current state:
  * - busy: Claude is actively working (spinner, "esc to interrupt")
- * - question: Claude is asking the user a question
+ * - question: Claude is asking the user a question (disabled for now - too many false positives)
  * - permission: Claude needs permission for a tool/command
  * - ready: Claude is waiting for user input
  */
@@ -15,42 +15,27 @@ export class ClaudeStatusDetector {
   private buffer: string = '';
   private readonly maxBufferSize = 2000;
 
+  // Track last detected state to avoid flickering
+  private lastState: ClaudeStatus = null;
+  private lastStateTime: number = 0;
+  private readonly stateDebounceMs = 300; // Minimum time between state changes
+
   // ANSI escape code stripper pattern
-  private readonly ansiPattern = /\x1B\[[0-9;]*[a-zA-Z]|\x1B\][^\x07]*\x07|\x1B[()][AB012]|\x1B\[[\?]?[0-9;]*[hlm]/g;
+  private readonly ansiPattern = /\x1B(?:\[[0-9;]*[a-zA-Z]|\][^\x07]*\x07|[()][AB012]|\[[\?]?[0-9;]*[hlm]|[=>]|\[[0-9]*[ABCDEFGJKST])/g;
 
   // Spinner characters used by Claude Code (Braille patterns and stars)
-  private readonly spinnerChars = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✳✶✽]/;
+  private readonly spinnerChars = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✳✶✽⣾⣽⣻⢿⡿⣟⣯⣷]/;
 
   // Pattern for "busy" state - Claude is working
-  // Matches: "(esc to interrupt" in status line
-  private readonly busyPattern = /\(esc to interrupt/i;
+  private readonly busyPatterns = [
+    /\(esc to interrupt/i,
+    /tokens/i,  // Token count in status line
+  ];
 
   // Pattern for "permission" state - Claude needs approval
-  // Matches numbered options with "Yes", "Allow", "Approve" etc.
-  // Example: "> 1. Yes" or "1. Allow"
+  // Very specific: numbered list with Yes as first option
   private readonly permissionPatterns = [
-    /^\s*>\s*1\.\s*(Yes|Allow|Approve)/im,
-    /Do you want to proceed\?/i,
-    /Allow this action\?/i,
-    /1\.\s*Yes\s*\n\s*2\.\s*(Yes,? and don't ask|No)/i,
-  ];
-
-  // Pattern for "question" state - Claude is asking a question
-  // Matches question format with numbered options
-  private readonly questionPatterns = [
-    /\?\s*["']?\s*$/m,  // Ends with question mark
-    /Which .*\?\s*$/im,
-    /What .*\?\s*$/im,
-    /How .*\?\s*$/im,
-    /Do you .*\?\s*$/im,
-    /Would you .*\?\s*$/im,
-  ];
-
-  // Pattern for "ready" state - Claude waiting for input
-  // Matches the ">" prompt at the start of a line
-  private readonly readyPatterns = [
-    /^>\s*$/m,           // Just ">" prompt
-    /\n>\s*$/,           // Newline followed by ">" prompt
+    /1\.\s*Yes\s*\r?\n\s*2\.\s*(Yes,? and don't ask|No)/i,
   ];
 
   /**
@@ -58,6 +43,37 @@ export class ClaudeStatusDetector {
    */
   private stripAnsi(text: string): string {
     return text.replace(this.ansiPattern, '');
+  }
+
+  /**
+   * Check if enough time has passed to change state (debouncing)
+   */
+  private canChangeState(): boolean {
+    return Date.now() - this.lastStateTime >= this.stateDebounceMs;
+  }
+
+  /**
+   * Check if the buffer ends with Claude's input prompt
+   */
+  private endsWithPrompt(text: string): boolean {
+    // Claude's prompt is "❯" (U+276F) not ">"
+    // The prompt line looks like "❯  " or just "❯"
+    const trimmed = text.trimEnd();
+
+    // Check the last few lines (sometimes there are empty lines)
+    const lines = trimmed.split('\n');
+
+    // Check last 3 lines for the prompt
+    for (let i = Math.max(0, lines.length - 3); i < lines.length; i++) {
+      const line = lines[i]?.trim() || '';
+      // Claude's prompt is "❯" possibly with trailing spaces
+      // Also check for regular ">" just in case
+      if (line === '❯' || line === '>' || line.startsWith('❯ ') || line.startsWith('> ')) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -79,46 +95,65 @@ export class ClaudeStatusDetector {
     const cleanData = this.stripAnsi(data);
     const cleanBuffer = this.stripAnsi(this.buffer);
 
-    // Check for carriage return (status line update) - indicates busy
-    if (data.includes('\r') && !data.includes('\n')) {
-      // Status line update without newline = still working
-      if (this.spinnerChars.test(cleanData) || this.busyPattern.test(cleanData)) {
-        return 'busy';
-      }
+    let detectedState: ClaudeStatus = null;
+    let reason = '';
+
+    // Priority 1: Check for ready prompt FIRST
+    // This is the most important check - if Claude shows the prompt, we're ready
+    const promptCheck = this.endsWithPrompt(cleanBuffer);
+    if (promptCheck) {
+      detectedState = 'ready';
+      reason = 'prompt detected at end of buffer';
     }
 
-    // Check for permission prompt (highest priority for input states)
-    for (const pattern of this.permissionPatterns) {
-      if (pattern.test(cleanBuffer)) {
-        return 'permission';
-      }
-    }
-
-    // Check for question (second priority)
-    // Only if we have numbered options indicating a choice
-    const hasNumberedOptions = /^\s*[1-4]\.\s+\w+/m.test(cleanBuffer);
-    if (hasNumberedOptions) {
-      for (const pattern of this.questionPatterns) {
-        if (pattern.test(cleanBuffer)) {
-          return 'question';
+    // Priority 2: Check for permission prompt in buffer
+    if (!detectedState) {
+      const lastChunk = cleanBuffer.slice(-800);
+      for (const pattern of this.permissionPatterns) {
+        if (pattern.test(lastChunk)) {
+          detectedState = 'permission';
+          reason = 'permission pattern matched';
+          break;
         }
       }
     }
 
-    // Check for ready prompt
-    for (const pattern of this.readyPatterns) {
-      if (pattern.test(cleanBuffer)) {
-        return 'ready';
+    // Priority 3: Check for busy indicators in current data chunk
+    // ONLY if we didn't detect ready or permission
+    if (!detectedState) {
+      // Status line update (carriage return without newline) = busy
+      if (data.includes('\r') && !data.includes('\n')) {
+        detectedState = 'busy';
+        reason = 'status line update (\\r without \\n)';
+      }
+      // Spinner characters in current output = busy
+      else if (this.spinnerChars.test(cleanData)) {
+        detectedState = 'busy';
+        reason = 'spinner chars detected';
       }
     }
 
-    // Check for busy indicators
-    if (this.spinnerChars.test(cleanData) || this.busyPattern.test(cleanData)) {
-      return 'busy';
+    // Apply debouncing - don't change state too quickly
+    if (detectedState !== null && detectedState !== this.lastState) {
+      console.log(`[Detector] State change: ${this.lastState} -> ${detectedState}, canChange: ${this.canChangeState()}, reason: ${reason}`)
+      if (this.canChangeState()) {
+        this.lastState = detectedState;
+        this.lastStateTime = Date.now();
+        return detectedState;
+      }
     }
 
-    // No clear status detected
+    // Return null if no state change
     return null;
+  }
+
+  /**
+   * Force set busy state (call when user types input)
+   */
+  setUserInput(): void {
+    this.lastState = 'busy';
+    this.lastStateTime = Date.now();
+    this.buffer = '';
   }
 
   /**
@@ -126,12 +161,14 @@ export class ClaudeStatusDetector {
    */
   clearBuffer(): void {
     this.buffer = '';
+    this.lastState = null;
+    this.lastStateTime = 0;
   }
 
   /**
-   * Get the current buffer content (for debugging)
+   * Get the last detected state (for debugging)
    */
-  getBuffer(): string {
-    return this.buffer;
+  getLastState(): ClaudeStatus {
+    return this.lastState;
   }
 }

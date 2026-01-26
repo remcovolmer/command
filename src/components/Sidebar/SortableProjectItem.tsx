@@ -72,6 +72,10 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const inputStates = ['ready', 'question', 'permission'] as const
   const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
 
+  // States that should show an indicator (busy shows static, input states blink)
+  const visibleStates = ['busy', 'ready', 'question', 'permission'] as const
+  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
+
   return (
     <li ref={setNodeRef} style={style} className="relative">
       {/* Drop indicator line */}
@@ -150,10 +154,12 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               />
               <span className="flex-1 text-xs truncate">{terminal.title}</span>
 
-              {/* Input required indicator - shows for ready, question, permission states */}
-              {isInputState(terminal.state) && (
+              {/* State indicator - shows for busy (static) and input states (blinking) */}
+              {isVisibleState(terminal.state) && (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${stateDots[terminal.state]} needs-input-indicator state-${terminal.state}`}
+                  className={`w-1.5 h-1.5 rounded-full ${stateDots[terminal.state]} ${
+                    isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
+                  }`}
                 />
               )}
 

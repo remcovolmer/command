@@ -20,8 +20,8 @@ export class TerminalManager {
   private terminals: Map<string, TerminalInstance> = new Map()
   private window: BrowserWindow
   private idleCheckInterval: NodeJS.Timeout | null = null
-  private readonly idleTimeoutMs = 2000 // 2 seconds of no output = potentially ready
-  private readonly stateDebounceMs = 300 // Debounce state changes
+  // Longer idle timeout - only mark as ready after significant silence
+  private readonly idleTimeoutMs = 8000 // 8 seconds of no output = potentially ready
 
   constructor(window: BrowserWindow) {
     this.window = window
@@ -31,17 +31,24 @@ export class TerminalManager {
   /**
    * Start periodic idle check for terminals
    * If a terminal is "busy" but has no output for idleTimeoutMs, mark as "ready"
+   * This is a fallback - the detector should catch most state changes
    */
   private startIdleChecker(): void {
     this.idleCheckInterval = setInterval(() => {
       const now = Date.now()
       for (const [id, terminal] of this.terminals) {
-        if (terminal.state === 'busy' && now - terminal.lastOutputTime > this.idleTimeoutMs) {
+        const idleTime = now - terminal.lastOutputTime
+        const detectorState = terminal.statusDetector.getLastState()
+
+        // Only use idle detection as fallback when detector hasn't found ready state
+        if (terminal.state === 'busy' && idleTime > this.idleTimeoutMs) {
           // Terminal was busy but idle now - likely finished
-          this.updateTerminalState(id, 'ready')
+          if (detectorState !== 'busy') {
+            this.updateTerminalState(id, 'ready')
+          }
         }
       }
-    }, 1000)
+    }, 3000) // Check every 3 seconds
   }
 
   /**
@@ -113,8 +120,19 @@ export class TerminalManager {
   }
 
   writeToTerminal(terminalId: string, data: string): void {
+    console.log(`[WriteTerminal] Called with terminalId=${terminalId.slice(0,8)}, data length=${data.length}, data=${JSON.stringify(data)}`)
     const terminal = this.terminals.get(terminalId)
+    console.log(`[WriteTerminal] Terminal found: ${!!terminal}, has pty: ${!!terminal?.pty}`)
     if (terminal?.pty) {
+      // When user types, assume Claude will be busy processing
+      // This prevents flickering and ensures immediate feedback
+      if (data.includes('\r') || data.includes('\n')) {
+        // User pressed Enter - Claude will be processing
+        console.log(`[WriteTerminal] User pressed Enter, setting to busy. Current state: ${terminal.state}`)
+        terminal.statusDetector.setUserInput()
+        this.updateTerminalState(terminalId, 'busy')
+        console.log(`[WriteTerminal] After update, state: ${terminal.state}`)
+      }
       terminal.pty.write(data)
     }
   }
