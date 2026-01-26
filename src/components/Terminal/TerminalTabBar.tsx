@@ -35,7 +35,7 @@ export function TerminalTabBar({
     e.dataTransfer.effectAllowed = 'move'
   }
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto">
+    <div className="flex items-center gap-1 px-3 py-1 bg-sidebar-accent border-b border-border overflow-x-auto">
       {terminals.map((terminal) => {
         const isActive = terminal.id === activeTerminalId
         const isInSplit = splitTerminalIds.includes(terminal.id)

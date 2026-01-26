@@ -54,7 +54,8 @@
       "Bash(node scripts/generate-icons.mjs:*)",
       "Bash(npx png2icons:*)",
       "Bash(npm run test)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(git stash:*)"
     ]
   }
 }

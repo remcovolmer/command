@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { MainLayout } from './components/Layout/MainLayout'
-import { useProjectStore } from './stores/projectStore'
+import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from './stores/projectStore'
+import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
 
 function App() {
@@ -34,12 +35,71 @@ function App() {
       if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'b') {
         e.preventDefault()
         toggleFileExplorer()
+        return
+      }
+
+      // Ctrl + Up/Down: Switch projects
+      if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault()
+        const { projects, activeProjectId, setActiveProject } = useProjectStore.getState()
+        if (projects.length === 0) return
+
+        const currentIndex = projects.findIndex(p => p.id === activeProjectId)
+        const direction = e.key === 'ArrowDown' ? 1 : -1
+        const newIndex = (currentIndex + direction + projects.length) % projects.length
+        setActiveProject(projects[newIndex].id)
+        return
+      }
+
+      // Ctrl + Left/Right: Switch terminals within project (with wrap-around)
+      if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault()
+        const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
+        if (!activeProjectId) return
+
+        const terminals = getProjectTerminals(activeProjectId)
+        if (terminals.length === 0) return
+
+        const currentIndex = terminals.findIndex(t => t.id === activeTerminalId)
+        const direction = e.key === 'ArrowRight' ? 1 : -1
+        const newIndex = (currentIndex + direction + terminals.length) % terminals.length
+        setActiveTerminal(terminals[newIndex].id)
+        return
+      }
+
+      // Ctrl + T: Create new terminal in active project
+      if (e.ctrlKey && e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        const { activeProjectId, terminals, getProjectTerminals, addTerminal } = useProjectStore.getState()
+        if (!activeProjectId) return
+
+        const projectTerminals = getProjectTerminals(activeProjectId)
+        if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
+          api.notification.show(
+            'Terminal Limit',
+            `Maximum ${MAX_TERMINALS_PER_PROJECT} terminals per project`
+          )
+          return
+        }
+
+        ;(async () => {
+          const terminalId = await api.terminal.create(activeProjectId)
+          const terminal: TerminalSession = {
+            id: terminalId,
+            projectId: activeProjectId,
+            state: 'starting',
+            lastActivity: Date.now(),
+            title: `Terminal ${projectTerminals.length + 1}`,
+          }
+          addTerminal(terminal)
+        })()
+        return
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleFileExplorer])
+    window.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
+  }, [toggleFileExplorer, api])
 
   // Sync theme class with html element (only add 'dark' class when dark mode)
   useEffect(() => {
