@@ -21,20 +21,21 @@ interface GitStatusPanelProps {
   project: Project
 }
 
+interface GitStatusHeaderProps {
+  project: Project
+  onToggle: () => void
+  isCollapsed: boolean
+}
+
 const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
 
-export function GitStatusPanel({ project }: GitStatusPanelProps) {
+// Header component - always visible
+export function GitStatusHeader({ project, onToggle, isCollapsed }: GitStatusHeaderProps) {
   const api = useMemo(() => getElectronAPI(), [])
   const gitStatus = useProjectStore((s) => s.gitStatus[project.id])
   const isLoading = useProjectStore((s) => s.gitStatusLoading[project.id])
   const setGitStatus = useProjectStore((s) => s.setGitStatus)
   const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
-
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    staged: true,
-    modified: true,
-    untracked: false,
-  })
 
   const fetchStatus = useCallback(async () => {
     setGitStatusLoading(project.id, true)
@@ -59,11 +60,6 @@ export function GitStatusPanel({ project }: GitStatusPanelProps) {
     return () => clearInterval(interval)
   }, [fetchStatus])
 
-  const toggleSection = (section: string) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
-  }
-
-  // Calculate change counts for header summary
   const totalChanges = gitStatus
     ? gitStatus.staged.length +
       gitStatus.modified.length +
@@ -72,38 +68,63 @@ export function GitStatusPanel({ project }: GitStatusPanelProps) {
     : 0
 
   return (
-    <div className="h-full flex flex-col border-t border-border">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-sidebar">
-        <div className="flex items-center gap-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Git
-          </h3>
-          {gitStatus?.branch && (
-            <span className="text-xs text-muted-foreground">
-              ({gitStatus.branch.name})
-            </span>
-          )}
-          {totalChanges > 0 && (
-            <span className="text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
-              {totalChanges}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={fetchStatus}
-          disabled={isLoading}
-          className="p-1 rounded hover:bg-sidebar-accent transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 text-muted-foreground ${isLoading ? 'animate-spin' : ''}`}
-          />
-        </button>
-      </div>
+    <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-sidebar">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 hover:text-sidebar-foreground transition-colors"
+      >
+        {isCollapsed ? (
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        )}
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Git
+        </h3>
+        {gitStatus?.branch && (
+          <span className="text-xs text-muted-foreground">
+            ({gitStatus.branch.name})
+          </span>
+        )}
+        {totalChanges > 0 && (
+          <span className="text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
+            {totalChanges}
+          </span>
+        )}
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          fetchStatus()
+        }}
+        disabled={isLoading}
+        className="p-1 rounded hover:bg-sidebar-accent transition-colors"
+        title="Refresh"
+      >
+        <RefreshCw
+          className={`w-3.5 h-3.5 text-muted-foreground ${isLoading ? 'animate-spin' : ''}`}
+        />
+      </button>
+    </div>
+  )
+}
 
-      {/* Content - scrollable */}
-      <div className="flex-1 overflow-y-auto sidebar-scroll">
+// Content component - inside collapsible panel
+export function GitStatusPanel({ project }: GitStatusPanelProps) {
+  const gitStatus = useProjectStore((s) => s.gitStatus[project.id])
+
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    staged: true,
+    modified: true,
+    untracked: false,
+  })
+
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
+  }
+
+  return (
+    <div className="h-full overflow-y-auto sidebar-scroll">
           {!gitStatus ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -179,7 +200,6 @@ export function GitStatusPanel({ project }: GitStatusPanelProps) {
               )}
             </>
           )}
-      </div>
     </div>
   )
 }

@@ -1,14 +1,17 @@
+import { useRef, useState } from 'react'
 import { X, RefreshCw } from 'lucide-react'
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
-import { GitStatusPanel } from './GitStatusPanel'
+import { GitStatusPanel, GitStatusHeader } from './GitStatusPanel'
 
 export function FileExplorer() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const projects = useProjectStore((s) => s.projects)
   const setFileExplorerVisible = useProjectStore((s) => s.setFileExplorerVisible)
   const clearDirectoryCache = useProjectStore((s) => s.clearDirectoryCache)
+  const gitPanelRef = useRef<ImperativePanelHandle>(null)
+  const [gitPanelCollapsed, setGitPanelCollapsed] = useState(false)
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
 
@@ -19,6 +22,17 @@ export function FileExplorer() {
   const handleRefresh = () => {
     if (activeProjectId) {
       clearDirectoryCache(activeProjectId)
+    }
+  }
+
+  const handleToggleGitPanel = () => {
+    const panel = gitPanelRef.current
+    if (!panel) return
+
+    if (panel.isCollapsed()) {
+      panel.expand()
+    } else {
+      panel.collapse()
     }
   }
 
@@ -46,24 +60,42 @@ export function FileExplorer() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col">
         {activeProject ? (
-          <PanelGroup direction="vertical" autoSaveId="file-explorer-layout">
-            {/* Files Panel */}
-            <Panel id="files" defaultSize={70} minSize={20}>
-              <div className="h-full overflow-y-auto sidebar-scroll">
-                <FileTree project={activeProject} />
-              </div>
-            </Panel>
+          <>
+            <PanelGroup direction="vertical" autoSaveId="file-explorer-layout" className="flex-1">
+              {/* Files Panel */}
+              <Panel id="files" defaultSize={70} minSize={20}>
+                <div className="h-full overflow-y-auto sidebar-scroll">
+                  <FileTree project={activeProject} />
+                </div>
+              </Panel>
 
-            {/* Resize Handle */}
-            <PanelResizeHandle className="h-1 bg-transparent hover:bg-border transition-colors cursor-row-resize" />
+              {/* Resize Handle */}
+              <PanelResizeHandle className="h-1 bg-transparent hover:bg-border transition-colors cursor-row-resize" />
 
-            {/* Git Panel */}
-            <Panel id="git" defaultSize={30} minSize={10}>
-              <GitStatusPanel project={activeProject} />
-            </Panel>
-          </PanelGroup>
+              {/* Git Panel Content (collapsible) */}
+              <Panel
+                ref={gitPanelRef}
+                id="git"
+                defaultSize={30}
+                minSize={0}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => setGitPanelCollapsed(true)}
+                onExpand={() => setGitPanelCollapsed(false)}
+              >
+                <GitStatusPanel project={activeProject} />
+              </Panel>
+            </PanelGroup>
+
+            {/* Git Header - always visible at bottom */}
+            <GitStatusHeader
+              project={activeProject}
+              onToggle={handleToggleGitPanel}
+              isCollapsed={gitPanelCollapsed}
+            />
+          </>
         ) : (
           <div className="px-3 py-4 text-sm text-muted-foreground">
             Select a project to view files
