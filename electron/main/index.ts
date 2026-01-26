@@ -34,7 +34,8 @@ if (os.release().startsWith('6.1')) app.disableHardwareAcceleration()
 // Set application name for Windows 10+ notifications
 if (process.platform === 'win32') app.setAppUserModelId('Claude Code Command Center')
 
-if (!app.requestSingleInstanceLock()) {
+// Skip single instance lock in test mode to allow Playwright to launch multiple instances
+if (process.env.NODE_ENV !== 'test' && !app.requestSingleInstanceLock()) {
   app.quit()
   process.exit(0)
 }
