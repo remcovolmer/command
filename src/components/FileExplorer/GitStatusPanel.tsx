@@ -4,7 +4,6 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   FileEdit,
   FilePlus,
   FileX,
@@ -20,19 +19,17 @@ import { getElectronAPI } from '../../utils/electron'
 
 interface GitStatusPanelProps {
   project: Project
-  onToggleCollapse?: (collapsed: boolean) => void
 }
 
 const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
 
-export function GitStatusPanel({ project, onToggleCollapse }: GitStatusPanelProps) {
+export function GitStatusPanel({ project }: GitStatusPanelProps) {
   const api = useMemo(() => getElectronAPI(), [])
   const gitStatus = useProjectStore((s) => s.gitStatus[project.id])
   const isLoading = useProjectStore((s) => s.gitStatusLoading[project.id])
   const setGitStatus = useProjectStore((s) => s.setGitStatus)
   const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
 
-  const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     staged: true,
     modified: true,
@@ -66,12 +63,6 @@ export function GitStatusPanel({ project, onToggleCollapse }: GitStatusPanelProp
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
   }
 
-  const handleToggleCollapse = () => {
-    const newCollapsed = !isCollapsed
-    setIsCollapsed(newCollapsed)
-    onToggleCollapse?.(newCollapsed)
-  }
-
   // Calculate change counts for header summary
   const totalChanges = gitStatus
     ? gitStatus.staged.length +
@@ -82,17 +73,9 @@ export function GitStatusPanel({ project, onToggleCollapse }: GitStatusPanelProp
 
   return (
     <div className="h-full flex flex-col border-t border-border">
-      {/* Header - always visible */}
+      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-sidebar">
-        <button
-          onClick={handleToggleCollapse}
-          className="flex items-center gap-2 hover:text-sidebar-foreground transition-colors"
-        >
-          {isCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          )}
+        <div className="flex items-center gap-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Git
           </h3>
@@ -106,12 +89,9 @@ export function GitStatusPanel({ project, onToggleCollapse }: GitStatusPanelProp
               {totalChanges}
             </span>
           )}
-        </button>
+        </div>
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            fetchStatus()
-          }}
+          onClick={fetchStatus}
           disabled={isLoading}
           className="p-1 rounded hover:bg-sidebar-accent transition-colors"
           title="Refresh"
@@ -123,8 +103,7 @@ export function GitStatusPanel({ project, onToggleCollapse }: GitStatusPanelProp
       </div>
 
       {/* Content - scrollable */}
-      {!isCollapsed && (
-        <div className="flex-1 overflow-y-auto sidebar-scroll">
+      <div className="flex-1 overflow-y-auto sidebar-scroll">
           {!gitStatus ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -200,8 +179,7 @@ export function GitStatusPanel({ project, onToggleCollapse }: GitStatusPanelProp
               )}
             </>
           )}
-        </div>
-      )}
+      </div>
     </div>
   )
 }

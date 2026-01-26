@@ -72,6 +72,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const isDisposedRef = useRef(false)
+  const isReadyRef = useRef(false)
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
   const theme = useProjectStore((s) => s.theme)
@@ -81,6 +82,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
   const safeFit = useCallback(() => {
     if (
       isDisposedRef.current ||
+      !isReadyRef.current ||
       !fitAddonRef.current ||
       !terminalRef.current ||
       !containerRef.current
@@ -91,6 +93,18 @@ export function Terminal({ id, isActive }: TerminalProps) {
     // Check container has dimensions
     const { clientWidth, clientHeight } = containerRef.current
     if (clientWidth === 0 || clientHeight === 0) {
+      return
+    }
+
+    // Check that xterm has fully initialized by verifying the DOM element exists
+    const terminalElement = containerRef.current.querySelector('.xterm')
+    if (!terminalElement) {
+      return
+    }
+
+    // Verify the terminal's internal element is still attached and has dimensions
+    const terminalCore = terminalRef.current as unknown as { element?: HTMLElement }
+    if (!terminalCore.element?.offsetParent) {
       return
     }
 
@@ -106,6 +120,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
     if (!containerRef.current || terminalRef.current) return
 
     isDisposedRef.current = false
+    isReadyRef.current = false
 
     const terminal = new XTerm({
       cursorBlink: true,
@@ -128,10 +143,14 @@ export function Terminal({ id, isActive }: TerminalProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // Delay initial fit to allow layout to settle
-    requestAnimationFrame(() => {
-      safeFit()
-    })
+    // Mark terminal as ready after a brief delay to ensure xterm's internal services are initialized
+    // Then perform initial fit
+    const readyTimer = setTimeout(() => {
+      if (!isDisposedRef.current) {
+        isReadyRef.current = true
+        safeFit()
+      }
+    }, 50)
 
     // Handle user input
     terminal.onData((data) => {
@@ -170,6 +189,8 @@ export function Terminal({ id, isActive }: TerminalProps) {
     // Cleanup
     return () => {
       isDisposedRef.current = true
+      isReadyRef.current = false
+      clearTimeout(readyTimer)
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current)
       }

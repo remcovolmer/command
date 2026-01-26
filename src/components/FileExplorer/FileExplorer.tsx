@@ -1,6 +1,5 @@
-import { useRef } from 'react'
 import { X, RefreshCw } from 'lucide-react'
-import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
@@ -10,7 +9,6 @@ export function FileExplorer() {
   const projects = useProjectStore((s) => s.projects)
   const setFileExplorerVisible = useProjectStore((s) => s.setFileExplorerVisible)
   const clearDirectoryCache = useProjectStore((s) => s.clearDirectoryCache)
-  const gitPanelRef = useRef<ImperativePanelHandle>(null)
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
 
@@ -21,17 +19,6 @@ export function FileExplorer() {
   const handleRefresh = () => {
     if (activeProjectId) {
       clearDirectoryCache(activeProjectId)
-    }
-  }
-
-  const handleGitPanelCollapse = (collapsed: boolean) => {
-    const panel = gitPanelRef.current
-    if (!panel) return
-
-    if (collapsed) {
-      panel.collapse()
-    } else {
-      panel.expand()
     }
   }
 
@@ -73,18 +60,8 @@ export function FileExplorer() {
             <PanelResizeHandle className="h-1 bg-transparent hover:bg-border transition-colors cursor-row-resize" />
 
             {/* Git Panel */}
-            <Panel
-              ref={gitPanelRef}
-              id="git"
-              defaultSize={30}
-              minSize={10}
-              collapsible
-              collapsedSize={0}
-            >
-              <GitStatusPanel
-                project={activeProject}
-                onToggleCollapse={handleGitPanelCollapse}
-              />
+            <Panel id="git" defaultSize={30} minSize={10}>
+              <GitStatusPanel project={activeProject} />
             </Panel>
           </PanelGroup>
         ) : (
