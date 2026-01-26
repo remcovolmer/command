@@ -143,6 +143,33 @@ export function Terminal({ id, isActive }: TerminalProps) {
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
+    // Handle Ctrl+C (copy when selected, otherwise send SIGINT) and Ctrl+V (paste)
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type !== 'keydown') return true
+
+      // Ctrl+C: copy if text selected, otherwise let terminal handle it (SIGINT)
+      if (event.ctrlKey && event.key === 'c') {
+        const selection = terminal.getSelection()
+        if (selection) {
+          navigator.clipboard.writeText(selection)
+          return false // Prevent terminal from handling it
+        }
+        return true // Let terminal send SIGINT
+      }
+
+      // Ctrl+V: paste from clipboard
+      if (event.ctrlKey && event.key === 'v') {
+        navigator.clipboard.readText().then((text) => {
+          if (text && !isDisposedRef.current) {
+            api.terminal.write(id, text)
+          }
+        })
+        return false // Prevent terminal from handling it
+      }
+
+      return true // Let terminal handle other keys
+    })
+
     // Mark terminal as ready after a brief delay to ensure xterm's internal services are initialized
     // Then perform initial fit
     const readyTimer = setTimeout(() => {
