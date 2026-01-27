@@ -53,6 +53,14 @@ export function Sidebar() {
   // State for worktree dialog
   const [worktreeDialogProjectId, setWorktreeDialogProjectId] = useState<string | null>(null)
 
+  // State for app version
+  const [appVersion, setAppVersion] = useState<string>('')
+
+  // Load app version on mount
+  useEffect(() => {
+    api.update.getVersion().then(setAppVersion)
+  }, [api])
+
   // Load projects on mount
   useEffect(() => {
     loadProjects().then(() => {
@@ -254,7 +262,7 @@ export function Sidebar() {
               Command
             </p>
             <p className="text-xs text-muted-foreground">
-              v0.1.0
+              {appVersion ? `v${appVersion}` : ''}
             </p>
           </div>
           <button
