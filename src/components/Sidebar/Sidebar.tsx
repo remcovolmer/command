@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, FolderOpen, Sparkles, PanelRightOpen, PanelRightClose, Sun, Moon } from 'lucide-react'
+import { Plus, FolderOpen, Sparkles, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import type { TerminalSession, Worktree } from '../../types'
@@ -56,6 +56,10 @@ export function Sidebar() {
   // State for app version
   const [appVersion, setAppVersion] = useState<string>('')
 
+  // State for update check
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'up-to-date' | 'error'>('idle')
+  const [latestVersion, setLatestVersion] = useState<string>('')
+
   // Load app version on mount
   useEffect(() => {
     api.update.getVersion().then(setAppVersion)
@@ -77,6 +81,32 @@ export function Sidebar() {
       loadWorktrees(project.id)
     })
   }, [projects.length, loadWorktrees])
+
+  const handleCheckForUpdate = async () => {
+    setUpdateStatus('checking')
+    try {
+      const result = await api.update.check()
+      if (result.isDev) {
+        setUpdateStatus('idle')
+        api.notification.show('Development Mode', 'Auto-updates disabled in development')
+        return
+      }
+      if (result.updateAvailable && result.version) {
+        setUpdateStatus('available')
+        setLatestVersion(result.version)
+        api.notification.show('Update Available', `Version ${result.version} is available`)
+      } else {
+        setUpdateStatus('up-to-date')
+        // Reset to idle after 3 seconds
+        setTimeout(() => setUpdateStatus('idle'), 3000)
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error)
+      setUpdateStatus('error')
+      // Reset to idle after 3 seconds
+      setTimeout(() => setUpdateStatus('idle'), 3000)
+    }
+  }
 
   const handleAddProject = async () => {
     const folderPath = await api.project.selectFolder()
@@ -265,6 +295,40 @@ export function Sidebar() {
               {appVersion ? `v${appVersion}` : ''}
             </p>
           </div>
+          <button
+            onClick={handleCheckForUpdate}
+            disabled={updateStatus === 'checking'}
+            className={`p-2 rounded-lg transition-colors ${
+              updateStatus === 'available'
+                ? 'bg-green-500/20 text-green-500'
+                : updateStatus === 'up-to-date'
+                ? 'text-green-500'
+                : updateStatus === 'error'
+                ? 'text-red-500'
+                : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
+            } disabled:opacity-50`}
+            title={
+              updateStatus === 'checking'
+                ? 'Checking for updates...'
+                : updateStatus === 'available'
+                ? `Update available: v${latestVersion}`
+                : updateStatus === 'up-to-date'
+                ? 'Up to date'
+                : updateStatus === 'error'
+                ? 'Failed to check for updates'
+                : 'Check for updates'
+            }
+          >
+            {updateStatus === 'checking' ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : updateStatus === 'available' || updateStatus === 'up-to-date' ? (
+              <Check className="w-5 h-5" />
+            ) : updateStatus === 'error' ? (
+              <AlertCircle className="w-5 h-5" />
+            ) : (
+              <RefreshCw className="w-5 h-5" />
+            )}
+          </button>
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
