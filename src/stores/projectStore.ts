@@ -4,7 +4,7 @@ import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSyste
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
-export const MAX_TERMINALS_PER_PROJECT = 3
+export const MAX_TERMINALS_PER_PROJECT = 10
 
 interface ProjectStore {
   // State
