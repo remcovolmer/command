@@ -74,6 +74,8 @@ export function Terminal({ id, isActive }: TerminalProps) {
   const isDisposedRef = useRef(false)
   const isReadyRef = useRef(false)
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasInitializedRef = useRef(false)
+  const cleanupRef = useRef<(() => void) | null>(null)
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
   const theme = useProjectStore((s) => s.theme)
   const api = useMemo(() => getElectronAPI(), [])
@@ -115,10 +117,15 @@ export function Terminal({ id, isActive }: TerminalProps) {
     }
   }, [])
 
-  // Initialize terminal
+  // Initialize terminal - deferred until active to ensure container has dimensions
   useEffect(() => {
-    if (!containerRef.current || terminalRef.current) return
+    // Skip if already initialized
+    if (hasInitializedRef.current) return
+    // Wait until terminal becomes active (container visible with display:block)
+    if (!isActive) return
+    if (!containerRef.current) return
 
+    hasInitializedRef.current = true
     isDisposedRef.current = false
     isReadyRef.current = false
 
@@ -213,10 +220,11 @@ export function Terminal({ id, isActive }: TerminalProps) {
     })
     resizeObserver.observe(containerRef.current)
 
-    // Cleanup
-    return () => {
+    // Store cleanup function in ref (will be called on unmount)
+    cleanupRef.current = () => {
       isDisposedRef.current = true
       isReadyRef.current = false
+      hasInitializedRef.current = false
       clearTimeout(readyTimer)
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current)
@@ -228,7 +236,15 @@ export function Terminal({ id, isActive }: TerminalProps) {
       fitAddonRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, updateTerminalState, api, safeFit])
+  }, [isActive, id, updateTerminalState, api, safeFit])
+
+  // Cleanup on unmount only
+  useEffect(() => {
+    return () => {
+      cleanupRef.current?.()
+      cleanupRef.current = null
+    }
+  }, [])
 
   // Update terminal theme when app theme changes
   useEffect(() => {

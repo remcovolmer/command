@@ -181,7 +181,7 @@ function SplitPanel({ terminal, isActive, isLast, onSelect }: SplitPanelProps) {
           className={`h-full ${isActive ? 'ring-2 ring-primary ring-inset' : ''}`}
           onClick={onSelect}
         >
-          <Terminal id={terminal.id} isActive={true} />
+          <Terminal id={terminal.id} isActive={isActive} />
         </div>
       </Panel>
       {!isLast && (
