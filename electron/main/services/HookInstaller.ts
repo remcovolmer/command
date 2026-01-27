@@ -26,10 +26,10 @@ function getHookScriptPath(): string {
 
   if (isDev) {
     // In development, use the source directory
-    return join(app.getAppPath(), 'electron', 'main', 'hooks', 'claude-state-hook.js')
+    return join(app.getAppPath(), 'electron', 'main', 'hooks', 'claude-state-hook.cjs')
   } else {
     // In production, the script should be in the app resources
-    return join(process.resourcesPath, 'app', 'electron', 'main', 'hooks', 'claude-state-hook.js')
+    return join(process.resourcesPath, 'app', 'electron', 'main', 'hooks', 'claude-state-hook.cjs')
   }
 }
 
