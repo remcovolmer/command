@@ -19,6 +19,10 @@ export class TerminalManager {
   private window: BrowserWindow
   private hookWatcher: ClaudeHookWatcher | null = null
 
+  // Auto-naming: track input buffer and whether terminal has been titled
+  private terminalInputBuffers: Map<string, string> = new Map()
+  private terminalTitled: Map<string, boolean> = new Map()
+
   constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher) {
     this.window = window
     this.hookWatcher = hookWatcher || null
@@ -92,6 +96,11 @@ export class TerminalManager {
   writeToTerminal(terminalId: string, data: string): void {
     const terminal = this.terminals.get(terminalId)
     if (terminal?.pty) {
+      // Auto-naming: buffer input and extract title on Enter
+      if (!this.terminalTitled.get(terminalId)) {
+        this.handleAutoNaming(terminalId, data)
+      }
+
       // When user presses Enter, set to busy immediately
       // The hook system will update to done when Claude finishes
       if (data.includes('\r') || data.includes('\n')) {
@@ -99,6 +108,80 @@ export class TerminalManager {
       }
       terminal.pty.write(data)
     }
+  }
+
+  /**
+   * Handle auto-naming by buffering input and extracting title on Enter
+   */
+  private handleAutoNaming(terminalId: string, data: string): void {
+    // Handle backspace - remove last character from buffer
+    if (data === '\x7f' || data === '\b') {
+      const buffer = this.terminalInputBuffers.get(terminalId) || ''
+      this.terminalInputBuffers.set(terminalId, buffer.slice(0, -1))
+      return
+    }
+
+    // Handle Enter - extract title from buffer
+    if (data.includes('\r') || data.includes('\n')) {
+      const buffer = this.terminalInputBuffers.get(terminalId) || ''
+      const title = this.extractTaskTitle(buffer)
+
+      if (title) {
+        this.terminalTitled.set(terminalId, true)
+        this.sendToRenderer('terminal:title', terminalId, title)
+      }
+
+      // Clear buffer for next input (in case title extraction failed)
+      this.terminalInputBuffers.set(terminalId, '')
+      return
+    }
+
+    // Accumulate printable characters
+    const buffer = this.terminalInputBuffers.get(terminalId) || ''
+    this.terminalInputBuffers.set(terminalId, buffer + data)
+  }
+
+  /**
+   * Extract a meaningful task title from user input
+   */
+  private extractTaskTitle(input: string): string | null {
+    const trimmed = input.trim()
+
+    // Skip empty input
+    if (!trimmed || trimmed.length < 3) {
+      return null
+    }
+
+    // Skip slash commands - wait for a real task
+    if (trimmed.startsWith('/')) {
+      return null
+    }
+
+    // Skip common non-task inputs
+    const skipPatterns = [
+      /^(hi|hello|hey|yo|sup)$/i,
+      /^(yes|no|y|n|ok|okay)$/i,
+      /^(exit|quit|q)$/i,
+    ]
+    if (skipPatterns.some(pattern => pattern.test(trimmed))) {
+      return null
+    }
+
+    // Extract title: take first 40 chars, capitalize first letter
+    let title = trimmed.slice(0, 40)
+
+    // Trim at word boundary if possible
+    if (trimmed.length > 40) {
+      const lastSpace = title.lastIndexOf(' ')
+      if (lastSpace > 20) {
+        title = title.slice(0, lastSpace)
+      }
+    }
+
+    // Capitalize first letter
+    title = title.charAt(0).toUpperCase() + title.slice(1)
+
+    return title
   }
 
   resizeTerminal(terminalId: string, cols: number, rows: number): void {
@@ -115,6 +198,10 @@ export class TerminalManager {
       if (this.hookWatcher) {
         this.hookWatcher.unregisterTerminal(terminalId)
       }
+
+      // Clean up auto-naming state
+      this.terminalInputBuffers.delete(terminalId)
+      this.terminalTitled.delete(terminalId)
 
       if (terminal.pty) {
         terminal.pty.kill()

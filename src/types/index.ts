@@ -141,6 +141,7 @@ export interface ElectronAPI {
     onData: (callback: (id: string, data: string) => void) => Unsubscribe;
     onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe;
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
+    onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
   };
   project: {
     list: () => Promise<Project[]>;

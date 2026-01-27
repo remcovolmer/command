@@ -140,6 +140,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('terminal:exit', handler)
       return () => ipcRenderer.removeListener('terminal:exit', handler)
     },
+
+    onTitleChange: (callback: (id: string, title: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) => callback(id, title)
+      ipcRenderer.on('terminal:title', handler)
+      return () => ipcRenderer.removeListener('terminal:title', handler)
+    },
   },
 
   // Project operations

@@ -77,6 +77,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
   const hasInitializedRef = useRef(false)
   const cleanupRef = useRef<(() => void) | null>(null)
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
+  const updateTerminalTitle = useProjectStore((s) => s.updateTerminalTitle)
   const theme = useProjectStore((s) => s.theme)
   const api = useMemo(() => getElectronAPI(), [])
 
@@ -206,6 +207,10 @@ export function Terminal({ id, isActive }: TerminalProps) {
       },
       (state) => {
         updateTerminalState(id, state)
+      },
+      undefined, // onExit - not needed here
+      (title) => {
+        updateTerminalTitle(id, title)
       }
     )
 
@@ -236,7 +241,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
       fitAddonRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, id, updateTerminalState, api, safeFit])
+  }, [isActive, id, updateTerminalState, updateTerminalTitle, api, safeFit])
 
   // Cleanup on unmount only
   useEffect(() => {

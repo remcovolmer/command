@@ -4,6 +4,7 @@ import { isValidTerminalState, type TerminalState, type Unsubscribe } from '../t
 type DataCallback = (data: string) => void
 type StateCallback = (state: TerminalState) => void
 type ExitCallback = (code: number) => void
+type TitleCallback = (title: string) => void
 
 /**
  * Centralized terminal event manager.
@@ -14,6 +15,7 @@ class TerminalEventManager {
   private dataCallbacks = new Map<string, DataCallback>()
   private stateCallbacks = new Map<string, StateCallback>()
   private exitCallbacks = new Map<string, ExitCallback>()
+  private titleCallbacks = new Map<string, TitleCallback>()
   private initialized = false
   private unsubscribers: Unsubscribe[] = []
 
@@ -47,24 +49,34 @@ class TerminalEventManager {
         if (callback) callback(code)
       })
     )
+
+    this.unsubscribers.push(
+      api.terminal.onTitleChange((terminalId, title) => {
+        const callback = this.titleCallbacks.get(terminalId)
+        if (callback) callback(title)
+      })
+    )
   }
 
   subscribe(
     terminalId: string,
     onData: DataCallback,
     onState: StateCallback,
-    onExit?: ExitCallback
+    onExit?: ExitCallback,
+    onTitle?: TitleCallback
   ) {
     this.init()
     this.dataCallbacks.set(terminalId, onData)
     this.stateCallbacks.set(terminalId, onState)
     if (onExit) this.exitCallbacks.set(terminalId, onExit)
+    if (onTitle) this.titleCallbacks.set(terminalId, onTitle)
   }
 
   unsubscribe(terminalId: string) {
     this.dataCallbacks.delete(terminalId)
     this.stateCallbacks.delete(terminalId)
     this.exitCallbacks.delete(terminalId)
+    this.titleCallbacks.delete(terminalId)
   }
 
   /**
@@ -76,6 +88,7 @@ class TerminalEventManager {
     this.dataCallbacks.clear()
     this.stateCallbacks.clear()
     this.exitCallbacks.clear()
+    this.titleCallbacks.clear()
     this.initialized = false
   }
 }
