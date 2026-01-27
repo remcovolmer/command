@@ -18,16 +18,17 @@ export interface Worktree {
   isLocked: boolean;
 }
 
-// Terminal types - Simplified Claude Code states (4 states)
+// Terminal types - Claude Code states (5 states)
 export type TerminalState =
   | 'busy'        // Blue - Claude is working (includes starting)
   | 'permission'  // Orange - Claude needs permission for tool/command
-  | 'ready'       // Green - Claude waiting for user input
+  | 'question'    // Orange - Claude asked a question via AskUserQuestion
+  | 'done'        // Green - Claude finished, waiting for new prompt
   | 'stopped';    // Red - Terminal stopped or error
 
 // Valid terminal states for runtime validation
 export const VALID_TERMINAL_STATES: readonly TerminalState[] = [
-  'busy', 'permission', 'ready', 'stopped'
+  'busy', 'permission', 'question', 'done', 'stopped'
 ] as const;
 
 // Type guard for terminal state

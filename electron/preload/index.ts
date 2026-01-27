@@ -2,8 +2,8 @@ import { ipcRenderer, contextBridge } from 'electron'
 
 console.log('[PRELOAD] Script starting...')
 
-// Type definitions for the exposed API - Simplified Claude Code states (4 states)
-type TerminalState = 'busy' | 'permission' | 'ready' | 'stopped'
+// Type definitions for the exposed API - Claude Code states (5 states)
+type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
 
 // Whitelist of channels that can have listeners removed
 const ALLOWED_LISTENER_CHANNELS = [

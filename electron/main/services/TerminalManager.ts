@@ -4,8 +4,8 @@ import { accessSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { ClaudeHookWatcher } from './ClaudeHookWatcher'
 
-// Simplified Claude Code terminal states (4 states)
-type TerminalState = 'busy' | 'permission' | 'ready' | 'stopped'
+// Claude Code terminal states (5 states)
+type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
 
 interface TerminalInstance {
   id: string
@@ -93,7 +93,7 @@ export class TerminalManager {
     const terminal = this.terminals.get(terminalId)
     if (terminal?.pty) {
       // When user presses Enter, set to busy immediately
-      // The hook system will update to ready when Claude finishes
+      // The hook system will update to done when Claude finishes
       if (data.includes('\r') || data.includes('\n')) {
         this.updateTerminalState(terminalId, 'busy')
       }

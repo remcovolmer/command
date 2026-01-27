@@ -12,16 +12,17 @@ interface TerminalTabBarProps {
   canAdd: boolean
 }
 
-// Simplified Claude Code state dot colors (4 states)
+// Claude Code state dot colors (5 states)
 const stateDots: Record<TerminalState, string> = {
   busy: 'bg-blue-500',       // Blue - working
   permission: 'bg-orange-500', // Orange - needs permission
-  ready: 'bg-green-500',     // Green - waiting for input
+  question: 'bg-orange-500', // Orange - waiting for question answer
+  done: 'bg-green-500',      // Green - finished, waiting for new prompt
   stopped: 'bg-red-500',     // Red - stopped/error
 }
 
 // States that require user input (show blinking indicator)
-const inputStates = ['ready', 'permission'] as const
+const inputStates = ['done', 'permission', 'question'] as const
 const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
 
 export function TerminalTabBar({

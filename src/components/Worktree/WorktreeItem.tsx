@@ -32,14 +32,15 @@ export const WorktreeItem = memo(function WorktreeItem({
   const stateDots: Record<string, string> = {
     busy: 'bg-blue-500',
     permission: 'bg-orange-500',
-    ready: 'bg-green-500',
+    question: 'bg-orange-500',
+    done: 'bg-green-500',
     stopped: 'bg-red-500',
   }
 
-  const inputStates = ['ready', 'permission'] as const
+  const inputStates = ['done', 'permission', 'question'] as const
   const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
 
-  const visibleStates = ['busy', 'ready', 'permission'] as const
+  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
   const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
   // Check if any terminal needs input

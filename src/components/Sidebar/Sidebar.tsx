@@ -183,9 +183,9 @@ export function Sidebar() {
   }
 
   // Check if any terminal in the project needs user input
-  // (ready or permission states)
+  // (done, permission, or question states)
   const hasNeedsInput = (projectId: string): boolean => {
-    const inputStates = ['ready', 'permission']
+    const inputStates = ['done', 'permission', 'question']
     return getProjectTerminals(projectId).some((t) => inputStates.includes(t.state))
   }
 

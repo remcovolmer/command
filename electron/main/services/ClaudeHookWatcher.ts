@@ -3,7 +3,7 @@ import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { homedir } from 'os'
 
-type HookState = 'busy' | 'permission' | 'ready' | 'stopped'
+type HookState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
 
 interface HookStateData {
   session_id: string

@@ -26,21 +26,30 @@ process.stdin.on('end', () => {
 
     switch (hookEvent) {
       case 'PreToolUse':
+        // Check if Claude is asking a question
+        if (data.tool_name === 'AskUserQuestion') {
+          // Question asked = question (orange)
+          state = 'question';
+        } else {
+          // Working with tools = busy (blue)
+          state = 'busy';
+        }
+        break;
       case 'SessionStart':
-        // Starting and working = busy (blue)
+        // Starting = busy (blue)
         state = 'busy';
         break;
       case 'Stop':
-        // Finished responding = ready (green)
-        state = 'ready';
+        // Finished responding = done (green)
+        state = 'done';
         break;
       case 'Notification':
         if (data.notification_type === 'permission_prompt') {
           // Permission needed = permission (orange)
           state = 'permission';
         } else if (data.notification_type === 'idle_prompt') {
-          // Idle = ready (green)
-          state = 'ready';
+          // Idle = done (green)
+          state = 'done';
         }
         break;
       case 'SessionEnd':

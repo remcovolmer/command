@@ -57,11 +57,12 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     opacity: isDragging ? 0.4 : 1,
   }
 
-  // Simplified Claude Code state colors (4 states)
+  // Claude Code state colors (5 states)
   const stateColors: Record<string, string> = {
     busy: 'text-blue-500',       // Blue - working
     permission: 'text-orange-500', // Orange - needs permission
-    ready: 'text-green-500',     // Green - waiting for input
+    question: 'text-orange-500', // Orange - waiting for question answer
+    done: 'text-green-500',      // Green - finished, waiting for new prompt
     stopped: 'text-red-500',     // Red - stopped/error
   }
 
@@ -69,16 +70,17 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const stateDots: Record<string, string> = {
     busy: 'bg-blue-500',
     permission: 'bg-orange-500',
-    ready: 'bg-green-500',
+    question: 'bg-orange-500',
+    done: 'bg-green-500',
     stopped: 'bg-red-500',
   }
 
   // States that require user input (show blinking indicator)
-  const inputStates = ['ready', 'permission'] as const
+  const inputStates = ['done', 'permission', 'question'] as const
   const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
 
   // States that should show an indicator (busy shows static, input states blink)
-  const visibleStates = ['busy', 'ready', 'permission'] as const
+  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
   const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
   return (
