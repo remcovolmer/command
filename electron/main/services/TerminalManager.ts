@@ -2,57 +2,30 @@ import { BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { accessSync } from 'node:fs'
 import * as pty from 'node-pty'
-import { ClaudeStatusDetector, ClaudeStatus } from './ClaudeStatusDetector'
+import { ClaudeHookWatcher } from './ClaudeHookWatcher'
 
-// Claude Code specific terminal states
-type TerminalState = 'starting' | 'busy' | 'question' | 'permission' | 'ready' | 'stopped' | 'error'
+// Simplified Claude Code terminal states (4 states)
+type TerminalState = 'busy' | 'permission' | 'ready' | 'stopped'
 
 interface TerminalInstance {
   id: string
   projectId: string
   pty: pty.IPty
   state: TerminalState
-  statusDetector: ClaudeStatusDetector
-  lastOutputTime: number
 }
 
 export class TerminalManager {
   private terminals: Map<string, TerminalInstance> = new Map()
   private window: BrowserWindow
-  private idleCheckInterval: NodeJS.Timeout | null = null
-  // Longer idle timeout - only mark as ready after significant silence
-  private readonly idleTimeoutMs = 8000 // 8 seconds of no output = potentially ready
+  private hookWatcher: ClaudeHookWatcher | null = null
 
-  constructor(window: BrowserWindow) {
+  constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher) {
     this.window = window
-    this.startIdleChecker()
+    this.hookWatcher = hookWatcher || null
   }
 
   /**
-   * Start periodic idle check for terminals
-   * If a terminal is "busy" but has no output for idleTimeoutMs, mark as "ready"
-   * This is a fallback - the detector should catch most state changes
-   */
-  private startIdleChecker(): void {
-    this.idleCheckInterval = setInterval(() => {
-      const now = Date.now()
-      for (const [id, terminal] of this.terminals) {
-        const idleTime = now - terminal.lastOutputTime
-        const detectorState = terminal.statusDetector.getLastState()
-
-        // Only use idle detection as fallback when detector hasn't found ready state
-        if (terminal.state === 'busy' && idleTime > this.idleTimeoutMs) {
-          // Terminal was busy but idle now - likely finished
-          if (detectorState !== 'busy') {
-            this.updateTerminalState(id, 'ready')
-          }
-        }
-      }
-    }, 3000) // Check every 3 seconds
-  }
-
-  /**
-   * Update terminal state with debouncing to avoid flicker
+   * Update terminal state
    */
   private updateTerminalState(terminalId: string, newState: TerminalState): void {
     const terminal = this.terminals.get(terminalId)
@@ -78,29 +51,25 @@ export class TerminalManager {
       id,
       projectId: cwd,
       pty: ptyProcess,
-      state: 'starting',
-      statusDetector: new ClaudeStatusDetector(),
-      lastOutputTime: Date.now(),
+      state: 'busy', // Start as busy (starting + busy merged)
+    }
+
+    // Register with hook watcher for state detection
+    if (this.hookWatcher) {
+      this.hookWatcher.registerTerminal(id, cwd)
     }
 
     ptyProcess.onData((data) => {
-      // Update last output time
-      terminal.lastOutputTime = Date.now()
-
-      // Analyze output for Claude status
-      const detectedStatus = terminal.statusDetector.analyzeOutput(data)
-
-      // Update state if a clear status was detected
-      if (detectedStatus !== null) {
-        this.updateTerminalState(id, detectedStatus)
-      }
-
-      // Always forward data to renderer
+      // Forward data to renderer
       this.sendToRenderer('terminal:data', id, data)
     })
 
     ptyProcess.onExit(({ exitCode }) => {
-      terminal.statusDetector.clearBuffer()
+      // Unregister from hook watcher
+      if (this.hookWatcher) {
+        this.hookWatcher.unregisterTerminal(id)
+      }
+
       terminal.state = 'stopped'
       this.sendToRenderer('terminal:state', id, 'stopped')
       this.sendToRenderer('terminal:exit', id, exitCode)
@@ -109,10 +78,11 @@ export class TerminalManager {
 
     this.terminals.set(id, terminal)
 
+    // Send initial state
+    this.sendToRenderer('terminal:state', id, 'busy')
+
     // Start Claude Code after shell is ready
     setTimeout(() => {
-      terminal.state = 'busy'
-      this.sendToRenderer('terminal:state', id, 'busy')
       ptyProcess.write('claude\r')
     }, 100)
 
@@ -120,18 +90,12 @@ export class TerminalManager {
   }
 
   writeToTerminal(terminalId: string, data: string): void {
-    console.log(`[WriteTerminal] Called with terminalId=${terminalId.slice(0,8)}, data length=${data.length}, data=${JSON.stringify(data)}`)
     const terminal = this.terminals.get(terminalId)
-    console.log(`[WriteTerminal] Terminal found: ${!!terminal}, has pty: ${!!terminal?.pty}`)
     if (terminal?.pty) {
-      // When user types, assume Claude will be busy processing
-      // This prevents flickering and ensures immediate feedback
+      // When user presses Enter, set to busy immediately
+      // The hook system will update to ready when Claude finishes
       if (data.includes('\r') || data.includes('\n')) {
-        // User pressed Enter - Claude will be processing
-        console.log(`[WriteTerminal] User pressed Enter, setting to busy. Current state: ${terminal.state}`)
-        terminal.statusDetector.setUserInput()
         this.updateTerminalState(terminalId, 'busy')
-        console.log(`[WriteTerminal] After update, state: ${terminal.state}`)
       }
       terminal.pty.write(data)
     }
@@ -147,7 +111,11 @@ export class TerminalManager {
   closeTerminal(terminalId: string): void {
     const terminal = this.terminals.get(terminalId)
     if (terminal) {
-      terminal.statusDetector.clearBuffer()
+      // Unregister from hook watcher
+      if (this.hookWatcher) {
+        this.hookWatcher.unregisterTerminal(terminalId)
+      }
+
       if (terminal.pty) {
         terminal.pty.kill()
       }
@@ -169,10 +137,6 @@ export class TerminalManager {
    * Clean up resources when manager is destroyed
    */
   destroy(): void {
-    if (this.idleCheckInterval) {
-      clearInterval(this.idleCheckInterval)
-      this.idleCheckInterval = null
-    }
     this.closeAllTerminals()
   }
 

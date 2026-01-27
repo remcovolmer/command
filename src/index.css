@@ -163,9 +163,9 @@ body {
   overflow-y: auto !important;
 }
 
-/* Notification indicator animations - Claude Code specific states */
+/* Notification indicator animations - Simplified Claude Code states (4 states) */
 
-/* Default animation (fallback) */
+/* Default animation (fallback) - green glow */
 .needs-input-indicator {
   animation: blink-glow-green 1.5s ease-in-out infinite;
 }
@@ -183,22 +183,6 @@ body {
   50% {
     opacity: 0.6;
     box-shadow: 0 0 4px oklch(0.72 0.19 142.5);
-  }
-}
-
-/* Question state - purple slow blink (Claude asking a question) */
-.needs-input-indicator.state-question {
-  animation: blink-glow-purple 1.5s ease-in-out infinite;
-}
-
-@keyframes blink-glow-purple {
-  0%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 8px oklch(0.59 0.22 292.3); /* purple-500 */
-  }
-  50% {
-    opacity: 0.6;
-    box-shadow: 0 0 4px oklch(0.59 0.22 292.3);
   }
 }
 
