@@ -20,8 +20,8 @@ export class ClaudeHookWatcher {
 
   // Session ID matching: session_id → terminal_id
   private sessionToTerminal: Map<string, string> = new Map()
-  // Pending terminals waiting for SessionStart: cwd → terminal_id
-  private pendingTerminals: Map<string, string> = new Map()
+  // Persistent cwd → terminal_id mapping (survives session restarts)
+  private cwdToTerminal: Map<string, string> = new Map()
 
   // Debounce file change events
   private lastProcessedTimestamp: number = 0
@@ -54,23 +54,24 @@ export class ClaudeHookWatcher {
   }
 
   /**
-   * Register a terminal as "pending" - waiting for SessionStart hook
+   * Register a terminal for a working directory
    */
   registerTerminal(terminalId: string, cwd: string): void {
     // Normalize path for comparison
     const normalizedCwd = cwd.replace(/\\/g, '/')
-    this.pendingTerminals.set(normalizedCwd, terminalId)
-    console.log(`[HookWatcher] Registered pending terminal ${terminalId} for cwd: ${normalizedCwd}`)
+    this.cwdToTerminal.set(normalizedCwd, terminalId)
+    console.log(`[HookWatcher] Registered terminal ${terminalId} for cwd: ${normalizedCwd}`)
   }
 
   /**
-   * Unregister terminal and cleanup session mapping
+   * Unregister terminal and cleanup all mappings
    */
   unregisterTerminal(terminalId: string): void {
-    // Remove from pending
-    for (const [cwd, tid] of this.pendingTerminals) {
+    // Remove from cwd mapping
+    for (const [cwd, tid] of this.cwdToTerminal) {
       if (tid === terminalId) {
-        this.pendingTerminals.delete(cwd)
+        this.cwdToTerminal.delete(cwd)
+        console.log(`[HookWatcher] Unregistered terminal ${terminalId} from cwd: ${cwd}`)
         break
       }
     }
@@ -100,20 +101,28 @@ export class ClaudeHookWatcher {
 
       console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}, session: ${hookState.session_id}, cwd: ${normalizedCwd}`)
 
-      // On SessionStart: associate session_id with pending terminal
+      // On SessionStart: associate session_id with terminal by cwd
       if (hookState.hook_event === 'SessionStart' && normalizedCwd) {
-        const pendingTerminalId = this.pendingTerminals.get(normalizedCwd)
-        if (pendingTerminalId) {
-          this.sessionToTerminal.set(hookState.session_id, pendingTerminalId)
-          this.pendingTerminals.delete(normalizedCwd)
-          console.log(`[HookWatcher] Associated session ${hookState.session_id} with terminal ${pendingTerminalId}`)
+        const terminalForCwd = this.cwdToTerminal.get(normalizedCwd)
+        if (terminalForCwd) {
+          // Remove any old session mapping for this terminal
+          for (const [oldSessionId, tid] of this.sessionToTerminal) {
+            if (tid === terminalForCwd) {
+              this.sessionToTerminal.delete(oldSessionId)
+              console.log(`[HookWatcher] Removed old session ${oldSessionId} for terminal ${terminalForCwd}`)
+              break
+            }
+          }
+          // Associate new session with terminal
+          this.sessionToTerminal.set(hookState.session_id, terminalForCwd)
+          console.log(`[HookWatcher] Associated session ${hookState.session_id} with terminal ${terminalForCwd}`)
         }
       }
 
       // Find terminal by session_id (primary) or cwd (fallback)
       let terminalId = this.sessionToTerminal.get(hookState.session_id)
       if (!terminalId && normalizedCwd) {
-        terminalId = this.pendingTerminals.get(normalizedCwd)
+        terminalId = this.cwdToTerminal.get(normalizedCwd)
       }
 
       if (terminalId) {
