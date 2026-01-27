@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from 'react'
+import { useEffect, useCallback, useMemo, useRef } from 'react'
 import { X } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
@@ -46,6 +46,10 @@ export function FileExplorer() {
     }
   }, [api, activeProject, setGitStatus, setGitStatusLoading])
 
+  // Use ref to avoid stale closure in effects
+  const handleGitRefreshRef = useRef(handleGitRefresh)
+  handleGitRefreshRef.current = handleGitRefresh
+
   const handleRefresh = () => {
     if (activeTab === 'files') {
       handleFilesRefresh()
@@ -57,16 +61,16 @@ export function FileExplorer() {
   // Fetch git status on mount and when project changes
   useEffect(() => {
     if (activeProject) {
-      handleGitRefresh()
+      handleGitRefreshRef.current()
     }
-  }, [activeProject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeProject?.id])
 
   // Auto-refresh git status
   useEffect(() => {
     if (!activeProject) return
-    const interval = setInterval(handleGitRefresh, GIT_REFRESH_INTERVAL)
+    const interval = setInterval(() => handleGitRefreshRef.current(), GIT_REFRESH_INTERVAL)
     return () => clearInterval(interval)
-  }, [handleGitRefresh, activeProject])
+  }, [activeProject])
 
   const totalGitChanges = gitStatus
     ? gitStatus.staged.length +
@@ -98,7 +102,7 @@ export function FileExplorer() {
       />
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto sidebar-scroll">
+      <div className="flex-1 min-h-0">
         {activeProject ? (
           activeTab === 'files' ? (
             <FileTree project={activeProject} />
