@@ -11,6 +11,12 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:state',
   'terminal:exit',
   'app:close-request',
+  'update:checking',
+  'update:available',
+  'update:not-available',
+  'update:progress',
+  'update:downloaded',
+  'update:error',
 ] as const
 
 interface Project {
@@ -66,6 +72,35 @@ interface GitStatus {
   conflicted: GitFileChange[]
   isClean: boolean
   error?: string
+}
+
+// Update types
+interface UpdateCheckResult {
+  updateAvailable: boolean
+  version?: string
+  currentVersion?: string
+  isDev?: boolean
+}
+
+interface UpdateAvailableInfo {
+  version: string
+  releaseDate?: string
+  releaseNotes?: string | null
+}
+
+interface UpdateProgressInfo {
+  percent: number
+  bytesPerSecond: number
+  transferred: number
+  total: number
+}
+
+interface UpdateDownloadedInfo {
+  version: string
+}
+
+interface UpdateErrorInfo {
+  message: string
 }
 
 // Unsubscribe function type
@@ -174,6 +209,58 @@ contextBridge.exposeInMainWorld('electronAPI', {
   git: {
     getStatus: (projectPath: string): Promise<GitStatus> =>
       ipcRenderer.invoke('git:status', projectPath),
+  },
+
+  // Update operations
+  update: {
+    check: (): Promise<UpdateCheckResult> =>
+      ipcRenderer.invoke('update:check'),
+
+    download: (): Promise<{ success: boolean; isDev?: boolean }> =>
+      ipcRenderer.invoke('update:download'),
+
+    install: (): Promise<void> =>
+      ipcRenderer.invoke('update:install'),
+
+    getVersion: (): Promise<string> =>
+      ipcRenderer.invoke('update:get-version'),
+
+    // Events from main process
+    onChecking: (callback: () => void): Unsubscribe => {
+      const handler = () => callback()
+      ipcRenderer.on('update:checking', handler)
+      return () => ipcRenderer.removeListener('update:checking', handler)
+    },
+
+    onAvailable: (callback: (info: UpdateAvailableInfo) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, info: UpdateAvailableInfo) => callback(info)
+      ipcRenderer.on('update:available', handler)
+      return () => ipcRenderer.removeListener('update:available', handler)
+    },
+
+    onNotAvailable: (callback: () => void): Unsubscribe => {
+      const handler = () => callback()
+      ipcRenderer.on('update:not-available', handler)
+      return () => ipcRenderer.removeListener('update:not-available', handler)
+    },
+
+    onProgress: (callback: (progress: UpdateProgressInfo) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: UpdateProgressInfo) => callback(progress)
+      ipcRenderer.on('update:progress', handler)
+      return () => ipcRenderer.removeListener('update:progress', handler)
+    },
+
+    onDownloaded: (callback: (info: UpdateDownloadedInfo) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, info: UpdateDownloadedInfo) => callback(info)
+      ipcRenderer.on('update:downloaded', handler)
+      return () => ipcRenderer.removeListener('update:downloaded', handler)
+    },
+
+    onError: (callback: (error: UpdateErrorInfo) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, error: UpdateErrorInfo) => callback(error)
+      ipcRenderer.on('update:error', handler)
+      return () => ipcRenderer.removeListener('update:error', handler)
+    },
   },
 
   // Cleanup helper - only allows whitelisted channels (#003 fix)

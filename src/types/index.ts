@@ -80,6 +80,35 @@ export interface GitStatus {
   error?: string;
 }
 
+// Update types
+export interface UpdateCheckResult {
+  updateAvailable: boolean;
+  version?: string;
+  currentVersion?: string;
+  isDev?: boolean;
+}
+
+export interface UpdateAvailableInfo {
+  version: string;
+  releaseDate?: string;
+  releaseNotes?: string | null;
+}
+
+export interface UpdateProgressInfo {
+  percent: number;
+  bytesPerSecond: number;
+  transferred: number;
+  total: number;
+}
+
+export interface UpdateDownloadedInfo {
+  version: string;
+}
+
+export interface UpdateErrorInfo {
+  message: string;
+}
+
 // Layout types
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -139,6 +168,18 @@ export interface ElectronAPI {
   };
   git: {
     getStatus: (projectPath: string) => Promise<GitStatus>;
+  };
+  update: {
+    check: () => Promise<UpdateCheckResult>;
+    download: () => Promise<{ success: boolean; isDev?: boolean }>;
+    install: () => Promise<void>;
+    getVersion: () => Promise<string>;
+    onChecking: (callback: () => void) => Unsubscribe;
+    onAvailable: (callback: (info: UpdateAvailableInfo) => void) => Unsubscribe;
+    onNotAvailable: (callback: () => void) => Unsubscribe;
+    onProgress: (callback: (progress: UpdateProgressInfo) => void) => Unsubscribe;
+    onDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => Unsubscribe;
+    onError: (callback: (error: UpdateErrorInfo) => void) => Unsubscribe;
   };
   removeAllListeners: (channel: string) => void;
 }

@@ -3,6 +3,7 @@ import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from
 import { Sidebar } from '../Sidebar/Sidebar'
 import { TerminalArea } from './TerminalArea'
 import { FileExplorer } from '../FileExplorer/FileExplorer'
+import { UpdateNotification } from '../UpdateNotification'
 import { useProjectStore } from '../../stores/projectStore'
 
 export function MainLayout() {
@@ -23,6 +24,7 @@ export function MainLayout() {
 
   return (
     <div className="h-screen w-screen bg-background">
+      <UpdateNotification />
       <PanelGroup direction="horizontal" autoSaveId="main-layout">
         {/* Sidebar */}
         <Panel

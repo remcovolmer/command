@@ -10,6 +10,7 @@ import { GitService } from './services/GitService'
 import { WorktreeService } from './services/WorktreeService'
 import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
 import { installClaudeHooks } from './services/HookInstaller'
+import { UpdateService } from './services/UpdateService'
 import { randomUUID } from 'node:crypto'
 
 // Validation helpers
@@ -50,6 +51,7 @@ let projectPersistence: ProjectPersistence | null = null
 let gitService: GitService | null = null
 let worktreeService: WorktreeService | null = null
 let hookWatcher: ClaudeHookWatcher | null = null
+let updateService: UpdateService | null = null
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
@@ -84,6 +86,8 @@ async function createWindow() {
   projectPersistence = new ProjectPersistence()
   gitService = new GitService()
   worktreeService = new WorktreeService()
+  updateService = new UpdateService()
+  updateService.initialize(win)
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -325,7 +329,35 @@ ipcMain.on('app:cancel-close', () => {
   // User cancelled, do nothing
 })
 
-app.whenReady().then(createWindow)
+// IPC Handlers for Update operations
+ipcMain.handle('update:check', async () => {
+  return updateService?.checkForUpdates()
+})
+
+ipcMain.handle('update:download', async () => {
+  return updateService?.downloadUpdate()
+})
+
+ipcMain.handle('update:install', () => {
+  updateService?.quitAndInstall()
+})
+
+ipcMain.handle('update:get-version', () => {
+  return updateService?.getCurrentVersion() ?? app.getVersion()
+})
+
+app.whenReady().then(async () => {
+  await createWindow()
+
+  // Check for updates after app is loaded (with delay to not block UI)
+  setTimeout(() => {
+    if (app.isPackaged) {
+      updateService?.checkForUpdates().catch((err) => {
+        console.error('Auto update check failed:', err)
+      })
+    }
+  }, 5000) // 5 second delay
+})
 
 app.on('window-all-closed', () => {
   hookWatcher?.stop()
