@@ -43,9 +43,6 @@ export const WorktreeItem = memo(function WorktreeItem({
   const visibleStates = ['busy', 'done', 'permission', 'question'] as const
   const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
-  // Check if any terminal needs input
-  const hasNeedsInput = terminals.some((t) => inputStates.includes(t.state as typeof inputStates[number]))
-
   return (
     <div className="mt-1 border-l border-primary/30 ml-6">
       {/* Worktree Header */}
@@ -54,11 +51,6 @@ export const WorktreeItem = memo(function WorktreeItem({
         <span className="flex-1 text-xs font-medium truncate" title={worktree.branch}>
           {worktree.name}
         </span>
-
-        {/* Needs input indicator */}
-        {hasNeedsInput && (
-          <span className="w-1.5 h-1.5 rounded-full bg-primary needs-input-indicator" />
-        )}
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

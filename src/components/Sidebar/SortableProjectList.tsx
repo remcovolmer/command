@@ -28,7 +28,6 @@ interface SortableProjectListProps {
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   activeProjectId: string | null
   activeTerminalId: string | null
-  hasNeedsInput: (projectId: string) => boolean
   onSelect: (projectId: string) => void
   onRemove: (e: React.MouseEvent, projectId: string) => void
   onCreateTerminal: (projectId: string, worktreeId?: string) => void
@@ -47,7 +46,6 @@ export function SortableProjectList({
   getWorktreeTerminals,
   activeProjectId,
   activeTerminalId,
-  hasNeedsInput,
   onSelect,
   onRemove,
   onCreateTerminal,
@@ -112,7 +110,6 @@ export function SortableProjectList({
               getWorktreeTerminals={getWorktreeTerminals}
               isActive={project.id === activeProjectId}
               activeTerminalId={activeTerminalId}
-              hasNeedsInput={hasNeedsInput(project.id)}
               isDragging={project.id === activeId}
               onSelect={() => onSelect(project.id)}
               onRemove={(e) => onRemove(e, project.id)}

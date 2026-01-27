@@ -212,13 +212,6 @@ export function Sidebar() {
     return Object.values(worktrees).filter((w) => w.projectId === projectId)
   }
 
-  // Check if any terminal in the project needs user input
-  // (done, permission, or question states)
-  const hasNeedsInput = (projectId: string): boolean => {
-    const inputStates = ['done', 'permission', 'question']
-    return getProjectTerminals(projectId).some((t) => inputStates.includes(t.state))
-  }
-
   return (
     <>
     <div className="flex flex-col h-full bg-sidebar">
@@ -268,7 +261,6 @@ export function Sidebar() {
             getWorktreeTerminals={getWorktreeTerminals}
             activeProjectId={activeProjectId}
             activeTerminalId={activeTerminalId}
-            hasNeedsInput={hasNeedsInput}
             onSelect={setActiveProject}
             onRemove={handleRemoveProject}
             onCreateTerminal={handleCreateTerminal}

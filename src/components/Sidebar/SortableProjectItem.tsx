@@ -13,7 +13,6 @@ interface SortableProjectItemProps {
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   isActive: boolean
   activeTerminalId: string | null
-  hasNeedsInput: boolean
   isDragging: boolean
   onSelect: () => void
   onRemove: (e: React.MouseEvent) => void
@@ -32,7 +31,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   getWorktreeTerminals,
   isActive,
   activeTerminalId,
-  hasNeedsInput,
   isDragging,
   onSelect,
   onRemove,
@@ -111,11 +109,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <span className="flex-1 text-sm truncate" title={project.path}>
           {project.name}
         </span>
-
-        {/* Notification indicator */}
-        {hasNeedsInput && (
-          <span className="w-2 h-2 rounded-full bg-primary needs-input-indicator" />
-        )}
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
