@@ -11,12 +11,23 @@ interface Project {
   sortOrder: number
 }
 
+interface Worktree {
+  id: string
+  projectId: string
+  name: string
+  branch: string
+  path: string
+  createdAt: number
+  isLocked: boolean
+}
+
 interface PersistedState {
   version: number
   projects: Project[]
+  worktrees: Record<string, Worktree[]>  // projectId -> worktrees
 }
 
-const STATE_VERSION = 1
+const STATE_VERSION = 2
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -38,7 +49,7 @@ export class ProjectPersistence {
         if (parsed && typeof parsed === 'object' && Array.isArray(parsed.projects)) {
           // Handle version migrations if needed
           if (parsed.version !== STATE_VERSION) {
-            return this.migrateState(parsed as PersistedState)
+            return this.migrateState(parsed)
           }
 
           return parsed as PersistedState
@@ -53,15 +64,25 @@ export class ProjectPersistence {
     return {
       version: STATE_VERSION,
       projects: [],
+      worktrees: {},
     }
   }
 
-  private migrateState(oldState: PersistedState): PersistedState {
-    // For now, just return the state with updated version
-    // Add migration logic here when schema changes
+  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]> }): PersistedState {
+    // Migrate from version 1 to 2: add worktrees
+    if (oldState.version === 1) {
+      return {
+        version: STATE_VERSION,
+        projects: oldState.projects,
+        worktrees: {},
+      }
+    }
+
+    // Default migration: ensure worktrees exist
     return {
-      ...oldState,
       version: STATE_VERSION,
+      projects: oldState.projects,
+      worktrees: oldState.worktrees ?? {},
     }
   }
 
@@ -146,5 +167,72 @@ export class ProjectPersistence {
     })
 
     this.saveState()
+  }
+
+  // Worktree methods
+  getWorktrees(projectId: string): Worktree[] {
+    return this.state.worktrees[projectId] ?? []
+  }
+
+  getAllWorktrees(): Record<string, Worktree[]> {
+    return { ...this.state.worktrees }
+  }
+
+  getWorktreeById(worktreeId: string): Worktree | null {
+    for (const projectWorktrees of Object.values(this.state.worktrees)) {
+      const worktree = projectWorktrees.find(w => w.id === worktreeId)
+      if (worktree) return worktree
+    }
+    return null
+  }
+
+  addWorktree(worktree: Worktree): Worktree {
+    if (!this.state.worktrees[worktree.projectId]) {
+      this.state.worktrees[worktree.projectId] = []
+    }
+
+    // Check for duplicate path
+    const existing = this.state.worktrees[worktree.projectId].find(
+      w => w.path === worktree.path
+    )
+    if (existing) {
+      return existing
+    }
+
+    this.state.worktrees[worktree.projectId].push(worktree)
+    this.saveState()
+
+    return worktree
+  }
+
+  removeWorktree(worktreeId: string): void {
+    for (const projectId of Object.keys(this.state.worktrees)) {
+      const index = this.state.worktrees[projectId].findIndex(w => w.id === worktreeId)
+      if (index !== -1) {
+        this.state.worktrees[projectId].splice(index, 1)
+        this.saveState()
+        return
+      }
+    }
+  }
+
+  updateWorktree(worktreeId: string, updates: Partial<Omit<Worktree, 'id' | 'projectId' | 'createdAt'>>): Worktree | null {
+    for (const projectWorktrees of Object.values(this.state.worktrees)) {
+      const worktree = projectWorktrees.find(w => w.id === worktreeId)
+      if (worktree) {
+        Object.assign(worktree, updates)
+        this.saveState()
+        return worktree
+      }
+    }
+    return null
+  }
+
+  // Remove all worktrees for a project (called when project is removed)
+  removeProjectWorktrees(projectId: string): void {
+    if (this.state.worktrees[projectId]) {
+      delete this.state.worktrees[projectId]
+      this.saveState()
+    }
   }
 }

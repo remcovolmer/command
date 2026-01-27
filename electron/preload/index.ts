@@ -2,8 +2,8 @@ import { ipcRenderer, contextBridge } from 'electron'
 
 console.log('[PRELOAD] Script starting...')
 
-// Type definitions for the exposed API - Claude Code specific states
-type TerminalState = 'starting' | 'busy' | 'question' | 'permission' | 'ready' | 'stopped' | 'error'
+// Type definitions for the exposed API - Simplified Claude Code states (4 states)
+type TerminalState = 'busy' | 'permission' | 'ready' | 'stopped'
 
 // Whitelist of channels that can have listeners removed
 const ALLOWED_LISTENER_CHANNELS = [
@@ -19,6 +19,22 @@ interface Project {
   path: string
   createdAt: number
   sortOrder: number
+}
+
+interface Worktree {
+  id: string
+  projectId: string
+  name: string
+  branch: string
+  path: string
+  createdAt: number
+  isLocked: boolean
+}
+
+interface BranchList {
+  local: string[]
+  remote: string[]
+  current: string | null
 }
 
 interface FileSystemEntry {
@@ -59,8 +75,8 @@ type Unsubscribe = () => void
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
   terminal: {
-    create: (projectId: string): Promise<string> =>
-      ipcRenderer.invoke('terminal:create', projectId),
+    create: (projectId: string, worktreeId?: string): Promise<string> =>
+      ipcRenderer.invoke('terminal:create', projectId, worktreeId),
 
     write: (terminalId: string, data: string): void =>
       ipcRenderer.send('terminal:write', terminalId, data),
@@ -107,6 +123,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     reorder: (projectIds: string[]): Promise<Project[]> =>
       ipcRenderer.invoke('project:reorder', projectIds),
+  },
+
+  // Worktree operations
+  worktree: {
+    create: (projectId: string, branchName: string, worktreeName?: string): Promise<Worktree> =>
+      ipcRenderer.invoke('worktree:create', projectId, branchName, worktreeName),
+
+    list: (projectId: string): Promise<Worktree[]> =>
+      ipcRenderer.invoke('worktree:list', projectId),
+
+    listBranches: (projectId: string): Promise<BranchList> =>
+      ipcRenderer.invoke('worktree:list-branches', projectId),
+
+    remove: (worktreeId: string, force?: boolean): Promise<void> =>
+      ipcRenderer.invoke('worktree:remove', worktreeId, force ?? false),
+
+    hasChanges: (worktreeId: string): Promise<boolean> =>
+      ipcRenderer.invoke('worktree:has-changes', worktreeId),
   },
 
   // Notification operations

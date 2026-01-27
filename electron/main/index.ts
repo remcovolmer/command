@@ -7,6 +7,10 @@ import os from 'node:os'
 import { TerminalManager } from './services/TerminalManager'
 import { ProjectPersistence } from './services/ProjectPersistence'
 import { GitService } from './services/GitService'
+import { WorktreeService } from './services/WorktreeService'
+import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
+import { installClaudeHooks } from './services/HookInstaller'
+import { randomUUID } from 'node:crypto'
 
 // Validation helpers
 const isValidUUID = (id: string): boolean =>
@@ -44,6 +48,8 @@ let win: BrowserWindow | null = null
 let terminalManager: TerminalManager | null = null
 let projectPersistence: ProjectPersistence | null = null
 let gitService: GitService | null = null
+let worktreeService: WorktreeService | null = null
+let hookWatcher: ClaudeHookWatcher | null = null
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
@@ -66,10 +72,18 @@ async function createWindow() {
     },
   })
 
+  // Install Claude Code hooks for state detection
+  installClaudeHooks()
+
+  // Initialize hook watcher
+  hookWatcher = new ClaudeHookWatcher(win)
+  hookWatcher.start()
+
   // Initialize services
-  terminalManager = new TerminalManager(win)
+  terminalManager = new TerminalManager(win, hookWatcher)
   projectPersistence = new ProjectPersistence()
   gitService = new GitService()
+  worktreeService = new WorktreeService()
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -94,11 +108,24 @@ async function createWindow() {
 }
 
 // IPC Handlers for Terminal operations
-ipcMain.handle('terminal:create', async (_event, projectId: string) => {
-  // Get the project path from the project ID
-  const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
-  const cwd = project?.path ?? process.cwd()
+ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string) => {
+  // Determine the working directory
+  let cwd: string
+
+  if (worktreeId) {
+    // Use worktree path if provided
+    const worktree = projectPersistence?.getWorktreeById(worktreeId)
+    if (!worktree) {
+      throw new Error(`Worktree not found: ${worktreeId}`)
+    }
+    cwd = worktree.path
+  } else {
+    // Use project path
+    const projects = projectPersistence?.getProjects() ?? []
+    const project = projects.find(p => p.id === projectId)
+    cwd = project?.path ?? process.cwd()
+  }
+
   return terminalManager?.createTerminal(cwd)
 })
 
@@ -187,6 +214,102 @@ ipcMain.handle('git:status', async (_event, projectPath: string) => {
   return gitService?.getStatus(projectPath)
 })
 
+// IPC Handlers for Worktree operations
+ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: string, worktreeName?: string) => {
+  if (!isValidUUID(projectId)) {
+    throw new Error('Invalid project ID')
+  }
+  if (typeof branchName !== 'string' || branchName.length === 0 || branchName.length > 200) {
+    throw new Error('Invalid branch name')
+  }
+
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === projectId)
+  if (!project) {
+    throw new Error(`Project not found: ${projectId}`)
+  }
+
+  // Create the worktree using git
+  const result = await worktreeService!.createWorktree(project.path, branchName, worktreeName)
+
+  // Save worktree to persistence
+  const name = worktreeName || branchName.replace(/\//g, '-')
+  const worktree = projectPersistence!.addWorktree({
+    id: randomUUID(),
+    projectId,
+    name,
+    branch: result.branch,
+    path: result.path,
+    createdAt: Date.now(),
+    isLocked: false,
+  })
+
+  return worktree
+})
+
+ipcMain.handle('worktree:list', async (_event, projectId: string) => {
+  if (!isValidUUID(projectId)) {
+    throw new Error('Invalid project ID')
+  }
+  return projectPersistence?.getWorktrees(projectId) ?? []
+})
+
+ipcMain.handle('worktree:list-branches', async (_event, projectId: string) => {
+  if (!isValidUUID(projectId)) {
+    throw new Error('Invalid project ID')
+  }
+
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === projectId)
+  if (!project) {
+    throw new Error(`Project not found: ${projectId}`)
+  }
+
+  const [local, remote, current] = await Promise.all([
+    worktreeService!.listBranches(project.path),
+    worktreeService!.listRemoteBranches(project.path),
+    worktreeService!.getCurrentBranch(project.path),
+  ])
+
+  return { local, remote, current }
+})
+
+ipcMain.handle('worktree:remove', async (_event, worktreeId: string, force: boolean = false) => {
+  if (!isValidUUID(worktreeId)) {
+    throw new Error('Invalid worktree ID')
+  }
+
+  const worktree = projectPersistence?.getWorktreeById(worktreeId)
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${worktreeId}`)
+  }
+
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === worktree.projectId)
+  if (!project) {
+    throw new Error(`Project not found: ${worktree.projectId}`)
+  }
+
+  // Remove the worktree using git
+  await worktreeService!.removeWorktree(project.path, worktree.path, force)
+
+  // Remove from persistence
+  projectPersistence!.removeWorktree(worktreeId)
+})
+
+ipcMain.handle('worktree:has-changes', async (_event, worktreeId: string) => {
+  if (!isValidUUID(worktreeId)) {
+    throw new Error('Invalid worktree ID')
+  }
+
+  const worktree = projectPersistence?.getWorktreeById(worktreeId)
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${worktreeId}`)
+  }
+
+  return worktreeService!.hasUncommittedChanges(worktree.path)
+})
+
 // IPC Handlers for Notifications
 ipcMain.on('notification:show', (_event, title: string, body: string) => {
   new Notification({ title, body }).show()
@@ -205,6 +328,7 @@ ipcMain.on('app:cancel-close', () => {
 app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {
+  hookWatcher?.stop()
   terminalManager?.closeAllTerminals()
   win = null
   if (process.platform !== 'darwin') app.quit()

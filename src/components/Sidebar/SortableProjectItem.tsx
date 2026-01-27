@@ -1,19 +1,25 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo } from 'react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X } from 'lucide-react'
-import type { Project, TerminalSession } from '../../types'
+import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch } from 'lucide-react'
+import type { Project, TerminalSession, Worktree } from '../../types'
+import { WorktreeItem } from '../Worktree/WorktreeItem'
 
 interface SortableProjectItemProps {
   project: Project
   terminals: TerminalSession[]
+  directTerminals: TerminalSession[]
+  worktrees: Worktree[]
+  getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   isActive: boolean
   activeTerminalId: string | null
   hasNeedsInput: boolean
   isDragging: boolean
   onSelect: () => void
   onRemove: (e: React.MouseEvent) => void
-  onCreateTerminal: () => void
+  onCreateTerminal: (worktreeId?: string) => void
+  onCreateWorktree: () => void
+  onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (id: string) => void
   onCloseTerminal: (e: React.MouseEvent, id: string) => void
 }
@@ -21,6 +27,9 @@ interface SortableProjectItemProps {
 export const SortableProjectItem = memo(function SortableProjectItem({
   project,
   terminals,
+  directTerminals,
+  worktrees,
+  getWorktreeTerminals,
   isActive,
   activeTerminalId,
   hasNeedsInput,
@@ -28,6 +37,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   onSelect,
   onRemove,
   onCreateTerminal,
+  onCreateWorktree,
+  onRemoveWorktree,
   onSelectTerminal,
   onCloseTerminal,
 }: SortableProjectItemProps) {
@@ -118,6 +129,17 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             <Plus className="w-3.5 h-3.5" />
           </button>
           <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onCreateWorktree()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="p-1 rounded hover:bg-border"
+            title="New Worktree"
+          >
+            <GitBranch className="w-3.5 h-3.5" />
+          </button>
+          <button
             onClick={onRemove}
             onPointerDown={(e) => e.stopPropagation()}
             className="p-1 rounded hover:bg-border"
@@ -128,10 +150,10 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         </div>
       </div>
 
-      {/* Terminal List */}
-      {terminals.length > 0 && (
+      {/* Direct Terminals (not in worktree) */}
+      {directTerminals.length > 0 && (
         <ul className="ml-6 mt-1 space-y-0.5 border-l border-border">
-          {terminals.map((terminal) => (
+          {directTerminals.map((terminal) => (
             <li
               key={terminal.id}
               onClick={() => onSelectTerminal(terminal.id)}
@@ -170,11 +192,25 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         </ul>
       )}
 
+      {/* Worktrees */}
+      {worktrees.map((worktree) => (
+        <WorktreeItem
+          key={worktree.id}
+          worktree={worktree}
+          terminals={getWorktreeTerminals(worktree.id)}
+          activeTerminalId={activeTerminalId}
+          onCreateTerminal={() => onCreateTerminal(worktree.id)}
+          onSelectTerminal={onSelectTerminal}
+          onCloseTerminal={onCloseTerminal}
+          onRemove={() => onRemoveWorktree(worktree.id)}
+        />
+      ))}
+
       {/* Empty state for active project */}
-      {isActive && terminals.length === 0 && (
+      {isActive && terminals.length === 0 && worktrees.length === 0 && (
         <div className="ml-6 pl-3 py-2 border-l border-border">
           <button
-            onClick={onCreateTerminal}
+            onClick={() => onCreateTerminal()}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="w-3 h-3" />

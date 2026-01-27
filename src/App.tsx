@@ -87,7 +87,8 @@ function App() {
           const terminal: TerminalSession = {
             id: terminalId,
             projectId: activeProjectId,
-            state: 'starting',
+            worktreeId: null,
+            state: 'busy',
             lastActivity: Date.now(),
             title: `Terminal ${projectTerminals.length + 1}`,
           }

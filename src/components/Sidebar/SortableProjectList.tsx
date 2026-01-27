@@ -16,19 +16,24 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import type { Project, TerminalSession } from '../../types'
+import type { Project, TerminalSession, Worktree } from '../../types'
 import { SortableProjectItem } from './SortableProjectItem'
 import { ProjectDragPreview } from './ProjectDragPreview'
 
 interface SortableProjectListProps {
   projects: Project[]
   getProjectTerminals: (projectId: string) => TerminalSession[]
+  getProjectDirectTerminals: (projectId: string) => TerminalSession[]
+  getProjectWorktrees: (projectId: string) => Worktree[]
+  getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   activeProjectId: string | null
   activeTerminalId: string | null
   hasNeedsInput: (projectId: string) => boolean
   onSelect: (projectId: string) => void
   onRemove: (e: React.MouseEvent, projectId: string) => void
-  onCreateTerminal: (projectId: string) => void
+  onCreateTerminal: (projectId: string, worktreeId?: string) => void
+  onCreateWorktree: (projectId: string) => void
+  onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (terminalId: string) => void
   onCloseTerminal: (e: React.MouseEvent, terminalId: string) => void
   onReorder: (projectIds: string[]) => void
@@ -37,12 +42,17 @@ interface SortableProjectListProps {
 export function SortableProjectList({
   projects,
   getProjectTerminals,
+  getProjectDirectTerminals,
+  getProjectWorktrees,
+  getWorktreeTerminals,
   activeProjectId,
   activeTerminalId,
   hasNeedsInput,
   onSelect,
   onRemove,
   onCreateTerminal,
+  onCreateWorktree,
+  onRemoveWorktree,
   onSelectTerminal,
   onCloseTerminal,
   onReorder,
@@ -97,13 +107,18 @@ export function SortableProjectList({
               key={project.id}
               project={project}
               terminals={getProjectTerminals(project.id)}
+              directTerminals={getProjectDirectTerminals(project.id)}
+              worktrees={getProjectWorktrees(project.id)}
+              getWorktreeTerminals={getWorktreeTerminals}
               isActive={project.id === activeProjectId}
               activeTerminalId={activeTerminalId}
               hasNeedsInput={hasNeedsInput(project.id)}
               isDragging={project.id === activeId}
               onSelect={() => onSelect(project.id)}
               onRemove={(e) => onRemove(e, project.id)}
-              onCreateTerminal={() => onCreateTerminal(project.id)}
+              onCreateTerminal={(worktreeId) => onCreateTerminal(project.id, worktreeId)}
+              onCreateWorktree={() => onCreateWorktree(project.id)}
+              onRemoveWorktree={onRemoveWorktree}
               onSelectTerminal={onSelectTerminal}
               onCloseTerminal={onCloseTerminal}
             />

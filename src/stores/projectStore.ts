@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree } from '../types'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
@@ -13,6 +13,10 @@ interface ProjectStore {
   layouts: Record<string, TerminalLayout>
   activeProjectId: string | null
   activeTerminalId: string | null
+
+  // Worktree state
+  worktrees: Record<string, Worktree>  // worktreeId -> Worktree
+  activeWorktreeId: string | null
 
   // File explorer state
   fileExplorerVisible: boolean
@@ -54,6 +58,15 @@ interface ProjectStore {
   updateTerminalState: (id: string, state: TerminalState) => void
   setActiveTerminal: (id: string | null) => void
   getProjectTerminals: (projectId: string) => TerminalSession[]
+  getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
+  getProjectDirectTerminals: (projectId: string) => TerminalSession[]
+
+  // Worktree actions
+  addWorktree: (worktree: Worktree) => void
+  removeWorktree: (id: string) => void
+  setActiveWorktree: (id: string | null) => void
+  getProjectWorktrees: (projectId: string) => Worktree[]
+  loadWorktrees: (projectId: string) => Promise<void>
 
   // Layout actions
   getLayout: (projectId: string) => TerminalLayout | null
@@ -74,6 +87,10 @@ export const useProjectStore = create<ProjectStore>()(
       layouts: {},
       activeProjectId: null,
       activeTerminalId: null,
+
+      // Worktree state
+      worktrees: {},
+      activeWorktreeId: null,
 
       // File explorer state
       fileExplorerVisible: false,
@@ -168,6 +185,14 @@ export const useProjectStore = create<ProjectStore>()(
             }
           })
 
+          // Remove all worktrees for this project
+          const newWorktrees = { ...state.worktrees }
+          Object.keys(newWorktrees).forEach((wtId) => {
+            if (newWorktrees[wtId].projectId === id) {
+              delete newWorktrees[wtId]
+            }
+          })
+
           // Remove layout
           const newLayouts = { ...state.layouts }
           delete newLayouts[id]
@@ -179,11 +204,19 @@ export const useProjectStore = create<ProjectStore>()(
               ? newProjects[0]?.id ?? null
               : state.activeProjectId
 
+          // Update active worktree if it was in the removed project
+          const newActiveWorktreeId =
+            state.activeWorktreeId && !newWorktrees[state.activeWorktreeId]
+              ? null
+              : state.activeWorktreeId
+
           return {
             projects: newProjects,
             terminals: newTerminals,
+            worktrees: newWorktrees,
             layouts: newLayouts,
             activeProjectId: newActiveProjectId,
+            activeWorktreeId: newActiveWorktreeId,
             activeTerminalId:
               state.activeTerminalId &&
               newTerminals[state.activeTerminalId]
@@ -313,6 +346,104 @@ export const useProjectStore = create<ProjectStore>()(
         return Object.values(state.terminals).filter(
           (t) => t.projectId === projectId
         )
+      },
+
+      getWorktreeTerminals: (worktreeId) => {
+        const state = get()
+        return Object.values(state.terminals).filter(
+          (t) => t.worktreeId === worktreeId
+        )
+      },
+
+      getProjectDirectTerminals: (projectId) => {
+        const state = get()
+        return Object.values(state.terminals).filter(
+          (t) => t.projectId === projectId && t.worktreeId === null
+        )
+      },
+
+      // Worktree actions
+      addWorktree: (worktree) =>
+        set((state) => ({
+          worktrees: { ...state.worktrees, [worktree.id]: worktree },
+        })),
+
+      removeWorktree: (id) =>
+        set((state) => {
+          const newWorktrees = { ...state.worktrees }
+          const removedWorktree = newWorktrees[id]
+          delete newWorktrees[id]
+
+          // Remove all terminals for this worktree
+          const newTerminals = { ...state.terminals }
+          Object.keys(newTerminals).forEach((termId) => {
+            if (newTerminals[termId].worktreeId === id) {
+              delete newTerminals[termId]
+            }
+          })
+
+          // Update active worktree if needed
+          let newActiveWorktreeId = state.activeWorktreeId
+          if (state.activeWorktreeId === id) {
+            // Find another worktree in the same project or null
+            const sameProjectWorktrees = Object.values(newWorktrees).filter(
+              (w) => w.projectId === removedWorktree?.projectId
+            )
+            newActiveWorktreeId = sameProjectWorktrees.length > 0
+              ? sameProjectWorktrees[0].id
+              : null
+          }
+
+          // Update active terminal if it was in the removed worktree
+          let newActiveTerminalId = state.activeTerminalId
+          if (state.activeTerminalId && !newTerminals[state.activeTerminalId]) {
+            const projectTerminals = Object.values(newTerminals).filter(
+              (t) => t.projectId === removedWorktree?.projectId
+            )
+            newActiveTerminalId = projectTerminals.length > 0
+              ? projectTerminals[0].id
+              : null
+          }
+
+          return {
+            worktrees: newWorktrees,
+            terminals: newTerminals,
+            activeWorktreeId: newActiveWorktreeId,
+            activeTerminalId: newActiveTerminalId,
+          }
+        }),
+
+      setActiveWorktree: (id) =>
+        set({ activeWorktreeId: id }),
+
+      getProjectWorktrees: (projectId) => {
+        const state = get()
+        return Object.values(state.worktrees).filter(
+          (w) => w.projectId === projectId
+        )
+      },
+
+      loadWorktrees: async (projectId) => {
+        const api = getElectronAPI()
+        try {
+          const worktrees = await api.worktree.list(projectId)
+          set((state) => {
+            const newWorktrees = { ...state.worktrees }
+            // Remove old worktrees for this project
+            Object.keys(newWorktrees).forEach((id) => {
+              if (newWorktrees[id].projectId === projectId) {
+                delete newWorktrees[id]
+              }
+            })
+            // Add new worktrees
+            worktrees.forEach((w) => {
+              newWorktrees[w.id] = w
+            })
+            return { worktrees: newWorktrees }
+          })
+        } catch (error) {
+          console.error('Failed to load worktrees:', error)
+        }
       },
 
       // Layout actions

@@ -7,19 +7,27 @@ export interface Project {
   sortOrder: number;
 }
 
-// Terminal types - Claude Code specific states
+// Worktree types
+export interface Worktree {
+  id: string;
+  projectId: string;
+  name: string;
+  branch: string;
+  path: string;
+  createdAt: number;
+  isLocked: boolean;
+}
+
+// Terminal types - Simplified Claude Code states (4 states)
 export type TerminalState =
-  | 'starting'    // Terminal starting up
-  | 'busy'        // Claude is working (spinner/activity detected)
-  | 'question'    // Claude asking a question
-  | 'permission'  // Claude needs permission for tool/command
-  | 'ready'       // Claude waiting for user input
-  | 'stopped'     // Terminal stopped
-  | 'error';      // Error occurred
+  | 'busy'        // Blue - Claude is working (includes starting)
+  | 'permission'  // Orange - Claude needs permission for tool/command
+  | 'ready'       // Green - Claude waiting for user input
+  | 'stopped';    // Red - Terminal stopped or error
 
 // Valid terminal states for runtime validation
 export const VALID_TERMINAL_STATES: readonly TerminalState[] = [
-  'starting', 'busy', 'question', 'permission', 'ready', 'stopped', 'error'
+  'busy', 'permission', 'ready', 'stopped'
 ] as const;
 
 // Type guard for terminal state
@@ -33,6 +41,7 @@ export type Unsubscribe = () => void;
 export interface TerminalSession {
   id: string;
   projectId: string;
+  worktreeId: string | null;  // null = direct in project, string = in worktree
   state: TerminalState;
   lastActivity: number;
   title: string;
@@ -95,7 +104,7 @@ export interface AppState {
 // IPC API types
 export interface ElectronAPI {
   terminal: {
-    create: (projectId: string) => Promise<string>;
+    create: (projectId: string, worktreeId?: string) => Promise<string>;
     write: (terminalId: string, data: string) => void;
     resize: (terminalId: string, cols: number, rows: number) => void;
     close: (terminalId: string) => void;
@@ -109,6 +118,13 @@ export interface ElectronAPI {
     remove: (id: string) => Promise<void>;
     selectFolder: () => Promise<string | null>;
     reorder: (projectIds: string[]) => Promise<Project[]>;
+  };
+  worktree: {
+    create: (projectId: string, branchName: string, worktreeName?: string) => Promise<Worktree>;
+    list: (projectId: string) => Promise<Worktree[]>;
+    listBranches: (projectId: string) => Promise<{ local: string[]; remote: string[]; current: string | null }>;
+    remove: (worktreeId: string, force?: boolean) => Promise<void>;
+    hasChanges: (worktreeId: string) => Promise<boolean>;
   };
   notification: {
     show: (title: string, body: string) => void;

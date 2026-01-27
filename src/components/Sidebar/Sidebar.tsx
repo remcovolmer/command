@@ -1,15 +1,17 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, FolderOpen, Sparkles, PanelRightOpen, PanelRightClose, Sun, Moon } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
-import type { TerminalSession } from '../../types'
+import type { TerminalSession, Worktree } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { SortableProjectList } from './SortableProjectList'
+import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
 
 export function Sidebar() {
   // Use granular selectors to prevent unnecessary re-renders
   const projects = useProjectStore((s) => s.projects)
   const terminals = useProjectStore((s) => s.terminals)
+  const worktrees = useProjectStore((s) => s.worktrees)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const activeTerminalId = useProjectStore((s) => s.activeTerminalId)
   const fileExplorerVisible = useProjectStore((s) => s.fileExplorerVisible)
@@ -25,7 +27,10 @@ export function Sidebar() {
     removeProject,
     addTerminal,
     removeTerminal,
+    addWorktree,
+    removeWorktree,
     loadProjects,
+    loadWorktrees,
     reorderProjects,
   } = useProjectStore(
     useShallow((s) => ({
@@ -35,17 +40,35 @@ export function Sidebar() {
       removeProject: s.removeProject,
       addTerminal: s.addTerminal,
       removeTerminal: s.removeTerminal,
+      addWorktree: s.addWorktree,
+      removeWorktree: s.removeWorktree,
       loadProjects: s.loadProjects,
+      loadWorktrees: s.loadWorktrees,
       reorderProjects: s.reorderProjects,
     }))
   )
 
   const api = useMemo(() => getElectronAPI(), [])
 
+  // State for worktree dialog
+  const [worktreeDialogProjectId, setWorktreeDialogProjectId] = useState<string | null>(null)
+
   // Load projects on mount
   useEffect(() => {
-    loadProjects()
+    loadProjects().then(() => {
+      // Load worktrees for all projects after projects are loaded
+      projects.forEach((project) => {
+        loadWorktrees(project.id)
+      })
+    })
   }, [loadProjects])
+
+  // Load worktrees when projects change
+  useEffect(() => {
+    projects.forEach((project) => {
+      loadWorktrees(project.id)
+    })
+  }, [projects.length, loadWorktrees])
 
   const handleAddProject = async () => {
     const folderPath = await api.project.selectFolder()
@@ -61,13 +84,12 @@ export function Sidebar() {
     removeProject(projectId)
   }
 
-  const handleCreateTerminal = async (projectId: string) => {
+  const handleCreateTerminal = async (projectId: string, worktreeId?: string) => {
     // Check terminal limit (max 3 per project)
     const projectTerminals = Object.values(terminals).filter(
       (t) => t.projectId === projectId
     )
     if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
-      // Show notification or toast
       api.notification.show(
         'Terminal Limit',
         `Maximum ${MAX_TERMINALS_PER_PROJECT} terminals per project`
@@ -75,15 +97,59 @@ export function Sidebar() {
       return
     }
 
-    const terminalId = await api.terminal.create(projectId)
+    const terminalId = await api.terminal.create(projectId, worktreeId)
+
+    // Determine terminal number
+    const existingCount = worktreeId
+      ? Object.values(terminals).filter((t) => t.worktreeId === worktreeId).length
+      : Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length
+
     const terminal: TerminalSession = {
       id: terminalId,
       projectId,
-      state: 'starting',
+      worktreeId: worktreeId ?? null,
+      state: 'busy',
       lastActivity: Date.now(),
-      title: `Terminal ${projectTerminals.length + 1}`,
+      title: `Terminal ${existingCount + 1}`,
     }
     addTerminal(terminal)
+  }
+
+  const handleCreateWorktree = (projectId: string) => {
+    setWorktreeDialogProjectId(projectId)
+  }
+
+  const handleWorktreeCreated = (worktree: Worktree) => {
+    addWorktree(worktree)
+    // Automatically create a terminal in the new worktree
+    handleCreateTerminal(worktree.projectId, worktree.id)
+  }
+
+  const handleRemoveWorktree = async (worktreeId: string) => {
+    // Check for uncommitted changes
+    const hasChanges = await api.worktree.hasChanges(worktreeId)
+    if (hasChanges) {
+      const confirmed = window.confirm(
+        'This worktree has uncommitted changes. Are you sure you want to remove it?'
+      )
+      if (!confirmed) return
+    }
+
+    try {
+      // Close all terminals in worktree first
+      Object.values(terminals)
+        .filter((t) => t.worktreeId === worktreeId)
+        .forEach((t) => {
+          api.terminal.close(t.id)
+          removeTerminal(t.id)
+        })
+
+      await api.worktree.remove(worktreeId, hasChanges)
+      removeWorktree(worktreeId)
+    } catch (error) {
+      console.error('Failed to remove worktree:', error)
+      api.notification.show('Error', 'Failed to remove worktree')
+    }
   }
 
   const handleCloseTerminal = (e: React.MouseEvent, terminalId: string) => {
@@ -96,14 +162,27 @@ export function Sidebar() {
     return Object.values(terminals).filter((t) => t.projectId === projectId)
   }
 
+  const getProjectDirectTerminals = (projectId: string): TerminalSession[] => {
+    return Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null)
+  }
+
+  const getWorktreeTerminals = (worktreeId: string): TerminalSession[] => {
+    return Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
+  }
+
+  const getProjectWorktrees = (projectId: string): Worktree[] => {
+    return Object.values(worktrees).filter((w) => w.projectId === projectId)
+  }
+
   // Check if any terminal in the project needs user input
-  // (ready, question, or permission states)
+  // (ready or permission states)
   const hasNeedsInput = (projectId: string): boolean => {
-    const inputStates = ['ready', 'question', 'permission']
+    const inputStates = ['ready', 'permission']
     return getProjectTerminals(projectId).some((t) => inputStates.includes(t.state))
   }
 
   return (
+    <>
     <div className="flex flex-col h-full bg-sidebar">
       {/* Logo Header */}
       <div className="flex items-center gap-2 px-4 py-5">
@@ -146,12 +225,17 @@ export function Sidebar() {
           <SortableProjectList
             projects={projects}
             getProjectTerminals={getProjectTerminals}
+            getProjectDirectTerminals={getProjectDirectTerminals}
+            getProjectWorktrees={getProjectWorktrees}
+            getWorktreeTerminals={getWorktreeTerminals}
             activeProjectId={activeProjectId}
             activeTerminalId={activeTerminalId}
             hasNeedsInput={hasNeedsInput}
             onSelect={setActiveProject}
             onRemove={handleRemoveProject}
             onCreateTerminal={handleCreateTerminal}
+            onCreateWorktree={handleCreateWorktree}
+            onRemoveWorktree={handleRemoveWorktree}
             onSelectTerminal={setActiveTerminal}
             onCloseTerminal={handleCloseTerminal}
             onReorder={reorderProjects}
@@ -202,5 +286,16 @@ export function Sidebar() {
         </div>
       </div>
     </div>
+
+    {/* Create Worktree Dialog */}
+    {worktreeDialogProjectId && (
+      <CreateWorktreeDialog
+        projectId={worktreeDialogProjectId}
+        isOpen={true}
+        onClose={() => setWorktreeDialogProjectId(null)}
+        onCreated={handleWorktreeCreated}
+      />
+    )}
+    </>
   )
 }
