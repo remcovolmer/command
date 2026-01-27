@@ -1,7 +1,6 @@
-import { useEffect, useCallback, useState, useMemo } from 'react'
+import { useState } from 'react'
 import {
   GitBranch,
-  RefreshCw,
   ChevronDown,
   ChevronRight,
   FileEdit,
@@ -15,101 +14,11 @@ import {
 } from 'lucide-react'
 import type { Project, GitFileChange, GitBranchInfo } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
-import { getElectronAPI } from '../../utils/electron'
 
 interface GitStatusPanelProps {
   project: Project
 }
 
-interface GitStatusHeaderProps {
-  project: Project
-  onToggle: () => void
-  isCollapsed: boolean
-}
-
-const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
-
-// Header component - always visible
-export function GitStatusHeader({ project, onToggle, isCollapsed }: GitStatusHeaderProps) {
-  const api = useMemo(() => getElectronAPI(), [])
-  const gitStatus = useProjectStore((s) => s.gitStatus[project.id])
-  const isLoading = useProjectStore((s) => s.gitStatusLoading[project.id])
-  const setGitStatus = useProjectStore((s) => s.setGitStatus)
-  const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
-
-  const fetchStatus = useCallback(async () => {
-    setGitStatusLoading(project.id, true)
-    try {
-      const status = await api.git.getStatus(project.path)
-      setGitStatus(project.id, status)
-    } catch (error) {
-      console.error('Failed to fetch git status:', error)
-    } finally {
-      setGitStatusLoading(project.id, false)
-    }
-  }, [api, project.id, project.path, setGitStatus, setGitStatusLoading])
-
-  // Fetch on mount and when project changes
-  useEffect(() => {
-    fetchStatus()
-  }, [fetchStatus])
-
-  // Auto-refresh interval
-  useEffect(() => {
-    const interval = setInterval(fetchStatus, GIT_REFRESH_INTERVAL)
-    return () => clearInterval(interval)
-  }, [fetchStatus])
-
-  const totalChanges = gitStatus
-    ? gitStatus.staged.length +
-      gitStatus.modified.length +
-      gitStatus.untracked.length +
-      gitStatus.conflicted.length
-    : 0
-
-  return (
-    <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-sidebar">
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-2 hover:text-sidebar-foreground transition-colors"
-      >
-        {isCollapsed ? (
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        )}
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Git
-        </h3>
-        {gitStatus?.branch && (
-          <span className="text-xs text-muted-foreground">
-            ({gitStatus.branch.name})
-          </span>
-        )}
-        {totalChanges > 0 && (
-          <span className="text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
-            {totalChanges}
-          </span>
-        )}
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          fetchStatus()
-        }}
-        disabled={isLoading}
-        className="p-1 rounded hover:bg-sidebar-accent transition-colors"
-        title="Refresh"
-      >
-        <RefreshCw
-          className={`w-3.5 h-3.5 text-muted-foreground ${isLoading ? 'animate-spin' : ''}`}
-        />
-      </button>
-    </div>
-  )
-}
-
-// Content component - inside collapsible panel
 export function GitStatusPanel({ project }: GitStatusPanelProps) {
   const gitStatus = useProjectStore((s) => s.gitStatus[project.id])
 
@@ -125,81 +34,81 @@ export function GitStatusPanel({ project }: GitStatusPanelProps) {
 
   return (
     <div className="h-full overflow-y-auto sidebar-scroll">
-          {!gitStatus ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-            </div>
-          ) : !gitStatus.isGitRepo ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
-              Not a git repository
+      {!gitStatus ? (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : !gitStatus.isGitRepo ? (
+        <div className="px-3 py-2 text-sm text-muted-foreground">
+          Not a git repository
+        </div>
+      ) : (
+        <>
+          {/* Branch Info */}
+          {gitStatus.branch && <BranchSection branch={gitStatus.branch} />}
+
+          {/* Status Indicator */}
+          {gitStatus.isClean ? (
+            <div className="flex items-center gap-2 px-3 py-2 text-sm text-green-600 dark:text-green-400">
+              <Check className="w-4 h-4" />
+              <span>Working tree clean</span>
             </div>
           ) : (
             <>
-              {/* Branch Info */}
-              {gitStatus.branch && <BranchSection branch={gitStatus.branch} />}
-
-              {/* Status Indicator */}
-              {gitStatus.isClean ? (
-                <div className="flex items-center gap-2 px-3 py-2 text-sm text-green-600 dark:text-green-400">
-                  <Check className="w-4 h-4" />
-                  <span>Working tree clean</span>
-                </div>
-              ) : (
-                <>
-                  {/* Staged Changes */}
-                  {gitStatus.staged.length > 0 && (
-                    <FileChangeSection
-                      title="Staged"
-                      files={gitStatus.staged}
-                      expanded={expandedSections.staged}
-                      onToggle={() => toggleSection('staged')}
-                      variant="success"
-                    />
-                  )}
-
-                  {/* Modified Changes */}
-                  {gitStatus.modified.length > 0 && (
-                    <FileChangeSection
-                      title="Modified"
-                      files={gitStatus.modified}
-                      expanded={expandedSections.modified}
-                      onToggle={() => toggleSection('modified')}
-                      variant="warning"
-                    />
-                  )}
-
-                  {/* Untracked Files */}
-                  {gitStatus.untracked.length > 0 && (
-                    <FileChangeSection
-                      title="Untracked"
-                      files={gitStatus.untracked}
-                      expanded={expandedSections.untracked}
-                      onToggle={() => toggleSection('untracked')}
-                      variant="muted"
-                    />
-                  )}
-
-                  {/* Conflicts */}
-                  {gitStatus.conflicted.length > 0 && (
-                    <FileChangeSection
-                      title="Conflicts"
-                      files={gitStatus.conflicted}
-                      expanded={true}
-                      onToggle={() => {}}
-                      variant="error"
-                    />
-                  )}
-                </>
+              {/* Staged Changes */}
+              {gitStatus.staged.length > 0 && (
+                <FileChangeSection
+                  title="Staged"
+                  files={gitStatus.staged}
+                  expanded={expandedSections.staged}
+                  onToggle={() => toggleSection('staged')}
+                  variant="success"
+                />
               )}
 
-              {gitStatus.error && (
-                <div className="px-3 py-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="truncate">{gitStatus.error}</span>
-                </div>
+              {/* Modified Changes */}
+              {gitStatus.modified.length > 0 && (
+                <FileChangeSection
+                  title="Modified"
+                  files={gitStatus.modified}
+                  expanded={expandedSections.modified}
+                  onToggle={() => toggleSection('modified')}
+                  variant="warning"
+                />
+              )}
+
+              {/* Untracked Files */}
+              {gitStatus.untracked.length > 0 && (
+                <FileChangeSection
+                  title="Untracked"
+                  files={gitStatus.untracked}
+                  expanded={expandedSections.untracked}
+                  onToggle={() => toggleSection('untracked')}
+                  variant="muted"
+                />
+              )}
+
+              {/* Conflicts */}
+              {gitStatus.conflicted.length > 0 && (
+                <FileChangeSection
+                  title="Conflicts"
+                  files={gitStatus.conflicted}
+                  expanded={true}
+                  onToggle={() => {}}
+                  variant="error"
+                />
               )}
             </>
           )}
+
+          {gitStatus.error && (
+            <div className="px-3 py-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              <span className="truncate">{gitStatus.error}</span>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

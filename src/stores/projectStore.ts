@@ -20,6 +20,7 @@ interface ProjectStore {
 
   // File explorer state
   fileExplorerVisible: boolean
+  fileExplorerActiveTab: 'files' | 'git'
   expandedPaths: Record<string, string[]>
   directoryCache: Record<string, FileSystemEntry[]>
 
@@ -33,6 +34,7 @@ interface ProjectStore {
   // File explorer actions
   toggleFileExplorer: () => void
   setFileExplorerVisible: (visible: boolean) => void
+  setFileExplorerActiveTab: (tab: 'files' | 'git') => void
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string) => void
@@ -94,6 +96,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       // File explorer state
       fileExplorerVisible: false,
+      fileExplorerActiveTab: 'files',
       expandedPaths: {},
       directoryCache: {},
 
@@ -110,6 +113,9 @@ export const useProjectStore = create<ProjectStore>()(
 
       setFileExplorerVisible: (visible) =>
         set({ fileExplorerVisible: visible }),
+
+      setFileExplorerActiveTab: (tab) =>
+        set({ fileExplorerActiveTab: tab }),
 
       toggleExpandedPath: (projectId, path) =>
         set((state) => {
@@ -556,6 +562,7 @@ export const useProjectStore = create<ProjectStore>()(
         activeProjectId: state.activeProjectId,
         // File explorer state
         fileExplorerVisible: state.fileExplorerVisible,
+        fileExplorerActiveTab: state.fileExplorerActiveTab,
         expandedPaths: state.expandedPaths,
         // Theme state
         theme: state.theme,
