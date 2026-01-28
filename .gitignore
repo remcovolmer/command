@@ -30,6 +30,7 @@ yarn.lock
 /test-results/
 /playwright-report/
 /playwright/.cache/
+test/screenshots/
 
 
 .claude/settings.local.json
