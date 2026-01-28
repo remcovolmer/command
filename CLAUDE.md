@@ -10,6 +10,9 @@ npm run dev          # Run in development mode (Vite dev server + Electron)
 npm run build        # Build for production (TypeScript + Vite + electron-builder)
 npm run test         # Run Vitest tests
 npm run rebuild      # Rebuild native modules (node-pty)
+npm run release:patch  # Bump patch version, push with tags
+npm run release:minor  # Bump minor version, push with tags
+npm run release:major  # Bump major version, push with tags
 ```
 
 ## Architecture
