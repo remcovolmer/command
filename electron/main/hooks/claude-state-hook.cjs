@@ -44,12 +44,16 @@ process.stdin.on('end', () => {
         state = 'done';
         break;
       case 'Notification':
-        if (data.notification_type === 'permission_prompt') {
-          // Permission needed = permission (orange)
-          state = 'permission';
-        } else if (data.notification_type === 'idle_prompt') {
-          // Idle = done (green)
-          state = 'done';
+        switch (data.notification_type) {
+          case 'permission_prompt':
+            // Permission needed = permission (orange)
+            state = 'permission';
+            break;
+          case 'idle_prompt':
+            // Claude waiting 60+ seconds for user input = done (green)
+            state = 'done';
+            break;
+          // auth_success and other types don't change state
         }
         break;
       case 'SessionEnd':

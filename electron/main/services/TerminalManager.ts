@@ -7,11 +7,15 @@ import { ClaudeHookWatcher } from './ClaudeHookWatcher'
 // Claude Code terminal states (5 states)
 type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
 
+// Terminal types: 'claude' runs Claude Code, 'normal' is a plain shell
+type TerminalType = 'claude' | 'normal'
+
 interface TerminalInstance {
   id: string
   projectId: string
   pty: pty.IPty
   state: TerminalState
+  type: TerminalType
 }
 
 export class TerminalManager {
@@ -39,7 +43,7 @@ export class TerminalManager {
     this.sendToRenderer('terminal:state', terminalId, newState)
   }
 
-  createTerminal(cwd: string): string {
+  createTerminal(cwd: string, type: TerminalType = 'claude'): string {
     const id = randomUUID()
     const shell = this.getShell()
 
@@ -55,11 +59,12 @@ export class TerminalManager {
       id,
       projectId: cwd,
       pty: ptyProcess,
-      state: 'busy', // Start as busy (starting + busy merged)
+      state: type === 'normal' ? 'done' : 'busy',
+      type,
     }
 
-    // Register with hook watcher for state detection
-    if (this.hookWatcher) {
+    // Register with hook watcher for state detection (only for Claude terminals)
+    if (type === 'claude' && this.hookWatcher) {
       this.hookWatcher.registerTerminal(id, cwd)
     }
 
@@ -69,8 +74,8 @@ export class TerminalManager {
     })
 
     ptyProcess.onExit(({ exitCode }) => {
-      // Unregister from hook watcher
-      if (this.hookWatcher) {
+      // Unregister from hook watcher (only for Claude terminals)
+      if (terminal.type === 'claude' && this.hookWatcher) {
         this.hookWatcher.unregisterTerminal(id)
       }
 
@@ -82,13 +87,15 @@ export class TerminalManager {
 
     this.terminals.set(id, terminal)
 
-    // Send initial state
-    this.sendToRenderer('terminal:state', id, 'busy')
-
-    // Start Claude Code after shell is ready
-    setTimeout(() => {
-      ptyProcess.write('claude\r')
-    }, 100)
+    // Send initial state and start Claude Code (only for Claude terminals)
+    if (type === 'claude') {
+      this.sendToRenderer('terminal:state', id, 'busy')
+      setTimeout(() => {
+        ptyProcess.write('claude\r')
+      }, 100)
+    } else {
+      this.sendToRenderer('terminal:state', id, 'done')
+    }
 
     return id
   }
@@ -96,14 +103,14 @@ export class TerminalManager {
   writeToTerminal(terminalId: string, data: string): void {
     const terminal = this.terminals.get(terminalId)
     if (terminal?.pty) {
-      // Auto-naming: buffer input and extract title on Enter
-      if (!this.terminalTitled.get(terminalId)) {
+      // Auto-naming: buffer input and extract title on Enter (only for Claude terminals)
+      if (terminal.type === 'claude' && !this.terminalTitled.get(terminalId)) {
         this.handleAutoNaming(terminalId, data)
       }
 
-      // When user presses Enter, set to busy immediately
+      // When user presses Enter, set to busy immediately (only for Claude terminals)
       // The hook system will update to done when Claude finishes
-      if (data.includes('\r') || data.includes('\n')) {
+      if (terminal.type === 'claude' && (data.includes('\r') || data.includes('\n'))) {
         this.updateTerminalState(terminalId, 'busy')
       }
       terminal.pty.write(data)

@@ -91,6 +91,7 @@ function App() {
             state: 'busy',
             lastActivity: Date.now(),
             title: `Terminal ${projectTerminals.length + 1}`,
+            type: 'claude',
           }
           addTerminal(terminal)
         })()

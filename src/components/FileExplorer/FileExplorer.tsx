@@ -1,9 +1,10 @@
 import { useEffect, useCallback, useMemo, useRef } from 'react'
-import { X } from 'lucide-react'
+import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
 import { FileExplorerTabBar } from './FileExplorerTabBar'
+import { SidecarTerminal } from './SidecarTerminal'
 import { getElectronAPI } from '../../utils/electron'
 
 const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
@@ -12,7 +13,6 @@ export function FileExplorer() {
   const api = useMemo(() => getElectronAPI(), [])
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const projects = useProjectStore((s) => s.projects)
-  const setFileExplorerVisible = useProjectStore((s) => s.setFileExplorerVisible)
   const clearDirectoryCache = useProjectStore((s) => s.clearDirectoryCache)
   const activeTab = useProjectStore((s) => s.fileExplorerActiveTab)
   const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
@@ -21,10 +21,43 @@ export function FileExplorer() {
   const setGitStatus = useProjectStore((s) => s.setGitStatus)
   const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
 
-  const activeProject = projects.find((p) => p.id === activeProjectId)
+  // Sidecar terminal state
+  const sidecarTerminalId = useProjectStore((s) =>
+    activeProjectId ? s.sidecarTerminals[activeProjectId] : null
+  )
+  const sidecarTerminalCollapsed = useProjectStore((s) => s.sidecarTerminalCollapsed)
+  const setSidecarTerminalCollapsed = useProjectStore((s) => s.setSidecarTerminalCollapsed)
+  const createSidecarTerminal = useProjectStore((s) => s.createSidecarTerminal)
+  const closeSidecarTerminal = useProjectStore((s) => s.closeSidecarTerminal)
 
-  const handleClose = () => {
-    setFileExplorerVisible(false)
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const terminalPanelRef = useRef<ImperativePanelHandle>(null)
+
+  // Sync panel collapse state with store
+  useEffect(() => {
+    const panel = terminalPanelRef.current
+    if (!panel || !sidecarTerminalId) return
+    if (sidecarTerminalCollapsed) {
+      panel.collapse()
+    } else {
+      panel.expand()
+    }
+  }, [sidecarTerminalCollapsed, sidecarTerminalId])
+
+  const handleOpenTerminal = async () => {
+    if (activeProjectId) {
+      await createSidecarTerminal(activeProjectId)
+    }
+  }
+
+  const handleCloseTerminal = () => {
+    if (activeProjectId) {
+      closeSidecarTerminal(activeProjectId)
+    }
+  }
+
+  const handleToggleCollapse = () => {
+    setSidecarTerminalCollapsed(!sidecarTerminalCollapsed)
   }
 
   const handleFilesRefresh = () => {
@@ -81,40 +114,58 @@ export function FileExplorer() {
 
   return (
     <div className="h-full flex flex-col bg-sidebar">
-      {/* Header */}
-      <div className="flex items-center justify-end px-3 py-2 border-b border-border">
-        <button
-          onClick={handleClose}
-          className="p-1 rounded hover:bg-sidebar-accent transition-colors"
-          title="Close (Ctrl+Alt+B)"
-        >
-          <X className="w-4 h-4 text-muted-foreground" />
-        </button>
-      </div>
-
-      {/* Tab Bar */}
+      {/* Tab Bar - at top, same styling as TerminalTabBar */}
       <FileExplorerTabBar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         gitChangeCount={totalGitChanges}
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
+        onOpenTerminal={!sidecarTerminalId ? handleOpenTerminal : undefined}
       />
 
-      {/* Content */}
-      <div className="flex-1 min-h-0">
-        {activeProject ? (
-          activeTab === 'files' ? (
-            <FileTree project={activeProject} />
-          ) : (
-            <GitStatusPanel project={activeProject} />
-          )
-        ) : (
-          <div className="px-3 py-4 text-sm text-muted-foreground">
-            Select a project to view files
+      {/* Content with optional terminal panel */}
+      <PanelGroup direction="vertical" autoSaveId="sidecar-layout" className="flex-1 min-h-0">
+        {/* Files/Git Content */}
+        <Panel id="sidecar-content" defaultSize={70} minSize={20}>
+          <div className="h-full overflow-auto">
+            {activeProject ? (
+              activeTab === 'files' ? (
+                <FileTree project={activeProject} />
+              ) : (
+                <GitStatusPanel project={activeProject} />
+              )
+            ) : (
+              <div className="px-3 py-4 text-sm text-muted-foreground">
+                Select a project to view files
+              </div>
+            )}
           </div>
+        </Panel>
+
+        {/* Terminal Panel - only show if terminal exists */}
+        {sidecarTerminalId && activeProject && (
+          <>
+            <PanelResizeHandle className="h-1 bg-border hover:bg-primary transition-colors" />
+            <Panel
+              ref={terminalPanelRef}
+              id="sidecar-terminal"
+              defaultSize={30}
+              minSize={10}
+              maxSize={70}
+              collapsible
+              collapsedSize={0}
+            >
+              <SidecarTerminal
+                terminalId={sidecarTerminalId}
+                isCollapsed={sidecarTerminalCollapsed}
+                onToggleCollapse={handleToggleCollapse}
+                onClose={handleCloseTerminal}
+              />
+            </Panel>
+          </>
         )}
-      </div>
+      </PanelGroup>
     </div>
   )
 }

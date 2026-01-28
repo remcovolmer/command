@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import { app } from 'electron'
+import { normalizePath } from '../utils/paths'
 
 interface ClaudeSettings {
   hooks?: {
@@ -70,12 +71,18 @@ export function installClaudeHooks(): void {
   const ourHook = {
     hooks: [{
       type: 'command',
-      command: `node "${hookScriptPath.replace(/\\/g, '/')}"`
+      command: `node "${normalizePath(hookScriptPath)}"`
     }]
   }
 
   // Hook events we need to monitor
-  const hookEvents = ['PreToolUse', 'Stop', 'Notification', 'SessionStart', 'SessionEnd']
+  const hookEvents = [
+    'PreToolUse',
+    'Stop',
+    'Notification',
+    'SessionStart',
+    'SessionEnd'
+  ]
 
   let installed = false
   for (const event of hookEvents) {
