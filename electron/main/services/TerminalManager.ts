@@ -211,6 +211,15 @@ export class TerminalManager {
       this.terminalTitled.delete(terminalId)
 
       if (terminal.pty) {
+        // On Windows, kill the entire process tree to ensure child processes (like claude) are cleaned up
+        if (process.platform === 'win32') {
+          try {
+            const pid = terminal.pty.pid
+            require('node:child_process').execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' })
+          } catch {
+            // Process may already be dead
+          }
+        }
         terminal.pty.kill()
       }
       this.terminals.delete(terminalId)

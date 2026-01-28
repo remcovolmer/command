@@ -366,6 +366,11 @@ app.whenReady().then(async () => {
   }, 5000) // 5 second delay
 })
 
+app.on('before-quit', () => {
+  hookWatcher?.stop()
+  terminalManager?.destroy()
+})
+
 app.on('window-all-closed', () => {
   hookWatcher?.stop()
   terminalManager?.closeAllTerminals()
