@@ -2,18 +2,17 @@ import { watch, FSWatcher, readFileSync, writeFileSync, existsSync, mkdirSync } 
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { homedir } from 'os'
+import type { TerminalState } from '../../../src/types'
+import { normalizePath } from '../utils/paths'
 
-type HookState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
+const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL
 
 interface HookStateData {
   session_id: string
   cwd: string
-  state: HookState
+  state: TerminalState
   timestamp: number
   hook_event: string
-  // Extra context for debugging
-  tool_name: string | null
-  notification_type: string | null
 }
 
 export class ClaudeHookWatcher {
@@ -28,6 +27,7 @@ export class ClaudeHookWatcher {
 
   // Debounce file change events
   private lastProcessedTimestamp: number = 0
+  private debounceTimer: NodeJS.Timeout | null = null
 
   constructor(window: BrowserWindow) {
     this.window = window
@@ -49,7 +49,8 @@ export class ClaudeHookWatcher {
     // Watch for file changes
     this.watcher = watch(this.stateFilePath, (eventType) => {
       if (eventType === 'change') {
-        this.onStateChange()
+        if (this.debounceTimer) clearTimeout(this.debounceTimer)
+        this.debounceTimer = setTimeout(() => this.onStateChange(), 50)
       }
     })
 
@@ -61,9 +62,11 @@ export class ClaudeHookWatcher {
    */
   registerTerminal(terminalId: string, cwd: string): void {
     // Normalize path for comparison
-    const normalizedCwd = cwd.replace(/\\/g, '/')
+    const normalizedCwd = normalizePath(cwd)
     this.cwdToTerminal.set(normalizedCwd, terminalId)
-    console.log(`[HookWatcher] Registered terminal ${terminalId} for cwd: ${normalizedCwd}`)
+    if (isDev) {
+      console.log(`[HookWatcher] Registered terminal ${terminalId} for cwd: ${normalizedCwd}`)
+    }
   }
 
   /**
@@ -74,7 +77,9 @@ export class ClaudeHookWatcher {
     for (const [cwd, tid] of this.cwdToTerminal) {
       if (tid === terminalId) {
         this.cwdToTerminal.delete(cwd)
-        console.log(`[HookWatcher] Unregistered terminal ${terminalId} from cwd: ${cwd}`)
+        if (isDev) {
+          console.log(`[HookWatcher] Unregistered terminal ${terminalId} from cwd: ${cwd}`)
+        }
         break
       }
     }
@@ -82,7 +87,9 @@ export class ClaudeHookWatcher {
     for (const [sessionId, tid] of this.sessionToTerminal) {
       if (tid === terminalId) {
         this.sessionToTerminal.delete(sessionId)
-        console.log(`[HookWatcher] Unregistered session ${sessionId} for terminal ${terminalId}`)
+        if (isDev) {
+          console.log(`[HookWatcher] Unregistered session ${sessionId} for terminal ${terminalId}`)
+        }
         break
       }
     }
@@ -100,15 +107,11 @@ export class ClaudeHookWatcher {
       this.lastProcessedTimestamp = hookState.timestamp
 
       // Normalize cwd for comparison
-      const normalizedCwd = hookState.cwd?.replace(/\\/g, '/')
+      const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
 
-      console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}`)
-      console.log(`[HookWatcher]   session: ${hookState.session_id}, cwd: ${normalizedCwd}`)
-      if (hookState.tool_name) {
-        console.log(`[HookWatcher]   tool: ${hookState.tool_name}`)
-      }
-      if (hookState.notification_type) {
-        console.log(`[HookWatcher]   notification: ${hookState.notification_type}`)
+      if (isDev) {
+        console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}`)
+        console.log(`[HookWatcher]   session: ${hookState.session_id}, cwd: ${normalizedCwd}`)
       }
 
       // On SessionStart: associate session_id with terminal by cwd
@@ -119,13 +122,17 @@ export class ClaudeHookWatcher {
           for (const [oldSessionId, tid] of this.sessionToTerminal) {
             if (tid === terminalForCwd) {
               this.sessionToTerminal.delete(oldSessionId)
-              console.log(`[HookWatcher] Removed old session ${oldSessionId} for terminal ${terminalForCwd}`)
+              if (isDev) {
+                console.log(`[HookWatcher] Removed old session ${oldSessionId} for terminal ${terminalForCwd}`)
+              }
               break
             }
           }
           // Associate new session with terminal
           this.sessionToTerminal.set(hookState.session_id, terminalForCwd)
-          console.log(`[HookWatcher] Associated session ${hookState.session_id} with terminal ${terminalForCwd}`)
+          if (isDev) {
+            console.log(`[HookWatcher] Associated session ${hookState.session_id} with terminal ${terminalForCwd}`)
+          }
         }
       }
 
@@ -133,12 +140,15 @@ export class ClaudeHookWatcher {
       let terminalId = this.sessionToTerminal.get(hookState.session_id)
       if (!terminalId && normalizedCwd) {
         terminalId = this.cwdToTerminal.get(normalizedCwd)
+        if (terminalId) {
+          console.warn(`[HookWatcher] Using cwd fallback for session ${hookState.session_id} - session not registered`)
+        }
       }
 
       if (terminalId) {
         console.log(`[HookWatcher] Emitting state ${hookState.state} for terminal ${terminalId}`)
         this.sendToRenderer('terminal:state', terminalId, hookState.state)
-      } else {
+      } else if (isDev) {
         console.log(`[HookWatcher] No matching terminal found for session ${hookState.session_id}`)
       }
 
@@ -158,6 +168,10 @@ export class ClaudeHookWatcher {
   }
 
   stop(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+    }
     if (this.watcher) {
       this.watcher.close()
       this.watcher = null

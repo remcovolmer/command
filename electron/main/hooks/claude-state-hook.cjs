@@ -35,14 +35,6 @@ process.stdin.on('end', () => {
           state = 'busy';
         }
         break;
-      case 'UserPromptSubmit':
-        // User submitted a prompt = immediately busy
-        state = 'busy';
-        break;
-      case 'PermissionRequest':
-        // Direct permission request (more reliable than Notification)
-        state = 'permission';
-        break;
       case 'SessionStart':
         // Starting = busy (blue)
         state = 'busy';
@@ -76,10 +68,7 @@ process.stdin.on('end', () => {
         cwd: data.cwd,
         state: state,
         timestamp: Date.now(),
-        hook_event: hookEvent,
-        // Extra context for debugging
-        tool_name: data.tool_name || null,
-        notification_type: data.notification_type || null
+        hook_event: hookEvent
       };
       fs.writeFileSync(stateFile, JSON.stringify(stateData, null, 2));
     }

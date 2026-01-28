@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import { app } from 'electron'
+import { normalizePath } from '../utils/paths'
 
 interface ClaudeSettings {
   hooks?: {
@@ -70,7 +71,7 @@ export function installClaudeHooks(): void {
   const ourHook = {
     hooks: [{
       type: 'command',
-      command: `node "${hookScriptPath.replace(/\\/g, '/')}"`
+      command: `node "${normalizePath(hookScriptPath)}"`
     }]
   }
 
@@ -80,9 +81,7 @@ export function installClaudeHooks(): void {
     'Stop',
     'Notification',
     'SessionStart',
-    'SessionEnd',
-    'UserPromptSubmit',   // Detect when user submits prompt
-    'PermissionRequest'   // Direct permission detection
+    'SessionEnd'
   ]
 
   let installed = false
