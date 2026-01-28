@@ -81,11 +81,14 @@ export function Terminal({ id, isActive }: TerminalProps) {
   const theme = useProjectStore((s) => s.theme)
   const api = useMemo(() => getElectronAPI(), [])
 
-  // Safe fit function that checks all prerequisites
-  const safeFit = useCallback(() => {
+  // Safe fit function with retry logic for race conditions
+  const safeFit = useCallback((attempt = 0) => {
+    const maxRetries = 5
+    const retryDelay = 50
+
+    // Check disposal and basic refs
     if (
       isDisposedRef.current ||
-      !isReadyRef.current ||
       !fitAddonRef.current ||
       !terminalRef.current ||
       !containerRef.current
@@ -93,21 +96,30 @@ export function Terminal({ id, isActive }: TerminalProps) {
       return
     }
 
-    // Check container has dimensions
+    // Check container has dimensions - retry if not yet rendered
     const { clientWidth, clientHeight } = containerRef.current
     if (clientWidth === 0 || clientHeight === 0) {
+      if (attempt < maxRetries) {
+        setTimeout(() => safeFit(attempt + 1), retryDelay)
+      }
       return
     }
 
     // Check that xterm has fully initialized by verifying the DOM element exists
     const terminalElement = containerRef.current.querySelector('.xterm')
     if (!terminalElement) {
+      if (attempt < maxRetries) {
+        setTimeout(() => safeFit(attempt + 1), retryDelay)
+      }
       return
     }
 
     // Verify the terminal's internal element is still attached and has dimensions
     const terminalCore = terminalRef.current as unknown as { element?: HTMLElement }
     if (!terminalCore.element?.offsetParent) {
+      if (attempt < maxRetries) {
+        setTimeout(() => safeFit(attempt + 1), retryDelay)
+      }
       return
     }
 
@@ -225,6 +237,20 @@ export function Terminal({ id, isActive }: TerminalProps) {
     })
     resizeObserver.observe(containerRef.current)
 
+    // Watch for xterm DOM changes (e.g., viewport initialization)
+    const mutationObserver = new MutationObserver(() => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current)
+      }
+      resizeTimeoutRef.current = setTimeout(() => {
+        safeFit()
+      }, 50)
+    })
+    mutationObserver.observe(containerRef.current, {
+      childList: true,
+      subtree: true
+    })
+
     // Store cleanup function in ref (will be called on unmount)
     cleanupRef.current = () => {
       isDisposedRef.current = true
@@ -235,6 +261,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
         clearTimeout(resizeTimeoutRef.current)
       }
       resizeObserver.disconnect()
+      mutationObserver.disconnect()
       terminalEvents.unsubscribe(id)
       terminal.dispose()
       terminalRef.current = null
@@ -274,7 +301,12 @@ export function Terminal({ id, isActive }: TerminalProps) {
     <div
       ref={containerRef}
       className="terminal-container w-full h-full bg-sidebar"
-      style={{ display: isActive ? 'block' : 'none' }}
+      style={{
+        visibility: isActive ? 'visible' : 'hidden',
+        position: isActive ? 'relative' : 'absolute',
+        inset: isActive ? undefined : 0,
+        pointerEvents: isActive ? 'auto' : 'none'
+      }}
     />
   )
 }
