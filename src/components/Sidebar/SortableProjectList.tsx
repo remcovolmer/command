@@ -16,7 +16,9 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
+import { LayoutGroup, AnimatePresence } from 'motion/react'
 import type { Project, TerminalSession, Worktree } from '../../types'
+import { useProjectStore } from '../../stores/projectStore'
 import { SortableProjectItem } from './SortableProjectItem'
 import { ProjectDragPreview } from './ProjectDragPreview'
 
@@ -55,7 +57,8 @@ export function SortableProjectList({
   onCloseTerminal,
   onReorder,
 }: SortableProjectListProps) {
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const terminals = useProjectStore((s) => s.terminals)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -68,69 +71,176 @@ export function SortableProjectList({
     })
   )
 
-  const projectIds = useMemo(() => projects.map((p) => p.id), [projects])
+  // Split projects into active (has terminals) and inactive (no terminals)
+  const activeProjects = useMemo(
+    () =>
+      projects.filter((p) =>
+        Object.values(terminals).some((t) => t.projectId === p.id)
+      ),
+    [projects, terminals]
+  )
 
-  const activeProject = useMemo(
-    () => (activeId ? projects.find((p) => p.id === activeId) : null),
-    [activeId, projects]
+  const inactiveProjects = useMemo(
+    () =>
+      projects.filter(
+        (p) => !Object.values(terminals).some((t) => t.projectId === p.id)
+      ),
+    [projects, terminals]
+  )
+
+  const activeProjectIds = useMemo(
+    () => activeProjects.map((p) => p.id),
+    [activeProjects]
+  )
+
+  const inactiveProjectIds = useMemo(
+    () => inactiveProjects.map((p) => p.id),
+    [inactiveProjects]
+  )
+
+  const draggedProject = useMemo(
+    () => (draggedId ? projects.find((p) => p.id === draggedId) : null),
+    [draggedId, projects]
   )
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string)
+    setDraggedId(event.active.id as string)
   }
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
+  const createDragEndHandler =
+    (sourceIds: string[], otherIds: string[], sourceFirst: boolean) =>
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      setDraggedId(null)
 
-    if (over && active.id !== over.id) {
-      const oldIndex = projectIds.indexOf(active.id as string)
-      const newIndex = projectIds.indexOf(over.id as string)
-      const newOrder = arrayMove(projectIds, oldIndex, newIndex)
-      onReorder(newOrder)
+      if (over && active.id !== over.id) {
+        const oldIndex = sourceIds.indexOf(active.id as string)
+        const newIndex = sourceIds.indexOf(over.id as string)
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newOrder = arrayMove(sourceIds, oldIndex, newIndex)
+          onReorder(
+            sourceFirst ? [...newOrder, ...otherIds] : [...otherIds, ...newOrder]
+          )
+        }
+      }
     }
-  }
 
+  const handleDragEndActive = createDragEndHandler(
+    activeProjectIds,
+    inactiveProjectIds,
+    true
+  )
+  const handleDragEndInactive = createDragEndHandler(
+    inactiveProjectIds,
+    activeProjectIds,
+    false
+  )
+
+  const renderProjectItem = (project: Project, isDragging: boolean) => (
+    <SortableProjectItem
+      key={project.id}
+      project={project}
+      layoutId={project.id}
+      terminals={getProjectTerminals(project.id)}
+      directTerminals={getProjectDirectTerminals(project.id)}
+      worktrees={getProjectWorktrees(project.id)}
+      getWorktreeTerminals={getWorktreeTerminals}
+      isActive={project.id === activeProjectId}
+      activeTerminalId={activeTerminalId}
+      isDragging={isDragging}
+      onSelect={onSelect}
+      onRemove={onRemove}
+      onCreateTerminal={onCreateTerminal}
+      onCreateWorktree={onCreateWorktree}
+      onRemoveWorktree={onRemoveWorktree}
+      onSelectTerminal={onSelectTerminal}
+      onCloseTerminal={onCloseTerminal}
+    />
+  )
+
+  // Architecture Note: Two separate DndContext instances are used intentionally.
+  // This prevents dragging projects between Active and Inactive sections.
+  // Projects move between sections automatically based on terminal count,
+  // not by manual drag-and-drop. Each section has its own sortable context.
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
-        <ul className="space-y-1">
-          {projects.map((project) => (
-            <SortableProjectItem
-              key={project.id}
-              project={project}
-              terminals={getProjectTerminals(project.id)}
-              directTerminals={getProjectDirectTerminals(project.id)}
-              worktrees={getProjectWorktrees(project.id)}
-              getWorktreeTerminals={getWorktreeTerminals}
-              isActive={project.id === activeProjectId}
-              activeTerminalId={activeTerminalId}
-              isDragging={project.id === activeId}
-              onSelect={() => onSelect(project.id)}
-              onRemove={(e) => onRemove(e, project.id)}
-              onCreateTerminal={(worktreeId) => onCreateTerminal(project.id, worktreeId)}
-              onCreateWorktree={() => onCreateWorktree(project.id)}
-              onRemoveWorktree={onRemoveWorktree}
-              onSelectTerminal={onSelectTerminal}
-              onCloseTerminal={onCloseTerminal}
-            />
-          ))}
-        </ul>
-      </SortableContext>
+    <LayoutGroup>
+      {/* Active Projects Section */}
+      {activeProjects.length > 0 && (
+        <section className="mb-2">
+          <h3 className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Active
+          </h3>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEndActive}
+          >
+            <SortableContext
+              items={activeProjectIds}
+              strategy={verticalListSortingStrategy}
+            >
+              <AnimatePresence mode="popLayout">
+                <ul className="space-y-1">
+                  {activeProjects.map((project) =>
+                    renderProjectItem(project, project.id === draggedId)
+                  )}
+                </ul>
+              </AnimatePresence>
+            </SortableContext>
 
-      <DragOverlay>
-        {activeProject ? (
-          <ProjectDragPreview
-            project={activeProject}
-            terminalCount={getProjectTerminals(activeProject.id).length}
-          />
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+            <DragOverlay>
+              {draggedProject && activeProjectIds.includes(draggedProject.id) ? (
+                <ProjectDragPreview
+                  project={draggedProject}
+                  terminalCount={
+                    Object.values(terminals).filter(
+                      (t) => t.projectId === draggedProject.id
+                    ).length
+                  }
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </section>
+      )}
+
+      {/* Inactive Projects Section */}
+      {inactiveProjects.length > 0 && (
+        <section>
+          <h3 className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Inactive
+          </h3>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEndInactive}
+          >
+            <SortableContext
+              items={inactiveProjectIds}
+              strategy={verticalListSortingStrategy}
+            >
+              <AnimatePresence mode="popLayout">
+                <ul className="space-y-1">
+                  {inactiveProjects.map((project) =>
+                    renderProjectItem(project, project.id === draggedId)
+                  )}
+                </ul>
+              </AnimatePresence>
+            </SortableContext>
+
+            <DragOverlay>
+              {draggedProject && inactiveProjectIds.includes(draggedProject.id) ? (
+                <ProjectDragPreview
+                  project={draggedProject}
+                  terminalCount={0}
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </section>
+      )}
+    </LayoutGroup>
   )
 }

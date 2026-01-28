@@ -113,6 +113,13 @@ async function createWindow() {
 
 // IPC Handlers for Terminal operations
 ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude') => {
+  if (!isValidUUID(projectId)) {
+    throw new Error('Invalid project ID')
+  }
+  if (worktreeId && !isValidUUID(worktreeId)) {
+    throw new Error('Invalid worktree ID')
+  }
+
   // Determine the working directory
   let cwd: string
 
