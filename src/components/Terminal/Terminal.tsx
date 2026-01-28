@@ -11,6 +11,13 @@ interface TerminalProps {
   isActive: boolean
 }
 
+// Timing constants for terminal dimension calculations
+const FIT_RETRY_DELAY_MS = 50       // Delay between retry attempts when waiting for DOM
+const FIT_MAX_RETRIES = 5           // Maximum retry attempts for safeFit
+const RESIZE_DEBOUNCE_MS = 100      // Debounce for ResizeObserver callbacks
+const READY_DELAY_MS = 50           // Delay before marking terminal ready after open
+const FOCUS_REFIT_DELAY_MS = 50     // Delay for refit after focus/visibility change
+
 // Helper to get computed CSS variable value as hex
 function getCssVar(name: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -74,6 +81,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
   const isDisposedRef = useRef(false)
   const isReadyRef = useRef(false)
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasInitializedRef = useRef(false)
   const cleanupRef = useRef<(() => void) | null>(null)
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
@@ -83,8 +91,11 @@ export function Terminal({ id, isActive }: TerminalProps) {
 
   // Safe fit function with retry logic for race conditions
   const safeFit = useCallback((attempt = 0) => {
-    const maxRetries = 5
-    const retryDelay = 50
+    // Clear any pending retry timeout before starting
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
 
     // Check disposal and basic refs
     if (
@@ -99,8 +110,8 @@ export function Terminal({ id, isActive }: TerminalProps) {
     // Check container has dimensions - retry if not yet rendered
     const { clientWidth, clientHeight } = containerRef.current
     if (clientWidth === 0 || clientHeight === 0) {
-      if (attempt < maxRetries) {
-        setTimeout(() => safeFit(attempt + 1), retryDelay)
+      if (attempt < FIT_MAX_RETRIES) {
+        retryTimeoutRef.current = setTimeout(() => safeFit(attempt + 1), FIT_RETRY_DELAY_MS)
       }
       return
     }
@@ -108,17 +119,20 @@ export function Terminal({ id, isActive }: TerminalProps) {
     // Check that xterm has fully initialized by verifying the DOM element exists
     const terminalElement = containerRef.current.querySelector('.xterm')
     if (!terminalElement) {
-      if (attempt < maxRetries) {
-        setTimeout(() => safeFit(attempt + 1), retryDelay)
+      if (attempt < FIT_MAX_RETRIES) {
+        retryTimeoutRef.current = setTimeout(() => safeFit(attempt + 1), FIT_RETRY_DELAY_MS)
       }
       return
     }
 
-    // Verify the terminal's internal element is still attached and has dimensions
+    // INTERNAL API: xterm.js exposes the underlying DOM element via an internal
+    // 'element' property. We check offsetParent to verify the terminal is attached
+    // to the DOM and visible (offsetParent is null for display:none or detached elements).
+    // This may need updating if xterm.js internals change in future versions.
     const terminalCore = terminalRef.current as unknown as { element?: HTMLElement }
     if (!terminalCore.element?.offsetParent) {
-      if (attempt < maxRetries) {
-        setTimeout(() => safeFit(attempt + 1), retryDelay)
+      if (attempt < FIT_MAX_RETRIES) {
+        retryTimeoutRef.current = setTimeout(() => safeFit(attempt + 1), FIT_RETRY_DELAY_MS)
       }
       return
     }
@@ -197,7 +211,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
         isReadyRef.current = true
         safeFit()
       }
-    }, 50)
+    }, READY_DELAY_MS)
 
     // Handle user input
     terminal.onData((data) => {
@@ -233,22 +247,26 @@ export function Terminal({ id, isActive }: TerminalProps) {
       }
       resizeTimeoutRef.current = setTimeout(() => {
         safeFit()
-      }, 100)
+      }, RESIZE_DEBOUNCE_MS)
     })
     resizeObserver.observe(containerRef.current)
 
-    // Watch for xterm DOM changes (e.g., viewport initialization)
+    // Watch for xterm initial DOM setup (viewport initialization)
+    // Once xterm is fully initialized, disconnect the observer - it's only needed for initial setup
     const mutationObserver = new MutationObserver(() => {
-      if (resizeTimeoutRef.current) {
-        clearTimeout(resizeTimeoutRef.current)
-      }
-      resizeTimeoutRef.current = setTimeout(() => {
+      if (!containerRef.current) return
+
+      // Check if xterm is fully initialized by looking for .xterm-viewport with dimensions
+      const viewport = containerRef.current.querySelector('.xterm-viewport')
+      if (viewport && viewport.clientWidth > 0 && viewport.clientHeight > 0) {
+        // xterm is fully initialized - disconnect observer and fit
+        mutationObserver.disconnect()
         safeFit()
-      }, 50)
+      }
     })
     mutationObserver.observe(containerRef.current, {
       childList: true,
-      subtree: true
+      subtree: false // Only watch top-level children, not all DOM mutations
     })
 
     // Store cleanup function in ref (will be called on unmount)
@@ -259,6 +277,9 @@ export function Terminal({ id, isActive }: TerminalProps) {
       clearTimeout(readyTimer)
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current)
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
       }
       resizeObserver.disconnect()
       mutationObserver.disconnect()
@@ -292,7 +313,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
       // Small delay to allow layout to settle after visibility change
       const timer = setTimeout(() => {
         safeFit()
-      }, 50)
+      }, FOCUS_REFIT_DELAY_MS)
       return () => clearTimeout(timer)
     }
   }, [isActive, safeFit])
