@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType } from '../types'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
@@ -30,6 +30,15 @@ interface ProjectStore {
   // Git status state (not persisted)
   gitStatus: Record<string, GitStatus>
   gitStatusLoading: Record<string, boolean>
+
+  // Sidecar terminal state (per project)
+  sidecarTerminals: Record<string, string | null>  // projectId -> terminalId
+  sidecarTerminalCollapsed: boolean
+
+  // Sidecar terminal actions
+  createSidecarTerminal: (projectId: string) => Promise<void>
+  closeSidecarTerminal: (projectId: string) => void
+  setSidecarTerminalCollapsed: (collapsed: boolean) => void
 
   // File explorer actions
   toggleFileExplorer: () => void
@@ -107,6 +116,51 @@ export const useProjectStore = create<ProjectStore>()(
       // Git status state (not persisted)
       gitStatus: {},
       gitStatusLoading: {},
+
+      // Sidecar terminal state
+      sidecarTerminals: {},
+      sidecarTerminalCollapsed: false,
+
+      // Sidecar terminal actions
+      createSidecarTerminal: async (projectId) => {
+        const api = getElectronAPI()
+        const terminalId = await api.terminal.create(projectId, undefined, 'normal')
+
+        set((state) => ({
+          terminals: {
+            ...state.terminals,
+            [terminalId]: {
+              id: terminalId,
+              projectId,
+              worktreeId: null,
+              state: 'done',
+              lastActivity: Date.now(),
+              title: 'Terminal',
+              type: 'normal' as TerminalType,
+            },
+          },
+          sidecarTerminals: { ...state.sidecarTerminals, [projectId]: terminalId },
+        }))
+      },
+
+      closeSidecarTerminal: (projectId) => {
+        const { sidecarTerminals, terminals } = get()
+        const terminalId = sidecarTerminals[projectId]
+        if (terminalId) {
+          const api = getElectronAPI()
+          api.terminal.close(terminalId)
+
+          const newTerminals = { ...terminals }
+          delete newTerminals[terminalId]
+          const newSidecarTerminals = { ...sidecarTerminals }
+          delete newSidecarTerminals[projectId]
+
+          set({ terminals: newTerminals, sidecarTerminals: newSidecarTerminals })
+        }
+      },
+
+      setSidecarTerminalCollapsed: (collapsed) =>
+        set({ sidecarTerminalCollapsed: collapsed }),
 
       // File explorer actions
       toggleFileExplorer: () =>
@@ -578,6 +632,8 @@ export const useProjectStore = create<ProjectStore>()(
         fileExplorerVisible: state.fileExplorerVisible,
         fileExplorerActiveTab: state.fileExplorerActiveTab,
         expandedPaths: state.expandedPaths,
+        // Sidecar terminal state (only collapse state, not terminal IDs)
+        sidecarTerminalCollapsed: state.sidecarTerminalCollapsed,
         // Theme state
         theme: state.theme,
       }),

@@ -26,6 +26,9 @@ export type TerminalState =
   | 'done'        // Green - Claude finished, waiting for new prompt
   | 'stopped';    // Red - Terminal stopped or error
 
+// Terminal type: 'claude' runs Claude Code, 'normal' is a plain shell
+export type TerminalType = 'claude' | 'normal';
+
 // Valid terminal states for runtime validation
 export const VALID_TERMINAL_STATES: readonly TerminalState[] = [
   'busy', 'permission', 'question', 'done', 'stopped'
@@ -46,6 +49,7 @@ export interface TerminalSession {
   state: TerminalState;
   lastActivity: number;
   title: string;
+  type: TerminalType;  // 'claude' or 'normal' shell
 }
 
 // File system types
@@ -134,7 +138,7 @@ export interface AppState {
 // IPC API types
 export interface ElectronAPI {
   terminal: {
-    create: (projectId: string, worktreeId?: string) => Promise<string>;
+    create: (projectId: string, worktreeId?: string, type?: TerminalType) => Promise<string>;
     write: (terminalId: string, data: string) => void;
     resize: (terminalId: string, cols: number, rows: number) => void;
     close: (terminalId: string) => void;

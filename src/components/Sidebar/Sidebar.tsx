@@ -149,6 +149,7 @@ export function Sidebar() {
       state: 'busy',
       lastActivity: Date.now(),
       title: `Terminal ${existingCount + 1}`,
+      type: 'claude',
     }
     addTerminal(terminal)
   }
