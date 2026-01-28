@@ -1,12 +1,14 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
 import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch } from 'lucide-react'
-import type { Project, TerminalSession, Worktree } from '../../types'
+import type { Project, TerminalSession, Worktree, TerminalState } from '../../types'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 
 interface SortableProjectItemProps {
   project: Project
+  layoutId: string
   terminals: TerminalSession[]
   directTerminals: TerminalSession[]
   worktrees: Worktree[]
@@ -14,10 +16,10 @@ interface SortableProjectItemProps {
   isActive: boolean
   activeTerminalId: string | null
   isDragging: boolean
-  onSelect: () => void
-  onRemove: (e: React.MouseEvent) => void
-  onCreateTerminal: (worktreeId?: string) => void
-  onCreateWorktree: () => void
+  onSelect: (projectId: string) => void
+  onRemove: (e: React.MouseEvent, projectId: string) => void
+  onCreateTerminal: (projectId: string, worktreeId?: string) => void
+  onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (id: string) => void
   onCloseTerminal: (e: React.MouseEvent, id: string) => void
@@ -25,6 +27,7 @@ interface SortableProjectItemProps {
 
 export const SortableProjectItem = memo(function SortableProjectItem({
   project,
+  layoutId,
   terminals,
   directTerminals,
   worktrees,
@@ -40,6 +43,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   onSelectTerminal,
   onCloseTerminal,
 }: SortableProjectItemProps) {
+  const shouldReduceMotion = useReducedMotion()
   const {
     attributes,
     listeners,
@@ -56,7 +60,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   }
 
   // Claude Code state colors (5 states)
-  const stateColors: Record<string, string> = {
+  const stateColors: Record<TerminalState, string> = {
     busy: 'text-blue-500',       // Blue - working
     permission: 'text-orange-500', // Orange - needs permission
     question: 'text-orange-500', // Orange - waiting for question answer
@@ -65,7 +69,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   }
 
   // State-specific dot colors for terminal indicators
-  const stateDots: Record<string, string> = {
+  const stateDots: Record<TerminalState, string> = {
     busy: 'bg-blue-500',
     permission: 'bg-orange-500',
     question: 'bg-orange-500',
@@ -82,7 +86,14 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
   return (
-    <li ref={setNodeRef} style={style} className="relative">
+    <motion.li
+      ref={setNodeRef}
+      layoutId={layoutId}
+      layout={shouldReduceMotion ? false : !isDragging}
+      initial={false}
+      style={style}
+      className="relative"
+    >
       {/* Drop indicator line */}
       {isOver && (
         <div className="absolute inset-x-0 -top-0.5 h-0.5 bg-primary rounded-full" />
@@ -90,7 +101,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
       {/* Project Header */}
       <div
-        onClick={onSelect}
+        onClick={() => onSelect(project.id)}
         {...attributes}
         {...listeners}
         className={`
@@ -115,7 +126,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onCreateTerminal()
+              onCreateTerminal(project.id)
             }}
             onPointerDown={(e) => e.stopPropagation()}
             className="p-1 rounded hover:bg-border"
@@ -126,7 +137,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onCreateWorktree()
+              onCreateWorktree(project.id)
             }}
             onPointerDown={(e) => e.stopPropagation()}
             className="p-1 rounded hover:bg-border"
@@ -135,7 +146,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             <GitBranch className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={onRemove}
+            onClick={(e) => onRemove(e, project.id)}
             onPointerDown={(e) => e.stopPropagation()}
             className="p-1 rounded hover:bg-border"
             title="Remove Project"
@@ -194,7 +205,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           worktree={worktree}
           terminals={getWorktreeTerminals(worktree.id)}
           activeTerminalId={activeTerminalId}
-          onCreateTerminal={() => onCreateTerminal(worktree.id)}
+          onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
           onSelectTerminal={onSelectTerminal}
           onCloseTerminal={onCloseTerminal}
           onRemove={() => onRemoveWorktree(worktree.id)}
@@ -205,7 +216,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       {isActive && terminals.length === 0 && worktrees.length === 0 && (
         <div className="ml-6 pl-3 py-2 border-l border-border">
           <button
-            onClick={() => onCreateTerminal()}
+            onClick={() => onCreateTerminal(project.id)}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="w-3 h-3" />
@@ -213,6 +224,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           </button>
         </div>
       )}
-    </li>
+    </motion.li>
   )
 })
