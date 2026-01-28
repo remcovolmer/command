@@ -35,6 +35,14 @@ process.stdin.on('end', () => {
           state = 'busy';
         }
         break;
+      case 'UserPromptSubmit':
+        // User submitted a prompt = immediately busy
+        state = 'busy';
+        break;
+      case 'PermissionRequest':
+        // Direct permission request (more reliable than Notification)
+        state = 'permission';
+        break;
       case 'SessionStart':
         // Starting = busy (blue)
         state = 'busy';
@@ -44,12 +52,16 @@ process.stdin.on('end', () => {
         state = 'done';
         break;
       case 'Notification':
-        if (data.notification_type === 'permission_prompt') {
-          // Permission needed = permission (orange)
-          state = 'permission';
-        } else if (data.notification_type === 'idle_prompt') {
-          // Idle = done (green)
-          state = 'done';
+        switch (data.notification_type) {
+          case 'permission_prompt':
+            // Permission needed = permission (orange)
+            state = 'permission';
+            break;
+          case 'idle_prompt':
+            // Claude waiting 60+ seconds for user input = done (green)
+            state = 'done';
+            break;
+          // auth_success and other types don't change state
         }
         break;
       case 'SessionEnd':
@@ -64,7 +76,10 @@ process.stdin.on('end', () => {
         cwd: data.cwd,
         state: state,
         timestamp: Date.now(),
-        hook_event: hookEvent
+        hook_event: hookEvent,
+        // Extra context for debugging
+        tool_name: data.tool_name || null,
+        notification_type: data.notification_type || null
       };
       fs.writeFileSync(stateFile, JSON.stringify(stateData, null, 2));
     }

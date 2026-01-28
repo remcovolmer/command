@@ -75,7 +75,15 @@ export function installClaudeHooks(): void {
   }
 
   // Hook events we need to monitor
-  const hookEvents = ['PreToolUse', 'Stop', 'Notification', 'SessionStart', 'SessionEnd']
+  const hookEvents = [
+    'PreToolUse',
+    'Stop',
+    'Notification',
+    'SessionStart',
+    'SessionEnd',
+    'UserPromptSubmit',   // Detect when user submits prompt
+    'PermissionRequest'   // Direct permission detection
+  ]
 
   let installed = false
   for (const event of hookEvents) {

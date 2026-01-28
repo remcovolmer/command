@@ -11,6 +11,9 @@ interface HookStateData {
   state: HookState
   timestamp: number
   hook_event: string
+  // Extra context for debugging
+  tool_name: string | null
+  notification_type: string | null
 }
 
 export class ClaudeHookWatcher {
@@ -99,7 +102,14 @@ export class ClaudeHookWatcher {
       // Normalize cwd for comparison
       const normalizedCwd = hookState.cwd?.replace(/\\/g, '/')
 
-      console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}, session: ${hookState.session_id}, cwd: ${normalizedCwd}`)
+      console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}`)
+      console.log(`[HookWatcher]   session: ${hookState.session_id}, cwd: ${normalizedCwd}`)
+      if (hookState.tool_name) {
+        console.log(`[HookWatcher]   tool: ${hookState.tool_name}`)
+      }
+      if (hookState.notification_type) {
+        console.log(`[HookWatcher]   notification: ${hookState.notification_type}`)
+      }
 
       // On SessionStart: associate session_id with terminal by cwd
       if (hookState.hook_event === 'SessionStart' && normalizedCwd) {
