@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, Notification } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, dialog, Notification, Menu } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -64,6 +64,8 @@ const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
 async function createWindow() {
+  Menu.setApplicationMenu(null)
+
   win = new BrowserWindow({
     title: 'Command',
     icon: path.join(process.env.APP_ROOT, 'build', 'icon.ico'),
