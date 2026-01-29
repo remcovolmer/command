@@ -20,6 +20,12 @@ const isValidUUID = (id: string): boolean =>
 const clamp = (val: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, Math.floor(val)))
 
+function validateProjectPath(projectPath: string): void {
+  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
+    throw new Error('Invalid project path')
+  }
+}
+
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -220,30 +226,22 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
 
 // IPC Handlers for Git operations
 ipcMain.handle('git:status', async (_event, projectPath: string) => {
-  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
-    throw new Error('Invalid project path')
-  }
+  validateProjectPath(projectPath)
   return gitService?.getStatus(projectPath)
 })
 
 ipcMain.handle('git:fetch', async (_event, projectPath: string) => {
-  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
-    throw new Error('Invalid project path')
-  }
+  validateProjectPath(projectPath)
   return gitService?.fetch(projectPath)
 })
 
 ipcMain.handle('git:pull', async (_event, projectPath: string) => {
-  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
-    throw new Error('Invalid project path')
-  }
+  validateProjectPath(projectPath)
   return gitService?.pull(projectPath)
 })
 
 ipcMain.handle('git:push', async (_event, projectPath: string) => {
-  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
-    throw new Error('Invalid project path')
-  }
+  validateProjectPath(projectPath)
   return gitService?.push(projectPath)
 })
 

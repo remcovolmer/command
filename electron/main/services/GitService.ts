@@ -33,6 +33,7 @@ export class GitService {
       cwd,
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large repos
       windowsHide: true,
+      timeout: 30000, // 30 seconds timeout to prevent hung network operations
     })
     return stdout.trim()
   }

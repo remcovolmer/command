@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import {
   GitBranch,
   ChevronDown,
@@ -12,7 +12,6 @@ import {
   Check,
   Loader2,
   Download,
-  Upload,
 } from 'lucide-react'
 import type { Project, GitFileChange, GitBranchInfo } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
@@ -135,18 +134,19 @@ function BranchSection({
   gitPath: string
   onRefresh?: () => void
 }) {
-  const api = useMemo(() => getElectronAPI(), [])
+  const api = getElectronAPI()
   const [loading, setLoading] = useState<'fetch' | 'pull' | 'push' | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   const handleGitAction = useCallback(async (action: 'fetch' | 'pull' | 'push') => {
     setLoading(action)
-    setError(null)
     try {
       await api.git[action](gitPath)
       onRefresh?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${action} failed`)
+      api.notification.show(
+        'Git Operation Failed',
+        err instanceof Error ? err.message : `${action} failed`
+      )
     } finally {
       setLoading(null)
     }
@@ -174,45 +174,30 @@ function BranchSection({
           </button>
           <button
             onClick={() => handleGitAction('pull')}
-            disabled={loading !== null}
-            className="relative p-1 rounded hover:bg-muted/50 transition-colors"
-            title={`Pull${branch.behind > 0 ? ` (${branch.behind} behind)` : ''}`}
+            disabled={loading !== null || !branch.upstream}
+            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!branch.upstream ? 'No upstream branch configured' : `Pull${branch.behind > 0 ? ` (${branch.behind} behind)` : ''}`}
           >
             {loading === 'pull' ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             ) : (
               <ArrowDown className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`} />
             )}
-            {branch.behind > 0 && (
-              <span className="absolute -top-1 -right-1 text-[9px] bg-orange-500/20 text-orange-600 dark:text-orange-400 px-0.5 rounded">
-                {branch.behind}
-              </span>
-            )}
           </button>
           <button
             onClick={() => handleGitAction('push')}
-            disabled={loading !== null}
-            className="relative p-1 rounded hover:bg-muted/50 transition-colors"
-            title={`Push${branch.ahead > 0 ? ` (${branch.ahead} ahead)` : ''}`}
+            disabled={loading !== null || !branch.upstream || branch.ahead === 0}
+            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!branch.upstream ? 'No upstream branch configured' : `Push${branch.ahead > 0 ? ` (${branch.ahead} ahead)` : ''}`}
           >
             {loading === 'push' ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             ) : (
               <ArrowUp className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`} />
             )}
-            {branch.ahead > 0 && (
-              <span className="absolute -top-1 -right-1 text-[9px] bg-green-500/20 text-green-600 dark:text-green-400 px-0.5 rounded">
-                {branch.ahead}
-              </span>
-            )}
           </button>
         </div>
       </div>
-      {error && (
-        <div className="mt-1 ml-6 text-xs text-red-600 dark:text-red-400 truncate" title={error}>
-          {error}
-        </div>
-      )}
     </div>
   )
 }
