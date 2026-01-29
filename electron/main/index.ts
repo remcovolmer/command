@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import os from 'node:os'
+import { exec } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
 import { ProjectPersistence } from './services/ProjectPersistence'
 import { GitService } from './services/GitService'
@@ -325,6 +326,26 @@ ipcMain.handle('worktree:has-changes', async (_event, worktreeId: string) => {
 // IPC Handlers for Notifications
 ipcMain.on('notification:show', (_event, title: string, body: string) => {
   new Notification({ title, body }).show()
+})
+
+// IPC Handlers for Shell operations
+ipcMain.handle('shell:open-path', async (_event, targetPath: string) => {
+  if (typeof targetPath !== 'string' || targetPath.length === 0 || targetPath.length > 1000) {
+    throw new Error('Invalid path')
+  }
+  return shell.openPath(targetPath)
+})
+
+ipcMain.handle('shell:open-in-editor', async (_event, targetPath: string) => {
+  if (typeof targetPath !== 'string' || targetPath.length === 0 || targetPath.length > 1000) {
+    throw new Error('Invalid path')
+  }
+  return new Promise<void>((resolve, reject) => {
+    exec(`antigravity "${targetPath}"`, (error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
 })
 
 // IPC Handlers for App lifecycle
