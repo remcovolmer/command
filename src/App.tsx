@@ -41,13 +41,19 @@ function App() {
       // Ctrl + Up/Down: Switch projects
       if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault()
-        const { projects, activeProjectId, setActiveProject } = useProjectStore.getState()
+        const { projects, activeProjectId, setActiveProject, terminals } = useProjectStore.getState()
         if (projects.length === 0) return
 
-        const currentIndex = projects.findIndex(p => p.id === activeProjectId)
+        // Match sidebar visual order: active projects first, then inactive
+        const terminalValues = Object.values(terminals)
+        const activeProjects = projects.filter(p => terminalValues.some(t => t.projectId === p.id))
+        const inactiveProjects = projects.filter(p => !terminalValues.some(t => t.projectId === p.id))
+        const visualOrder = [...activeProjects, ...inactiveProjects]
+
+        const currentIndex = visualOrder.findIndex(p => p.id === activeProjectId)
         const direction = e.key === 'ArrowDown' ? 1 : -1
-        const newIndex = (currentIndex + direction + projects.length) % projects.length
-        setActiveProject(projects[newIndex].id)
+        const newIndex = (currentIndex + direction + visualOrder.length) % visualOrder.length
+        setActiveProject(visualOrder[newIndex].id)
         return
       }
 
