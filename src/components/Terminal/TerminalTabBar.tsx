@@ -56,7 +56,7 @@ export function TerminalTabBar({
               transition-colors select-none
               ${
                 isActive
-                  ? 'bg-sidebar text-sidebar-foreground'
+                  ? 'bg-sidebar-accent text-sidebar-foreground border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
               }
             `}

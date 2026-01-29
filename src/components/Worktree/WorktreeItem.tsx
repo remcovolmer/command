@@ -88,8 +88,8 @@ export const WorktreeItem = memo(function WorktreeItem({
                 group flex items-center gap-2 px-3 py-1 cursor-pointer
                 transition-colors duration-150
                 ${terminal.id === activeTerminalId
-                  ? 'text-sidebar-foreground'
-                  : 'text-muted-foreground hover:text-sidebar-foreground'}
+                  ? 'bg-sidebar-accent text-sidebar-foreground rounded-md'
+                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
               `}
             >
               <TerminalIcon
