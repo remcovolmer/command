@@ -143,16 +143,19 @@ export class TerminalManager {
       return
     }
 
-    // Accumulate printable characters
-    const buffer = this.terminalInputBuffers.get(terminalId) || ''
-    this.terminalInputBuffers.set(terminalId, buffer + data)
+    // Strip ANSI escape sequences and control characters, only buffer printable text
+    const cleaned = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/[\x00-\x1f\x7f]/g, '')
+    if (cleaned) {
+      const buffer = this.terminalInputBuffers.get(terminalId) || ''
+      this.terminalInputBuffers.set(terminalId, buffer + cleaned)
+    }
   }
 
   /**
    * Extract a meaningful task title from user input
    */
   private extractTaskTitle(input: string): string | null {
-    const trimmed = input.trim()
+    const trimmed = input.replace(/[^\x20-\x7e\u00a0-\uffff]/g, '').trim()
 
     // Skip empty input
     if (!trimmed || trimmed.length < 3) {
