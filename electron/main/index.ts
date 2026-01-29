@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import os from 'node:os'
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
 import { ProjectPersistence } from './services/ProjectPersistence'
 import { GitService } from './services/GitService'
@@ -329,19 +329,26 @@ ipcMain.on('notification:show', (_event, title: string, body: string) => {
 })
 
 // IPC Handlers for Shell operations
-ipcMain.handle('shell:open-path', async (_event, targetPath: string) => {
+function validateProjectPath(targetPath: unknown): string {
   if (typeof targetPath !== 'string' || targetPath.length === 0 || targetPath.length > 1000) {
     throw new Error('Invalid path')
   }
-  return shell.openPath(targetPath)
+  const projects = projectPersistence?.getProjects() ?? []
+  const isKnownProject = projects.some(p => p.path === targetPath)
+  if (!isKnownProject) {
+    throw new Error('Path is not a registered project')
+  }
+  return targetPath
+}
+
+ipcMain.handle('shell:open-path', async (_event, targetPath: string) => {
+  return shell.openPath(validateProjectPath(targetPath))
 })
 
 ipcMain.handle('shell:open-in-editor', async (_event, targetPath: string) => {
-  if (typeof targetPath !== 'string' || targetPath.length === 0 || targetPath.length > 1000) {
-    throw new Error('Invalid path')
-  }
+  const validPath = validateProjectPath(targetPath)
   return new Promise<void>((resolve, reject) => {
-    exec(`antigravity "${targetPath}"`, (error) => {
+    execFile('antigravity', [validPath], { timeout: 10000 }, (error) => {
       if (error) reject(error)
       else resolve()
     })
