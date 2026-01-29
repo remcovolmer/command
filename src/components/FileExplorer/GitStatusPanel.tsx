@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   GitBranch,
   ChevronDown,
@@ -11,16 +11,20 @@ import {
   ArrowDown,
   Check,
   Loader2,
+  Download,
 } from 'lucide-react'
 import type { Project, GitFileChange, GitBranchInfo } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
+import { getElectronAPI } from '../../utils/electron'
 
 interface GitStatusPanelProps {
   project: Project
   gitContextId?: string | null
+  gitPath?: string
+  onRefresh?: () => void
 }
 
-export function GitStatusPanel({ project, gitContextId }: GitStatusPanelProps) {
+export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: GitStatusPanelProps) {
   const contextKey = gitContextId ?? project.id
   const gitStatus = useProjectStore((s) => s.gitStatus[contextKey])
 
@@ -47,7 +51,13 @@ export function GitStatusPanel({ project, gitContextId }: GitStatusPanelProps) {
       ) : (
         <>
           {/* Branch Info */}
-          {gitStatus.branch && <BranchSection branch={gitStatus.branch} />}
+          {gitStatus.branch && (
+            <BranchSection
+              branch={gitStatus.branch}
+              gitPath={gitPath ?? project.path}
+              onRefresh={onRefresh}
+            />
+          )}
 
           {/* Status Indicator */}
           {gitStatus.isClean ? (
@@ -115,31 +125,79 @@ export function GitStatusPanel({ project, gitContextId }: GitStatusPanelProps) {
   )
 }
 
-function BranchSection({ branch }: { branch: GitBranchInfo }) {
+function BranchSection({
+  branch,
+  gitPath,
+  onRefresh,
+}: {
+  branch: GitBranchInfo
+  gitPath: string
+  onRefresh?: () => void
+}) {
+  const api = getElectronAPI()
+  const [loading, setLoading] = useState<'fetch' | 'pull' | 'push' | null>(null)
+
+  const handleGitAction = useCallback(async (action: 'fetch' | 'pull' | 'push') => {
+    setLoading(action)
+    try {
+      await api.git[action](gitPath)
+      onRefresh?.()
+    } catch (err) {
+      api.notification.show(
+        'Git Operation Failed',
+        err instanceof Error ? err.message : `${action} failed`
+      )
+    } finally {
+      setLoading(null)
+    }
+  }, [api, gitPath, onRefresh])
+
   return (
     <div className="px-3 py-2">
       <div className="flex items-center gap-2">
         <GitBranch className="w-4 h-4 text-primary" />
-        <span className="text-sm text-sidebar-foreground font-medium truncate">
+        <span className="text-sm text-sidebar-foreground font-medium truncate flex-1">
           {branch.name}
         </span>
-      </div>
-      {branch.upstream && (branch.ahead > 0 || branch.behind > 0) && (
-        <div className="flex items-center gap-3 mt-1 ml-6 text-xs text-muted-foreground">
-          {branch.ahead > 0 && (
-            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-              <ArrowUp className="w-3 h-3" />
-              {branch.ahead}
-            </span>
-          )}
-          {branch.behind > 0 && (
-            <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-              <ArrowDown className="w-3 h-3" />
-              {branch.behind}
-            </span>
-          )}
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => handleGitAction('fetch')}
+            disabled={loading !== null}
+            className="p-1 rounded hover:bg-muted/50 transition-colors"
+            title="Fetch"
+          >
+            {loading === 'fetch' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-muted-foreground hover:text-sidebar-foreground" />
+            )}
+          </button>
+          <button
+            onClick={() => handleGitAction('pull')}
+            disabled={loading !== null || !branch.upstream}
+            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!branch.upstream ? 'No upstream branch configured' : `Pull${branch.behind > 0 ? ` (${branch.behind} behind)` : ''}`}
+          >
+            {loading === 'pull' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <ArrowDown className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`} />
+            )}
+          </button>
+          <button
+            onClick={() => handleGitAction('push')}
+            disabled={loading !== null || !branch.upstream || branch.ahead === 0}
+            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!branch.upstream ? 'No upstream branch configured' : `Push${branch.ahead > 0 ? ` (${branch.ahead} ahead)` : ''}`}
+          >
+            {loading === 'push' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <ArrowUp className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`} />
+            )}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   )
 }

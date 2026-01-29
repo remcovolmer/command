@@ -143,7 +143,7 @@ export function FileExplorer() {
               activeTab === 'files' ? (
                 <FileTree project={activeProject} />
               ) : (
-                <GitStatusPanel project={activeProject} gitContextId={gitContextId} />
+                <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
               )
             ) : (
               <div className="px-3 py-4 text-sm text-muted-foreground">
