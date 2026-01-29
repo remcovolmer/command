@@ -417,8 +417,9 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectTerminals: (projectId) => {
         const state = get()
+        const sidecarIds = new Set(Object.values(state.sidecarTerminals).filter(Boolean))
         return Object.values(state.terminals).filter(
-          (t) => t.projectId === projectId
+          (t) => t.projectId === projectId && !sidecarIds.has(t.id)
         )
       },
 
@@ -431,8 +432,9 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectDirectTerminals: (projectId) => {
         const state = get()
+        const sidecarIds = new Set(Object.values(state.sidecarTerminals).filter(Boolean))
         return Object.values(state.terminals).filter(
-          (t) => t.projectId === projectId && t.worktreeId === null
+          (t) => t.projectId === projectId && t.worktreeId === null && !sidecarIds.has(t.id)
         )
       },
 
