@@ -10,6 +10,13 @@
     "dist-electron",
     "dist"
   ],
+  "extraResources": [
+    {
+      "from": "electron/main/hooks",
+      "to": "hooks",
+      "filter": ["*.cjs"]
+    }
+  ],
   "win": {
     "target": [
       {

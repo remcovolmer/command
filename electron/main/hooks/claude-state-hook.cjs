@@ -60,6 +60,14 @@ process.stdin.on('end', () => {
         // Session ended = stopped (red)
         state = 'stopped';
         break;
+      case 'UserPromptSubmit':
+        // User submitted a prompt = busy (blue)
+        state = 'busy';
+        break;
+      case 'PermissionRequest':
+        // Permission requested = permission (orange)
+        state = 'permission';
+        break;
     }
 
     if (state) {

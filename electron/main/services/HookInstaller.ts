@@ -29,8 +29,8 @@ function getHookScriptPath(): string {
     // In development, use the source directory
     return join(app.getAppPath(), 'electron', 'main', 'hooks', 'claude-state-hook.cjs')
   } else {
-    // In production, the script should be in the app resources
-    return join(process.resourcesPath, 'app', 'electron', 'main', 'hooks', 'claude-state-hook.cjs')
+    // In production, the script is in extraResources/hooks/
+    return join(process.resourcesPath, 'hooks', 'claude-state-hook.cjs')
   }
 }
 
@@ -81,7 +81,9 @@ export function installClaudeHooks(): void {
     'Stop',
     'Notification',
     'SessionStart',
-    'SessionEnd'
+    'SessionEnd',
+    'UserPromptSubmit',
+    'PermissionRequest'
   ]
 
   let installed = false
