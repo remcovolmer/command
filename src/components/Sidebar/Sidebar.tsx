@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, FolderOpen, Sparkles, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle } from 'lucide-react'
+import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import type { TerminalSession, Worktree } from '../../types'
@@ -218,7 +218,7 @@ export function Sidebar() {
     <div className="flex flex-col h-full bg-sidebar">
       {/* Logo Header */}
       <div className="flex items-center gap-2 px-4 py-5">
-        <Sparkles className="w-6 h-6 text-primary" />
+        <img src="favicon.png" alt="Command" className="w-6 h-6" />
         <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
       </div>
 
@@ -277,9 +277,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-4 py-3 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-sm font-medium text-primary-foreground">CC</span>
-          </div>
+          <img src="favicon.png" alt="Command" className="w-8 h-8" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
               Command

@@ -59,6 +59,7 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html')
 async function createWindow() {
   win = new BrowserWindow({
     title: 'Command',
+    icon: path.join(process.env.APP_ROOT, 'build', 'icon.ico'),
     width: 1400,
     height: 900,
     minWidth: 800,
