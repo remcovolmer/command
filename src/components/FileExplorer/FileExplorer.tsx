@@ -16,8 +16,17 @@ export function FileExplorer() {
   const clearDirectoryCache = useProjectStore((s) => s.clearDirectoryCache)
   const activeTab = useProjectStore((s) => s.fileExplorerActiveTab)
   const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
-  const gitStatus = useProjectStore((s) => activeProjectId ? s.gitStatus[activeProjectId] : null)
-  const isGitLoading = useProjectStore((s) => activeProjectId ? s.gitStatusLoading[activeProjectId] : false)
+
+  // Determine git context from active terminal (worktree or project root)
+  const activeWorktree = useProjectStore((s) => {
+    const term = s.activeTerminalId ? s.terminals[s.activeTerminalId] : null
+    return term?.worktreeId ? s.worktrees[term.worktreeId] : null
+  })
+  const gitContextId = activeWorktree?.id ?? activeProjectId
+  const gitContextPath = activeWorktree?.path // project path resolved below via activeProject
+
+  const gitStatus = useProjectStore((s) => gitContextId ? s.gitStatus[gitContextId] : null)
+  const isGitLoading = useProjectStore((s) => gitContextId ? s.gitStatusLoading[gitContextId] : false)
   const setGitStatus = useProjectStore((s) => s.setGitStatus)
   const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
 
@@ -66,18 +75,19 @@ export function FileExplorer() {
     }
   }
 
+  const gitPath = gitContextPath ?? activeProject?.path
   const handleGitRefresh = useCallback(async () => {
-    if (!activeProject) return
-    setGitStatusLoading(activeProject.id, true)
+    if (!gitPath || !gitContextId) return
+    setGitStatusLoading(gitContextId, true)
     try {
-      const status = await api.git.getStatus(activeProject.path)
-      setGitStatus(activeProject.id, status)
+      const status = await api.git.getStatus(gitPath)
+      setGitStatus(gitContextId, status)
     } catch (error) {
       console.error('Failed to fetch git status:', error)
     } finally {
-      setGitStatusLoading(activeProject.id, false)
+      setGitStatusLoading(gitContextId, false)
     }
-  }, [api, activeProject, setGitStatus, setGitStatusLoading])
+  }, [api, gitPath, gitContextId, setGitStatus, setGitStatusLoading])
 
   // Use ref to avoid stale closure in effects
   const handleGitRefreshRef = useRef(handleGitRefresh)
@@ -91,19 +101,19 @@ export function FileExplorer() {
     }
   }
 
-  // Fetch git status on mount and when project changes
+  // Fetch git status on mount and when git context changes (project or worktree)
   useEffect(() => {
-    if (activeProject) {
+    if (gitContextId) {
       handleGitRefreshRef.current()
     }
-  }, [activeProject?.id])
+  }, [gitContextId])
 
   // Auto-refresh git status
   useEffect(() => {
-    if (!activeProject) return
+    if (!gitContextId) return
     const interval = setInterval(() => handleGitRefreshRef.current(), GIT_REFRESH_INTERVAL)
     return () => clearInterval(interval)
-  }, [activeProject])
+  }, [gitContextId])
 
   const totalGitChanges = gitStatus
     ? gitStatus.staged.length +
@@ -133,7 +143,7 @@ export function FileExplorer() {
               activeTab === 'files' ? (
                 <FileTree project={activeProject} />
               ) : (
-                <GitStatusPanel project={activeProject} />
+                <GitStatusPanel project={activeProject} gitContextId={gitContextId} />
               )
             ) : (
               <div className="px-3 py-4 text-sm text-muted-foreground">

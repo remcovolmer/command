@@ -17,10 +17,12 @@ import { useProjectStore } from '../../stores/projectStore'
 
 interface GitStatusPanelProps {
   project: Project
+  gitContextId?: string | null
 }
 
-export function GitStatusPanel({ project }: GitStatusPanelProps) {
-  const gitStatus = useProjectStore((s) => s.gitStatus[project.id])
+export function GitStatusPanel({ project, gitContextId }: GitStatusPanelProps) {
+  const contextKey = gitContextId ?? project.id
+  const gitStatus = useProjectStore((s) => s.gitStatus[contextKey])
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     staged: true,
