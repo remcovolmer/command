@@ -184,6 +184,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('worktree:has-changes', worktreeId),
   },
 
+  // Shell operations
+  shell: {
+    openPath: (path: string): Promise<string> =>
+      ipcRenderer.invoke('shell:open-path', path),
+
+    openInEditor: (path: string): Promise<void> =>
+      ipcRenderer.invoke('shell:open-in-editor', path),
+  },
+
   // Notification operations
   notification: {
     show: (title: string, body: string): void =>

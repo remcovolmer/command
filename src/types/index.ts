@@ -161,6 +161,10 @@ export interface ElectronAPI {
     remove: (worktreeId: string, force?: boolean) => Promise<void>;
     hasChanges: (worktreeId: string) => Promise<boolean>;
   };
+  shell: {
+    openPath: (path: string) => Promise<string>;
+    openInEditor: (path: string) => Promise<void>;
+  };
   notification: {
     show: (title: string, body: string) => void;
   };

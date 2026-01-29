@@ -1,10 +1,12 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { memo } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch } from 'lucide-react'
 import type { Project, TerminalSession, Worktree, TerminalState } from '../../types'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
+import { ContextMenu } from './ContextMenu'
+import { getElectronAPI } from '../../utils/electron'
 
 interface SortableProjectItemProps {
   project: Project
@@ -85,6 +87,26 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const visibleStates = ['busy', 'done', 'permission', 'question'] as const
   const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const contextMenuItems = [
+    {
+      label: 'Open in File Explorer',
+      onClick: () => getElectronAPI().shell.openPath(project.path),
+    },
+    {
+      label: 'Open in Antigravity',
+      onClick: () => getElectronAPI().shell.openInEditor(project.path),
+    },
+  ]
+
   return (
     <motion.li
       ref={setNodeRef}
@@ -99,9 +121,20 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <div className="absolute inset-x-0 -top-0.5 h-0.5 bg-primary rounded-full" />
       )}
 
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
       {/* Project Header */}
       <div
         onClick={() => onSelect(project.id)}
+        onContextMenu={handleContextMenu}
         {...attributes}
         {...listeners}
         className={`
