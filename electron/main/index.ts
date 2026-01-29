@@ -350,7 +350,7 @@ ipcMain.on('notification:show', (_event, title: string, body: string) => {
 })
 
 // IPC Handlers for Shell operations
-function validateProjectPath(targetPath: unknown): string {
+function validateShellPath(targetPath: unknown): string {
   if (typeof targetPath !== 'string' || targetPath.length === 0 || targetPath.length > 1000) {
     throw new Error('Invalid path')
   }
@@ -363,11 +363,11 @@ function validateProjectPath(targetPath: unknown): string {
 }
 
 ipcMain.handle('shell:open-path', async (_event, targetPath: string) => {
-  return shell.openPath(validateProjectPath(targetPath))
+  return shell.openPath(validateShellPath(targetPath))
 })
 
 ipcMain.handle('shell:open-in-editor', async (_event, targetPath: string) => {
-  const validPath = validateProjectPath(targetPath)
+  const validPath = validateShellPath(targetPath)
   return new Promise<void>((resolve, reject) => {
     execFile('antigravity', [validPath], { timeout: 10000 }, (error) => {
       if (error) reject(error)
