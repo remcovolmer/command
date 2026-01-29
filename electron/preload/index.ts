@@ -215,6 +215,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   git: {
     getStatus: (projectPath: string): Promise<GitStatus> =>
       ipcRenderer.invoke('git:status', projectPath),
+    fetch: (projectPath: string): Promise<string> =>
+      ipcRenderer.invoke('git:fetch', projectPath),
+    pull: (projectPath: string): Promise<string> =>
+      ipcRenderer.invoke('git:pull', projectPath),
+    push: (projectPath: string): Promise<string> =>
+      ipcRenderer.invoke('git:push', projectPath),
   },
 
   // Update operations

@@ -226,6 +226,27 @@ ipcMain.handle('git:status', async (_event, projectPath: string) => {
   return gitService?.getStatus(projectPath)
 })
 
+ipcMain.handle('git:fetch', async (_event, projectPath: string) => {
+  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
+    throw new Error('Invalid project path')
+  }
+  return gitService?.fetch(projectPath)
+})
+
+ipcMain.handle('git:pull', async (_event, projectPath: string) => {
+  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
+    throw new Error('Invalid project path')
+  }
+  return gitService?.pull(projectPath)
+})
+
+ipcMain.handle('git:push', async (_event, projectPath: string) => {
+  if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
+    throw new Error('Invalid project path')
+  }
+  return gitService?.push(projectPath)
+})
+
 // IPC Handlers for Worktree operations
 ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: string, worktreeName?: string) => {
   if (!isValidUUID(projectId)) {

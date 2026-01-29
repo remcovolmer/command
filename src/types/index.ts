@@ -174,6 +174,9 @@ export interface ElectronAPI {
   };
   git: {
     getStatus: (projectPath: string) => Promise<GitStatus>;
+    fetch: (projectPath: string) => Promise<string>;
+    pull: (projectPath: string) => Promise<string>;
+    push: (projectPath: string) => Promise<string>;
   };
   update: {
     check: () => Promise<UpdateCheckResult>;

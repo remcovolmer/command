@@ -199,6 +199,18 @@ export class GitService {
     return { staged, modified, untracked, conflicted }
   }
 
+  async fetch(projectPath: string): Promise<string> {
+    return this.execGit(projectPath, ['fetch'])
+  }
+
+  async pull(projectPath: string): Promise<string> {
+    return this.execGit(projectPath, ['pull'])
+  }
+
+  async push(projectPath: string): Promise<string> {
+    return this.execGit(projectPath, ['push'])
+  }
+
   private mapStatus(code: string): GitFileChange['status'] {
     switch (code) {
       case 'M':
