@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Claude Code Hook Script for Command Center
+ * Claude Code Hook Script for Command
  *
  * This script receives hook events from Claude Code via stdin (JSON)
  * and writes the state to a file that the Electron app watches.

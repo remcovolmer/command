@@ -58,7 +58,7 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'Claude Code Command Center',
+    title: 'Command',
     width: 1400,
     height: 900,
     minWidth: 800,

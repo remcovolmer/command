@@ -1,4 +1,4 @@
-# feat: Claude Code Command Center
+# feat: Command
 
 > A desktop application for managing multiple Claude Code terminal instances across projects
 
@@ -65,17 +65,17 @@ This command center solves these problems by centralizing all Claude Code sessio
 
 ### Technology Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| Desktop Framework | Electron 34+ | Cross-platform desktop app |
-| Build Tool | electron-vite | Fast HMR, modern bundling |
-| Frontend | React 18 + TypeScript | UI components |
-| Terminal Emulation | xterm.js + addons | Render terminal output |
-| PTY Backend | node-pty | Spawn shell processes |
-| Split Views | react-resizable-panels | Resizable terminal panes |
-| State Management | Zustand + persist | Project/terminal state |
-| Styling | Tailwind CSS | Utility-first CSS |
-| UI Components | shadcn/ui | Accessible, customizable |
+| Layer              | Technology             | Purpose                    |
+| ------------------ | ---------------------- | -------------------------- |
+| Desktop Framework  | Electron 34+           | Cross-platform desktop app |
+| Build Tool         | electron-vite          | Fast HMR, modern bundling  |
+| Frontend           | React 18 + TypeScript  | UI components              |
+| Terminal Emulation | xterm.js + addons      | Render terminal output     |
+| PTY Backend        | node-pty               | Spawn shell processes      |
+| Split Views        | react-resizable-panels | Resizable terminal panes   |
+| State Management   | Zustand + persist      | Project/terminal state     |
+| Styling            | Tailwind CSS           | Utility-first CSS          |
+| UI Components      | shadcn/ui              | Accessible, customizable   |
 
 ### Project Structure
 
@@ -273,6 +273,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 **Goal**: Basic Electron + React app with single terminal
 
 **Tasks**:
+
 - [ ] Initialize electron-vite project
 - [ ] Configure TypeScript, Tailwind, shadcn/ui
 - [ ] Create main process with basic window
@@ -283,12 +284,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 - [ ] Verify Claude Code CLI starts automatically
 
 **Files to create**:
+
 - `src/main/index.ts`
 - `src/main/services/TerminalManager.ts`
 - `src/preload/index.ts`
 - `src/renderer/src/components/Terminal/Terminal.tsx`
 
 **Validation**:
+
 - [ ] App launches without errors
 - [ ] Terminal renders and accepts input
 - [ ] `claude` command runs when terminal opens
@@ -299,6 +302,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 **Goal**: Sidebar with project list, add/remove projects
 
 **Tasks**:
+
 - [ ] Create Zustand store for projects
 - [ ] Implement project persistence (electron-store or JSON file)
 - [ ] Create Sidebar component
@@ -308,6 +312,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 - [ ] Handle project switching
 
 **Files to create**:
+
 - `src/renderer/src/stores/projectStore.ts`
 - `src/main/services/ProjectPersistence.ts`
 - `src/renderer/src/components/Sidebar/Sidebar.tsx`
@@ -315,6 +320,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 - `src/renderer/src/components/Sidebar/ProjectItem.tsx`
 
 **Validation**:
+
 - [ ] Can add project via folder picker
 - [ ] Projects persist across app restarts
 - [ ] Can remove projects
@@ -325,6 +331,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 **Goal**: Support 2-3 terminals per project with split layout
 
 **Tasks**:
+
 - [ ] Integrate react-resizable-panels
 - [ ] Create MainLayout component with PanelGroup
 - [ ] Update TerminalManager to handle multiple PTYs
@@ -335,11 +342,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 - [ ] Enforce 3 terminal limit
 
 **Files to create**:
+
 - `src/renderer/src/components/Layout/MainLayout.tsx`
 - `src/renderer/src/components/Terminal/TerminalPane.tsx`
 - `src/renderer/src/components/Terminal/TerminalHeader.tsx`
 
 **Validation**:
+
 - [ ] Can create second terminal (split view)
 - [ ] Can create third terminal
 - [ ] Cannot create fourth terminal (graceful message)
@@ -351,6 +360,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 **Goal**: Visual and system notifications when Claude needs input
 
 **Tasks**:
+
 - [ ] Implement InputDetector service
 - [ ] Add terminal state tracking (needs_input state)
 - [ ] Create blinking indicator CSS animation
@@ -360,10 +370,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 - [ ] Handle multiple terminals needing input
 
 **Files to create**:
+
 - `src/main/services/InputDetector.ts`
 - `src/renderer/src/hooks/useNotifications.ts`
 
 **Validation**:
+
 - [ ] Green blink when Claude finishes task
 - [ ] Blink visible in sidebar for background projects
 - [ ] Native OS notification when app minimized
@@ -374,6 +386,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 **Goal**: Production-ready, optimized for Windows
 
 **Tasks**:
+
 - [ ] Windows shell detection (PowerShell default)
 - [ ] Test ConPTY integration
 - [ ] Add keyboard shortcuts (Ctrl+T, Ctrl+W, etc.)
@@ -385,6 +398,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 - [ ] Package for Windows installer
 
 **Validation**:
+
 - [ ] App works on Windows 10 and 11
 - [ ] PowerShell and Git Bash work
 - [ ] Keyboard shortcuts functional
@@ -466,23 +480,23 @@ erDiagram
 
 ### Critical (Before Implementation)
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 1 | Exact Claude Code CLI command? | `claude`, `npx @anthropic/claude-code`, other | Core functionality |
-| 2 | Auto-restart terminals on app launch? | Yes (resume), No (manual start) | UX, performance |
-| 3 | What happens on app close with running terminals? | Kill, Warn+Kill, Keep running | Data loss risk |
-| 4 | Default Windows shell? | PowerShell, CMD, Git Bash, User choice | Compatibility |
-| 5 | Terminal scrollback buffer size? | 1000, 5000, 10000, configurable | Memory usage |
+| # | Question                                          | Options                                           | Impact             |
+| - | ------------------------------------------------- | ------------------------------------------------- | ------------------ |
+| 1 | Exact Claude Code CLI command?                    | `claude`, `npx @anthropic/claude-code`, other | Core functionality |
+| 2 | Auto-restart terminals on app launch?             | Yes (resume), No (manual start)                   | UX, performance    |
+| 3 | What happens on app close with running terminals? | Kill, Warn+Kill, Keep running                     | Data loss risk     |
+| 4 | Default Windows shell?                            | PowerShell, CMD, Git Bash, User choice            | Compatibility      |
+| 5 | Terminal scrollback buffer size?                  | 1000, 5000, 10000, configurable                   | Memory usage       |
 
 ### Important (Affects UX)
 
-| # | Question | Default Assumption |
-|---|----------|-------------------|
-| 6 | Can user rename projects? | Yes, via right-click context menu |
-| 7 | Project ordering in sidebar? | Manual (drag-and-drop) |
-| 8 | Sound with notifications? | No sound by default, configurable |
-| 9 | Search within terminal output? | Yes, via Ctrl+F |
-| 10 | Export/import projects config? | Out of scope for v1 |
+| #  | Question                       | Default Assumption                |
+| -- | ------------------------------ | --------------------------------- |
+| 6  | Can user rename projects?      | Yes, via right-click context menu |
+| 7  | Project ordering in sidebar?   | Manual (drag-and-drop)            |
+| 8  | Sound with notifications?      | No sound by default, configurable |
+| 9  | Search within terminal output? | Yes, via Ctrl+F                   |
+| 10 | Export/import projects config? | Out of scope for v1               |
 
 ## Dependencies
 
@@ -527,11 +541,13 @@ erDiagram
 ## References
 
 ### Internal Documentation
+
 - Research: xterm.js + node-pty integration patterns
 - Research: Electron IPC best practices
 - Research: react-resizable-panels usage
 
 ### External Documentation
+
 - [xterm.js Documentation](https://xtermjs.org/)
 - [node-pty GitHub](https://github.com/microsoft/node-pty)
 - [Electron IPC Tutorial](https://www.electronjs.org/docs/latest/tutorial/ipc)
@@ -542,6 +558,7 @@ erDiagram
 - [Claude Code Terminal Notifications](https://martin.hjartmyr.se/articles/claude-code-terminal-notifications/)
 
 ### Similar Projects (Reference Implementations)
+
 - [Electerm](https://github.com/electerm/electerm) - Terminal with multi-tab support
 - [Hyper](https://github.com/vercel/hyper) - Electron-based terminal
 - [VS Code Integrated Terminal](https://github.com/microsoft/vscode) - xterm.js in Electron

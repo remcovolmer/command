@@ -35,7 +35,7 @@ function getHookScriptPath(): string {
 }
 
 /**
- * Install Claude Code hooks for Command Center state detection
+ * Install Claude Code hooks for Command state detection
  *
  * This function adds hooks to the user's ~/.claude/settings.json
  * to enable state detection via the hook system.
@@ -110,7 +110,7 @@ export function installClaudeHooks(): void {
 }
 
 /**
- * Remove Command Center hooks from Claude settings
+ * Remove Command hooks from Claude settings
  */
 export function uninstallClaudeHooks(): void {
   const settingsPath = join(homedir(), '.claude', 'settings.json')

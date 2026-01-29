@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-command-center",
+  "name": "command",
   "version": "0.4.3",
   "main": "dist-electron/main/index.js",
   "description": "Command center for managing multiple Claude Code terminal instances",
