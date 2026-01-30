@@ -17,6 +17,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'update:progress',
   'update:downloaded',
   'update:error',
+  'github:pr-status-update',
 ] as const
 
 interface Project {
@@ -75,6 +76,30 @@ interface GitStatus {
 }
 
 // Update types
+interface PRCheckStatus {
+  name: string
+  state: string
+  bucket: string
+}
+
+interface PRStatus {
+  noPR: boolean
+  number?: number
+  title?: string
+  url?: string
+  state?: 'OPEN' | 'CLOSED' | 'MERGED'
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
+  mergeStateStatus?: 'CLEAN' | 'DIRTY' | 'BLOCKED' | 'UNSTABLE' | 'UNKNOWN'
+  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null
+  statusCheckRollup?: PRCheckStatus[]
+  additions?: number
+  deletions?: number
+  changedFiles?: number
+  loading?: boolean
+  error?: string
+  lastUpdated?: number
+}
+
 interface UpdateCheckResult {
   updateAvailable: boolean
   version?: string
@@ -230,6 +255,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:pull', projectPath),
     push: (projectPath: string): Promise<string> =>
       ipcRenderer.invoke('git:push', projectPath),
+  },
+
+  // GitHub operations
+  github: {
+    checkAvailable: (): Promise<{ installed: boolean; authenticated: boolean }> =>
+      ipcRenderer.invoke('github:check-available'),
+
+    getPRStatus: (projectPath: string): Promise<PRStatus> =>
+      ipcRenderer.invoke('github:get-pr-status', projectPath),
+
+    mergePR: (projectPath: string, prNumber: number): Promise<void> =>
+      ipcRenderer.invoke('github:merge-pr', projectPath, prNumber),
+
+    startPolling: (key: string, projectPath: string): Promise<void> =>
+      ipcRenderer.invoke('github:start-polling', key, projectPath),
+
+    stopPolling: (key: string): Promise<void> =>
+      ipcRenderer.invoke('github:stop-polling', key),
+
+    onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, key: string, status: PRStatus) => callback(key, status)
+      ipcRenderer.on('github:pr-status-update', handler)
+      return () => ipcRenderer.removeListener('github:pr-status-update', handler)
+    },
   },
 
   // Update operations

@@ -85,6 +85,31 @@ export interface GitStatus {
   error?: string;
 }
 
+// GitHub PR types
+export interface PRCheckStatus {
+  name: string;
+  state: string;
+  bucket: string;
+}
+
+export interface PRStatus {
+  noPR: boolean;
+  number?: number;
+  title?: string;
+  url?: string;
+  state?: 'OPEN' | 'CLOSED' | 'MERGED';
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+  mergeStateStatus?: 'CLEAN' | 'DIRTY' | 'BLOCKED' | 'UNSTABLE' | 'UNKNOWN';
+  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  statusCheckRollup?: PRCheckStatus[];
+  additions?: number;
+  deletions?: number;
+  changedFiles?: number;
+  loading?: boolean;
+  error?: string;
+  lastUpdated?: number;
+}
+
 // Update types
 export interface UpdateCheckResult {
   updateAvailable: boolean;
@@ -181,6 +206,14 @@ export interface ElectronAPI {
     fetch: (projectPath: string) => Promise<string>;
     pull: (projectPath: string) => Promise<string>;
     push: (projectPath: string) => Promise<string>;
+  };
+  github: {
+    checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;
+    getPRStatus: (projectPath: string) => Promise<PRStatus>;
+    mergePR: (projectPath: string, prNumber: number) => Promise<void>;
+    startPolling: (key: string, projectPath: string) => Promise<void>;
+    stopPolling: (key: string) => Promise<void>;
+    onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void) => Unsubscribe;
   };
   update: {
     check: () => Promise<UpdateCheckResult>;
