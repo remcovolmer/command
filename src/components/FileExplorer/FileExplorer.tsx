@@ -1,10 +1,9 @@
 import { useEffect, useCallback, useMemo, useRef } from 'react'
-import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
 import { FileExplorerTabBar } from './FileExplorerTabBar'
-import { SidecarTerminal } from './SidecarTerminal'
+import { SidecarTerminalPanel } from './SidecarTerminalPanel'
 import { getElectronAPI } from '../../utils/electron'
 
 const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
@@ -16,6 +15,7 @@ export function FileExplorer() {
   const clearDirectoryCache = useProjectStore((s) => s.clearDirectoryCache)
   const activeTab = useProjectStore((s) => s.fileExplorerActiveTab)
   const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
+  const activeWorktreeId = useProjectStore((s) => s.activeWorktreeId)
 
   // Determine git context from active terminal (worktree or project root)
   const activeWorktree = useProjectStore((s) => {
@@ -23,7 +23,7 @@ export function FileExplorer() {
     return term?.worktreeId ? s.worktrees[term.worktreeId] : null
   })
   const gitContextId = activeWorktree?.id ?? activeProjectId
-  const gitContextPath = activeWorktree?.path // project path resolved below via activeProject
+  const gitContextPath = activeWorktree?.path
 
   const gitStatus = useProjectStore((s) => gitContextId ? s.gitStatus[gitContextId] : null)
   const isGitLoading = useProjectStore((s) => gitContextId ? s.gitStatusLoading[gitContextId] : false)
@@ -31,37 +31,35 @@ export function FileExplorer() {
   const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
 
   // Sidecar terminal state
-  const sidecarTerminalId = useProjectStore((s) =>
-    activeProjectId ? s.sidecarTerminals[activeProjectId] : null
+  const sidecarContextKey = activeWorktreeId ?? activeProjectId
+  const sidecarTerminals = useProjectStore((s) =>
+    sidecarContextKey ? s.getSidecarTerminals(sidecarContextKey) : []
   )
+  const activeSidecarTerminalId = useProjectStore((s) => s.activeSidecarTerminalId)
   const sidecarTerminalCollapsed = useProjectStore((s) => s.sidecarTerminalCollapsed)
   const setSidecarTerminalCollapsed = useProjectStore((s) => s.setSidecarTerminalCollapsed)
   const createSidecarTerminal = useProjectStore((s) => s.createSidecarTerminal)
   const closeSidecarTerminal = useProjectStore((s) => s.closeSidecarTerminal)
+  const setActiveSidecarTerminal = useProjectStore((s) => s.setActiveSidecarTerminal)
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
-  const terminalPanelRef = useRef<ImperativePanelHandle>(null)
 
-  // Sync panel collapse state with store
+  // Auto-select first sidecar terminal when context changes
   useEffect(() => {
-    const panel = terminalPanelRef.current
-    if (!panel || !sidecarTerminalId) return
-    if (sidecarTerminalCollapsed) {
-      panel.collapse()
-    } else {
-      panel.expand()
+    if (sidecarTerminals.length > 0 && !sidecarTerminals.find((t) => t.id === activeSidecarTerminalId)) {
+      setActiveSidecarTerminal(sidecarTerminals[0].id)
     }
-  }, [sidecarTerminalCollapsed, sidecarTerminalId])
+  }, [sidecarContextKey, sidecarTerminals, activeSidecarTerminalId, setActiveSidecarTerminal])
 
-  const handleOpenTerminal = async () => {
-    if (activeProjectId) {
-      await createSidecarTerminal(activeProjectId)
+  const handleCreateTerminal = async () => {
+    if (activeProjectId && sidecarContextKey) {
+      await createSidecarTerminal(sidecarContextKey, activeProjectId, activeWorktreeId ?? undefined)
     }
   }
 
-  const handleCloseTerminal = () => {
-    if (activeProjectId) {
-      closeSidecarTerminal(activeProjectId)
+  const handleCloseTerminal = (terminalId: string) => {
+    if (sidecarContextKey) {
+      closeSidecarTerminal(sidecarContextKey, terminalId)
     }
   }
 
@@ -89,7 +87,6 @@ export function FileExplorer() {
     }
   }, [api, gitPath, gitContextId, setGitStatus, setGitStatusLoading])
 
-  // Use ref to avoid stale closure in effects
   const handleGitRefreshRef = useRef(handleGitRefresh)
   handleGitRefreshRef.current = handleGitRefresh
 
@@ -101,14 +98,12 @@ export function FileExplorer() {
     }
   }
 
-  // Fetch git status on mount and when git context changes (project or worktree)
   useEffect(() => {
     if (gitContextId) {
       handleGitRefreshRef.current()
     }
   }, [gitContextId])
 
-  // Auto-refresh git status
   useEffect(() => {
     if (!gitContextId) return
     const interval = setInterval(() => handleGitRefreshRef.current(), GIT_REFRESH_INTERVAL)
@@ -122,60 +117,53 @@ export function FileExplorer() {
       gitStatus.conflicted.length
     : 0
 
+  const hasTerminals = sidecarTerminals.length > 0
+  const isExpanded = hasTerminals && !sidecarTerminalCollapsed
+
   return (
     <div className="h-full flex flex-col bg-sidebar">
-      {/* Tab Bar - at top, same styling as TerminalTabBar */}
+      {/* Tab Bar - at top */}
       <FileExplorerTabBar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         gitChangeCount={totalGitChanges}
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
-        onOpenTerminal={!sidecarTerminalId ? handleOpenTerminal : undefined}
       />
 
-      {/* Content with optional terminal panel */}
-      <PanelGroup direction="vertical" autoSaveId="sidecar-layout" className="flex-1 min-h-0">
-        {/* Files/Git Content */}
-        <Panel id="sidecar-content" defaultSize={70} minSize={20}>
-          <div className="h-full overflow-auto">
-            {activeProject ? (
-              activeTab === 'files' ? (
-                <FileTree project={activeProject} />
-              ) : (
-                <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
-              )
-            ) : (
-              <div className="px-3 py-4 text-sm text-muted-foreground">
-                Select a project to view files
-              </div>
-            )}
+      {/* Files/Git Content - takes remaining space */}
+      <div className={`${isExpanded ? 'flex-1' : 'flex-1'} min-h-0 overflow-auto`}>
+        {activeProject ? (
+          activeTab === 'files' ? (
+            <FileTree project={activeProject} />
+          ) : (
+            <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
+          )
+        ) : (
+          <div className="px-3 py-4 text-sm text-muted-foreground">
+            Select a project to view files
           </div>
-        </Panel>
-
-        {/* Terminal Panel - only show if terminal exists */}
-        {sidecarTerminalId && activeProject && (
-          <>
-            <PanelResizeHandle className="h-1 bg-border hover:bg-primary transition-colors" />
-            <Panel
-              ref={terminalPanelRef}
-              id="sidecar-terminal"
-              defaultSize={30}
-              minSize={10}
-              maxSize={70}
-              collapsible
-              collapsedSize={0}
-            >
-              <SidecarTerminal
-                terminalId={sidecarTerminalId}
-                isCollapsed={sidecarTerminalCollapsed}
-                onToggleCollapse={handleToggleCollapse}
-                onClose={handleCloseTerminal}
-              />
-            </Panel>
-          </>
         )}
-      </PanelGroup>
+      </div>
+
+      {/* Terminal Panel - always visible at bottom */}
+      <SidecarTerminalPanel
+        contextKey={sidecarContextKey ?? ''}
+        projectId={activeProjectId ?? ''}
+        worktreeId={activeWorktreeId ?? undefined}
+        terminals={sidecarTerminals}
+        activeTerminalId={activeSidecarTerminalId}
+        isCollapsed={sidecarTerminalCollapsed}
+        onToggleCollapse={handleToggleCollapse}
+        onCreateTerminal={handleCreateTerminal}
+        onCloseTerminal={handleCloseTerminal}
+        onSelectTerminal={(id) => {
+          setActiveSidecarTerminal(id)
+          if (sidecarTerminalCollapsed) {
+            setSidecarTerminalCollapsed(false)
+          }
+        }}
+      />
     </div>
   )
 }

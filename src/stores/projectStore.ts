@@ -31,14 +31,17 @@ interface ProjectStore {
   gitStatus: Record<string, GitStatus>
   gitStatusLoading: Record<string, boolean>
 
-  // Sidecar terminal state (per project)
-  sidecarTerminals: Record<string, string | null>  // projectId -> terminalId
+  // Sidecar terminal state (per context: worktreeId or projectId)
+  sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
   sidecarTerminalCollapsed: boolean
+  activeSidecarTerminalId: string | null
 
   // Sidecar terminal actions
-  createSidecarTerminal: (projectId: string) => Promise<void>
-  closeSidecarTerminal: (projectId: string) => void
+  createSidecarTerminal: (contextKey: string, projectId: string, worktreeId?: string) => Promise<void>
+  closeSidecarTerminal: (contextKey: string, terminalId: string) => void
   setSidecarTerminalCollapsed: (collapsed: boolean) => void
+  setActiveSidecarTerminal: (id: string | null) => void
+  getSidecarTerminals: (contextKey: string) => TerminalSession[]
 
   // File explorer actions
   toggleFileExplorer: () => void
@@ -120,47 +123,79 @@ export const useProjectStore = create<ProjectStore>()(
       // Sidecar terminal state
       sidecarTerminals: {},
       sidecarTerminalCollapsed: false,
+      activeSidecarTerminalId: null,
 
       // Sidecar terminal actions
-      createSidecarTerminal: async (projectId) => {
+      createSidecarTerminal: async (contextKey, projectId, worktreeId) => {
         const api = getElectronAPI()
-        const terminalId = await api.terminal.create(projectId, undefined, 'normal')
+        const terminalId = await api.terminal.create(projectId, worktreeId, 'normal')
 
-        set((state) => ({
-          terminals: {
-            ...state.terminals,
-            [terminalId]: {
-              id: terminalId,
-              projectId,
-              worktreeId: null,
-              state: 'done',
-              lastActivity: Date.now(),
-              title: 'Terminal',
-              type: 'normal' as TerminalType,
+        set((state) => {
+          const existing = state.sidecarTerminals[contextKey] ?? []
+          return {
+            terminals: {
+              ...state.terminals,
+              [terminalId]: {
+                id: terminalId,
+                projectId,
+                worktreeId: worktreeId ?? null,
+                state: 'done',
+                lastActivity: Date.now(),
+                title: 'Terminal',
+                type: 'normal' as TerminalType,
+              },
             },
-          },
-          sidecarTerminals: { ...state.sidecarTerminals, [projectId]: terminalId },
-        }))
+            sidecarTerminals: {
+              ...state.sidecarTerminals,
+              [contextKey]: [...existing, terminalId],
+            },
+            activeSidecarTerminalId: terminalId,
+            sidecarTerminalCollapsed: false,
+          }
+        })
       },
 
-      closeSidecarTerminal: (projectId) => {
-        const { sidecarTerminals, terminals } = get()
-        const terminalId = sidecarTerminals[projectId]
-        if (terminalId) {
-          const api = getElectronAPI()
-          api.terminal.close(terminalId)
+      closeSidecarTerminal: (contextKey, terminalId) => {
+        const { sidecarTerminals, terminals, activeSidecarTerminalId } = get()
+        const api = getElectronAPI()
+        api.terminal.close(terminalId)
 
-          const newTerminals = { ...terminals }
-          delete newTerminals[terminalId]
-          const newSidecarTerminals = { ...sidecarTerminals }
-          delete newSidecarTerminals[projectId]
+        const newTerminals = { ...terminals }
+        delete newTerminals[terminalId]
 
-          set({ terminals: newTerminals, sidecarTerminals: newSidecarTerminals })
+        const existing = sidecarTerminals[contextKey] ?? []
+        const newList = existing.filter((id) => id !== terminalId)
+        const newSidecarTerminals = { ...sidecarTerminals }
+        if (newList.length === 0) {
+          delete newSidecarTerminals[contextKey]
+        } else {
+          newSidecarTerminals[contextKey] = newList
         }
+
+        // Auto-select next if active was closed
+        let newActiveSidecar = activeSidecarTerminalId
+        if (activeSidecarTerminalId === terminalId) {
+          newActiveSidecar = newList.length > 0 ? newList[newList.length - 1] : null
+        }
+
+        set({
+          terminals: newTerminals,
+          sidecarTerminals: newSidecarTerminals,
+          activeSidecarTerminalId: newActiveSidecar,
+        })
       },
 
       setSidecarTerminalCollapsed: (collapsed) =>
         set({ sidecarTerminalCollapsed: collapsed }),
+
+      setActiveSidecarTerminal: (id) =>
+        set({ activeSidecarTerminalId: id }),
+
+      getSidecarTerminals: (contextKey) => {
+        const state = get()
+        const ids = state.sidecarTerminals[contextKey] ?? []
+        return ids.map((id) => state.terminals[id]).filter(Boolean)
+      },
 
       // File explorer actions
       toggleFileExplorer: () =>
@@ -417,7 +452,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectTerminals: (projectId) => {
         const state = get()
-        const sidecarIds = new Set(Object.values(state.sidecarTerminals).filter(Boolean))
+        const sidecarIds = new Set(Object.values(state.sidecarTerminals).flat())
         return Object.values(state.terminals).filter(
           (t) => t.projectId === projectId && !sidecarIds.has(t.id)
         )
@@ -432,7 +467,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectDirectTerminals: (projectId) => {
         const state = get()
-        const sidecarIds = new Set(Object.values(state.sidecarTerminals).filter(Boolean))
+        const sidecarIds = new Set(Object.values(state.sidecarTerminals).flat())
         return Object.values(state.terminals).filter(
           (t) => t.projectId === projectId && t.worktreeId === null && !sidecarIds.has(t.id)
         )
