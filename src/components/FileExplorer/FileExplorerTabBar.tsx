@@ -1,4 +1,4 @@
-import { FolderTree, GitBranch, RefreshCw, TerminalSquare } from 'lucide-react'
+import { FolderTree, GitBranch, RefreshCw } from 'lucide-react'
 
 interface FileExplorerTabBarProps {
   activeTab: 'files' | 'git'
@@ -6,7 +6,6 @@ interface FileExplorerTabBarProps {
   gitChangeCount: number
   isGitLoading: boolean
   onRefresh: () => void
-  onOpenTerminal?: () => void  // undefined if terminal already open
 }
 
 export function FileExplorerTabBar({
@@ -15,7 +14,6 @@ export function FileExplorerTabBar({
   gitChangeCount,
   isGitLoading,
   onRefresh,
-  onOpenTerminal,
 }: FileExplorerTabBarProps) {
   const tabs = [
     { id: 'files' as const, label: 'Files', icon: FolderTree },
@@ -53,15 +51,6 @@ export function FileExplorerTabBar({
         })}
       </div>
       <div className="flex items-center gap-1">
-        {onOpenTerminal && (
-          <button
-            onClick={onOpenTerminal}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-            title="Open Terminal"
-          >
-            <TerminalSquare className="w-3.5 h-3.5 text-muted-foreground hover:text-sidebar-foreground" />
-          </button>
-        )}
         <button
           onClick={onRefresh}
           disabled={activeTab === 'git' && isGitLoading}
