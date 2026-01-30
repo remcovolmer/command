@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useMemo, useRef } from 'react'
+import { useShallow } from 'zustand/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
@@ -30,12 +31,19 @@ export function FileExplorer() {
   const setGitStatus = useProjectStore((s) => s.setGitStatus)
   const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
 
-  // Sidecar terminal state
+  // Sidecar terminal state — select ID array with shallow equality to avoid re-renders
   const sidecarContextKey = activeWorktreeId ?? activeProjectId
-  const sidecarTerminals = useProjectStore((s) =>
-    sidecarContextKey ? s.getSidecarTerminals(sidecarContextKey) : []
+  const sidecarTerminalIds = useProjectStore(
+    useShallow((s) => sidecarContextKey ? (s.sidecarTerminals[sidecarContextKey] ?? []) : [])
   )
-  const activeSidecarTerminalId = useProjectStore((s) => s.activeSidecarTerminalId)
+  const terminals = useProjectStore((s) => s.terminals)
+  const sidecarTerminals = useMemo(
+    () => sidecarTerminalIds.map((id) => terminals[id]).filter(Boolean),
+    [sidecarTerminalIds, terminals]
+  )
+  const activeSidecarTerminalId = useProjectStore((s) =>
+    sidecarContextKey ? s.activeSidecarTerminalId[sidecarContextKey] ?? null : null
+  )
   const sidecarTerminalCollapsed = useProjectStore((s) => s.sidecarTerminalCollapsed)
   const setSidecarTerminalCollapsed = useProjectStore((s) => s.setSidecarTerminalCollapsed)
   const createSidecarTerminal = useProjectStore((s) => s.createSidecarTerminal)
@@ -47,7 +55,9 @@ export function FileExplorer() {
   // Auto-select first sidecar terminal when context changes
   useEffect(() => {
     if (sidecarTerminals.length > 0 && !sidecarTerminals.find((t) => t.id === activeSidecarTerminalId)) {
-      setActiveSidecarTerminal(sidecarTerminals[0].id)
+      if (sidecarContextKey) {
+        setActiveSidecarTerminal(sidecarContextKey, sidecarTerminals[0].id)
+      }
     }
   }, [sidecarContextKey, sidecarTerminals, activeSidecarTerminalId, setActiveSidecarTerminal])
 
@@ -132,7 +142,7 @@ export function FileExplorer() {
       />
 
       {/* Files/Git Content - takes remaining space */}
-      <div className={`${isExpanded ? 'flex-1' : 'flex-1'} min-h-0 overflow-auto`}>
+      <div className="flex-1 min-h-0 overflow-auto">
         {activeProject ? (
           activeTab === 'files' ? (
             <FileTree project={activeProject} />
@@ -146,24 +156,26 @@ export function FileExplorer() {
         )}
       </div>
 
-      {/* Terminal Panel - always visible at bottom */}
-      <SidecarTerminalPanel
-        contextKey={sidecarContextKey ?? ''}
-        projectId={activeProjectId ?? ''}
-        worktreeId={activeWorktreeId ?? undefined}
-        terminals={sidecarTerminals}
-        activeTerminalId={activeSidecarTerminalId}
-        isCollapsed={sidecarTerminalCollapsed}
-        onToggleCollapse={handleToggleCollapse}
-        onCreateTerminal={handleCreateTerminal}
-        onCloseTerminal={handleCloseTerminal}
-        onSelectTerminal={(id) => {
-          setActiveSidecarTerminal(id)
-          if (sidecarTerminalCollapsed) {
-            setSidecarTerminalCollapsed(false)
-          }
-        }}
-      />
+      {/* Terminal Panel - only render when context exists */}
+      {sidecarContextKey && activeProjectId && (
+        <SidecarTerminalPanel
+          contextKey={sidecarContextKey}
+          projectId={activeProjectId}
+          worktreeId={activeWorktreeId ?? undefined}
+          terminals={sidecarTerminals}
+          activeTerminalId={activeSidecarTerminalId}
+          isCollapsed={sidecarTerminalCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+          onCreateTerminal={handleCreateTerminal}
+          onCloseTerminal={handleCloseTerminal}
+          onSelectTerminal={(id) => {
+            setActiveSidecarTerminal(sidecarContextKey, id)
+            if (sidecarTerminalCollapsed) {
+              setSidecarTerminalCollapsed(false)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

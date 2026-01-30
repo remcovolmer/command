@@ -34,13 +34,13 @@ interface ProjectStore {
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
   sidecarTerminalCollapsed: boolean
-  activeSidecarTerminalId: string | null
+  activeSidecarTerminalId: Record<string, string | null>  // per-context active terminal
 
   // Sidecar terminal actions
   createSidecarTerminal: (contextKey: string, projectId: string, worktreeId?: string) => Promise<void>
   closeSidecarTerminal: (contextKey: string, terminalId: string) => void
   setSidecarTerminalCollapsed: (collapsed: boolean) => void
-  setActiveSidecarTerminal: (id: string | null) => void
+  setActiveSidecarTerminal: (contextKey: string, id: string | null) => void
   getSidecarTerminals: (contextKey: string) => TerminalSession[]
 
   // File explorer actions
@@ -123,10 +123,15 @@ export const useProjectStore = create<ProjectStore>()(
       // Sidecar terminal state
       sidecarTerminals: {},
       sidecarTerminalCollapsed: false,
-      activeSidecarTerminalId: null,
+      activeSidecarTerminalId: {},
 
       // Sidecar terminal actions
       createSidecarTerminal: async (contextKey, projectId, worktreeId) => {
+        const state = get()
+        const existing = state.sidecarTerminals[contextKey] ?? []
+        // Enforce limit of 5 sidecar terminals per context
+        if (existing.length >= 5) return
+
         const api = getElectronAPI()
         const terminalId = await api.terminal.create(projectId, worktreeId, 'normal')
 
@@ -149,7 +154,10 @@ export const useProjectStore = create<ProjectStore>()(
               ...state.sidecarTerminals,
               [contextKey]: [...existing, terminalId],
             },
-            activeSidecarTerminalId: terminalId,
+            activeSidecarTerminalId: {
+              ...state.activeSidecarTerminalId,
+              [contextKey]: terminalId,
+            },
             sidecarTerminalCollapsed: false,
           }
         })
@@ -173,9 +181,9 @@ export const useProjectStore = create<ProjectStore>()(
         }
 
         // Auto-select next if active was closed
-        let newActiveSidecar = activeSidecarTerminalId
-        if (activeSidecarTerminalId === terminalId) {
-          newActiveSidecar = newList.length > 0 ? newList[newList.length - 1] : null
+        const newActiveSidecar = { ...activeSidecarTerminalId }
+        if (activeSidecarTerminalId[contextKey] === terminalId) {
+          newActiveSidecar[contextKey] = newList.length > 0 ? newList[newList.length - 1] : null
         }
 
         set({
@@ -188,8 +196,13 @@ export const useProjectStore = create<ProjectStore>()(
       setSidecarTerminalCollapsed: (collapsed) =>
         set({ sidecarTerminalCollapsed: collapsed }),
 
-      setActiveSidecarTerminal: (id) =>
-        set({ activeSidecarTerminalId: id }),
+      setActiveSidecarTerminal: (contextKey, id) =>
+        set((state) => ({
+          activeSidecarTerminalId: {
+            ...state.activeSidecarTerminalId,
+            [contextKey]: id,
+          },
+        })),
 
       getSidecarTerminals: (contextKey) => {
         const state = get()
@@ -306,11 +319,36 @@ export const useProjectStore = create<ProjectStore>()(
               ? null
               : state.activeWorktreeId
 
+          // Clean sidecar terminals for removed project/worktrees
+          const removedTerminalIds = new Set(
+            Object.keys(state.terminals).filter((tid) => state.terminals[tid].projectId === id)
+          )
+          const newSidecarTerminals = { ...state.sidecarTerminals }
+          const newActiveSidecar = { ...state.activeSidecarTerminalId }
+          // Remove project context key and any worktree context keys
+          delete newSidecarTerminals[id]
+          delete newActiveSidecar[id]
+          for (const wtId of Object.keys(newWorktrees)) {
+            // worktrees for this project were already deleted above
+          }
+          // Also clean any context keys whose terminals were all removed
+          for (const [contextKey, ids] of Object.entries(newSidecarTerminals)) {
+            const filtered = ids.filter((tid) => !removedTerminalIds.has(tid))
+            if (filtered.length === 0) {
+              delete newSidecarTerminals[contextKey]
+              delete newActiveSidecar[contextKey]
+            } else {
+              newSidecarTerminals[contextKey] = filtered
+            }
+          }
+
           return {
             projects: newProjects,
             terminals: newTerminals,
             worktrees: newWorktrees,
             layouts: newLayouts,
+            sidecarTerminals: newSidecarTerminals,
+            activeSidecarTerminalId: newActiveSidecar,
             activeProjectId: newActiveProjectId,
             activeWorktreeId: newActiveWorktreeId,
             activeTerminalId:
@@ -391,10 +429,30 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
+          // Clean stale ID from sidecarTerminals
+          const newSidecarTerminals = { ...state.sidecarTerminals }
+          const newActiveSidecar = { ...state.activeSidecarTerminalId }
+          for (const [contextKey, ids] of Object.entries(newSidecarTerminals)) {
+            if (ids.includes(id)) {
+              const filtered = ids.filter((tid) => tid !== id)
+              if (filtered.length === 0) {
+                delete newSidecarTerminals[contextKey]
+                delete newActiveSidecar[contextKey]
+              } else {
+                newSidecarTerminals[contextKey] = filtered
+                if (newActiveSidecar[contextKey] === id) {
+                  newActiveSidecar[contextKey] = filtered[filtered.length - 1]
+                }
+              }
+            }
+          }
+
           return {
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
             layouts: newLayouts,
+            sidecarTerminals: newSidecarTerminals,
+            activeSidecarTerminalId: newActiveSidecar,
           }
         }),
 
