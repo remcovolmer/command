@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus } from '../types'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
@@ -31,6 +31,10 @@ interface ProjectStore {
   gitStatus: Record<string, GitStatus>
   gitStatusLoading: Record<string, boolean>
 
+  // GitHub PR status (not persisted)
+  prStatus: Record<string, PRStatus>  // key (worktreeId or projectId) -> PRStatus
+  ghAvailable: { installed: boolean; authenticated: boolean } | null
+
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
   sidecarTerminalCollapsed: boolean
@@ -58,6 +62,10 @@ interface ProjectStore {
   // Git status actions
   setGitStatus: (projectId: string, status: GitStatus) => void
   setGitStatusLoading: (projectId: string, loading: boolean) => void
+
+  // GitHub PR status actions
+  setPRStatus: (key: string, status: PRStatus) => void
+  setGhAvailable: (available: { installed: boolean; authenticated: boolean }) => void
 
   // Project actions
   setProjects: (projects: Project[]) => void
@@ -119,6 +127,10 @@ export const useProjectStore = create<ProjectStore>()(
       // Git status state (not persisted)
       gitStatus: {},
       gitStatusLoading: {},
+
+      // GitHub PR status (not persisted)
+      prStatus: {},
+      ghAvailable: null,
 
       // Sidecar terminal state
       sidecarTerminals: {},
@@ -274,6 +286,15 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           gitStatusLoading: { ...state.gitStatusLoading, [projectId]: loading },
         })),
+
+      // GitHub PR status actions
+      setPRStatus: (key, status) =>
+        set((state) => ({
+          prStatus: { ...state.prStatus, [key]: status },
+        })),
+
+      setGhAvailable: (available) =>
+        set({ ghAvailable: available }),
 
       // Project actions
       setProjects: (projects) => set({ projects }),

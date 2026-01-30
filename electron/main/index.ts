@@ -12,6 +12,7 @@ import { WorktreeService } from './services/WorktreeService'
 import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
 import { installClaudeHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
+import { GitHubService } from './services/GitHubService'
 import { randomUUID } from 'node:crypto'
 
 // Validation helpers
@@ -59,6 +60,7 @@ let gitService: GitService | null = null
 let worktreeService: WorktreeService | null = null
 let hookWatcher: ClaudeHookWatcher | null = null
 let updateService: UpdateService | null = null
+let githubService: GitHubService | null = null
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
@@ -98,6 +100,8 @@ async function createWindow() {
   worktreeService = new WorktreeService()
   updateService = new UpdateService()
   updateService.initialize(win)
+  githubService = new GitHubService()
+  githubService.setWindow(win)
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -105,6 +109,14 @@ async function createWindow() {
   } else {
     win.loadFile(indexHtml)
   }
+
+  // Pause/resume GitHub polling on focus/blur
+  win.on('blur', () => {
+    githubService?.pauseAllPolling()
+  })
+  win.on('focus', () => {
+    githubService?.resumeAllPolling()
+  })
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -246,6 +258,41 @@ ipcMain.handle('git:pull', async (_event, projectPath: string) => {
 ipcMain.handle('git:push', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)
   return gitService?.push(projectPath)
+})
+
+// IPC Handlers for GitHub operations
+ipcMain.handle('github:check-available', async () => {
+  const installed = await githubService!.isGhInstalled()
+  const authenticated = installed ? await githubService!.isGhAuthenticated() : false
+  return { installed, authenticated }
+})
+
+ipcMain.handle('github:get-pr-status', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return githubService!.getPRStatus(projectPath)
+})
+
+ipcMain.handle('github:merge-pr', async (_event, projectPath: string, prNumber: number) => {
+  validateProjectPath(projectPath)
+  if (typeof prNumber !== 'number' || prNumber < 1) {
+    throw new Error('Invalid PR number')
+  }
+  return githubService!.mergePR(projectPath, prNumber)
+})
+
+ipcMain.handle('github:start-polling', async (_event, key: string, projectPath: string) => {
+  if (typeof key !== 'string' || key.length === 0 || key.length > 200) {
+    throw new Error('Invalid polling key')
+  }
+  validateProjectPath(projectPath)
+  githubService!.startPolling(key, projectPath)
+})
+
+ipcMain.handle('github:stop-polling', async (_event, key: string) => {
+  if (typeof key !== 'string' || key.length === 0 || key.length > 200) {
+    throw new Error('Invalid polling key')
+  }
+  githubService!.stopPolling(key)
 })
 
 // IPC Handlers for Worktree operations
@@ -418,6 +465,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   hookWatcher?.stop()
+  githubService?.destroy()
   terminalManager?.destroy()
 })
 

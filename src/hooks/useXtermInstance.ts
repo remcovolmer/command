@@ -146,6 +146,7 @@ export function useXtermInstance({
       }
 
       if (event.ctrlKey && event.key === 'v') {
+        event.preventDefault()
         navigator.clipboard.readText().then((text) => {
           if (text && !isDisposedRef.current) {
             api.terminal.write(id, text)
