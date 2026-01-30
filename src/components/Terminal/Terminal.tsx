@@ -193,6 +193,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
 
       // Ctrl+V: paste from clipboard
       if (event.ctrlKey && event.key === 'v') {
+        event.preventDefault()
         navigator.clipboard.readText().then((text) => {
           if (text && !isDisposedRef.current) {
             api.terminal.write(id, text)
