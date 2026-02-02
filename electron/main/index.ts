@@ -141,6 +141,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   if (worktreeId && !isValidUUID(worktreeId)) {
     throw new Error('Invalid worktree ID')
   }
+  if (type !== undefined && type !== 'claude' && type !== 'normal') {
+    throw new Error('Invalid terminal type')
+  }
 
   // Determine the working directory
   let cwd: string
@@ -159,7 +162,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     cwd = project?.path ?? process.cwd()
   }
 
-  return terminalManager?.createTerminal(cwd, type)
+  // For worktree terminals, default to plan mode initial input
+  const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
+  return terminalManager?.createTerminal(cwd, type, effectiveInitialInput)
 })
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
