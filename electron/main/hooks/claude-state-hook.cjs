@@ -56,10 +56,6 @@ process.stdin.on('end', () => {
           // auth_success and other types don't change state
         }
         break;
-      case 'SessionEnd':
-        // Session ended = stopped (red)
-        state = 'stopped';
-        break;
       case 'UserPromptSubmit':
         // User submitted a prompt = busy (blue)
         state = 'busy';
