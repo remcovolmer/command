@@ -1,4 +1,4 @@
-import { watch, FSWatcher, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { watchFile, unwatchFile, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { homedir } from 'os'
@@ -16,7 +16,7 @@ interface HookStateData {
 }
 
 export class ClaudeHookWatcher {
-  private watcher: FSWatcher | null = null
+  private watching: boolean = false
   private stateFilePath: string
   private window: BrowserWindow
 
@@ -25,9 +25,8 @@ export class ClaudeHookWatcher {
   // Persistent cwd → terminal_id mapping (survives session restarts)
   private cwdToTerminal: Map<string, string> = new Map()
 
-  // Debounce file change events
+  // Deduplicate file change events
   private lastProcessedTimestamp: number = 0
-  private debounceTimer: NodeJS.Timeout | null = null
 
   constructor(window: BrowserWindow) {
     this.window = window
@@ -46,13 +45,11 @@ export class ClaudeHookWatcher {
       writeFileSync(this.stateFilePath, '{}')
     }
 
-    // Watch for file changes
-    this.watcher = watch(this.stateFilePath, (eventType) => {
-      if (eventType === 'change') {
-        if (this.debounceTimer) clearTimeout(this.debounceTimer)
-        this.debounceTimer = setTimeout(() => this.onStateChange(), 50)
-      }
+    // Poll for file changes (fs.watch is unreliable on Windows)
+    watchFile(this.stateFilePath, { interval: 100 }, () => {
+      this.onStateChange()
     })
+    this.watching = true
 
     console.log('[HookWatcher] Started watching:', this.stateFilePath)
   }
@@ -168,13 +165,9 @@ export class ClaudeHookWatcher {
   }
 
   stop(): void {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer)
-      this.debounceTimer = null
-    }
-    if (this.watcher) {
-      this.watcher.close()
-      this.watcher = null
+    if (this.watching) {
+      unwatchFile(this.stateFilePath)
+      this.watching = false
       console.log('[HookWatcher] Stopped watching')
     }
   }
