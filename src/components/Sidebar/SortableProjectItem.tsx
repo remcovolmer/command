@@ -240,7 +240,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           activeTerminalId={activeTerminalId}
           onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
           onSelectTerminal={onSelectTerminal}
-          onCloseTerminal={onCloseTerminal}
           onRemove={() => onRemoveWorktree(worktree.id)}
         />
       ))}

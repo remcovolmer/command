@@ -135,8 +135,8 @@ type Unsubscribe = () => void
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal', initialInput?: string): Promise<string> =>
-      ipcRenderer.invoke('terminal:create', projectId, worktreeId, type, initialInput),
+    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal'): Promise<string> =>
+      ipcRenderer.invoke('terminal:create', projectId, worktreeId, type),
 
     write: (terminalId: string, data: string): void =>
       ipcRenderer.send('terminal:write', terminalId, data),

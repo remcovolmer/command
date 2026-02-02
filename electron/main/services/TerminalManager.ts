@@ -4,6 +4,9 @@ import { accessSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { ClaudeHookWatcher } from './ClaudeHookWatcher'
 
+const SHELL_READY_DELAY_MS = 100
+const CLAUDE_STARTUP_DELAY_MS = 3000
+
 // Claude Code terminal states (5 states)
 type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
 
@@ -16,6 +19,7 @@ interface TerminalInstance {
   pty: pty.IPty
   state: TerminalState
   type: TerminalType
+  timeouts: ReturnType<typeof setTimeout>[]
 }
 
 export class TerminalManager {
@@ -61,6 +65,7 @@ export class TerminalManager {
       pty: ptyProcess,
       state: type === 'normal' ? 'done' : 'busy',
       type,
+      timeouts: [],
     }
 
     // Register with hook watcher for state detection (only for Claude terminals)
@@ -83,6 +88,8 @@ export class TerminalManager {
       this.sendToRenderer('terminal:state', id, 'stopped')
       this.sendToRenderer('terminal:exit', id, exitCode)
       this.terminals.delete(id)
+      this.terminalInputBuffers.delete(id)
+      this.terminalTitled.delete(id)
     })
 
     this.terminals.set(id, terminal)
@@ -90,15 +97,17 @@ export class TerminalManager {
     // Send initial state and start Claude Code (only for Claude terminals)
     if (type === 'claude') {
       this.sendToRenderer('terminal:state', id, 'busy')
-      setTimeout(() => {
-        ptyProcess.write('claude\r')
-      }, 100)
+      const claudeTimeout = setTimeout(() => {
+        if (this.terminals.has(id)) ptyProcess.write('claude\r')
+      }, SHELL_READY_DELAY_MS)
+      terminal.timeouts.push(claudeTimeout)
 
       // If initialInput is provided, send it after Claude has started
       if (initialInput) {
-        setTimeout(() => {
-          ptyProcess.write(initialInput)
-        }, 3000)
+        const inputTimeout = setTimeout(() => {
+          if (this.terminals.has(id)) ptyProcess.write(initialInput)
+        }, CLAUDE_STARTUP_DELAY_MS)
+        terminal.timeouts.push(inputTimeout)
       }
     } else {
       this.sendToRenderer('terminal:state', id, 'done')
@@ -211,6 +220,9 @@ export class TerminalManager {
   closeTerminal(terminalId: string): void {
     const terminal = this.terminals.get(terminalId)
     if (terminal) {
+      // Clear pending timeouts
+      terminal.timeouts?.forEach(clearTimeout)
+
       // Unregister from hook watcher
       if (this.hookWatcher) {
         this.hookWatcher.unregisterTerminal(terminalId)

@@ -23,8 +23,11 @@ export function TerminalArea() {
   } = useProjectStore()
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
-  const projectTerminals = Object.values(terminals).filter(
-    (t) => t.projectId === activeProjectId && t.type !== 'normal'
+  const projectTerminals = useMemo(
+    () => Object.values(terminals).filter(
+      (t) => t.projectId === activeProjectId && t.type !== 'normal'
+    ),
+    [terminals, activeProjectId]
   )
 
   // Get current layout for the project

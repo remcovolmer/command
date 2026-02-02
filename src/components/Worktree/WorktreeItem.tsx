@@ -10,7 +10,6 @@ interface WorktreeItemProps {
   activeTerminalId: string | null
   onCreateTerminal: () => void
   onSelectTerminal: (id: string) => void
-  onCloseTerminal: (e: React.MouseEvent, id: string) => void
   onRemove: () => void
 }
 
@@ -183,12 +182,6 @@ export const WorktreeItem = memo(function WorktreeItem({
         <span className="flex-1 text-xs font-medium truncate" title={worktree.branch}>
           {worktree.name}
         </span>
-        {terminal?.title && terminal.title !== worktree.name && (
-          <span className="text-[10px] text-muted-foreground truncate max-w-[80px]" title={terminal.title}>
-            {terminal.title}
-          </span>
-        )}
-
         {/* Right-aligned: PR info + controls */}
         <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
           {/* PR number badge */}

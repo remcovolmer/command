@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
@@ -211,21 +211,21 @@ export function Sidebar() {
     removeTerminal(terminalId)
   }
 
-  const getProjectTerminals = (projectId: string): TerminalSession[] => {
+  const getProjectTerminals = useCallback((projectId: string): TerminalSession[] => {
     return Object.values(terminals).filter((t) => t.projectId === projectId)
-  }
+  }, [terminals])
 
-  const getProjectDirectTerminals = (projectId: string): TerminalSession[] => {
+  const getProjectDirectTerminals = useCallback((projectId: string): TerminalSession[] => {
     return Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null)
-  }
+  }, [terminals])
 
-  const getWorktreeTerminals = (worktreeId: string): TerminalSession[] => {
+  const getWorktreeTerminals = useCallback((worktreeId: string): TerminalSession[] => {
     return Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
-  }
+  }, [terminals])
 
-  const getProjectWorktrees = (projectId: string): Worktree[] => {
+  const getProjectWorktrees = useCallback((projectId: string): Worktree[] => {
     return Object.values(worktrees).filter((w) => w.projectId === projectId)
-  }
+  }, [worktrees])
 
   return (
     <>

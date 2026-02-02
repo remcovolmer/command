@@ -134,12 +134,15 @@ async function createWindow() {
 }
 
 // IPC Handlers for Terminal operations
-ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude', initialInput?: string) => {
+ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude') => {
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
   }
   if (worktreeId && !isValidUUID(worktreeId)) {
     throw new Error('Invalid worktree ID')
+  }
+  if (type !== undefined && type !== 'claude' && type !== 'normal') {
+    throw new Error('Invalid terminal type')
   }
 
   // Determine the working directory
@@ -160,7 +163,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   }
 
   // For worktree terminals, default to plan mode initial input
-  const effectiveInitialInput = initialInput ?? (worktreeId ? '/workflows:plan ' : undefined)
+  const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
   return terminalManager?.createTerminal(cwd, type, effectiveInitialInput)
 })
 
