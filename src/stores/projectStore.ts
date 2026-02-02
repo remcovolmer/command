@@ -171,6 +171,7 @@ export const useProjectStore = create<ProjectStore>()(
               [contextKey]: terminalId,
             },
             sidecarTerminalCollapsed: false,
+            fileExplorerVisible: true,
           }
         })
       },

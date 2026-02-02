@@ -24,7 +24,7 @@ export function TerminalArea() {
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const projectTerminals = Object.values(terminals).filter(
-    (t) => t.projectId === activeProjectId
+    (t) => t.projectId === activeProjectId && t.type !== 'normal'
   )
 
   // Get current layout for the project
