@@ -473,6 +473,7 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             activeProjectId: id,
             activeTerminalId: newActiveTerminalId,
+            activeCenterTabId: newActiveTerminalId,
           }
         }),
 
@@ -491,6 +492,7 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           terminals: { ...state.terminals, [terminal.id]: terminal },
           activeTerminalId: terminal.id,
+          activeCenterTabId: terminal.id,
         })),
 
       removeTerminal: (id) =>
@@ -591,12 +593,12 @@ export const useProjectStore = create<ProjectStore>()(
       setActiveTerminal: (id) =>
         set((state) => {
           if (id === null) {
-            return { activeTerminalId: null }
+            return { activeTerminalId: null, activeCenterTabId: null }
           }
 
           const terminal = state.terminals[id]
           if (!terminal) {
-            return { activeTerminalId: id }
+            return { activeTerminalId: id, activeCenterTabId: id }
           }
 
           // Als terminal in ander project zit, wissel ook van project
@@ -604,10 +606,11 @@ export const useProjectStore = create<ProjectStore>()(
             return {
               activeProjectId: terminal.projectId,
               activeTerminalId: id,
+              activeCenterTabId: id,
             }
           }
 
-          return { activeTerminalId: id }
+          return { activeTerminalId: id, activeCenterTabId: id }
         }),
 
       getProjectTerminals: (projectId) => {
