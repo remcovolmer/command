@@ -1,10 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab } from '../types'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
 export const MAX_TERMINALS_PER_PROJECT = 10
+
+/** Maximum number of editor tabs allowed per project */
+export const MAX_EDITOR_TABS = 15
 
 interface ProjectStore {
   // State
@@ -34,6 +37,16 @@ interface ProjectStore {
   // GitHub PR status (not persisted)
   prStatus: Record<string, PRStatus>  // key (worktreeId or projectId) -> PRStatus
   ghAvailable: { installed: boolean; authenticated: boolean } | null
+
+  // Editor tab state
+  editorTabs: Record<string, EditorTab>  // tabId -> EditorTab
+  activeCenterTabId: string | null  // can be terminal or editor tab (type derived from lookup)
+
+  // Editor tab actions
+  openEditorTab: (filePath: string, fileName: string, projectId: string) => void
+  closeEditorTab: (tabId: string) => void
+  setEditorDirty: (tabId: string, isDirty: boolean) => void
+  setActiveCenterTab: (id: string) => void
 
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
@@ -132,6 +145,73 @@ export const useProjectStore = create<ProjectStore>()(
       prStatus: {},
       ghAvailable: null,
 
+      // Editor tab state
+      editorTabs: {},
+      activeCenterTabId: null,
+
+      // Editor tab actions
+      openEditorTab: (filePath, fileName, projectId) =>
+        set((state) => {
+          // Check if already open
+          const existing = Object.values(state.editorTabs).find(
+            (t) => t.filePath === filePath
+          )
+          if (existing) {
+            return { activeCenterTabId: existing.id }
+          }
+          // Enforce tab limit
+          const projectTabCount = Object.values(state.editorTabs).filter(
+            (t) => t.projectId === projectId
+          ).length
+          if (projectTabCount >= MAX_EDITOR_TABS) {
+            return state
+          }
+          const id = `editor-${crypto.randomUUID()}`
+          const tab: EditorTab = { id, type: 'editor', filePath, fileName, isDirty: false, projectId }
+          return {
+            editorTabs: { ...state.editorTabs, [id]: tab },
+            activeCenterTabId: id,
+          }
+        }),
+
+      closeEditorTab: (tabId) =>
+        set((state) => {
+          const newTabs = { ...state.editorTabs }
+          delete newTabs[tabId]
+          let newActiveId = state.activeCenterTabId
+          if (state.activeCenterTabId === tabId) {
+            const remaining = Object.values(newTabs)
+            if (remaining.length > 0) {
+              newActiveId = remaining[remaining.length - 1].id
+            } else {
+              newActiveId = state.activeTerminalId
+            }
+          }
+          return {
+            editorTabs: newTabs,
+            activeCenterTabId: newActiveId,
+          }
+        }),
+
+      setEditorDirty: (tabId, isDirty) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab || tab.isDirty === isDirty) return state
+          return {
+            editorTabs: {
+              ...state.editorTabs,
+              [tabId]: { ...tab, isDirty },
+            },
+          }
+        }),
+
+      setActiveCenterTab: (id) =>
+        set((state) => ({
+          activeCenterTabId: id,
+          // If it's a terminal, also update activeTerminalId
+          ...(state.terminals[id] ? { activeTerminalId: id } : {}),
+        })),
+
       // Sidecar terminal state
       sidecarTerminals: {},
       sidecarTerminalCollapsed: false,
@@ -171,6 +251,7 @@ export const useProjectStore = create<ProjectStore>()(
               [contextKey]: terminalId,
             },
             sidecarTerminalCollapsed: false,
+            fileExplorerVisible: true,
           }
         })
       },

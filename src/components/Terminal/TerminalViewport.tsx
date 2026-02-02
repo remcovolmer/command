@@ -1,11 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Terminal } from './Terminal'
-import type { TerminalSession } from '../../types'
+import { CodeEditor } from '../Editor/CodeEditor'
+import type { TerminalSession, EditorTab } from '../../types'
 
 interface TerminalViewportProps {
   terminals: TerminalSession[]
+  editorTabs: EditorTab[]
   activeTerminalId: string | null
+  activeCenterTabId: string | null
   splitTerminalIds: string[]
   projectId: string
   onSplitSizesChange: (sizes: number[]) => void
@@ -15,7 +18,9 @@ interface TerminalViewportProps {
 
 export function TerminalViewport({
   terminals,
+  editorTabs,
   activeTerminalId,
+  activeCenterTabId,
   splitTerminalIds,
   projectId,
   onSplitSizesChange,
@@ -121,10 +126,14 @@ export function TerminalViewport({
     )
   }
 
-  // Single terminal view (active terminal from tabs)
-  const activeTerminal = terminals.find((t) => t.id === activeTerminalId)
+  // Derive active type from the ID
+  const isEditorActive = activeCenterTabId != null && editorTabs.some((t) => t.id === activeCenterTabId)
+  const effectiveTerminalId = isEditorActive ? null : (activeCenterTabId ?? activeTerminalId)
 
-  if (!activeTerminal) {
+  // Single terminal view (active terminal from tabs)
+  const hasContent = terminals.length > 0 || editorTabs.length > 0
+
+  if (!hasContent) {
     return null
   }
 
@@ -134,11 +143,22 @@ export function TerminalViewport({
       onDragOver={(e) => e.preventDefault()}
     >
       <div className="h-full w-full">
+        {/* Render all terminals (hidden if not active) */}
         {terminals.map((terminal) => (
           <Terminal
             key={terminal.id}
             id={terminal.id}
-            isActive={terminal.id === activeTerminalId}
+            isActive={!isEditorActive && terminal.id === effectiveTerminalId}
+          />
+        ))}
+
+        {/* Render all editor tabs (hidden if not active) */}
+        {editorTabs.map((tab) => (
+          <CodeEditor
+            key={tab.id}
+            tabId={tab.id}
+            filePath={tab.filePath}
+            isActive={isEditorActive && tab.id === activeCenterTabId}
           />
         ))}
       </div>

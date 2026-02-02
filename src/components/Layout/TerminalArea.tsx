@@ -14,12 +14,16 @@ export function TerminalArea() {
     terminals,
     projects,
     layouts,
+    editorTabs,
+    activeCenterTabId,
     addTerminal,
     setActiveTerminal,
     removeTerminal,
     addToSplit,
     removeFromSplit,
     setSplitSizes,
+    setActiveCenterTab,
+    closeEditorTab,
   } = useProjectStore()
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
@@ -28,6 +32,14 @@ export function TerminalArea() {
       (t) => t.projectId === activeProjectId && t.type !== 'normal'
     ),
     [terminals, activeProjectId]
+  )
+
+  // Get editor tabs for the active project
+  const projectEditorTabs = useMemo(
+    () => Object.values(editorTabs).filter(
+      (t) => t.projectId === activeProjectId
+    ),
+    [editorTabs, activeProjectId]
   )
 
   // Get current layout for the project
@@ -57,6 +69,7 @@ export function TerminalArea() {
       type: 'claude',
     }
     addTerminal(terminal)
+    setActiveCenterTab(terminalId)
   }
 
   const handleCloseTerminal = useCallback(
@@ -65,6 +78,34 @@ export function TerminalArea() {
       removeTerminal(terminalId)
     },
     [api, removeTerminal]
+  )
+
+  const handleSelectTerminal = useCallback(
+    (terminalId: string) => {
+      setActiveTerminal(terminalId)
+      setActiveCenterTab(terminalId)
+    },
+    [setActiveTerminal, setActiveCenterTab]
+  )
+
+  const handleSelectEditor = useCallback(
+    (tabId: string) => {
+      setActiveCenterTab(tabId)
+    },
+    [setActiveCenterTab]
+  )
+
+  const handleCloseEditor = useCallback(
+    (tabId: string) => {
+      const tab = editorTabs[tabId]
+      if (tab?.isDirty) {
+        if (!window.confirm(`"${tab.fileName}" has unsaved changes. Close anyway?`)) {
+          return
+        }
+      }
+      closeEditorTab(tabId)
+    },
+    [editorTabs, closeEditorTab]
   )
 
   const handleUnsplit = useCallback(
@@ -89,15 +130,12 @@ export function TerminalArea() {
       let pairTerminalId: string | null = null
 
       if (activeTerminalId && activeTerminalId !== terminalId) {
-        // Use the active terminal as pair
         pairTerminalId = activeTerminalId
       } else {
-        // Active terminal is being dragged, find another terminal to pair with
         const otherTerminal = projectTerminals.find(t => t.id !== terminalId)
         pairTerminalId = otherTerminal?.id ?? null
       }
 
-      // Create new split with the dragged terminal and the pair
       if (pairTerminalId) {
         if (position === 'left') {
           addToSplit(activeProjectId, terminalId)
@@ -149,8 +187,8 @@ export function TerminalArea() {
     )
   }
 
-  // No terminals in project
-  if (projectTerminals.length === 0) {
+  // No terminals and no editor tabs in project
+  if (projectTerminals.length === 0 && projectEditorTabs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-sidebar">
         <div className="text-center max-w-md mx-auto px-8">
@@ -180,10 +218,14 @@ export function TerminalArea() {
     <div className="h-full w-full flex flex-col bg-sidebar">
       <TerminalTabBar
         terminals={projectTerminals}
+        editorTabs={projectEditorTabs}
         activeTerminalId={activeTerminalId}
+        activeCenterTabId={activeCenterTabId}
         splitTerminalIds={splitTerminalIds}
-        onSelect={setActiveTerminal}
+        onSelectTerminal={handleSelectTerminal}
+        onSelectEditor={handleSelectEditor}
         onClose={handleCloseTerminal}
+        onCloseEditor={handleCloseEditor}
         onUnsplit={handleUnsplit}
         onAdd={handleCreateTerminal}
         canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
@@ -191,12 +233,14 @@ export function TerminalArea() {
       <div className="flex-1 min-h-0">
         <TerminalViewport
           terminals={projectTerminals}
+          editorTabs={projectEditorTabs}
           activeTerminalId={activeTerminalId}
+          activeCenterTabId={activeCenterTabId}
           splitTerminalIds={splitTerminalIds}
           projectId={activeProjectId!}
           onSplitSizesChange={handleSplitSizesChange}
           onDropToSplit={handleDropToSplit}
-          onSelect={setActiveTerminal}
+          onSelect={handleSelectTerminal}
         />
       </div>
     </div>

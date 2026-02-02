@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { ChevronRight, Loader2 } from 'lucide-react'
 import type { FileSystemEntry } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { getFileIcon, getFolderIcon } from './fileIcons'
+import { isEditableFile } from '../../utils/editorLanguages'
 
 interface FileTreeNodeProps {
   entry: FileSystemEntry
@@ -12,7 +13,7 @@ interface FileTreeNodeProps {
 }
 
 export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
-  const api = useMemo(() => getElectronAPI(), [])
+  const api = getElectronAPI()
   const [isLoading, setIsLoading] = useState(false)
 
   // Use specific selectors to avoid creating new references
@@ -25,11 +26,17 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
   const toggleExpandedPath = useProjectStore((s) => s.toggleExpandedPath)
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
   const directoryCache = useProjectStore((s) => s.directoryCache)
+  const openEditorTab = useProjectStore((s) => s.openEditorTab)
 
   const isDirectory = entry.type === 'directory'
 
   const handleClick = async () => {
-    if (!isDirectory) return
+    if (!isDirectory) {
+      if (isEditableFile(entry.name, entry.extension)) {
+        openEditorTab(entry.path, entry.name, projectId)
+      }
+      return
+    }
 
     // If expanding and not cached, load contents
     if (!isExpanded && !directoryCache[entry.path]) {
@@ -61,7 +68,7 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
           w-full flex items-center gap-1.5 py-1 px-2 rounded text-left
           text-sm text-sidebar-foreground
           hover:bg-sidebar-accent transition-colors
-          ${isDirectory ? 'cursor-pointer' : 'cursor-default'}
+          cursor-pointer
         `}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >

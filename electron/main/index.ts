@@ -244,6 +244,40 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
   }
 })
 
+// IPC Handlers for File read/write operations
+function validateFilePathInProject(filePath: string): string {
+  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+    throw new Error('Invalid file path')
+  }
+  const resolved = path.resolve(path.normalize(filePath))
+  const projects = projectPersistence?.getProjects() ?? []
+  const isInProject = projects.some(p => resolved.startsWith(path.resolve(p.path)))
+  if (!isInProject) {
+    throw new Error('File path is not within a registered project')
+  }
+  return resolved
+}
+
+ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
+  const resolved = validateFilePathInProject(filePath)
+  const stat = await fs.stat(resolved)
+  if (stat.size > 10 * 1024 * 1024) {
+    throw new Error('File too large (max 10MB)')
+  }
+  return fs.readFile(resolved, 'utf-8')
+})
+
+ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
+  const resolved = validateFilePathInProject(filePath)
+  if (typeof content !== 'string') {
+    throw new Error('Invalid content')
+  }
+  if (content.length > 10 * 1024 * 1024) {
+    throw new Error('Content too large (max 10MB)')
+  }
+  await fs.writeFile(resolved, content, 'utf-8')
+})
+
 // IPC Handlers for Git operations
 ipcMain.handle('git:status', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)

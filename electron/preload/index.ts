@@ -243,6 +243,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fs: {
     readDirectory: (dirPath: string): Promise<FileSystemEntry[]> =>
       ipcRenderer.invoke('fs:readDirectory', dirPath),
+    readFile: (filePath: string): Promise<string> =>
+      ipcRenderer.invoke('fs:readFile', filePath),
+    writeFile: (filePath: string, content: string): Promise<void> =>
+      ipcRenderer.invoke('fs:writeFile', filePath, content),
   },
 
   // Git operations
