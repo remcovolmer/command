@@ -103,6 +103,17 @@ function App() {
         })()
         return
       }
+
+      // Ctrl + W: Close active terminal
+      if (e.ctrlKey && e.key.toLowerCase() === 'w') {
+        e.preventDefault()
+        const { activeProjectId, activeTerminalId, removeTerminal } = useProjectStore.getState()
+        if (!activeProjectId || !activeTerminalId) return
+
+        api.terminal.close(activeTerminalId)
+        removeTerminal(activeTerminalId)
+        return
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown, { capture: true })
