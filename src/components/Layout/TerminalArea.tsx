@@ -16,7 +16,6 @@ export function TerminalArea() {
     layouts,
     editorTabs,
     activeCenterTabId,
-    activeCenterTabType,
     addTerminal,
     setActiveTerminal,
     removeTerminal,
@@ -64,7 +63,7 @@ export function TerminalArea() {
       type: 'claude',
     }
     addTerminal(terminal)
-    setActiveCenterTab(terminalId, 'terminal')
+    setActiveCenterTab(terminalId)
   }
 
   const handleCloseTerminal = useCallback(
@@ -78,14 +77,14 @@ export function TerminalArea() {
   const handleSelectTerminal = useCallback(
     (terminalId: string) => {
       setActiveTerminal(terminalId)
-      setActiveCenterTab(terminalId, 'terminal')
+      setActiveCenterTab(terminalId)
     },
     [setActiveTerminal, setActiveCenterTab]
   )
 
   const handleSelectEditor = useCallback(
     (tabId: string) => {
-      setActiveCenterTab(tabId, 'editor')
+      setActiveCenterTab(tabId)
     },
     [setActiveCenterTab]
   )
@@ -216,7 +215,6 @@ export function TerminalArea() {
         editorTabs={projectEditorTabs}
         activeTerminalId={activeTerminalId}
         activeCenterTabId={activeCenterTabId}
-        activeCenterTabType={activeCenterTabType}
         splitTerminalIds={splitTerminalIds}
         onSelectTerminal={handleSelectTerminal}
         onSelectEditor={handleSelectEditor}
@@ -232,7 +230,6 @@ export function TerminalArea() {
           editorTabs={projectEditorTabs}
           activeTerminalId={activeTerminalId}
           activeCenterTabId={activeCenterTabId}
-          activeCenterTabType={activeCenterTabType}
           splitTerminalIds={splitTerminalIds}
           projectId={activeProjectId!}
           onSplitSizesChange={handleSplitSizesChange}

@@ -9,7 +9,6 @@ interface TerminalViewportProps {
   editorTabs: EditorTab[]
   activeTerminalId: string | null
   activeCenterTabId: string | null
-  activeCenterTabType: 'terminal' | 'editor' | null
   splitTerminalIds: string[]
   projectId: string
   onSplitSizesChange: (sizes: number[]) => void
@@ -22,7 +21,6 @@ export function TerminalViewport({
   editorTabs,
   activeTerminalId,
   activeCenterTabId,
-  activeCenterTabType,
   splitTerminalIds,
   projectId,
   onSplitSizesChange,
@@ -128,8 +126,8 @@ export function TerminalViewport({
     )
   }
 
-  // Determine what's active
-  const isEditorActive = activeCenterTabType === 'editor'
+  // Derive active type from the ID
+  const isEditorActive = activeCenterTabId != null && editorTabs.some((t) => t.id === activeCenterTabId)
   const effectiveTerminalId = isEditorActive ? null : (activeCenterTabId ?? activeTerminalId)
 
   // Single terminal view (active terminal from tabs)

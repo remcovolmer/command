@@ -6,7 +6,6 @@ interface TerminalTabBarProps {
   editorTabs: EditorTab[]
   activeTerminalId: string | null
   activeCenterTabId: string | null
-  activeCenterTabType: 'terminal' | 'editor' | null
   splitTerminalIds: string[]
   onSelectTerminal: (terminalId: string) => void
   onSelectEditor: (tabId: string) => void
@@ -35,7 +34,6 @@ export function TerminalTabBar({
   editorTabs,
   activeTerminalId,
   activeCenterTabId,
-  activeCenterTabType,
   splitTerminalIds,
   onSelectTerminal,
   onSelectEditor,
@@ -50,11 +48,16 @@ export function TerminalTabBar({
     e.dataTransfer.effectAllowed = 'move'
   }
 
+  // Derive active tab type from the ID
+  const isEditorTabActive = (tabId: string) =>
+    editorTabs.some((t) => t.id === tabId)
+  const activeIsEditor = activeCenterTabId != null && isEditorTabActive(activeCenterTabId)
+
   return (
     <div className="flex items-center gap-1 px-3 py-1 bg-sidebar-accent border-b border-border overflow-x-auto">
       {/* Terminal tabs */}
       {terminals.map((terminal) => {
-        const isActive = activeCenterTabType === 'terminal' && terminal.id === (activeCenterTabId ?? activeTerminalId)
+        const isActive = !activeIsEditor && terminal.id === (activeCenterTabId ?? activeTerminalId)
         const isInSplit = splitTerminalIds.includes(terminal.id)
 
         return (
@@ -114,7 +117,7 @@ export function TerminalTabBar({
 
       {/* Editor tabs */}
       {editorTabs.map((tab) => {
-        const isActive = activeCenterTabType === 'editor' && tab.id === activeCenterTabId
+        const isActive = activeIsEditor && tab.id === activeCenterTabId
 
         return (
           <div

@@ -6,6 +6,9 @@ import { getElectronAPI } from '../utils/electron'
 /** Maximum number of terminals allowed per project */
 export const MAX_TERMINALS_PER_PROJECT = 10
 
+/** Maximum number of editor tabs allowed per project */
+export const MAX_EDITOR_TABS = 15
+
 interface ProjectStore {
   // State
   projects: Project[]
@@ -37,14 +40,13 @@ interface ProjectStore {
 
   // Editor tab state
   editorTabs: Record<string, EditorTab>  // tabId -> EditorTab
-  activeCenterTabId: string | null  // can be terminal or editor tab
-  activeCenterTabType: 'terminal' | 'editor' | null
+  activeCenterTabId: string | null  // can be terminal or editor tab (type derived from lookup)
 
   // Editor tab actions
   openEditorTab: (filePath: string, fileName: string, projectId: string) => void
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
-  setActiveCenterTab: (id: string, type: 'terminal' | 'editor') => void
+  setActiveCenterTab: (id: string) => void
 
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
@@ -146,7 +148,6 @@ export const useProjectStore = create<ProjectStore>()(
       // Editor tab state
       editorTabs: {},
       activeCenterTabId: null,
-      activeCenterTabType: null,
 
       // Editor tab actions
       openEditorTab: (filePath, fileName, projectId) =>
@@ -156,17 +157,20 @@ export const useProjectStore = create<ProjectStore>()(
             (t) => t.filePath === filePath
           )
           if (existing) {
-            return {
-              activeCenterTabId: existing.id,
-              activeCenterTabType: 'editor' as const,
-            }
+            return { activeCenterTabId: existing.id }
           }
-          const id = `editor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          // Enforce tab limit
+          const projectTabCount = Object.values(state.editorTabs).filter(
+            (t) => t.projectId === projectId
+          ).length
+          if (projectTabCount >= MAX_EDITOR_TABS) {
+            return state
+          }
+          const id = `editor-${crypto.randomUUID()}`
           const tab: EditorTab = { id, type: 'editor', filePath, fileName, isDirty: false, projectId }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
             activeCenterTabId: id,
-            activeCenterTabType: 'editor' as const,
           }
         }),
 
@@ -174,30 +178,25 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => {
           const newTabs = { ...state.editorTabs }
           delete newTabs[tabId]
-          // If closing active tab, switch to another editor tab or back to terminal
           let newActiveId = state.activeCenterTabId
-          let newActiveType = state.activeCenterTabType
           if (state.activeCenterTabId === tabId) {
             const remaining = Object.values(newTabs)
             if (remaining.length > 0) {
               newActiveId = remaining[remaining.length - 1].id
-              newActiveType = 'editor'
             } else {
               newActiveId = state.activeTerminalId
-              newActiveType = state.activeTerminalId ? 'terminal' : null
             }
           }
           return {
             editorTabs: newTabs,
             activeCenterTabId: newActiveId,
-            activeCenterTabType: newActiveType,
           }
         }),
 
       setEditorDirty: (tabId, isDirty) =>
         set((state) => {
           const tab = state.editorTabs[tabId]
-          if (!tab) return state
+          if (!tab || tab.isDirty === isDirty) return state
           return {
             editorTabs: {
               ...state.editorTabs,
@@ -206,11 +205,11 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
-      setActiveCenterTab: (id, type) =>
-        set(() => ({
+      setActiveCenterTab: (id) =>
+        set((state) => ({
           activeCenterTabId: id,
-          activeCenterTabType: type,
-          ...(type === 'terminal' ? { activeTerminalId: id } : {}),
+          // If it's a terminal, also update activeTerminalId
+          ...(state.terminals[id] ? { activeTerminalId: id } : {}),
         })),
 
       // Sidecar terminal state

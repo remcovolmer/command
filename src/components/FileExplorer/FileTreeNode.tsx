@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { ChevronRight, Loader2 } from 'lucide-react'
 import type { FileSystemEntry } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { getFileIcon, getFolderIcon } from './fileIcons'
+import { isEditableFile } from '../../utils/editorLanguages'
 
 interface FileTreeNodeProps {
   entry: FileSystemEntry
@@ -12,7 +13,7 @@ interface FileTreeNodeProps {
 }
 
 export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
-  const api = useMemo(() => getElectronAPI(), [])
+  const api = getElectronAPI()
   const [isLoading, setIsLoading] = useState(false)
 
   // Use specific selectors to avoid creating new references
@@ -29,20 +30,9 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
 
   const isDirectory = entry.type === 'directory'
 
-  const TEXT_EXTENSIONS = new Set([
-    'ts', 'tsx', 'js', 'jsx', 'json', 'md', 'css', 'scss', 'html', 'xml',
-    'yaml', 'yml', 'py', 'rb', 'rs', 'go', 'sh', 'bash', 'sql', 'toml',
-    'env', 'gitignore', 'txt', 'csv', 'svg', 'lock', 'conf', 'cfg', 'ini',
-    'vue', 'svelte', 'astro', 'prisma', 'graphql', 'gql', 'dockerfile',
-    'makefile', 'cmake', 'gradle', 'kt', 'kts', 'java', 'c', 'cpp', 'h',
-    'hpp', 'cs', 'swift', 'dart', 'lua', 'r', 'php', 'ex', 'exs', 'erl',
-    'zig', 'nim', 'elm', 'clj', 'cljs', 'hs', 'ml', 'mli',
-  ])
-
   const handleClick = async () => {
     if (!isDirectory) {
-      const ext = entry.extension?.toLowerCase() ?? ''
-      if (TEXT_EXTENSIONS.has(ext) || entry.name.startsWith('.')) {
+      if (isEditableFile(entry.name, entry.extension)) {
         openEditorTab(entry.path, entry.name, projectId)
       }
       return

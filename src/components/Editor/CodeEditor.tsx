@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { getMonacoLanguage } from '../../utils/editorLanguages'
 
 interface CodeEditorProps {
   tabId: string
@@ -10,38 +11,8 @@ interface CodeEditorProps {
   isActive: boolean
 }
 
-const EXT_TO_LANGUAGE: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'typescript',
-  js: 'javascript',
-  jsx: 'javascript',
-  json: 'json',
-  md: 'markdown',
-  css: 'css',
-  scss: 'scss',
-  html: 'html',
-  xml: 'xml',
-  yaml: 'yaml',
-  yml: 'yaml',
-  py: 'python',
-  rb: 'ruby',
-  rs: 'rust',
-  go: 'go',
-  sh: 'shell',
-  bash: 'shell',
-  sql: 'sql',
-  toml: 'ini',
-  env: 'ini',
-  gitignore: 'ini',
-}
-
-function getLanguage(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
-  return EXT_TO_LANGUAGE[ext] ?? 'plaintext'
-}
-
 export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
-  const api = useMemo(() => getElectronAPI(), [])
+  const api = getElectronAPI()
   const theme = useProjectStore((s) => s.theme)
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
 
@@ -49,6 +20,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   const [error, setError] = useState<string | null>(null)
   const savedContentRef = useRef<string>('')
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const lastDirtyRef = useRef<boolean>(false)
 
   // Load file
   useEffect(() => {
@@ -78,6 +50,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
           await api.fs.writeFile(filePath, value)
           savedContentRef.current = value
           setEditorDirty(tabId, false)
+          lastDirtyRef.current = false
         } catch (err) {
           console.error('Failed to save file:', err)
         }
@@ -88,7 +61,11 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   const handleChange = useCallback((value: string | undefined) => {
     if (value === undefined) return
     const dirty = value !== savedContentRef.current
-    setEditorDirty(tabId, dirty)
+    // Only update store when dirty state actually changes
+    if (dirty !== lastDirtyRef.current) {
+      lastDirtyRef.current = dirty
+      setEditorDirty(tabId, dirty)
+    }
   }, [tabId, setEditorDirty])
 
   if (error) {
@@ -117,7 +94,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
     <div style={{ display: isActive ? 'block' : 'none', height: '100%', width: '100%' }}>
       <Editor
         defaultValue={content}
-        language={getLanguage(filePath)}
+        language={getMonacoLanguage(filePath)}
         theme={theme === 'dark' ? 'vs-dark' : 'vs'}
         onMount={handleMount}
         onChange={handleChange}
