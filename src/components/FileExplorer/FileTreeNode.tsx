@@ -25,11 +25,28 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
   const toggleExpandedPath = useProjectStore((s) => s.toggleExpandedPath)
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
   const directoryCache = useProjectStore((s) => s.directoryCache)
+  const openEditorTab = useProjectStore((s) => s.openEditorTab)
 
   const isDirectory = entry.type === 'directory'
 
+  const TEXT_EXTENSIONS = new Set([
+    'ts', 'tsx', 'js', 'jsx', 'json', 'md', 'css', 'scss', 'html', 'xml',
+    'yaml', 'yml', 'py', 'rb', 'rs', 'go', 'sh', 'bash', 'sql', 'toml',
+    'env', 'gitignore', 'txt', 'csv', 'svg', 'lock', 'conf', 'cfg', 'ini',
+    'vue', 'svelte', 'astro', 'prisma', 'graphql', 'gql', 'dockerfile',
+    'makefile', 'cmake', 'gradle', 'kt', 'kts', 'java', 'c', 'cpp', 'h',
+    'hpp', 'cs', 'swift', 'dart', 'lua', 'r', 'php', 'ex', 'exs', 'erl',
+    'zig', 'nim', 'elm', 'clj', 'cljs', 'hs', 'ml', 'mli',
+  ])
+
   const handleClick = async () => {
-    if (!isDirectory) return
+    if (!isDirectory) {
+      const ext = entry.extension?.toLowerCase() ?? ''
+      if (TEXT_EXTENSIONS.has(ext) || entry.name.startsWith('.')) {
+        openEditorTab(entry.path, entry.name, projectId)
+      }
+      return
+    }
 
     // If expanding and not cached, load contents
     if (!isExpanded && !directoryCache[entry.path]) {
@@ -61,7 +78,7 @@ export function FileTreeNode({ entry, projectId, depth }: FileTreeNodeProps) {
           w-full flex items-center gap-1.5 py-1 px-2 rounded text-left
           text-sm text-sidebar-foreground
           hover:bg-sidebar-accent transition-colors
-          ${isDirectory ? 'cursor-pointer' : 'cursor-default'}
+          cursor-pointer
         `}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >

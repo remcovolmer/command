@@ -52,6 +52,16 @@ export interface TerminalSession {
   type: TerminalType;  // 'claude' or 'normal' shell
 }
 
+// Editor tab types
+export interface EditorTab {
+  id: string;
+  type: 'editor';
+  filePath: string;
+  fileName: string;
+  isDirty: boolean;
+  projectId: string;
+}
+
 // File system types
 export interface FileSystemEntry {
   name: string;
@@ -200,6 +210,8 @@ export interface ElectronAPI {
   };
   fs: {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;
+    readFile: (filePath: string) => Promise<string>;
+    writeFile: (filePath: string, content: string) => Promise<void>;
   };
   git: {
     getStatus: (projectPath: string) => Promise<GitStatus>;

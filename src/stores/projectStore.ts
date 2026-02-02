@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab } from '../types'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
@@ -34,6 +34,17 @@ interface ProjectStore {
   // GitHub PR status (not persisted)
   prStatus: Record<string, PRStatus>  // key (worktreeId or projectId) -> PRStatus
   ghAvailable: { installed: boolean; authenticated: boolean } | null
+
+  // Editor tab state
+  editorTabs: Record<string, EditorTab>  // tabId -> EditorTab
+  activeCenterTabId: string | null  // can be terminal or editor tab
+  activeCenterTabType: 'terminal' | 'editor' | null
+
+  // Editor tab actions
+  openEditorTab: (filePath: string, fileName: string, projectId: string) => void
+  closeEditorTab: (tabId: string) => void
+  setEditorDirty: (tabId: string, isDirty: boolean) => void
+  setActiveCenterTab: (id: string, type: 'terminal' | 'editor') => void
 
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
@@ -131,6 +142,76 @@ export const useProjectStore = create<ProjectStore>()(
       // GitHub PR status (not persisted)
       prStatus: {},
       ghAvailable: null,
+
+      // Editor tab state
+      editorTabs: {},
+      activeCenterTabId: null,
+      activeCenterTabType: null,
+
+      // Editor tab actions
+      openEditorTab: (filePath, fileName, projectId) =>
+        set((state) => {
+          // Check if already open
+          const existing = Object.values(state.editorTabs).find(
+            (t) => t.filePath === filePath
+          )
+          if (existing) {
+            return {
+              activeCenterTabId: existing.id,
+              activeCenterTabType: 'editor' as const,
+            }
+          }
+          const id = `editor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          const tab: EditorTab = { id, type: 'editor', filePath, fileName, isDirty: false, projectId }
+          return {
+            editorTabs: { ...state.editorTabs, [id]: tab },
+            activeCenterTabId: id,
+            activeCenterTabType: 'editor' as const,
+          }
+        }),
+
+      closeEditorTab: (tabId) =>
+        set((state) => {
+          const newTabs = { ...state.editorTabs }
+          delete newTabs[tabId]
+          // If closing active tab, switch to another editor tab or back to terminal
+          let newActiveId = state.activeCenterTabId
+          let newActiveType = state.activeCenterTabType
+          if (state.activeCenterTabId === tabId) {
+            const remaining = Object.values(newTabs)
+            if (remaining.length > 0) {
+              newActiveId = remaining[remaining.length - 1].id
+              newActiveType = 'editor'
+            } else {
+              newActiveId = state.activeTerminalId
+              newActiveType = state.activeTerminalId ? 'terminal' : null
+            }
+          }
+          return {
+            editorTabs: newTabs,
+            activeCenterTabId: newActiveId,
+            activeCenterTabType: newActiveType,
+          }
+        }),
+
+      setEditorDirty: (tabId, isDirty) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab) return state
+          return {
+            editorTabs: {
+              ...state.editorTabs,
+              [tabId]: { ...tab, isDirty },
+            },
+          }
+        }),
+
+      setActiveCenterTab: (id, type) =>
+        set(() => ({
+          activeCenterTabId: id,
+          activeCenterTabType: type,
+          ...(type === 'terminal' ? { activeTerminalId: id } : {}),
+        })),
 
       // Sidecar terminal state
       sidecarTerminals: {},

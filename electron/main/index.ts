@@ -239,6 +239,24 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
   }
 })
 
+// IPC Handlers for File read/write operations
+ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
+  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+    throw new Error('Invalid file path')
+  }
+  return fs.readFile(filePath, 'utf-8')
+})
+
+ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
+  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+    throw new Error('Invalid file path')
+  }
+  if (typeof content !== 'string') {
+    throw new Error('Invalid content')
+  }
+  await fs.writeFile(filePath, content, 'utf-8')
+})
+
 // IPC Handlers for Git operations
 ipcMain.handle('git:status', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)

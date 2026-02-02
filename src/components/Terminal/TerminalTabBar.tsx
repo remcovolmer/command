@@ -1,12 +1,17 @@
-import { TerminalIcon, Plus, X, LayoutGrid } from 'lucide-react'
-import type { TerminalSession, TerminalState } from '../../types'
+import { TerminalIcon, Plus, X, LayoutGrid, FileText, Circle } from 'lucide-react'
+import type { TerminalSession, TerminalState, EditorTab } from '../../types'
 
 interface TerminalTabBarProps {
   terminals: TerminalSession[]
+  editorTabs: EditorTab[]
   activeTerminalId: string | null
+  activeCenterTabId: string | null
+  activeCenterTabType: 'terminal' | 'editor' | null
   splitTerminalIds: string[]
-  onSelect: (terminalId: string) => void
+  onSelectTerminal: (terminalId: string) => void
+  onSelectEditor: (tabId: string) => void
   onClose: (terminalId: string) => void
+  onCloseEditor: (tabId: string) => void
   onUnsplit: (terminalId: string) => void
   onAdd: () => void
   canAdd: boolean
@@ -27,10 +32,15 @@ const isInputState = (state: string) => inputStates.includes(state as typeof inp
 
 export function TerminalTabBar({
   terminals,
+  editorTabs,
   activeTerminalId,
+  activeCenterTabId,
+  activeCenterTabType,
   splitTerminalIds,
-  onSelect,
+  onSelectTerminal,
+  onSelectEditor,
   onClose,
+  onCloseEditor,
   onUnsplit,
   onAdd,
   canAdd,
@@ -39,10 +49,12 @@ export function TerminalTabBar({
     e.dataTransfer.setData('terminalId', terminalId)
     e.dataTransfer.effectAllowed = 'move'
   }
+
   return (
     <div className="flex items-center gap-1 px-3 py-1 bg-sidebar-accent border-b border-border overflow-x-auto">
+      {/* Terminal tabs */}
       {terminals.map((terminal) => {
-        const isActive = terminal.id === activeTerminalId
+        const isActive = activeCenterTabType === 'terminal' && terminal.id === (activeCenterTabId ?? activeTerminalId)
         const isInSplit = splitTerminalIds.includes(terminal.id)
 
         return (
@@ -50,7 +62,7 @@ export function TerminalTabBar({
             key={terminal.id}
             draggable
             onDragStart={(e) => handleDragStart(e, terminal.id)}
-            onClick={() => onSelect(terminal.id)}
+            onClick={() => onSelectTerminal(terminal.id)}
             className={`
               group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer
               transition-colors select-none
@@ -86,6 +98,49 @@ export function TerminalTabBar({
               onClick={(e) => {
                 e.stopPropagation()
                 onClose(terminal.id)
+              }}
+              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-all"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )
+      })}
+
+      {/* Separator between terminal and editor tabs */}
+      {terminals.length > 0 && editorTabs.length > 0 && (
+        <div className="w-px h-5 bg-border mx-1" />
+      )}
+
+      {/* Editor tabs */}
+      {editorTabs.map((tab) => {
+        const isActive = activeCenterTabType === 'editor' && tab.id === activeCenterTabId
+
+        return (
+          <div
+            key={tab.id}
+            onClick={() => onSelectEditor(tab.id)}
+            className={`
+              group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer
+              transition-colors select-none
+              ${
+                isActive
+                  ? 'bg-sidebar-accent text-sidebar-foreground border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
+              }
+            `}
+          >
+            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">
+              {tab.fileName}
+            </span>
+            {tab.isDirty && (
+              <Circle className="w-2 h-2 flex-shrink-0 fill-current text-orange-400" />
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onCloseEditor(tab.id)
               }}
               className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-all"
             >
