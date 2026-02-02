@@ -123,7 +123,17 @@ export function Sidebar() {
   }
 
   const handleCreateTerminal = async (projectId: string, worktreeId?: string) => {
-    // Check terminal limit (max 3 per project)
+    // Enforce 1:1 worktree-terminal coupling
+    if (worktreeId) {
+      const existing = Object.values(terminals).find((t) => t.worktreeId === worktreeId)
+      if (existing) {
+        // Already has a terminal — just select it
+        setActiveTerminal(existing.id)
+        return
+      }
+    }
+
+    // Check terminal limit (max per project)
     const projectTerminals = Object.values(terminals).filter(
       (t) => t.projectId === projectId
     )
@@ -137,10 +147,14 @@ export function Sidebar() {
 
     const terminalId = await api.terminal.create(projectId, worktreeId)
 
-    // Determine terminal number
-    const existingCount = worktreeId
-      ? Object.values(terminals).filter((t) => t.worktreeId === worktreeId).length
-      : Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length
+    // For worktree terminals, use the worktree name as the tab title
+    const worktree = worktreeId
+      ? Object.values(worktrees).find((w) => w.id === worktreeId)
+      : null
+
+    const title = worktree
+      ? worktree.name
+      : `Terminal ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
 
     const terminal: TerminalSession = {
       id: terminalId,
@@ -148,7 +162,7 @@ export function Sidebar() {
       worktreeId: worktreeId ?? null,
       state: 'busy',
       lastActivity: Date.now(),
-      title: `Terminal ${existingCount + 1}`,
+      title,
       type: 'claude',
     }
     addTerminal(terminal)

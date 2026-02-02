@@ -43,7 +43,7 @@ export class TerminalManager {
     this.sendToRenderer('terminal:state', terminalId, newState)
   }
 
-  createTerminal(cwd: string, type: TerminalType = 'claude'): string {
+  createTerminal(cwd: string, type: TerminalType = 'claude', initialInput?: string): string {
     const id = randomUUID()
     const shell = this.getShell()
 
@@ -93,6 +93,13 @@ export class TerminalManager {
       setTimeout(() => {
         ptyProcess.write('claude\r')
       }, 100)
+
+      // If initialInput is provided, send it after Claude has started
+      if (initialInput) {
+        setTimeout(() => {
+          ptyProcess.write(initialInput)
+        }, 3000)
+      }
     } else {
       this.sendToRenderer('terminal:state', id, 'done')
     }

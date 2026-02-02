@@ -134,7 +134,7 @@ async function createWindow() {
 }
 
 // IPC Handlers for Terminal operations
-ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude') => {
+ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude', initialInput?: string) => {
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
   }
@@ -159,7 +159,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     cwd = project?.path ?? process.cwd()
   }
 
-  return terminalManager?.createTerminal(cwd, type)
+  // For worktree terminals, default to plan mode initial input
+  const effectiveInitialInput = initialInput ?? (worktreeId ? '/workflows:plan ' : undefined)
+  return terminalManager?.createTerminal(cwd, type, effectiveInitialInput)
 })
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
