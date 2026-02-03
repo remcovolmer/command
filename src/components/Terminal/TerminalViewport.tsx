@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Terminal } from './Terminal'
-import { CodeEditor } from '../Editor/CodeEditor'
+import { EditorContainer } from '../Editor/EditorContainer'
 import type { TerminalSession, EditorTab } from '../../types'
 
 interface TerminalViewportProps {
@@ -154,7 +154,7 @@ export function TerminalViewport({
 
         {/* Render all editor tabs (hidden if not active) */}
         {editorTabs.map((tab) => (
-          <CodeEditor
+          <EditorContainer
             key={tab.id}
             tabId={tab.id}
             filePath={tab.filePath}

@@ -212,6 +212,9 @@ export interface ElectronAPI {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;
     readFile: (filePath: string) => Promise<string>;
     writeFile: (filePath: string, content: string) => Promise<void>;
+    watchFile: (filePath: string) => Promise<void>;
+    unwatchFile: (filePath: string) => Promise<void>;
+    onFileChanged: (callback: (filePath: string) => void) => Unsubscribe;
   };
   git: {
     getStatus: (projectPath: string) => Promise<GitStatus>;

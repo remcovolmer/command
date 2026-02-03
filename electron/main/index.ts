@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
+import { watch, type FSWatcher } from 'node:fs'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
@@ -67,6 +68,9 @@ let worktreeService: WorktreeService | null = null
 let hookWatcher: ClaudeHookWatcher | null = null
 let updateService: UpdateService | null = null
 let githubService: GitHubService | null = null
+
+// File watchers for live updates (path -> watcher)
+const fileWatchers = new Map<string, FSWatcher>()
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
@@ -260,7 +264,17 @@ function validateFilePathInProject(filePath: string): string {
   }
   const resolved = path.resolve(path.normalize(filePath))
   const projects = projectPersistence?.getProjects() ?? []
-  const isInProject = projects.some(p => resolved.startsWith(path.resolve(p.path)))
+
+  // Case-insensitive comparison on Windows
+  const isWin = process.platform === 'win32'
+  const normalizedResolved = isWin ? resolved.toLowerCase() : resolved
+
+  const isInProject = projects.some(p => {
+    const projectPath = path.resolve(p.path)
+    const normalizedProject = isWin ? projectPath.toLowerCase() : projectPath
+    return normalizedResolved.startsWith(normalizedProject)
+  })
+
   if (!isInProject) {
     throw new Error('File path is not within a registered project')
   }
@@ -268,12 +282,19 @@ function validateFilePathInProject(filePath: string): string {
 }
 
 ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
-  const resolved = validateFilePathInProject(filePath)
-  const stat = await fs.stat(resolved)
-  if (stat.size > 10 * 1024 * 1024) {
-    throw new Error('File too large (max 10MB)')
+  console.log('[fs:readFile] Request:', filePath)
+  try {
+    const resolved = validateFilePathInProject(filePath)
+    console.log('[fs:readFile] Validated:', resolved)
+    const stat = await fs.stat(resolved)
+    if (stat.size > 10 * 1024 * 1024) {
+      throw new Error('File too large (max 10MB)')
+    }
+    return fs.readFile(resolved, 'utf-8')
+  } catch (error) {
+    console.error('[fs:readFile] Error:', error)
+    throw error
   }
-  return fs.readFile(resolved, 'utf-8')
 })
 
 ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string) => {
@@ -285,6 +306,40 @@ ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string)
     throw new Error('Content too large (max 10MB)')
   }
   await fs.writeFile(resolved, content, 'utf-8')
+})
+
+// File watching IPC handlers for live updates when Claude Code modifies files
+ipcMain.handle('fs:watchFile', async (_event, filePath: string) => {
+  const resolved = validateFilePathInProject(filePath)
+
+  // Already watching this file
+  if (fileWatchers.has(resolved)) return
+
+  try {
+    const watcher = watch(resolved, (eventType) => {
+      if (eventType === 'change') {
+        win?.webContents.send('fs:fileChanged', filePath)
+      }
+    })
+
+    watcher.on('error', (err) => {
+      console.error('[fs:watchFile] Watcher error:', err)
+      fileWatchers.delete(resolved)
+    })
+
+    fileWatchers.set(resolved, watcher)
+  } catch (error) {
+    console.error('[fs:watchFile] Failed to watch:', error)
+  }
+})
+
+ipcMain.handle('fs:unwatchFile', async (_event, filePath: string) => {
+  const resolved = validateFilePathInProject(filePath)
+  const watcher = fileWatchers.get(resolved)
+  if (watcher) {
+    watcher.close()
+    fileWatchers.delete(resolved)
+  }
 })
 
 // IPC Handlers for Git operations
@@ -589,6 +644,11 @@ app.on('before-quit', () => {
   hookWatcher?.stop()
   githubService?.destroy()
   terminalManager?.destroy()
+  // Close all file watchers
+  for (const watcher of fileWatchers.values()) {
+    watcher.close()
+  }
+  fileWatchers.clear()
 })
 
 app.on('window-all-closed', () => {

@@ -26,15 +26,60 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   useEffect(() => {
     let cancelled = false
     setError(null)
-    api.fs.readFile(filePath).then((text) => {
-      if (cancelled) return
-      setContent(text)
-      savedContentRef.current = text
-    }).catch((err) => {
-      if (cancelled) return
-      setError(err?.message ?? 'Failed to read file')
+
+    const timeoutId = setTimeout(() => {
+      if (!cancelled && content === null) {
+        setError('Loading timed out - check console for details')
+      }
+    }, 10000)
+
+    api.fs.readFile(filePath)
+      .then((text) => {
+        clearTimeout(timeoutId)
+        if (cancelled) return
+        setContent(text)
+        savedContentRef.current = text
+      })
+      .catch((err) => {
+        clearTimeout(timeoutId)
+        if (cancelled) return
+        setError(err?.message ?? 'Failed to read file')
+      })
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
+  }, [filePath, api])
+
+  // File watching for live updates when Claude Code modifies the file
+  useEffect(() => {
+    api.fs.watchFile(filePath)
+
+    const unsubscribe = api.fs.onFileChanged((changedPath) => {
+      if (changedPath === filePath && !lastDirtyRef.current) {
+        // Reload content if no unsaved changes
+        api.fs.readFile(filePath).then((text) => {
+          const editor = editorRef.current
+          if (editor) {
+            // Preserve cursor position
+            const position = editor.getPosition()
+            editor.setValue(text)
+            if (position) {
+              editor.setPosition(position)
+            }
+          }
+          savedContentRef.current = text
+        }).catch((err) => {
+          console.error('Failed to reload file:', err)
+        })
+      }
     })
-    return () => { cancelled = true }
+
+    return () => {
+      api.fs.unwatchFile(filePath)
+      unsubscribe()
+    }
   }, [filePath, api])
 
   const handleMount: OnMount = useCallback((editor) => {
