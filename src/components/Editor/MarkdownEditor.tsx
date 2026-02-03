@@ -24,8 +24,6 @@ interface MilkdownEditorInnerProps {
 }
 
 function MilkdownEditorInner({ defaultValue, onContentChange }: MilkdownEditorInnerProps) {
-  const theme = useProjectStore((s) => s.theme)
-
   useEditor((root) => {
     return Editor.make()
       .config((ctx) => {
@@ -47,10 +45,7 @@ function MilkdownEditorInner({ defaultValue, onContentChange }: MilkdownEditorIn
   }, [defaultValue])
 
   return (
-    <div
-      className={`milkdown-wrapper h-full w-full overflow-auto ${theme === 'dark' ? 'milkdown-dark' : ''}`}
-      style={{ backgroundColor: theme === 'dark' ? '#1e1e2e' : '#ffffff' }}
-    >
+    <div className="milkdown-wrapper h-full w-full overflow-auto bg-background">
       <Milkdown />
     </div>
   )
