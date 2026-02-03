@@ -259,20 +259,95 @@ export class WorktreeService {
   }
 
   /**
-   * Remove a worktree
+   * Remove a worktree with robust error handling
    */
   async removeWorktree(
     projectPath: string,
     worktreePath: string,
     force: boolean = false
   ): Promise<void> {
-    const args = ['worktree', 'remove']
-    if (force) {
-      args.push('--force')
+    // Step 1: Prune stale worktrees first (cleans up if directory was manually deleted)
+    try {
+      await this.execGit(projectPath, ['worktree', 'prune'])
+    } catch {
+      // Prune failed, continue anyway
     }
-    args.push(worktreePath)
 
-    await this.execGit(projectPath, args)
+    // Step 2: Check if worktree still exists in git's list
+    const worktrees = await this.listWorktrees(projectPath)
+    const worktreeExists = worktrees.some(
+      wt => path.normalize(wt.path) === path.normalize(worktreePath)
+    )
+
+    if (!worktreeExists) {
+      // Worktree was already pruned or doesn't exist in git
+      return
+    }
+
+    // Step 3: Check if locked and unlock if needed
+    const worktree = worktrees.find(
+      wt => path.normalize(wt.path) === path.normalize(worktreePath)
+    )
+    if (worktree?.isLocked) {
+      try {
+        await this.execGit(projectPath, ['worktree', 'unlock', worktreePath])
+      } catch {
+        // Unlock failed, continue anyway (might already be unlocked)
+      }
+    }
+
+    // Step 4: Attempt removal
+    try {
+      const args = ['worktree', 'remove']
+      if (force) {
+        args.push('--force')
+      }
+      args.push(worktreePath)
+      await this.execGit(projectPath, args)
+    } catch (error) {
+      // Step 5: If removal failed without force, retry with force
+      if (!force) {
+        try {
+          await this.execGit(projectPath, ['worktree', 'remove', '--force', worktreePath])
+          return
+        } catch {
+          // Force removal also failed
+        }
+      }
+
+      // Step 6: Final fallback - prune again and check if it's gone
+      try {
+        await this.execGit(projectPath, ['worktree', 'prune'])
+        const remaining = await this.listWorktrees(projectPath)
+        const stillExists = remaining.some(
+          wt => path.normalize(wt.path) === path.normalize(worktreePath)
+        )
+        if (!stillExists) {
+          return // Successfully removed via prune
+        }
+      } catch {
+        // Prune failed
+      }
+
+      // Re-throw with detailed error message
+      const errorMessage = error instanceof Error ? error.message : String(error)
+
+      // Parse git error and provide actionable message
+      let userMessage = `Failed to remove worktree at ${worktreePath}`
+      if (errorMessage.includes('contains modified or untracked files')) {
+        userMessage += ': Has uncommitted changes (use force to override)'
+      } else if (errorMessage.includes('is locked')) {
+        userMessage += ': Worktree is locked'
+      } else if (errorMessage.includes('not a valid directory') || errorMessage.includes('does not exist')) {
+        userMessage += ': Directory not found (may have been manually deleted)'
+      } else if (errorMessage.includes('Permission denied') || errorMessage.includes('EBUSY')) {
+        userMessage += ': Directory is in use by another process'
+      } else {
+        userMessage += `: ${errorMessage}`
+      }
+
+      throw new Error(userMessage)
+    }
   }
 
   /**

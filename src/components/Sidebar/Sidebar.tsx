@@ -190,18 +190,23 @@ export function Sidebar() {
 
     try {
       // Close all terminals in worktree first
-      Object.values(terminals)
-        .filter((t) => t.worktreeId === worktreeId)
-        .forEach((t) => {
-          api.terminal.close(t.id)
-          removeTerminal(t.id)
-        })
+      const terminalsToClose = Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
+      terminalsToClose.forEach((t) => {
+        api.terminal.close(t.id)
+        removeTerminal(t.id)
+      })
+
+      // Add delay for Windows to release file handles
+      if (terminalsToClose.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
 
       await api.worktree.remove(worktreeId, hasChanges)
       removeWorktree(worktreeId)
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to remove worktree'
       console.error('Failed to remove worktree:', error)
-      api.notification.show('Error', 'Failed to remove worktree')
+      api.notification.show('Error', message)
     }
   }
 
