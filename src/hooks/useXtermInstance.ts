@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useCallback } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { useProjectStore } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
 import { terminalEvents } from '../utils/terminalEvents'
@@ -122,12 +123,23 @@ export function useXtermInstance({
       lineHeight: 1.2,
       scrollback,
       theme: buildTerminalTheme(theme),
+      allowProposedApi: true,
+      letterSpacing: 0,
+      customGlyphs: true,
     })
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.loadAddon(new WebLinksAddon())
+
+    // Unicode 11 addon for better wide character and emoji support
+    const unicodeAddon = new Unicode11Addon()
+    terminal.loadAddon(unicodeAddon)
+
     terminal.open(containerRef.current)
+
+    // Activate Unicode 11 for correct character width calculations
+    terminal.unicode.activeVersion = '11'
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
@@ -255,6 +267,8 @@ export function useXtermInstance({
   useEffect(() => {
     if (isActive && terminalRef.current) {
       terminalRef.current.focus()
+      // Force cursor refresh to ensure cursor is visible after focus
+      terminalRef.current.refresh(0, terminalRef.current.rows - 1)
       const timer = setTimeout(() => {
         safeFit()
       }, FOCUS_REFIT_DELAY_MS)

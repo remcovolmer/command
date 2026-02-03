@@ -17,9 +17,8 @@ export function Terminal({ id, isActive }: TerminalProps) {
       ref={containerRef}
       className="terminal-container w-full h-full bg-sidebar"
       style={{
-        visibility: isActive ? 'visible' : 'hidden',
-        position: isActive ? 'relative' : 'absolute',
-        inset: isActive ? undefined : 0,
+        display: isActive ? 'block' : 'none',
+        position: 'relative',
         pointerEvents: isActive ? 'auto' : 'none'
       }}
     />
