@@ -2,6 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
+import { history } from '@milkdown/plugin-history'
+import { clipboard } from '@milkdown/plugin-clipboard'
+import { indent } from '@milkdown/plugin-indent'
+import { cursor } from '@milkdown/plugin-cursor'
+import { trailing } from '@milkdown/plugin-trailing'
 import { Milkdown, MilkdownProvider, useEditor, useInstance } from '@milkdown/react'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
@@ -35,6 +40,11 @@ function MilkdownEditorInner({ defaultValue, onContentChange }: MilkdownEditorIn
       })
       .use(commonmark)
       .use(gfm)
+      .use(history)
+      .use(clipboard)
+      .use(indent)
+      .use(cursor)
+      .use(trailing)
       .use(listener)
   }, [defaultValue])
 

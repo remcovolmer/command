@@ -297,14 +297,50 @@ button {
   margin: 0.5em 0;
 }
 
-.milkdown-wrapper .ProseMirror ul,
+.milkdown-wrapper .ProseMirror ul {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+  list-style-type: disc;
+}
+
+.milkdown-wrapper .ProseMirror ul ul {
+  list-style-type: circle;
+}
+
+.milkdown-wrapper .ProseMirror ul ul ul {
+  list-style-type: square;
+}
+
 .milkdown-wrapper .ProseMirror ol {
   padding-left: 1.5em;
   margin: 0.5em 0;
+  list-style-type: decimal;
 }
 
 .milkdown-wrapper .ProseMirror li {
   margin: 0.25em 0;
+  display: list-item;
+}
+
+.milkdown-wrapper .ProseMirror li p {
+  margin: 0;
+  display: inline;
+}
+
+/* Task list items (checkboxes) */
+.milkdown-wrapper .ProseMirror li[data-item-type="task"] {
+  list-style-type: none;
+  margin-left: -1.5em;
+  padding-left: 1.5em;
+}
+
+.milkdown-wrapper .ProseMirror li[data-item-type="task"]::before {
+  content: '';
+}
+
+.milkdown-wrapper .ProseMirror input[type="checkbox"] {
+  margin-right: 0.5em;
+  cursor: pointer;
 }
 
 .milkdown-wrapper .ProseMirror li[data-checked="true"] {
