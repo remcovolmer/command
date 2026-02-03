@@ -47,7 +47,7 @@ export class TerminalManager {
     this.sendToRenderer('terminal:state', terminalId, newState)
   }
 
-  createTerminal(cwd: string, type: TerminalType = 'claude', initialInput?: string): string {
+  createTerminal(cwd: string, type: TerminalType = 'claude', initialInput?: string, initialTitle?: string): string {
     const id = randomUUID()
     const shell = this.getShell()
 
@@ -93,6 +93,12 @@ export class TerminalManager {
     })
 
     this.terminals.set(id, terminal)
+
+    // If initial title is provided, set it and mark as titled (skip auto-naming)
+    if (initialTitle) {
+      this.terminalTitled.set(id, true)
+      this.sendToRenderer('terminal:title', id, initialTitle)
+    }
 
     // Send initial state and start Claude Code (only for Claude terminals)
     if (type === 'claude') {

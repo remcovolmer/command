@@ -151,8 +151,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     throw new Error('Invalid terminal type')
   }
 
-  // Determine the working directory
+  // Determine the working directory and initial title
   let cwd: string
+  let initialTitle: string | undefined
 
   if (worktreeId) {
     // Use worktree path if provided
@@ -161,6 +162,8 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
       throw new Error(`Worktree not found: ${worktreeId}`)
     }
     cwd = worktree.path
+    // Use worktree name as terminal title
+    initialTitle = worktree.name
   } else {
     // Use project path
     const projects = projectPersistence?.getProjects() ?? []
@@ -170,7 +173,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
 
   // For worktree terminals, default to plan mode initial input
   const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
-  return terminalManager?.createTerminal(cwd, type, effectiveInitialInput)
+  return terminalManager?.createTerminal(cwd, type, effectiveInitialInput, initialTitle)
 })
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
