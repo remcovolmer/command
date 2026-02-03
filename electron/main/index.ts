@@ -377,7 +377,81 @@ ipcMain.handle('worktree:list', async (_event, projectId: string) => {
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
   }
-  return projectPersistence?.getWorktrees(projectId) ?? []
+
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === projectId)
+
+  if (!project || !projectPersistence || !worktreeService) {
+    return projectPersistence?.getWorktrees(projectId) ?? []
+  }
+
+  try {
+    // Get actual git worktrees from disk
+    const gitWorktrees = await worktreeService.listWorktrees(project.path)
+
+    // Get persisted worktrees
+    const persistedWorktrees = projectPersistence.getWorktrees(projectId)
+
+    // Build lookup maps for comparison (normalize paths for Windows compatibility)
+    const gitPathSet = new Set(
+      gitWorktrees
+        .filter(wt => !wt.isMain) // Skip main worktree (project root)
+        .map(wt => path.normalize(wt.path).toLowerCase())
+    )
+
+    const persistedPathMap = new Map(
+      persistedWorktrees.map(wt => [path.normalize(wt.path).toLowerCase(), wt])
+    )
+
+    // Add worktrees that exist in git but not in persistence
+    for (const gitWorktree of gitWorktrees) {
+      if (gitWorktree.isMain) continue // Skip main worktree
+
+      const normalizedPath = path.normalize(gitWorktree.path).toLowerCase()
+      if (!persistedPathMap.has(normalizedPath)) {
+        // Derive name from directory basename, fallback to branch name
+        const dirName = path.basename(gitWorktree.path)
+        const name = dirName && dirName.length > 1 && !/^[A-Z]:$/i.test(dirName)
+          ? dirName
+          : gitWorktree.branch.replace(/\//g, '-')
+
+        projectPersistence.addWorktree({
+          id: randomUUID(),
+          projectId,
+          name,
+          branch: gitWorktree.branch,
+          path: gitWorktree.path,
+          createdAt: Date.now(),
+          isLocked: gitWorktree.isLocked,
+        })
+      }
+    }
+
+    // Remove worktrees from persistence that no longer exist in git
+    for (const persisted of persistedWorktrees) {
+      const normalizedPath = path.normalize(persisted.path).toLowerCase()
+      if (!gitPathSet.has(normalizedPath)) {
+        projectPersistence.removeWorktree(persisted.id)
+      }
+    }
+
+    // Update lock state for existing worktrees
+    for (const gitWorktree of gitWorktrees) {
+      if (gitWorktree.isMain) continue
+
+      const normalizedPath = path.normalize(gitWorktree.path).toLowerCase()
+      const persisted = persistedPathMap.get(normalizedPath)
+      if (persisted && persisted.isLocked !== gitWorktree.isLocked) {
+        projectPersistence.updateWorktree(persisted.id, { isLocked: gitWorktree.isLocked })
+      }
+    }
+
+    return projectPersistence.getWorktrees(projectId)
+  } catch (error) {
+    console.error('Failed to sync worktrees:', error)
+    // Fallback to persisted worktrees if sync fails
+    return projectPersistence.getWorktrees(projectId)
+  }
 })
 
 ipcMain.handle('worktree:list-branches', async (_event, projectId: string) => {
