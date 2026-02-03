@@ -235,9 +235,9 @@ export const WorktreeItem = memo(function WorktreeItem({
 
           {/* Diff stats */}
           {(prStatus.additions !== undefined || prStatus.deletions !== undefined) && (
-            <span className="text-[10px] font-mono">
+            <span className="text-[10px] font-mono bg-muted/50 rounded px-1 py-0.5 leading-none">
               <span className="text-green-500">+{prStatus.additions ?? 0}</span>
-              {' '}
+              <span className="text-muted-foreground">/</span>
               <span className="text-red-500">-{prStatus.deletions ?? 0}</span>
             </span>
           )}
