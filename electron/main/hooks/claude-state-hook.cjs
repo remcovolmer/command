@@ -15,7 +15,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 // Read hook input from stdin
 let input = '';
 process.stdin.on('data', chunk => input += chunk);
-process.stdin.on('end', () => {
+process.stdin.on('end', async () => {
   try {
     const data = JSON.parse(input);
 
@@ -89,7 +89,7 @@ process.stdin.on('end', () => {
       // Use Object.create(null) to prevent prototype pollution
       let allStates = Object.create(null);
       try {
-        const existing = fs.readFileSync(stateFile, 'utf-8');
+        const existing = await fs.promises.readFile(stateFile, 'utf-8');
         const parsed = JSON.parse(existing);
         allStates = Object.assign(Object.create(null), parsed);
       } catch (e) {
@@ -110,11 +110,11 @@ process.stdin.on('end', () => {
       // Atomic write: temp file + rename to avoid TOCTOU race conditions
       const tempFile = stateFile + '.tmp.' + process.pid;
       try {
-        fs.writeFileSync(tempFile, JSON.stringify(allStates));
-        fs.renameSync(tempFile, stateFile);
+        await fs.promises.writeFile(tempFile, JSON.stringify(allStates));
+        await fs.promises.rename(tempFile, stateFile);
       } catch (writeErr) {
         // Cleanup temp file on error
-        try { fs.unlinkSync(tempFile); } catch (e) {}
+        try { await fs.promises.unlink(tempFile); } catch (e) {}
       }
     }
   } catch (e) {
