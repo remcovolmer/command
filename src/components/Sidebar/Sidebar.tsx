@@ -260,7 +260,12 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Workspaces Section - Always visible at top */}
+      {/* Workspaces Section - Always visible at top
+          NOTE: Workspaces use simplified rendering (not SortableProjectList) intentionally:
+          - They are pinned at top and should not be reorderable via drag-and-drop
+          - They have a distinct visual treatment (star icon, border) to emphasize importance
+          - Future: Will gain dashboard functionality that differs from regular projects
+      */}
       {workspaceProjects.length > 0 && (
         <div className="px-3 mb-2">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">

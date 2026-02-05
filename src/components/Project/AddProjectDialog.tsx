@@ -1,7 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { X, Code, FolderOpen, Loader2, Star } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import type { Project, ProjectType } from '../../types'
+
+const PROJECT_TYPE_OPTIONS = [
+  { type: 'workspace' as const, icon: Star, label: 'Workspace', description: 'Pinned overview' },
+  { type: 'project' as const, icon: FolderOpen, label: 'Project', description: 'Files + Claude' },
+  { type: 'code' as const, icon: Code, label: 'Code', description: 'Full dev tools' },
+]
 
 interface AddProjectDialogProps {
   isOpen: boolean
@@ -20,6 +26,15 @@ export function AddProjectDialog({
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedType('project')
+      setSelectedPath(null)
+      setError(null)
+    }
+  }, [isOpen])
 
   const handleSelectFolder = async () => {
     const folderPath = await api.project.selectFolder()
@@ -92,60 +107,27 @@ export function AddProjectDialog({
               Project Type
             </label>
             <div className="flex gap-2">
-              <button
-                onClick={() => setSelectedType('workspace')}
-                className={`flex-1 flex flex-col items-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
-                  selectedType === 'workspace'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-muted-foreground'
-                }`}
-              >
-                <Star className={`w-6 h-6 ${selectedType === 'workspace' ? 'text-primary' : 'text-muted-foreground'}`} />
-                <div className="text-center">
-                  <p className={`text-xs font-medium ${selectedType === 'workspace' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    Workspace
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Pinned overview
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={() => setSelectedType('project')}
-                className={`flex-1 flex flex-col items-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
-                  selectedType === 'project'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-muted-foreground'
-                }`}
-              >
-                <FolderOpen className={`w-6 h-6 ${selectedType === 'project' ? 'text-primary' : 'text-muted-foreground'}`} />
-                <div className="text-center">
-                  <p className={`text-xs font-medium ${selectedType === 'project' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    Project
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Files + Claude
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={() => setSelectedType('code')}
-                className={`flex-1 flex flex-col items-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
-                  selectedType === 'code'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-muted-foreground'
-                }`}
-              >
-                <Code className={`w-6 h-6 ${selectedType === 'code' ? 'text-primary' : 'text-muted-foreground'}`} />
-                <div className="text-center">
-                  <p className={`text-xs font-medium ${selectedType === 'code' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    Code
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Full dev tools
-                  </p>
-                </div>
-              </button>
+              {PROJECT_TYPE_OPTIONS.map(({ type, icon: Icon, label, description }) => (
+                <button
+                  key={type}
+                  onClick={() => setSelectedType(type)}
+                  className={`flex-1 flex flex-col items-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
+                    selectedType === type
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground'
+                  }`}
+                >
+                  <Icon className={`w-6 h-6 ${selectedType === type ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <div className="text-center">
+                    <p className={`text-xs font-medium ${selectedType === type ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {label}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {description}
+                    </p>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
 

@@ -11,11 +11,11 @@ const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
 
 export function FileExplorer() {
   const api = useMemo(() => getElectronAPI(), [])
+
+  // Data selectors - individual for granular subscription
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const projects = useProjectStore((s) => s.projects)
-  const clearDirectoryCache = useProjectStore((s) => s.clearDirectoryCache)
   const activeTab = useProjectStore((s) => s.fileExplorerActiveTab)
-  const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
   const activeWorktreeId = useProjectStore((s) => s.activeWorktreeId)
 
   // Determine git context from active terminal (worktree or project root)
@@ -28,8 +28,6 @@ export function FileExplorer() {
 
   const gitStatus = useProjectStore((s) => gitContextId ? s.gitStatus[gitContextId] : null)
   const isGitLoading = useProjectStore((s) => gitContextId ? s.gitStatusLoading[gitContextId] : false)
-  const setGitStatus = useProjectStore((s) => s.setGitStatus)
-  const setGitStatusLoading = useProjectStore((s) => s.setGitStatusLoading)
 
   // Sidecar terminal state — select ID array with shallow equality to avoid re-renders
   const sidecarContextKey = activeWorktreeId ?? activeProjectId
@@ -45,14 +43,39 @@ export function FileExplorer() {
     sidecarContextKey ? s.activeSidecarTerminalId[sidecarContextKey] ?? null : null
   )
   const sidecarTerminalCollapsed = useProjectStore((s) => s.sidecarTerminalCollapsed)
-  const setSidecarTerminalCollapsed = useProjectStore((s) => s.setSidecarTerminalCollapsed)
-  const createSidecarTerminal = useProjectStore((s) => s.createSidecarTerminal)
-  const closeSidecarTerminal = useProjectStore((s) => s.closeSidecarTerminal)
-  const setActiveSidecarTerminal = useProjectStore((s) => s.setActiveSidecarTerminal)
 
-  const activeProject = projects.find((p) => p.id === activeProjectId)
+  // Action selectors - grouped with useShallow for consistency
+  const {
+    clearDirectoryCache,
+    setActiveTab,
+    setGitStatus,
+    setGitStatusLoading,
+    setSidecarTerminalCollapsed,
+    createSidecarTerminal,
+    closeSidecarTerminal,
+    setActiveSidecarTerminal,
+  } = useProjectStore(
+    useShallow((s) => ({
+      clearDirectoryCache: s.clearDirectoryCache,
+      setActiveTab: s.setFileExplorerActiveTab,
+      setGitStatus: s.setGitStatus,
+      setGitStatusLoading: s.setGitStatusLoading,
+      setSidecarTerminalCollapsed: s.setSidecarTerminalCollapsed,
+      createSidecarTerminal: s.createSidecarTerminal,
+      closeSidecarTerminal: s.closeSidecarTerminal,
+      setActiveSidecarTerminal: s.setActiveSidecarTerminal,
+    }))
+  )
+
+  const activeProject = useMemo(
+    () => projects.find((p) => p.id === activeProjectId),
+    [projects, activeProjectId]
+  )
   // Both 'workspace' and 'project' types have limited functionality (no git, no sidecar)
-  const isLimitedProject = activeProject?.type === 'workspace' || activeProject?.type === 'project'
+  const isLimitedProject = useMemo(
+    () => activeProject?.type === 'workspace' || activeProject?.type === 'project',
+    [activeProject?.type]
+  )
 
   // Auto-select first sidecar terminal when context changes
   useEffect(() => {

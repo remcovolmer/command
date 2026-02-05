@@ -107,6 +107,11 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     },
   ]
 
+  // Show empty state for active project when there are no terminals
+  // Code projects also require no worktrees to show the empty state
+  const showEmptyState = isActive && terminals.length === 0 &&
+    (project.type !== 'code' || worktrees.length === 0)
+
   return (
     <motion.li
       ref={setNodeRef}
@@ -255,7 +260,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       ))}
 
       {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
-      {isActive && terminals.length === 0 && (project.type !== 'code' || worktrees.length === 0) && (
+      {showEmptyState && (
         <div className="ml-6 pl-3 py-2 border-l border-border">
           <button
             onClick={() => onCreateTerminal(project.id)}

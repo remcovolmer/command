@@ -21,6 +21,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'fs:fileChanged',
 ] as const
 
+// NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type ProjectType = 'workspace' | 'project' | 'code'
 
 interface Project {

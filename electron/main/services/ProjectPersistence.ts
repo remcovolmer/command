@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
+// NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type ProjectType = 'workspace' | 'project' | 'code'
 
 interface Project {
@@ -85,7 +86,13 @@ export class ProjectPersistence {
 
     // Migrate from version 2 to 3: add project type
     if (oldState.version === 2) {
-      const migratedProjects = oldState.projects.map(p => ({
+      // Filter out malformed projects before migration
+      const validProjects = oldState.projects.filter(p =>
+        p && typeof p === 'object' &&
+        typeof p.id === 'string' &&
+        typeof p.path === 'string'
+      )
+      const migratedProjects = validProjects.map(p => ({
         ...p,
         type: 'code' as const,
       }))
