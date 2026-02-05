@@ -379,7 +379,6 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
 
     const result = entries
-      .filter(entry => !entry.name.startsWith('.')) // Hide hidden files
       .map(entry => ({
         name: entry.name,
         path: path.join(dirPath, entry.name),
