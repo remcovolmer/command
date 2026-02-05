@@ -96,7 +96,8 @@
       "Bash(npx vitest:*)",
       "Bash(git worktree:*)",
       "Bash(dir:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git log:*)"
     ]
   }
 }

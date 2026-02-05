@@ -180,6 +180,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <WorktreeItem
           key={worktree.id}
           worktree={worktree}
+          projectPath={project.path}
           terminals={getWorktreeTerminals(worktree.id)}
           activeTerminalId={activeTerminalId}
           onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
