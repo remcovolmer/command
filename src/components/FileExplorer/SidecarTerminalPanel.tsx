@@ -2,18 +2,8 @@ import { useCallback } from 'react'
 import { ChevronDown, ChevronUp, Plus, X, TerminalSquare } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { useXtermInstance } from '../../hooks/useXtermInstance'
-import type { TerminalSession, TerminalState } from '../../types'
-
-function getStateColor(state: TerminalState): string {
-  switch (state) {
-    case 'busy': return 'bg-blue-500'
-    case 'permission':
-    case 'question': return 'bg-orange-500'
-    case 'done': return 'bg-green-500'
-    case 'stopped': return 'bg-red-500'
-    default: return 'bg-muted-foreground'
-  }
-}
+import { getStateColor } from '../../utils/terminalState'
+import type { TerminalSession } from '../../types'
 
 interface SidecarTerminalPanelProps {
   contextKey: string

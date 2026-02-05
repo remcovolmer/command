@@ -1,11 +1,11 @@
 import { Terminal as TerminalIcon, X } from 'lucide-react'
 import type { TerminalSession } from '../../types'
 import {
-  TERMINAL_STATE_COLORS,
-  TERMINAL_STATE_DOTS,
+  STATE_TEXT_COLORS,
+  STATE_DOT_COLORS,
   isInputState,
   isVisibleState,
-} from './terminalStateUtils'
+} from '../../utils/terminalState'
 
 interface TerminalListItemProps {
   terminal: TerminalSession
@@ -34,13 +34,13 @@ export function TerminalListItem({
       className={className ?? defaultClassName}
     >
       <TerminalIcon
-        className={`w-3 h-3 flex-shrink-0 ${TERMINAL_STATE_COLORS[terminal.state]}`}
+        className={`w-3 h-3 flex-shrink-0 ${STATE_TEXT_COLORS[terminal.state]}`}
       />
       <span className="flex-1 text-xs truncate">{terminal.title}</span>
       {/* State indicator - shows for busy (static) and input states (blinking) */}
       {isVisibleState(terminal.state) && (
         <span
-          className={`w-1.5 h-1.5 rounded-full ${TERMINAL_STATE_DOTS[terminal.state]} ${
+          className={`w-1.5 h-1.5 rounded-full ${STATE_DOT_COLORS[terminal.state]} ${
             isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
           }`}
         />

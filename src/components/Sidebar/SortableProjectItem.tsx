@@ -7,12 +7,7 @@ import type { Project, TerminalSession, Worktree } from '../../types'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { ContextMenu } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
-import {
-  TERMINAL_STATE_COLORS,
-  TERMINAL_STATE_DOTS,
-  isInputState,
-  isVisibleState,
-} from './terminalStateUtils'
+import { STATE_TEXT_COLORS, STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
 
 interface SortableProjectItemProps {
   project: Project
@@ -200,14 +195,14 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               `}
             >
               <TerminalIcon
-                className={`w-3 h-3 flex-shrink-0 ${TERMINAL_STATE_COLORS[terminal.state]}`}
+                className={`w-3 h-3 flex-shrink-0 ${STATE_TEXT_COLORS[terminal.state]}`}
               />
               <span className="flex-1 text-xs truncate">{terminal.title}</span>
 
               {/* State indicator - shows for busy (static) and input states (blinking) */}
               {isVisibleState(terminal.state) && (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${TERMINAL_STATE_DOTS[terminal.state]} ${
+                  className={`w-1.5 h-1.5 rounded-full ${STATE_DOT_COLORS[terminal.state]} ${
                     isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
                   }`}
                 />
