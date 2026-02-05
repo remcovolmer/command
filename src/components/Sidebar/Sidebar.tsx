@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
-import type { TerminalSession, Worktree } from '../../types'
+import type { TerminalSession, Worktree, Project } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { SortableProjectList } from './SortableProjectList'
 import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
+import { AddProjectDialog } from '../Project/AddProjectDialog'
 
 export function Sidebar() {
   // Use granular selectors to prevent unnecessary re-renders
@@ -52,6 +53,9 @@ export function Sidebar() {
 
   // State for worktree dialog
   const [worktreeDialogProjectId, setWorktreeDialogProjectId] = useState<string | null>(null)
+
+  // State for add project dialog
+  const [addProjectDialogOpen, setAddProjectDialogOpen] = useState(false)
 
   // State for app version
   const [appVersion, setAppVersion] = useState<string>('')
@@ -108,12 +112,12 @@ export function Sidebar() {
     }
   }
 
-  const handleAddProject = async () => {
-    const folderPath = await api.project.selectFolder()
-    if (folderPath) {
-      const project = await api.project.add(folderPath)
-      addProject(project)
-    }
+  const handleAddProject = () => {
+    setAddProjectDialogOpen(true)
+  }
+
+  const handleProjectCreated = (project: Project) => {
+    addProject(project)
   }
 
   const handleRemoveProject = async (e: React.MouseEvent, projectId: string) => {
@@ -378,6 +382,13 @@ export function Sidebar() {
         onCreated={handleWorktreeCreated}
       />
     )}
+
+    {/* Add Project Dialog */}
+    <AddProjectDialog
+      isOpen={addProjectDialogOpen}
+      onClose={() => setAddProjectDialogOpen(false)}
+      onCreated={handleProjectCreated}
+    />
     </>
   )
 }

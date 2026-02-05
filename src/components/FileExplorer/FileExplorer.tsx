@@ -51,6 +51,7 @@ export function FileExplorer() {
   const setActiveSidecarTerminal = useProjectStore((s) => s.setActiveSidecarTerminal)
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
+  const isWorkspaceProject = activeProject?.type === 'workspace'
 
   // Auto-select first sidecar terminal when context changes
   useEffect(() => {
@@ -134,17 +135,18 @@ export function FileExplorer() {
     <div className="h-full flex flex-col bg-sidebar">
       {/* Tab Bar - at top */}
       <FileExplorerTabBar
-        activeTab={activeTab}
+        activeTab={isWorkspaceProject ? 'files' : activeTab}
         onTabChange={setActiveTab}
         gitChangeCount={totalGitChanges}
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
+        showGitTab={!isWorkspaceProject}
       />
 
       {/* Files/Git Content - takes remaining space */}
       <div className="flex-1 min-h-0 overflow-auto">
         {activeProject ? (
-          activeTab === 'files' ? (
+          (isWorkspaceProject || activeTab === 'files') ? (
             <FileTree project={activeProject} />
           ) : (
             <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
@@ -156,8 +158,8 @@ export function FileExplorer() {
         )}
       </div>
 
-      {/* Terminal Panel - only render when context exists */}
-      {sidecarContextKey && activeProjectId && (
+      {/* Terminal Panel - only render for code projects */}
+      {sidecarContextKey && activeProjectId && !isWorkspaceProject && (
         <SidecarTerminalPanel
           contextKey={sidecarContextKey}
           projectId={activeProjectId}

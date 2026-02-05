@@ -3,10 +3,13 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
+type ProjectType = 'code' | 'workspace'
+
 interface Project {
   id: string
   name: string
   path: string
+  type: ProjectType
   createdAt: number
   sortOrder: number
 }
@@ -27,7 +30,7 @@ interface PersistedState {
   worktrees: Record<string, Worktree[]>  // projectId -> worktrees
 }
 
-const STATE_VERSION = 2
+const STATE_VERSION = 3
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -71,10 +74,25 @@ export class ProjectPersistence {
   private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]> }): PersistedState {
     // Migrate from version 1 to 2: add worktrees
     if (oldState.version === 1) {
-      return {
-        version: STATE_VERSION,
+      // First migrate to v2, then to v3
+      const v2State = {
+        version: 2,
         projects: oldState.projects,
         worktrees: {},
+      }
+      return this.migrateState(v2State)
+    }
+
+    // Migrate from version 2 to 3: add project type
+    if (oldState.version === 2) {
+      const migratedProjects = oldState.projects.map(p => ({
+        ...p,
+        type: 'code' as const,
+      }))
+      return {
+        version: STATE_VERSION,
+        projects: migratedProjects,
+        worktrees: oldState.worktrees ?? {},
       }
     }
 
@@ -106,7 +124,7 @@ export class ProjectPersistence {
     return [...this.state.projects].sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
-  addProject(projectPath: string, name?: string): Project {
+  addProject(projectPath: string, name?: string, type: ProjectType = 'code'): Project {
     // Check if project already exists
     const existing = this.state.projects.find(p => p.path === projectPath)
     if (existing) {
@@ -120,6 +138,7 @@ export class ProjectPersistence {
       id: randomUUID(),
       name: projectName,
       path: projectPath,
+      type,
       createdAt: Date.now(),
       sortOrder: this.state.projects.length,
     }
