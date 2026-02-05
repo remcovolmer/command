@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { watch, type FSWatcher } from 'node:fs'
+import { watch, existsSync, type FSWatcher } from 'node:fs'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
@@ -71,6 +71,111 @@ let githubService: GitHubService | null = null
 
 // File watchers for live updates (path -> watcher)
 const fileWatchers = new Map<string, FSWatcher>()
+
+/**
+ * Verify that a Claude session file exists
+ * Sessions are stored in ~/.claude/projects/{encoded-path}/
+ */
+function verifyClaudeSession(cwd: string, sessionId: string): boolean {
+  try {
+    // Claude encodes the path for the session directory
+    // The session file is stored as {sessionId}.json
+    const claudeDir = path.join(os.homedir(), '.claude', 'projects')
+
+    // Claude encodes the path by replacing certain characters
+    const encodedPath = cwd.replace(/[/\\:]/g, '-').replace(/^-/, '')
+    const sessionPath = path.join(claudeDir, encodedPath, `${sessionId}.json`)
+
+    return existsSync(sessionPath)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Restore sessions from previous app close
+ */
+async function restoreSessions(): Promise<void> {
+  if (!projectPersistence || !terminalManager || !win) {
+    console.log('[Session] Cannot restore: services not initialized')
+    return
+  }
+
+  const sessions = projectPersistence.getSessions()
+  if (sessions.length === 0) {
+    console.log('[Session] No sessions to restore')
+    return
+  }
+
+  console.log(`[Session] Attempting to restore ${sessions.length} sessions`)
+
+  const projects = projectPersistence.getProjects()
+  const projectMap = new Map(projects.map(p => [p.id, p]))
+
+  for (const session of sessions) {
+    try {
+      // Verify project still exists
+      const project = projectMap.get(session.projectId)
+      if (!project) {
+        console.log(`[Session] Skipping session: project ${session.projectId} no longer exists`)
+        continue
+      }
+
+      // Verify worktree still exists (if applicable)
+      if (session.worktreeId) {
+        const worktree = projectPersistence.getWorktreeById(session.worktreeId)
+        if (!worktree) {
+          console.log(`[Session] Skipping session: worktree ${session.worktreeId} no longer exists`)
+          continue
+        }
+        // Verify worktree path still exists on disk
+        if (!existsSync(worktree.path)) {
+          console.log(`[Session] Skipping session: worktree path ${worktree.path} no longer exists`)
+          continue
+        }
+      }
+
+      // Verify CWD still exists
+      if (!existsSync(session.cwd)) {
+        console.log(`[Session] Skipping session: cwd ${session.cwd} no longer exists`)
+        continue
+      }
+
+      // Verify Claude session file exists (optional - Claude handles gracefully if missing)
+      const sessionExists = verifyClaudeSession(session.cwd, session.claudeSessionId)
+      if (!sessionExists) {
+        console.log(`[Session] Session file not found for ${session.claudeSessionId}, starting fresh`)
+      }
+
+      // Create terminal with --resume flag (or fresh if session file missing)
+      const terminalId = terminalManager.createTerminal(
+        session.cwd,
+        'claude',
+        undefined,  // no initialInput
+        session.title || undefined,
+        session.projectId,
+        session.worktreeId ?? undefined,
+        sessionExists ? session.claudeSessionId : undefined  // only resume if session file exists
+      )
+
+      console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
+
+      // Notify renderer about restored session
+      win.webContents.send('session:restored', {
+        terminalId,
+        projectId: session.projectId,
+        worktreeId: session.worktreeId,
+        title: session.title,
+      })
+    } catch (error) {
+      console.error(`[Session] Failed to restore session:`, error)
+    }
+  }
+
+  // Clear persisted sessions after restoration
+  projectPersistence.clearSessions()
+  console.log('[Session] Restoration complete, cleared persisted sessions')
+}
 
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
@@ -177,7 +282,14 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
 
   // For worktree terminals, default to plan mode initial input
   const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
-  return terminalManager?.createTerminal(cwd, type, effectiveInitialInput, initialTitle)
+  return terminalManager?.createTerminal(
+    cwd,
+    type,
+    effectiveInitialInput,
+    initialTitle,
+    projectId,
+    worktreeId ?? undefined
+  )
 })
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
@@ -630,6 +742,13 @@ ipcMain.handle('update:get-version', () => {
 app.whenReady().then(async () => {
   await createWindow()
 
+  // Restore sessions from previous app close (with delay for store initialization)
+  setTimeout(() => {
+    restoreSessions().catch((err) => {
+      console.error('Session restoration failed:', err)
+    })
+  }, 1000) // 1 second delay for store init
+
   // Check for updates after app is loaded (with delay to not block UI)
   setTimeout(() => {
     if (app.isPackaged) {
@@ -641,6 +760,40 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  // Persist Claude sessions for restoration on next startup
+  if (hookWatcher && terminalManager && projectPersistence) {
+    const terminalSessions = hookWatcher.getTerminalSessions()
+    const sessionsToSave: Array<{
+      terminalId: string
+      projectId: string
+      worktreeId: string | null
+      claudeSessionId: string
+      cwd: string
+      title: string
+      closedAt: number
+    }> = []
+
+    for (const { terminalId, sessionId } of terminalSessions) {
+      const info = terminalManager.getTerminalInfo(terminalId)
+      if (info && info.type === 'claude') {
+        sessionsToSave.push({
+          terminalId,
+          projectId: info.projectId,
+          worktreeId: info.worktreeId ?? null,
+          claudeSessionId: sessionId,
+          cwd: info.cwd,
+          title: info.title ?? '',
+          closedAt: Date.now(),
+        })
+      }
+    }
+
+    if (sessionsToSave.length > 0) {
+      console.log(`[Session] Persisting ${sessionsToSave.length} sessions for restoration`)
+      projectPersistence.setSessions(sessionsToSave)
+    }
+  }
+
   hookWatcher?.stop()
   githubService?.destroy()
   terminalManager?.destroy()

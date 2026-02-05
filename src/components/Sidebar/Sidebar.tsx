@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import type { TerminalSession, Worktree } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
+import { terminalEvents } from '../../utils/terminalEvents'
 import { SortableProjectList } from './SortableProjectList'
 import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
 
@@ -81,6 +82,24 @@ export function Sidebar() {
       loadWorktrees(project.id)
     })
   }, [projects.length, loadWorktrees])
+
+  // Listen for restored sessions (from previous app close)
+  useEffect(() => {
+    const unsubscribe = terminalEvents.onSessionRestored((session) => {
+      const terminal: TerminalSession = {
+        id: session.terminalId,
+        projectId: session.projectId,
+        worktreeId: session.worktreeId,
+        state: 'busy', // Restored sessions start in busy state
+        lastActivity: Date.now(),
+        title: session.title || 'Restored',
+        type: 'claude',
+      }
+      addTerminal(terminal)
+      console.log(`[Session] Added restored terminal ${session.terminalId} to store`)
+    })
+    return unsubscribe
+  }, [addTerminal])
 
   const handleCheckForUpdate = async () => {
     setUpdateStatus('checking')

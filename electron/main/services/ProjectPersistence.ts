@@ -21,13 +21,24 @@ interface Worktree {
   isLocked: boolean
 }
 
+interface PersistedSession {
+  terminalId: string
+  projectId: string
+  worktreeId: string | null
+  claudeSessionId: string
+  cwd: string
+  title: string
+  closedAt: number
+}
+
 interface PersistedState {
   version: number
   projects: Project[]
   worktrees: Record<string, Worktree[]>  // projectId -> worktrees
+  sessions: PersistedSession[]  // Sessions to restore on startup
 }
 
-const STATE_VERSION = 2
+const STATE_VERSION = 3
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -65,24 +76,37 @@ export class ProjectPersistence {
       version: STATE_VERSION,
       projects: [],
       worktrees: {},
+      sessions: [],
     }
   }
 
-  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]> }): PersistedState {
-    // Migrate from version 1 to 2: add worktrees
+  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]>; sessions?: PersistedSession[] }): PersistedState {
+    // Migrate from version 1 to current: add worktrees and sessions
     if (oldState.version === 1) {
       return {
         version: STATE_VERSION,
         projects: oldState.projects,
         worktrees: {},
+        sessions: [],
       }
     }
 
-    // Default migration: ensure worktrees exist
+    // Migrate from version 2 to 3: add sessions
+    if (oldState.version === 2) {
+      return {
+        version: STATE_VERSION,
+        projects: oldState.projects,
+        worktrees: oldState.worktrees ?? {},
+        sessions: [],
+      }
+    }
+
+    // Default migration: ensure all fields exist
     return {
       version: STATE_VERSION,
       projects: oldState.projects,
       worktrees: oldState.worktrees ?? {},
+      sessions: oldState.sessions ?? [],
     }
   }
 
@@ -235,4 +259,21 @@ export class ProjectPersistence {
       this.saveState()
     }
   }
+
+  // Session methods for restore-on-startup
+  getSessions(): PersistedSession[] {
+    return [...this.state.sessions]
+  }
+
+  setSessions(sessions: PersistedSession[]): void {
+    this.state.sessions = sessions
+    this.saveState()
+  }
+
+  clearSessions(): void {
+    this.state.sessions = []
+    this.saveState()
+  }
 }
+
+export type { PersistedSession }

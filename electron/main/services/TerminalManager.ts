@@ -16,9 +16,12 @@ type TerminalType = 'claude' | 'normal'
 interface TerminalInstance {
   id: string
   projectId: string
+  worktreeId?: string
+  cwd: string
   pty: pty.IPty
   state: TerminalState
   type: TerminalType
+  title?: string
   timeouts: ReturnType<typeof setTimeout>[]
 }
 
@@ -47,7 +50,15 @@ export class TerminalManager {
     this.sendToRenderer('terminal:state', terminalId, newState)
   }
 
-  createTerminal(cwd: string, type: TerminalType = 'claude', initialInput?: string, initialTitle?: string): string {
+  createTerminal(
+    cwd: string,
+    type: TerminalType = 'claude',
+    initialInput?: string,
+    initialTitle?: string,
+    projectId?: string,
+    worktreeId?: string,
+    resumeSessionId?: string
+  ): string {
     const id = randomUUID()
     const shell = this.getShell()
 
@@ -61,10 +72,13 @@ export class TerminalManager {
 
     const terminal: TerminalInstance = {
       id,
-      projectId: cwd,
+      projectId: projectId ?? cwd,
+      worktreeId,
+      cwd,
       pty: ptyProcess,
       state: type === 'normal' ? 'done' : 'busy',
       type,
+      title: initialTitle,
       timeouts: [],
     }
 
@@ -103,8 +117,11 @@ export class TerminalManager {
     // Send initial state and start Claude Code (only for Claude terminals)
     if (type === 'claude') {
       this.sendToRenderer('terminal:state', id, 'busy')
+      const claudeCommand = resumeSessionId
+        ? `claude --resume "${resumeSessionId}"\r`
+        : 'claude\r'
       const claudeTimeout = setTimeout(() => {
-        if (this.terminals.has(id)) ptyProcess.write('claude\r')
+        if (this.terminals.has(id)) ptyProcess.write(claudeCommand)
       }, SHELL_READY_DELAY_MS)
       terminal.timeouts.push(claudeTimeout)
 
@@ -262,6 +279,30 @@ export class TerminalManager {
 
   hasActiveTerminals(): boolean {
     return this.terminals.size > 0
+  }
+
+  /**
+   * Get terminal info for persistence (only Claude terminals)
+   */
+  getTerminalInfo(terminalId: string): { projectId: string; worktreeId?: string; cwd: string; title?: string; type: TerminalType } | null {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal) return null
+    return {
+      projectId: terminal.projectId,
+      worktreeId: terminal.worktreeId,
+      cwd: terminal.cwd,
+      title: terminal.title,
+      type: terminal.type,
+    }
+  }
+
+  /**
+   * Get all Claude terminal IDs (for session persistence)
+   */
+  getClaudeTerminalIds(): string[] {
+    return Array.from(this.terminals.values())
+      .filter(t => t.type === 'claude')
+      .map(t => t.id)
   }
 
   /**

@@ -171,6 +171,13 @@ export interface AppState {
 }
 
 // IPC API types
+export interface RestoredSession {
+  terminalId: string;
+  projectId: string;
+  worktreeId: string | null;
+  title: string;
+}
+
 export interface ElectronAPI {
   terminal: {
     create: (projectId: string, worktreeId?: string, type?: TerminalType) => Promise<string>;
@@ -181,6 +188,7 @@ export interface ElectronAPI {
     onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe;
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
     onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
+    onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
   };
   project: {
     list: () => Promise<Project[]>;
