@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Star, X } from 'lucide-react'
+import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
@@ -7,6 +7,7 @@ import { getElectronAPI } from '../../utils/electron'
 import { terminalEvents } from '../../utils/terminalEvents'
 import { SortableProjectList } from './SortableProjectList'
 import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
+import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
 import { TerminalListItem } from './TerminalListItem'
 
@@ -21,6 +22,8 @@ export function Sidebar() {
   const toggleFileExplorer = useProjectStore((s) => s.toggleFileExplorer)
   const theme = useProjectStore((s) => s.theme)
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
+  const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
+  const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
 
   // Group actions together with useShallow for stable reference
   const {
@@ -262,7 +265,7 @@ export function Sidebar() {
 
   return (
     <>
-    <div className="flex flex-col h-full bg-sidebar">
+    <div className="flex flex-col h-full bg-sidebar" data-sidebar>
       {/* Logo Header */}
       <div className="flex items-center gap-2 px-4 py-5">
         <img src="favicon.png" alt="Command" className="w-6 h-6" />
@@ -456,7 +459,7 @@ export function Sidebar() {
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={`${theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
           >
             {theme === 'dark' ? (
               <Sun className="w-5 h-5" />
@@ -465,13 +468,20 @@ export function Sidebar() {
             )}
           </button>
           <button
+            onClick={() => setSettingsDialogOpen(true)}
+            className="p-2 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+            title={`Settings (${formatBinding(hotkeyConfig['ui.openSettings'])})`}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+          <button
             onClick={toggleFileExplorer}
             className={`p-2 rounded-lg transition-colors ${
               fileExplorerVisible
                 ? 'bg-sidebar-accent text-primary'
                 : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
             }`}
-            title={fileExplorerVisible ? 'Hide Files (Ctrl+Alt+B)' : 'Show Files (Ctrl+Alt+B)'}
+            title={`${fileExplorerVisible ? 'Hide Files' : 'Show Files'} (${formatBinding(hotkeyConfig['fileExplorer.toggle'])})`}
           >
             {fileExplorerVisible ? (
               <PanelRightClose className="w-5 h-5" />

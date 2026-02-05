@@ -156,7 +156,7 @@ export function FileExplorer() {
   const isExpanded = hasTerminals && !sidecarTerminalCollapsed
 
   return (
-    <div className="h-full flex flex-col bg-sidebar">
+    <div className="h-full flex flex-col bg-sidebar" data-file-explorer>
       {/* Tab Bar - at top */}
       <FileExplorerTabBar
         activeTab={isLimitedProject ? 'files' : activeTab}

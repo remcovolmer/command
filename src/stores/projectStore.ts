@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab } from '../types'
+import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
+import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
 
 /** Maximum number of terminals allowed per project */
@@ -42,11 +44,25 @@ interface ProjectStore {
   editorTabs: Record<string, EditorTab>  // tabId -> EditorTab
   activeCenterTabId: string | null  // can be terminal or editor tab (type derived from lookup)
 
+  // Hotkey configuration
+  hotkeyConfig: HotkeyConfig
+
+  // Settings dialog state
+  settingsDialogOpen: boolean
+
   // Editor tab actions
   openEditorTab: (filePath: string, fileName: string, projectId: string) => void
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setActiveCenterTab: (id: string) => void
+
+  // Hotkey actions
+  updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
+  resetHotkey: (action: HotkeyAction) => void
+  resetAllHotkeys: () => void
+
+  // Settings dialog actions
+  setSettingsDialogOpen: (open: boolean) => void
 
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
@@ -149,6 +165,12 @@ export const useProjectStore = create<ProjectStore>()(
       editorTabs: {},
       activeCenterTabId: null,
 
+      // Hotkey configuration
+      hotkeyConfig: DEFAULT_HOTKEY_CONFIG,
+
+      // Settings dialog state
+      settingsDialogOpen: false,
+
       // Editor tab actions
       openEditorTab: (filePath, fileName, projectId) =>
         set((state) => {
@@ -211,6 +233,33 @@ export const useProjectStore = create<ProjectStore>()(
           // If it's a terminal, also update activeTerminalId
           ...(state.terminals[id] ? { activeTerminalId: id } : {}),
         })),
+
+      // Hotkey actions
+      updateHotkey: (action, binding) =>
+        set((state) => ({
+          hotkeyConfig: {
+            ...state.hotkeyConfig,
+            [action]: {
+              ...state.hotkeyConfig[action],
+              ...binding,
+            },
+          },
+        })),
+
+      resetHotkey: (action) =>
+        set((state) => ({
+          hotkeyConfig: {
+            ...state.hotkeyConfig,
+            [action]: DEFAULT_HOTKEY_CONFIG[action],
+          },
+        })),
+
+      resetAllHotkeys: () =>
+        set({ hotkeyConfig: DEFAULT_HOTKEY_CONFIG }),
+
+      // Settings dialog actions
+      setSettingsDialogOpen: (open) =>
+        set({ settingsDialogOpen: open }),
 
       // Sidecar terminal state
       sidecarTerminals: {},
@@ -836,6 +885,8 @@ export const useProjectStore = create<ProjectStore>()(
         sidecarTerminalCollapsed: state.sidecarTerminalCollapsed,
         // Theme state
         theme: state.theme,
+        // Hotkey configuration
+        hotkeyConfig: state.hotkeyConfig,
       }),
     }
   )

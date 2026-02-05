@@ -1,14 +1,27 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { MainLayout } from './components/Layout/MainLayout'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from './stores/projectStore'
+import { SettingsDialog } from './components/Settings/SettingsDialog'
+import { ShortcutsOverlay } from './components/Settings/ShortcutsOverlay'
 import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
+import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
 
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const terminals = useProjectStore((s) => s.terminals)
   const toggleFileExplorer = useProjectStore((s) => s.toggleFileExplorer)
+  const setFileExplorerVisible = useProjectStore((s) => s.setFileExplorerVisible)
+  const setFileExplorerActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
   const theme = useProjectStore((s) => s.theme)
+  const toggleTheme = useProjectStore((s) => s.toggleTheme)
+  const settingsDialogOpen = useProjectStore((s) => s.settingsDialogOpen)
+  const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
+  const addToSplit = useProjectStore((s) => s.addToSplit)
+  const removeFromSplit = useProjectStore((s) => s.removeFromSplit)
+  const getLayout = useProjectStore((s) => s.getLayout)
+  const closeEditorTab = useProjectStore((s) => s.closeEditorTab)
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
 
@@ -28,97 +41,221 @@ function App() {
     return unsubscribe
   }, [api])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Alt+B to toggle file explorer
-      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'b') {
-        e.preventDefault()
-        toggleFileExplorer()
-        return
-      }
+  // Helper to get visual order of projects (active first, then inactive)
+  const getProjectVisualOrder = useCallback(() => {
+    const { projects, terminals } = useProjectStore.getState()
+    if (projects.length === 0) return []
 
-      // Ctrl + Up/Down: Switch projects
-      if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        e.preventDefault()
-        const { projects, activeProjectId, setActiveProject, terminals } = useProjectStore.getState()
-        if (projects.length === 0) return
+    const terminalValues = Object.values(terminals)
+    const activeProjects = projects.filter(p => terminalValues.some(t => t.projectId === p.id))
+    const inactiveProjects = projects.filter(p => !terminalValues.some(t => t.projectId === p.id))
+    return [...activeProjects, ...inactiveProjects]
+  }, [])
 
-        // Match sidebar visual order: active projects first, then inactive
-        const terminalValues = Object.values(terminals)
-        const activeProjects = projects.filter(p => terminalValues.some(t => t.projectId === p.id))
-        const inactiveProjects = projects.filter(p => !terminalValues.some(t => t.projectId === p.id))
-        const visualOrder = [...activeProjects, ...inactiveProjects]
+  // Helper to switch to terminal by index (1-9)
+  const switchToTerminal = useCallback((index: number) => {
+    const { activeProjectId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
+    if (!activeProjectId) return
 
-        const currentIndex = visualOrder.findIndex(p => p.id === activeProjectId)
-        const direction = e.key === 'ArrowDown' ? 1 : -1
-        const newIndex = (currentIndex + direction + visualOrder.length) % visualOrder.length
-        setActiveProject(visualOrder[newIndex].id)
-        return
-      }
-
-      // Ctrl + Left/Right: Switch terminals within project (with wrap-around)
-      if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-        e.preventDefault()
-        const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
-        if (!activeProjectId) return
-
-        const terminals = getProjectTerminals(activeProjectId)
-        if (terminals.length === 0) return
-
-        const currentIndex = terminals.findIndex(t => t.id === activeTerminalId)
-        const direction = e.key === 'ArrowRight' ? 1 : -1
-        const newIndex = (currentIndex + direction + terminals.length) % terminals.length
-        setActiveTerminal(terminals[newIndex].id)
-        return
-      }
-
-      // Ctrl + T: Create new terminal in active project
-      if (e.ctrlKey && e.key.toLowerCase() === 't') {
-        e.preventDefault()
-        const { activeProjectId, terminals, getProjectTerminals, addTerminal } = useProjectStore.getState()
-        if (!activeProjectId) return
-
-        const projectTerminals = getProjectTerminals(activeProjectId)
-        if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
-          api.notification.show(
-            'Terminal Limit',
-            `Maximum ${MAX_TERMINALS_PER_PROJECT} terminals per project`
-          )
-          return
-        }
-
-        ;(async () => {
-          const terminalId = await api.terminal.create(activeProjectId)
-          const terminal: TerminalSession = {
-            id: terminalId,
-            projectId: activeProjectId,
-            worktreeId: null,
-            state: 'busy',
-            lastActivity: Date.now(),
-            title: `Terminal ${projectTerminals.length + 1}`,
-            type: 'claude',
-          }
-          addTerminal(terminal)
-        })()
-        return
-      }
-
-      // Ctrl + W: Close active terminal
-      if (e.ctrlKey && e.key.toLowerCase() === 'w') {
-        e.preventDefault()
-        const { activeProjectId, activeTerminalId, removeTerminal } = useProjectStore.getState()
-        if (!activeProjectId || !activeTerminalId) return
-
-        api.terminal.close(activeTerminalId)
-        removeTerminal(activeTerminalId)
-        return
-      }
+    const projectTerminals = getProjectTerminals(activeProjectId)
+    if (index < projectTerminals.length) {
+      setActiveTerminal(projectTerminals[index].id)
     }
+  }, [])
 
-    window.addEventListener('keydown', handleKeyDown, { capture: true })
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
-  }, [toggleFileExplorer, api])
+  // Register all hotkeys
+  useHotkeys({
+    // Navigation
+    'nav.previousProject': () => {
+      const { activeProjectId, setActiveProject } = useProjectStore.getState()
+      const visualOrder = getProjectVisualOrder()
+      if (visualOrder.length === 0) return
+
+      const currentIndex = visualOrder.findIndex(p => p.id === activeProjectId)
+      const newIndex = (currentIndex - 1 + visualOrder.length) % visualOrder.length
+      setActiveProject(visualOrder[newIndex].id)
+    },
+
+    'nav.nextProject': () => {
+      const { activeProjectId, setActiveProject } = useProjectStore.getState()
+      const visualOrder = getProjectVisualOrder()
+      if (visualOrder.length === 0) return
+
+      const currentIndex = visualOrder.findIndex(p => p.id === activeProjectId)
+      const newIndex = (currentIndex + 1) % visualOrder.length
+      setActiveProject(visualOrder[newIndex].id)
+    },
+
+    'nav.previousTerminal': () => {
+      const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
+      if (!activeProjectId) return
+
+      const projectTerminals = getProjectTerminals(activeProjectId)
+      if (projectTerminals.length === 0) return
+
+      const currentIndex = projectTerminals.findIndex(t => t.id === activeTerminalId)
+      const newIndex = (currentIndex - 1 + projectTerminals.length) % projectTerminals.length
+      setActiveTerminal(projectTerminals[newIndex].id)
+    },
+
+    'nav.nextTerminal': () => {
+      const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
+      if (!activeProjectId) return
+
+      const projectTerminals = getProjectTerminals(activeProjectId)
+      if (projectTerminals.length === 0) return
+
+      const currentIndex = projectTerminals.findIndex(t => t.id === activeTerminalId)
+      const newIndex = (currentIndex + 1) % projectTerminals.length
+      setActiveTerminal(projectTerminals[newIndex].id)
+    },
+
+    'nav.focusSidebar': () => {
+      // Focus the sidebar by finding the first focusable element
+      const sidebar = document.querySelector('[data-sidebar]')
+      if (sidebar) {
+        const focusable = sidebar.querySelector('button, [tabindex="0"]') as HTMLElement
+        focusable?.focus()
+      }
+    },
+
+    'nav.focusTerminal': () => {
+      // Focus the active terminal
+      const terminal = document.querySelector('[data-terminal-active="true"]')
+      if (terminal) {
+        const terminalEl = terminal.querySelector('.xterm-helper-textarea') as HTMLElement
+        terminalEl?.focus()
+      }
+    },
+
+    'nav.focusFileExplorer': () => {
+      // Open file explorer if closed, then focus
+      const { fileExplorerVisible, setFileExplorerVisible } = useProjectStore.getState()
+      if (!fileExplorerVisible) {
+        setFileExplorerVisible(true)
+      }
+      // Focus the file explorer
+      setTimeout(() => {
+        const fileExplorer = document.querySelector('[data-file-explorer]')
+        if (fileExplorer) {
+          const focusable = fileExplorer.querySelector('button, [tabindex="0"]') as HTMLElement
+          focusable?.focus()
+        }
+      }, 50)
+    },
+
+    // Terminal operations
+    'terminal.new': () => {
+      const { activeProjectId, getProjectTerminals, addTerminal } = useProjectStore.getState()
+      if (!activeProjectId) return
+
+      const projectTerminals = getProjectTerminals(activeProjectId)
+      if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
+        api.notification.show(
+          'Terminal Limit',
+          `Maximum ${MAX_TERMINALS_PER_PROJECT} terminals per project`
+        )
+        return
+      }
+
+      ;(async () => {
+        const terminalId = await api.terminal.create(activeProjectId)
+        const terminal: TerminalSession = {
+          id: terminalId,
+          projectId: activeProjectId,
+          worktreeId: null,
+          state: 'busy',
+          lastActivity: Date.now(),
+          title: `Terminal ${projectTerminals.length + 1}`,
+          type: 'claude',
+        }
+        addTerminal(terminal)
+      })()
+    },
+
+    'terminal.close': () => {
+      const { activeProjectId, activeTerminalId, removeTerminal } = useProjectStore.getState()
+      if (!activeProjectId || !activeTerminalId) return
+
+      api.terminal.close(activeTerminalId)
+      removeTerminal(activeTerminalId)
+    },
+
+    'terminal.split': () => {
+      const { activeProjectId, activeTerminalId } = useProjectStore.getState()
+      if (!activeProjectId || !activeTerminalId) return
+      addToSplit(activeProjectId, activeTerminalId)
+    },
+
+    'terminal.unsplit': () => {
+      const { activeProjectId, activeTerminalId } = useProjectStore.getState()
+      if (!activeProjectId || !activeTerminalId) return
+      removeFromSplit(activeProjectId, activeTerminalId)
+    },
+
+    // Terminal shortcuts Alt+1-9 (generated handlers)
+    ...Object.fromEntries(
+      Array.from({ length: 9 }, (_, i) => [
+        `terminal.goTo${i + 1}`,
+        () => switchToTerminal(i)
+      ])
+    ),
+
+    // File explorer
+    'fileExplorer.toggle': toggleFileExplorer,
+    'fileExplorer.filesTab': () => {
+      setFileExplorerVisible(true)
+      setFileExplorerActiveTab('files')
+    },
+    'fileExplorer.gitTab': () => {
+      setFileExplorerVisible(true)
+      setFileExplorerActiveTab('git')
+    },
+
+    // Editor
+    'editor.closeTab': () => {
+      const { activeCenterTabId, editorTabs } = useProjectStore.getState()
+      if (activeCenterTabId && editorTabs[activeCenterTabId]) {
+        closeEditorTab(activeCenterTabId)
+      }
+    },
+    'editor.nextTab': () => {
+      const { editorTabs, activeCenterTabId, setActiveCenterTab } = useProjectStore.getState()
+      const tabs = Object.values(editorTabs)
+      if (tabs.length === 0) return
+
+      const currentIndex = tabs.findIndex(t => t.id === activeCenterTabId)
+      const nextIndex = (currentIndex + 1) % tabs.length
+      setActiveCenterTab(tabs[nextIndex].id)
+    },
+    'editor.previousTab': () => {
+      const { editorTabs, activeCenterTabId, setActiveCenterTab } = useProjectStore.getState()
+      const tabs = Object.values(editorTabs)
+      if (tabs.length === 0) return
+
+      const currentIndex = tabs.findIndex(t => t.id === activeCenterTabId)
+      const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
+      setActiveCenterTab(tabs[prevIndex].id)
+    },
+    'editor.save': () => {
+      // Editor save is handled by CodeEditor component via Monaco
+      // This is a fallback that triggers the active editor's save
+      const event = new CustomEvent('editor-save-request')
+      window.dispatchEvent(event)
+    },
+
+    // UI & Settings
+    'ui.openSettings': () => setSettingsDialogOpen(true),
+    'ui.toggleTheme': toggleTheme,
+    'ui.showShortcuts': () => setShowShortcuts(true),
+  })
+
+  // Close dialog with Escape
+  useDialogHotkeys(
+    () => setShowCloseDialog(false),
+    () => {}, // Don't confirm close on Enter
+    { enabled: showCloseDialog, canConfirm: false }
+  )
 
   // Sync theme class with html element (only add 'dark' class when dark mode)
   useEffect(() => {
@@ -147,6 +284,18 @@ function App() {
   return (
     <>
       <MainLayout />
+
+      {/* Settings Dialog */}
+      <SettingsDialog
+        isOpen={settingsDialogOpen}
+        onClose={() => setSettingsDialogOpen(false)}
+      />
+
+      {/* Shortcuts Overlay */}
+      <ShortcutsOverlay
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+      />
 
       {/* Close Confirmation Dialog */}
       {showCloseDialog && (
