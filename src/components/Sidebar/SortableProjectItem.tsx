@@ -3,10 +3,16 @@ import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code } from 'lucide-react'
-import type { Project, TerminalSession, Worktree, TerminalState } from '../../types'
+import type { Project, TerminalSession, Worktree } from '../../types'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { ContextMenu } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
+import {
+  TERMINAL_STATE_COLORS,
+  TERMINAL_STATE_DOTS,
+  isInputState,
+  isVisibleState,
+} from './terminalStateUtils'
 
 interface SortableProjectItemProps {
   project: Project
@@ -60,32 +66,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     transition,
     opacity: isDragging ? 0.4 : 1,
   }
-
-  // Claude Code state colors (5 states)
-  const stateColors: Record<TerminalState, string> = {
-    busy: 'text-blue-500',       // Blue - working
-    permission: 'text-orange-500', // Orange - needs permission
-    question: 'text-orange-500', // Orange - waiting for question answer
-    done: 'text-green-500',      // Green - finished, waiting for new prompt
-    stopped: 'text-red-500',     // Red - stopped/error
-  }
-
-  // State-specific dot colors for terminal indicators
-  const stateDots: Record<TerminalState, string> = {
-    busy: 'bg-blue-500',
-    permission: 'bg-orange-500',
-    question: 'bg-orange-500',
-    done: 'bg-green-500',
-    stopped: 'bg-red-500',
-  }
-
-  // States that require user input (show blinking indicator)
-  const inputStates = ['done', 'permission', 'question'] as const
-  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
-
-  // States that should show an indicator (busy shows static, input states blink)
-  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
-  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -220,14 +200,14 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               `}
             >
               <TerminalIcon
-                className={`w-3 h-3 flex-shrink-0 ${stateColors[terminal.state]}`}
+                className={`w-3 h-3 flex-shrink-0 ${TERMINAL_STATE_COLORS[terminal.state]}`}
               />
               <span className="flex-1 text-xs truncate">{terminal.title}</span>
 
               {/* State indicator - shows for busy (static) and input states (blinking) */}
               {isVisibleState(terminal.state) && (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${stateDots[terminal.state]} ${
+                  className={`w-1.5 h-1.5 rounded-full ${TERMINAL_STATE_DOTS[terminal.state]} ${
                     isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
                   }`}
                 />
