@@ -254,8 +254,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         />
       ))}
 
-      {/* Empty state for active project (code projects show when no terminals/worktrees, workspace when no terminals) */}
-      {isActive && terminals.length === 0 && (project.type === 'workspace' || worktrees.length === 0) && (
+      {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
+      {isActive && terminals.length === 0 && (project.type !== 'code' || worktrees.length === 0) && (
         <div className="ml-6 pl-3 py-2 border-l border-border">
           <button
             onClick={() => onCreateTerminal(project.id)}

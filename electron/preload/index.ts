@@ -21,7 +21,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'fs:fileChanged',
 ] as const
 
-type ProjectType = 'code' | 'workspace'
+type ProjectType = 'workspace' | 'project' | 'code'
 
 interface Project {
   id: string

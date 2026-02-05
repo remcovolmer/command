@@ -1,5 +1,5 @@
 // Project types
-export type ProjectType = 'code' | 'workspace';
+export type ProjectType = 'workspace' | 'project' | 'code';
 
 export interface Project {
   id: string;

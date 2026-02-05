@@ -203,7 +203,7 @@ ipcMain.handle('project:list', async () => {
   return projectPersistence?.getProjects() ?? []
 })
 
-ipcMain.handle('project:add', async (_event, projectPath: string, name?: string, type?: 'code' | 'workspace') => {
+ipcMain.handle('project:add', async (_event, projectPath: string, name?: string, type?: 'workspace' | 'project' | 'code') => {
   return projectPersistence?.addProject(projectPath, name, type)
 })
 

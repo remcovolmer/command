@@ -51,7 +51,8 @@ export function FileExplorer() {
   const setActiveSidecarTerminal = useProjectStore((s) => s.setActiveSidecarTerminal)
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
-  const isWorkspaceProject = activeProject?.type === 'workspace'
+  // Both 'workspace' and 'project' types have limited functionality (no git, no sidecar)
+  const isLimitedProject = activeProject?.type === 'workspace' || activeProject?.type === 'project'
 
   // Auto-select first sidecar terminal when context changes
   useEffect(() => {
@@ -135,18 +136,18 @@ export function FileExplorer() {
     <div className="h-full flex flex-col bg-sidebar">
       {/* Tab Bar - at top */}
       <FileExplorerTabBar
-        activeTab={isWorkspaceProject ? 'files' : activeTab}
+        activeTab={isLimitedProject ? 'files' : activeTab}
         onTabChange={setActiveTab}
         gitChangeCount={totalGitChanges}
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
-        showGitTab={!isWorkspaceProject}
+        showGitTab={!isLimitedProject}
       />
 
       {/* Files/Git Content - takes remaining space */}
       <div className="flex-1 min-h-0 overflow-auto">
         {activeProject ? (
-          (isWorkspaceProject || activeTab === 'files') ? (
+          (isLimitedProject || activeTab === 'files') ? (
             <FileTree project={activeProject} />
           ) : (
             <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
@@ -159,7 +160,7 @@ export function FileExplorer() {
       </div>
 
       {/* Terminal Panel - only render for code projects */}
-      {sidecarContextKey && activeProjectId && !isWorkspaceProject && (
+      {sidecarContextKey && activeProjectId && !isLimitedProject && (
         <SidecarTerminalPanel
           contextKey={sidecarContextKey}
           projectId={activeProjectId}

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-type ProjectType = 'code' | 'workspace'
+type ProjectType = 'workspace' | 'project' | 'code'
 
 interface Project {
   id: string
