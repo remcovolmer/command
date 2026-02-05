@@ -63,7 +63,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
   // Claude Code state colors (5 states)
   const stateColors: Record<TerminalState, string> = {
-    busy: 'text-blue-500',       // Blue - working
+    busy: 'text-gray-400',       // Grey - working
     permission: 'text-orange-500', // Orange - needs permission
     question: 'text-orange-500', // Orange - waiting for question answer
     done: 'text-green-500',      // Green - finished, waiting for new prompt
@@ -72,7 +72,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
   // State-specific dot colors for terminal indicators
   const stateDots: Record<TerminalState, string> = {
-    busy: 'bg-blue-500',
+    busy: 'bg-gray-400',
     permission: 'bg-orange-500',
     question: 'bg-orange-500',
     done: 'bg-green-500',

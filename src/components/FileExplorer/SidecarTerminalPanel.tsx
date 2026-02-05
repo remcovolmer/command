@@ -6,7 +6,7 @@ import type { TerminalSession, TerminalState } from '../../types'
 
 function getStateColor(state: TerminalState): string {
   switch (state) {
-    case 'busy': return 'bg-blue-500'
+    case 'busy': return 'bg-gray-400'
     case 'permission':
     case 'question': return 'bg-orange-500'
     case 'done': return 'bg-green-500'

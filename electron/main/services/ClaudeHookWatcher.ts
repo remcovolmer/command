@@ -15,6 +15,9 @@ interface HookStateData {
   hook_event: string
 }
 
+// Multi-session state file format: { [session_id]: HookStateData }
+type MultiSessionState = Record<string, HookStateData>
+
 export class ClaudeHookWatcher {
   private watching: boolean = false
   private stateFilePath: string
@@ -22,11 +25,14 @@ export class ClaudeHookWatcher {
 
   // Session ID matching: session_id → terminal_id
   private sessionToTerminal: Map<string, string> = new Map()
-  // Persistent cwd → terminal_id mapping (survives session restarts)
-  private cwdToTerminal: Map<string, string> = new Map()
+  // Multiple terminals can share same cwd (e.g., split terminals)
+  private cwdToTerminals: Map<string, Set<string>> = new Map()
 
-  // Deduplicate file change events
-  private lastProcessedTimestamp: number = 0
+  // Per-session timestamp tracking for deduplication
+  private lastProcessedTimestamps: Map<string, number> = new Map()
+
+  // Queue for states arriving before terminal is registered
+  private pendingStates: Map<string, HookStateData[]> = new Map()
 
   constructor(window: BrowserWindow) {
     this.window = window
@@ -58,11 +64,31 @@ export class ClaudeHookWatcher {
    * Register a terminal for a working directory
    */
   registerTerminal(terminalId: string, cwd: string): void {
-    // Normalize path for comparison
     const normalizedCwd = normalizePath(cwd)
-    this.cwdToTerminal.set(normalizedCwd, terminalId)
+
+    // Add terminal to the Set for this cwd
+    let terminals = this.cwdToTerminals.get(normalizedCwd)
+    if (!terminals) {
+      terminals = new Set()
+      this.cwdToTerminals.set(normalizedCwd, terminals)
+    }
+    terminals.add(terminalId)
+
     if (isDev) {
       console.log(`[HookWatcher] Registered terminal ${terminalId} for cwd: ${normalizedCwd}`)
+      console.log(`[HookWatcher]   Terminals in this cwd: ${Array.from(terminals).join(', ')}`)
+    }
+
+    // Process any pending states for this cwd
+    const pending = this.pendingStates.get(normalizedCwd)
+    if (pending && pending.length > 0) {
+      if (isDev) {
+        console.log(`[HookWatcher] Processing ${pending.length} pending states for cwd: ${normalizedCwd}`)
+      }
+      for (const state of pending) {
+        this.processStateForTerminal(state, terminalId)
+      }
+      this.pendingStates.delete(normalizedCwd)
     }
   }
 
@@ -71,19 +97,25 @@ export class ClaudeHookWatcher {
    */
   unregisterTerminal(terminalId: string): void {
     // Remove from cwd mapping
-    for (const [cwd, tid] of this.cwdToTerminal) {
-      if (tid === terminalId) {
-        this.cwdToTerminal.delete(cwd)
+    for (const [cwd, terminals] of this.cwdToTerminals) {
+      if (terminals.has(terminalId)) {
+        terminals.delete(terminalId)
         if (isDev) {
           console.log(`[HookWatcher] Unregistered terminal ${terminalId} from cwd: ${cwd}`)
+        }
+        // Cleanup empty Sets
+        if (terminals.size === 0) {
+          this.cwdToTerminals.delete(cwd)
         }
         break
       }
     }
-    // Remove from session mapping
+
+    // Remove from session mapping and cleanup timestamp tracking
     for (const [sessionId, tid] of this.sessionToTerminal) {
       if (tid === terminalId) {
         this.sessionToTerminal.delete(sessionId)
+        this.lastProcessedTimestamps.delete(sessionId)
         if (isDev) {
           console.log(`[HookWatcher] Unregistered session ${sessionId} for terminal ${terminalId}`)
         }
@@ -95,67 +127,185 @@ export class ClaudeHookWatcher {
   private onStateChange(): void {
     try {
       const content = readFileSync(this.stateFilePath, 'utf-8')
-      const hookState: HookStateData = JSON.parse(content)
+      const parsed = JSON.parse(content)
 
-      // Skip if we've already processed this timestamp (debounce)
-      if (hookState.timestamp <= this.lastProcessedTimestamp) {
-        return
-      }
-      this.lastProcessedTimestamp = hookState.timestamp
+      // Handle both legacy single-session and new multi-session format
+      const allStates: MultiSessionState = this.normalizeStateFile(parsed)
 
-      // Normalize cwd for comparison
-      const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
-
-      if (isDev) {
-        console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}`)
-        console.log(`[HookWatcher]   session: ${hookState.session_id}, cwd: ${normalizedCwd}`)
-      }
-
-      // On SessionStart: associate session_id with terminal by cwd
-      if (hookState.hook_event === 'SessionStart' && normalizedCwd) {
-        const terminalForCwd = this.cwdToTerminal.get(normalizedCwd)
-        if (terminalForCwd) {
-          // Remove any old session mapping for this terminal
-          for (const [oldSessionId, tid] of this.sessionToTerminal) {
-            if (tid === terminalForCwd) {
-              this.sessionToTerminal.delete(oldSessionId)
-              if (isDev) {
-                console.log(`[HookWatcher] Removed old session ${oldSessionId} for terminal ${terminalForCwd}`)
-              }
-              break
-            }
-          }
-          // Associate new session with terminal
-          this.sessionToTerminal.set(hookState.session_id, terminalForCwd)
-          if (isDev) {
-            console.log(`[HookWatcher] Associated session ${hookState.session_id} with terminal ${terminalForCwd}`)
-          }
-        }
-      }
-
-      // Find terminal by session_id (primary) or cwd (fallback)
-      let terminalId = this.sessionToTerminal.get(hookState.session_id)
-      if (!terminalId && normalizedCwd) {
-        terminalId = this.cwdToTerminal.get(normalizedCwd)
-        if (terminalId) {
-          console.warn(`[HookWatcher] Using cwd fallback for session ${hookState.session_id} - session not registered`)
-        }
-      }
-
-      if (terminalId) {
-        console.log(`[HookWatcher] Emitting state ${hookState.state} for terminal ${terminalId}`)
-        this.sendToRenderer('terminal:state', terminalId, hookState.state)
-      } else if (isDev) {
-        console.log(`[HookWatcher] No matching terminal found for session ${hookState.session_id}`)
-      }
-
-      // On SessionEnd: cleanup session mapping
-      if (hookState.hook_event === 'SessionEnd') {
-        this.sessionToTerminal.delete(hookState.session_id)
+      // Process each session's state
+      for (const sessionId in allStates) {
+        const hookState = allStates[sessionId]
+        this.processSessionState(hookState)
       }
     } catch (e) {
       // Ignore parse errors (file might be mid-write)
     }
+  }
+
+  /**
+   * Normalize state file to multi-session format (handles legacy single-session)
+   */
+  private normalizeStateFile(parsed: unknown): MultiSessionState {
+    if (!parsed || typeof parsed !== 'object') {
+      return {}
+    }
+
+    const obj = parsed as Record<string, unknown>
+
+    // Check if this is legacy single-session format (has session_id at root)
+    if (obj.session_id && typeof obj.session_id === 'string' && obj.state) {
+      // Legacy format: wrap in multi-session structure
+      return { [obj.session_id as string]: obj as HookStateData }
+    }
+
+    // Already multi-session format
+    return obj as MultiSessionState
+  }
+
+  /**
+   * Process a single session's state update
+   */
+  private processSessionState(hookState: HookStateData): void {
+    const sessionId = hookState.session_id
+    if (!sessionId) return
+
+    // Skip if we've already processed this timestamp for this session
+    const lastTimestamp = this.lastProcessedTimestamps.get(sessionId) || 0
+    if (hookState.timestamp <= lastTimestamp) {
+      return
+    }
+    this.lastProcessedTimestamps.set(sessionId, hookState.timestamp)
+
+    const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
+
+    if (isDev) {
+      console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}`)
+      console.log(`[HookWatcher]   session: ${sessionId}, cwd: ${normalizedCwd}`)
+    }
+
+    // Try to find terminal for this session
+    let terminalId = this.sessionToTerminal.get(sessionId)
+
+    // On SessionStart: try to associate with an unassigned terminal in this cwd
+    if (hookState.hook_event === 'SessionStart' && normalizedCwd && !terminalId) {
+      terminalId = this.associateSessionWithTerminal(sessionId, normalizedCwd)
+    }
+
+    // Fallback: find any terminal in this cwd that doesn't have a session yet
+    if (!terminalId && normalizedCwd) {
+      terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
+      if (terminalId) {
+        // Associate this session with the found terminal
+        this.removeOldSessionForTerminal(terminalId)
+        this.sessionToTerminal.set(sessionId, terminalId)
+        if (isDev) {
+          console.log(`[HookWatcher] Late association: session ${sessionId} with terminal ${terminalId}`)
+        }
+      }
+    }
+
+    if (terminalId) {
+      this.processStateForTerminal(hookState, terminalId)
+    } else if (normalizedCwd) {
+      // Queue state for when terminal registers
+      this.queuePendingState(normalizedCwd, hookState)
+    } else if (isDev) {
+      console.log(`[HookWatcher] No matching terminal found for session ${sessionId}`)
+    }
+
+    // On SessionEnd: cleanup session mapping
+    if (hookState.hook_event === 'SessionEnd') {
+      this.sessionToTerminal.delete(sessionId)
+      this.lastProcessedTimestamps.delete(sessionId)
+    }
+  }
+
+  /**
+   * Associate a new session with an unassigned terminal in the same cwd
+   */
+  private associateSessionWithTerminal(sessionId: string, normalizedCwd: string): string | undefined {
+    const terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
+
+    if (terminalId) {
+      // Remove any old session mapping for this terminal
+      this.removeOldSessionForTerminal(terminalId)
+
+      // Associate new session with terminal
+      this.sessionToTerminal.set(sessionId, terminalId)
+      if (isDev) {
+        console.log(`[HookWatcher] Associated session ${sessionId} with terminal ${terminalId}`)
+      }
+    }
+
+    return terminalId
+  }
+
+  /**
+   * Find a terminal in the given cwd that doesn't have a session assigned yet
+   */
+  private findUnassignedTerminalInCwd(normalizedCwd: string): string | undefined {
+    const terminals = this.cwdToTerminals.get(normalizedCwd)
+    if (!terminals || terminals.size === 0) {
+      return undefined
+    }
+
+    // Get set of terminals that already have sessions
+    const assignedTerminals = new Set(this.sessionToTerminal.values())
+
+    // Find first unassigned terminal
+    for (const terminalId of terminals) {
+      if (!assignedTerminals.has(terminalId)) {
+        return terminalId
+      }
+    }
+
+    // All terminals have sessions - return first one (will update existing)
+    return terminals.values().next().value
+  }
+
+  /**
+   * Remove old session mapping for a terminal (when reassigning to new session)
+   */
+  private removeOldSessionForTerminal(terminalId: string): void {
+    for (const [oldSessionId, tid] of this.sessionToTerminal) {
+      if (tid === terminalId) {
+        this.sessionToTerminal.delete(oldSessionId)
+        this.lastProcessedTimestamps.delete(oldSessionId)
+        if (isDev) {
+          console.log(`[HookWatcher] Removed old session ${oldSessionId} for terminal ${terminalId}`)
+        }
+        break
+      }
+    }
+  }
+
+  /**
+   * Queue a state update for a cwd that doesn't have a terminal yet
+   */
+  private queuePendingState(normalizedCwd: string, hookState: HookStateData): void {
+    let pending = this.pendingStates.get(normalizedCwd)
+    if (!pending) {
+      pending = []
+      this.pendingStates.set(normalizedCwd, pending)
+    }
+
+    // Limit queue size to prevent memory issues
+    if (pending.length >= 10) {
+      pending.shift()
+    }
+    pending.push(hookState)
+
+    if (isDev) {
+      console.log(`[HookWatcher] Queued pending state for cwd: ${normalizedCwd} (queue size: ${pending.length})`)
+    }
+  }
+
+  /**
+   * Process a state and emit to renderer
+   */
+  private processStateForTerminal(hookState: HookStateData, terminalId: string): void {
+    console.log(`[HookWatcher] Emitting state ${hookState.state} for terminal ${terminalId}`)
+    this.sendToRenderer('terminal:state', terminalId, hookState.state)
   }
 
   private sendToRenderer(channel: string, ...args: unknown[]): void {

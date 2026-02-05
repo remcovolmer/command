@@ -74,7 +74,33 @@ process.stdin.on('end', () => {
         timestamp: Date.now(),
         hook_event: hookEvent
       };
-      fs.writeFileSync(stateFile, JSON.stringify(stateData, null, 2));
+
+      // Read-merge-write pattern for multi-session support
+      let allStates = {};
+      try {
+        const existing = fs.readFileSync(stateFile, 'utf-8');
+        allStates = JSON.parse(existing);
+        // Handle legacy single-session format (migrate to multi-session)
+        if (allStates.session_id && !allStates[allStates.session_id]) {
+          allStates = {};
+        }
+      } catch (e) {
+        // Start fresh if file doesn't exist or is invalid
+      }
+
+      // Write this session's state keyed by session_id
+      allStates[data.session_id] = stateData;
+
+      // Cleanup stale sessions (older than 1 hour)
+      const ONE_HOUR = 60 * 60 * 1000;
+      const now = Date.now();
+      for (const sid in allStates) {
+        if (allStates[sid].timestamp && now - allStates[sid].timestamp > ONE_HOUR) {
+          delete allStates[sid];
+        }
+      }
+
+      fs.writeFileSync(stateFile, JSON.stringify(allStates, null, 2));
     }
   } catch (e) {
     // Silent fail - don't interfere with Claude Code

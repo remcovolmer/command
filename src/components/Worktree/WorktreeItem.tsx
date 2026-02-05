@@ -129,7 +129,7 @@ export const WorktreeItem = memo(function WorktreeItem({
   }, [terminal, onSelectTerminal, onCreateTerminal])
 
   const stateDots: Record<string, string> = {
-    busy: 'bg-blue-500',
+    busy: 'bg-gray-400',
     permission: 'bg-orange-500',
     question: 'bg-orange-500',
     done: 'bg-green-500',

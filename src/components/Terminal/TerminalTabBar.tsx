@@ -18,7 +18,7 @@ interface TerminalTabBarProps {
 
 // Claude Code state dot colors (5 states)
 const stateDots: Record<TerminalState, string> = {
-  busy: 'bg-blue-500',       // Blue - working
+  busy: 'bg-gray-400',       // Grey - working
   permission: 'bg-orange-500', // Orange - needs permission
   question: 'bg-orange-500', // Orange - waiting for question answer
   done: 'bg-green-500',      // Green - finished, waiting for new prompt
