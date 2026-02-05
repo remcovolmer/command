@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, GitBranch, Plus, Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
+import { useDialogHotkeys } from '../../hooks/useHotkeys'
 
 interface CreateWorktreeDialogProps {
   projectId: string
@@ -28,6 +29,12 @@ export function CreateWorktreeDialog({
   const [newBranchName, setNewBranchName] = useState('')
   const [customName, setCustomName] = useState('')
   const [isNewBranch, setIsNewBranch] = useState(false)
+
+  // Determine if form is valid for submission
+  const canSubmit = !loading && !creating && (
+    (isNewBranch && newBranchName.trim()) ||
+    (!isNewBranch && selectedBranch)
+  )
 
   // Load branches when dialog opens
   useEffect(() => {
@@ -66,7 +73,7 @@ export function CreateWorktreeDialog({
     }
   }, [isOpen])
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     const branchName = isNewBranch ? newBranchName.trim() : selectedBranch
     if (!branchName) {
       setError('Please select or enter a branch name')
@@ -90,7 +97,14 @@ export function CreateWorktreeDialog({
     } finally {
       setCreating(false)
     }
-  }
+  }, [api, projectId, isNewBranch, newBranchName, selectedBranch, customName, onCreated, onClose])
+
+  // Keyboard shortcuts: Escape to close, Enter to confirm
+  useDialogHotkeys(
+    onClose,
+    canSubmit ? handleCreate : undefined,
+    { enabled: isOpen, canConfirm: !!canSubmit }
+  )
 
   // Filter out current branch and already used branches
   const availableBranches = useMemo(() => {

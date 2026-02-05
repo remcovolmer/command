@@ -16,6 +16,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
     <div
       ref={containerRef}
       className="terminal-container w-full h-full bg-sidebar"
+      data-terminal-active={isActive ? 'true' : 'false'}
       style={{
         display: isActive ? 'block' : 'none',
         position: 'relative',

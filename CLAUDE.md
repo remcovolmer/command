@@ -148,6 +148,7 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 - Tailwind CSS for styling
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
+- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
 
 ## Windows Development
 
@@ -162,3 +163,60 @@ If node-pty fails to compile:
 ## File Paths
 
 Always use complete absolute Windows paths with drive letters and backslashes for all file operations (workaround for a known bug).
+
+## Keyboard Shortcuts
+
+All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to view all shortcuts.
+
+### Navigation
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + ↑` | Previous project |
+| `Ctrl + ↓` | Next project |
+| `Ctrl + ←` | Previous terminal |
+| `Ctrl + →` | Next terminal |
+| `Ctrl + 1` | Focus sidebar |
+| `Ctrl + 2` | Focus terminal |
+| `Ctrl + 3` | Focus file explorer |
+
+### Terminal
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + T` | New terminal |
+| `Ctrl + W` | Close terminal |
+| `Ctrl + \` | Add to split view |
+| `Ctrl + Shift + \` | Remove from split view |
+| `Alt + 1-9` | Go to terminal 1-9 |
+
+### File Explorer
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + B` | Toggle file explorer |
+| `Ctrl + Shift + E` | Switch to files tab |
+| `Ctrl + Shift + G` | Switch to git tab |
+
+### Editor
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + Shift + W` | Close editor tab |
+| `Ctrl + Tab` | Next editor tab |
+| `Ctrl + Shift + Tab` | Previous editor tab |
+| `Ctrl + S` | Save file |
+
+### Worktree
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + Shift + N` | Create worktree |
+
+### UI & Settings
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + ,` | Open settings |
+| `Ctrl + Shift + T` | Toggle theme |
+| `Ctrl + /` | Show shortcuts |
+
+### Dialogs
+| Shortcut | Action |
+|----------|--------|
+| `Escape` | Close dialog |
+| `Enter` | Confirm dialog |
