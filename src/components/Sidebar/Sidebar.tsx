@@ -336,8 +336,8 @@ export function Sidebar() {
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  {/* Show terminals when workspace is active */}
-                  {isActive && workspaceTerminals.length > 0 && (
+                  {/* Show terminals for workspaces (always visible) */}
+                  {workspaceTerminals.length > 0 && (
                     <ul className="ml-6 mt-1 space-y-0.5 border-l border-border pl-3">
                       {workspaceTerminals.map((terminal) => (
                         <TerminalListItem
@@ -351,7 +351,7 @@ export function Sidebar() {
                     </ul>
                   )}
                   {/* Empty state for workspace with no terminals */}
-                  {isActive && workspaceTerminals.length === 0 && (
+                  {workspaceTerminals.length === 0 && (
                     <div className="ml-6 pl-3 py-2 border-l border-border">
                       <button
                         onClick={() => handleCreateTerminal(workspace.id)}
