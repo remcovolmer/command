@@ -2,11 +2,17 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch } from 'lucide-react'
-import type { Project, TerminalSession, Worktree, TerminalState } from '../../types'
+import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code } from 'lucide-react'
+import type { Project, TerminalSession, Worktree } from '../../types'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { ContextMenu } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
+import {
+  TERMINAL_STATE_COLORS,
+  TERMINAL_STATE_DOTS,
+  isInputState,
+  isVisibleState,
+} from './terminalStateUtils'
 
 interface SortableProjectItemProps {
   project: Project
@@ -61,32 +67,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     opacity: isDragging ? 0.4 : 1,
   }
 
-  // Claude Code state colors (5 states)
-  const stateColors: Record<TerminalState, string> = {
-    busy: 'text-blue-500',       // Blue - working
-    permission: 'text-orange-500', // Orange - needs permission
-    question: 'text-orange-500', // Orange - waiting for question answer
-    done: 'text-green-500',      // Green - finished, waiting for new prompt
-    stopped: 'text-red-500',     // Red - stopped/error
-  }
-
-  // State-specific dot colors for terminal indicators
-  const stateDots: Record<TerminalState, string> = {
-    busy: 'bg-blue-500',
-    permission: 'bg-orange-500',
-    question: 'bg-orange-500',
-    done: 'bg-green-500',
-    stopped: 'bg-red-500',
-  }
-
-  // States that require user input (show blinking indicator)
-  const inputStates = ['done', 'permission', 'question'] as const
-  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
-
-  // States that should show an indicator (busy shows static, input states blink)
-  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
-  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
-
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
@@ -106,6 +86,11 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       onClick: () => getElectronAPI().shell.openInEditor(project.path),
     },
   ]
+
+  // Show empty state for active project when there are no terminals
+  // Code projects also require no worktrees to show the empty state
+  const showEmptyState = isActive && terminals.length === 0 &&
+    (project.type !== 'code' || worktrees.length === 0)
 
   return (
     <motion.li
@@ -145,11 +130,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
         `}
       >
-        <FolderOpen
-          className={`w-4 h-4 flex-shrink-0 ${
-            isActive ? 'text-primary' : ''
-          }`}
-        />
+        {project.type === 'code' ? (
+          <Code
+            className={`w-4 h-4 flex-shrink-0 ${
+              isActive ? 'text-primary' : ''
+            }`}
+          />
+        ) : (
+          <FolderOpen
+            className={`w-4 h-4 flex-shrink-0 ${
+              isActive ? 'text-primary' : ''
+            }`}
+          />
+        )}
         <span className="flex-1 text-sm truncate" title={project.path}>
           {project.name}
         </span>
@@ -167,17 +160,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onCreateWorktree(project.id)
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-border"
-            title="New Worktree"
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-          </button>
+          {project.type === 'code' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onCreateWorktree(project.id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="p-1 rounded hover:bg-border"
+              title="New Worktree"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             onClick={(e) => onRemove(e, project.id)}
             onPointerDown={(e) => e.stopPropagation()}
@@ -205,14 +200,14 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               `}
             >
               <TerminalIcon
-                className={`w-3 h-3 flex-shrink-0 ${stateColors[terminal.state]}`}
+                className={`w-3 h-3 flex-shrink-0 ${TERMINAL_STATE_COLORS[terminal.state]}`}
               />
               <span className="flex-1 text-xs truncate">{terminal.title}</span>
 
               {/* State indicator - shows for busy (static) and input states (blinking) */}
               {isVisibleState(terminal.state) && (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${stateDots[terminal.state]} ${
+                  className={`w-1.5 h-1.5 rounded-full ${TERMINAL_STATE_DOTS[terminal.state]} ${
                     isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
                   }`}
                 />
@@ -244,8 +239,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         />
       ))}
 
-      {/* Empty state for active project */}
-      {isActive && terminals.length === 0 && worktrees.length === 0 && (
+      {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
+      {showEmptyState && (
         <div className="ml-6 pl-3 py-2 border-l border-border">
           <button
             onClick={() => onCreateTerminal(project.id)}
