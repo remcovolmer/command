@@ -9,6 +9,7 @@ npm install          # Install dependencies
 npm run dev          # Run in development mode (Vite dev server + Electron)
 npm run build        # Build for production (TypeScript + Vite + electron-builder)
 npm run test         # Run Vitest tests
+npm run test -- path/to/test.ts  # Run a single test file
 npm run rebuild      # Rebuild native modules (node-pty)
 npm run release:patch  # Bump patch version, push with tags
 npm run release:minor  # Bump minor version, push with tags
@@ -17,7 +18,7 @@ npm run release:major  # Bump major version, push with tags
 
 ## Workflow Orchestration
 
-### 1. Plan Mode De fault
+### 1. Plan Mode Default
 
 - Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 - If something goes sideways, STOP and re-plan immediately - don't keep pushing
@@ -77,31 +78,18 @@ npm run release:major  # Bump major version, push with tags
 
 This is an **Electron + React + TypeScript** desktop app for managing multiple Claude Code terminal instances.
 
-### Directory Structure
+### Main Process Services (`electron/main/services/`)
 
-```
-├── electron/
-│   ├── main/              # Electron main process
-│   │   ├── index.ts       # App entry, window management, IPC handlers
-│   │   └── services/
-│   │       ├── TerminalManager.ts    # PTY spawning via node-pty
-│   │       └── ProjectPersistence.ts # JSON file storage
-│   └── preload/
-│       └── index.ts       # Secure context bridge (window.electronAPI)
-│
-└── src/                   # React renderer
-    ├── components/
-    │   ├── Layout/        # MainLayout.tsx, TerminalArea.tsx
-    │   ├── Sidebar/       # Project/terminal list
-    │   └── Terminal/      # xterm.js component
-    ├── stores/
-    │   └── projectStore.ts  # Zustand state with persist
-    ├── utils/
-    │   ├── electron.ts      # API accessor
-    │   └── terminalEvents.ts # Centralized IPC subscriptions
-    └── types/
-        └── index.ts       # TypeScript types, ElectronAPI interface
-```
+| Service | Purpose |
+|---------|---------|
+| `TerminalManager.ts` | PTY spawning via node-pty, terminal state management |
+| `ClaudeHookWatcher.ts` | Watches Claude Code hooks to detect state changes (busy/permission/question/done) |
+| `HookInstaller.ts` | Installs Claude Code hooks for state detection |
+| `ProjectPersistence.ts` | JSON file storage in `userData/projects.json` |
+| `WorktreeService.ts` | Git worktree management (create, list, remove) |
+| `GitService.ts` | Git operations (status, fetch, pull, push) |
+| `GitHubService.ts` | GitHub PR status polling via `gh` CLI |
+| `UpdateService.ts` | Auto-updates via electron-updater |
 
 ### Process Architecture
 
@@ -109,9 +97,7 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 ┌─────────────────────────────────────────────────────────────┐
 │  Main Process (electron/main/)                              │
 │  ├── index.ts         - App lifecycle, IPC handlers         │
-│  └── services/                                              │
-│      ├── TerminalManager.ts   - PTY spawning via node-pty   │
-│      └── ProjectPersistence.ts - JSON file storage          │
+│  └── services/        - See table above                     │
 └─────────────────────────────────────────────────────────────┘
          ↕ IPC via contextBridge (secure)
 ┌─────────────────────────────────────────────────────────────┐
@@ -134,12 +120,14 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 - **State Management**: Zustand store (`projectStore.ts`) persists layouts; terminals recreated on startup
 - **Terminal Events**: Centralized subscription manager in `terminalEvents.ts` prevents listener leaks
 - **Shell Selection**: `TerminalManager.getShell()` auto-detects Git Bash on Windows, falls back to PowerShell. Override with `COMMAND_CENTER_SHELL` env var
+- **Claude State Detection**: `ClaudeHookWatcher` monitors hook files to detect 5 states: `busy`, `permission`, `question`, `done`, `stopped`
 
 ### Data Flow
 
 1. User adds project → `project:add` IPC → `ProjectPersistence` saves to `userData/projects.json`
 2. User creates terminal → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command
 3. Terminal output → `terminal:data` event → `terminalEvents` routes to specific `Terminal` component → xterm.js renders
+4. Claude state changes → `ClaudeHookWatcher` detects hook file updates → `terminal:state` event → UI shows attention indicator
 
 ## Code Conventions
 
@@ -162,3 +150,12 @@ If node-pty fails to compile:
 ## File Paths
 
 Always use complete absolute Windows paths with drive letters and backslashes for all file operations (workaround for a known bug).
+
+## Keyboard Shortcuts (for reference)
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + ↑/↓` | Switch between projects |
+| `Ctrl + ←/→` | Switch between terminals |
+| `Ctrl + T` | New terminal in current project |
+| `Ctrl + Alt + B` | Toggle file explorer |
