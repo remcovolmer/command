@@ -272,35 +272,88 @@ export function Sidebar() {
             Workspaces
           </h2>
           <ul className="space-y-1">
-            {workspaceProjects.map((workspace) => (
-              <li
-                key={workspace.id}
-                onClick={() => setActiveProject(workspace.id)}
-                className={`
-                  group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
-                  border-2 transition-colors duration-150
-                  ${activeProjectId === workspace.id
-                    ? 'border-primary/50 bg-primary/10 text-sidebar-foreground'
-                    : 'border-transparent text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
-                `}
-              >
-                <Star
-                  className={`w-4 h-4 flex-shrink-0 ${
-                    activeProjectId === workspace.id ? 'text-primary fill-primary' : 'text-muted-foreground'
-                  }`}
-                />
-                <span className="flex-1 text-sm font-medium truncate" title={workspace.path}>
-                  {workspace.name}
-                </span>
-                <button
-                  onClick={(e) => handleRemoveProject(e, workspace.id)}
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                  title="Remove Workspace"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </li>
-            ))}
+            {workspaceProjects.map((workspace) => {
+              const workspaceTerminals = getProjectTerminals(workspace.id)
+              const isActive = activeProjectId === workspace.id
+              return (
+                <li key={workspace.id}>
+                  <div
+                    onClick={() => setActiveProject(workspace.id)}
+                    className={`
+                      group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
+                      border-2 transition-colors duration-150
+                      ${isActive
+                        ? 'border-primary/50 bg-primary/10 text-sidebar-foreground'
+                        : 'border-transparent text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
+                    `}
+                  >
+                    <Star
+                      className={`w-4 h-4 flex-shrink-0 ${
+                        isActive ? 'text-primary fill-primary' : 'text-muted-foreground'
+                      }`}
+                    />
+                    <span className="flex-1 text-sm font-medium truncate" title={workspace.path}>
+                      {workspace.name}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleCreateTerminal(workspace.id)
+                      }}
+                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
+                      title="New Terminal"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleRemoveProject(e, workspace.id)}
+                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
+                      title="Remove Workspace"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {/* Show terminals when workspace is active */}
+                  {isActive && workspaceTerminals.length > 0 && (
+                    <ul className="ml-6 mt-1 space-y-0.5 border-l border-border pl-3">
+                      {workspaceTerminals.map((terminal) => (
+                        <li
+                          key={terminal.id}
+                          onClick={() => setActiveTerminal(terminal.id)}
+                          className={`
+                            group flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm
+                            ${activeTerminalId === terminal.id
+                              ? 'bg-muted text-sidebar-foreground'
+                              : 'text-muted-foreground hover:bg-muted/50 hover:text-sidebar-foreground'}
+                          `}
+                        >
+                          <span className="flex-1 truncate">{terminal.title}</span>
+                          <button
+                            onClick={(e) => handleCloseTerminal(e, terminal.id)}
+                            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
+                            title="Close Terminal"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {/* Empty state for workspace with no terminals */}
+                  {isActive && workspaceTerminals.length === 0 && (
+                    <div className="ml-6 pl-3 py-2 border-l border-border">
+                      <button
+                        onClick={() => handleCreateTerminal(workspace.id)}
+                        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        New Terminal
+                      </button>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
