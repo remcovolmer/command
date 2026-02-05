@@ -106,15 +106,28 @@ export function useDialogHotkeys(
 
   const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG;
 
+  // Use refs to avoid re-registering listener on every callback/config change
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const onConfirmRef = useRef(onConfirm);
+  onConfirmRef.current = onConfirm;
+
+  const configRef = useRef(hotkeyConfig);
+  configRef.current = hotkeyConfig;
+
+  const canConfirmRef = useRef(canConfirm);
+  canConfirmRef.current = canConfirm;
+
   useEffect(() => {
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Close on Escape
-      if (matchesBinding(e, hotkeyConfig['dialog.close'])) {
+      if (matchesBinding(e, configRef.current['dialog.close'])) {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -122,10 +135,10 @@ export function useDialogHotkeys(
       const target = e.target as HTMLElement;
       const isTextArea = target.tagName === 'TEXTAREA';
 
-      if (!isTextArea && canConfirm && onConfirm && matchesBinding(e, hotkeyConfig['dialog.confirm'])) {
+      if (!isTextArea && canConfirmRef.current && onConfirmRef.current && matchesBinding(e, configRef.current['dialog.confirm'])) {
         e.preventDefault();
         e.stopPropagation();
-        onConfirm();
+        onConfirmRef.current();
         return;
       }
     };
@@ -133,5 +146,5 @@ export function useDialogHotkeys(
     // Use capture to intercept before other handlers
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [enabled, canConfirm, onClose, onConfirm, hotkeyConfig]);
+  }, [enabled]);
 }

@@ -386,20 +386,35 @@ export function findConflicts(
   return conflicts;
 }
 
+// Modifier-only keys that should be ignored when parsing key events
+const MODIFIER_ONLY_KEYS = ['Control', 'Alt', 'Shift', 'Meta'] as const;
+
+// Type guard to check if a key is a modifier-only key
+function isModifierOnlyKey(key: string): key is (typeof MODIFIER_ONLY_KEYS)[number] {
+  return (MODIFIER_ONLY_KEYS as readonly string[]).includes(key);
+}
+
+// Mapping from KeyboardEvent modifier flags to ModifierKey values
+const MODIFIER_FLAG_MAP: ReadonlyArray<{ flag: keyof Pick<KeyboardEvent, 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>; modifier: ModifierKey }> = [
+  { flag: 'ctrlKey', modifier: 'ctrl' },
+  { flag: 'altKey', modifier: 'alt' },
+  { flag: 'shiftKey', modifier: 'shift' },
+  { flag: 'metaKey', modifier: 'meta' },
+];
+
 /**
  * Parse a key event into a binding (for recording)
  */
 export function parseKeyEvent(e: KeyboardEvent): Omit<HotkeyBinding, 'description' | 'category' | 'enabled'> | null {
-  // Ignore modifier-only key presses
-  if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+  // Ignore modifier-only key presses using type guard
+  if (isModifierOnlyKey(e.key)) {
     return null;
   }
 
-  const modifiers: ModifierKey[] = [];
-  if (e.ctrlKey) modifiers.push('ctrl');
-  if (e.altKey) modifiers.push('alt');
-  if (e.shiftKey) modifiers.push('shift');
-  if (e.metaKey) modifiers.push('meta');
+  // Build modifiers array using type-safe mapping
+  const modifiers = MODIFIER_FLAG_MAP
+    .filter(({ flag }) => e[flag])
+    .map(({ modifier }) => modifier);
 
   return {
     key: e.key,

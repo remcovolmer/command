@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { RotateCcw, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { formatBinding, DEFAULT_HOTKEY_CONFIG, findConflicts } from '../../utils/hotkeys'
@@ -10,11 +10,10 @@ interface HotkeyRowProps {
   binding: HotkeyBinding
 }
 
-export function HotkeyRow({ action, binding }: HotkeyRowProps) {
+export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowProps) {
   const [isRecording, setIsRecording] = useState(false)
   const updateHotkey = useProjectStore((s) => s.updateHotkey)
   const resetHotkey = useProjectStore((s) => s.resetHotkey)
-  const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
 
   const isDefault =
     binding.key === DEFAULT_HOTKEY_CONFIG[action].key &&
@@ -32,15 +31,18 @@ export function HotkeyRow({ action, binding }: HotkeyRowProps) {
   const handleRecordingComplete = (newBinding: Pick<HotkeyBinding, 'key' | 'modifiers'> | null) => {
     setIsRecording(false)
     if (newBinding) {
+      // Get current config at time of recording (avoids subscribing to all config changes)
+      const currentConfig = useProjectStore.getState().hotkeyConfig ?? DEFAULT_HOTKEY_CONFIG
+
       // Check for conflicts
       const conflicts = findConflicts(
         { ...binding, ...newBinding },
-        hotkeyConfig,
+        currentConfig,
         action
       )
 
       if (conflicts.length > 0) {
-        const conflictNames = conflicts.map(a => hotkeyConfig[a].description).join(', ')
+        const conflictNames = conflicts.map(a => currentConfig[a].description).join(', ')
         if (!window.confirm(`This shortcut conflicts with: ${conflictNames}\n\nDo you want to use it anyway? The conflicting shortcuts will be disabled.`)) {
           return
         }
@@ -119,4 +121,4 @@ export function HotkeyRow({ action, binding }: HotkeyRowProps) {
       )}
     </>
   )
-}
+})

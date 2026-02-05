@@ -15,13 +15,10 @@ export function Terminal({ id, isActive }: TerminalProps) {
   return (
     <div
       ref={containerRef}
-      className="terminal-container w-full h-full bg-sidebar"
+      className={`terminal-container w-full h-full bg-sidebar relative ${
+        isActive ? 'block pointer-events-auto' : 'hidden pointer-events-none'
+      }`}
       data-terminal-active={isActive ? 'true' : 'false'}
-      style={{
-        display: isActive ? 'block' : 'none',
-        position: 'relative',
-        pointerEvents: isActive ? 'auto' : 'none'
-      }}
     />
   )
 }

@@ -193,16 +193,13 @@ function App() {
       removeFromSplit(activeProjectId, activeTerminalId)
     },
 
-    // Terminal shortcuts Alt+1-9
-    'terminal.goTo1': () => switchToTerminal(0),
-    'terminal.goTo2': () => switchToTerminal(1),
-    'terminal.goTo3': () => switchToTerminal(2),
-    'terminal.goTo4': () => switchToTerminal(3),
-    'terminal.goTo5': () => switchToTerminal(4),
-    'terminal.goTo6': () => switchToTerminal(5),
-    'terminal.goTo7': () => switchToTerminal(6),
-    'terminal.goTo8': () => switchToTerminal(7),
-    'terminal.goTo9': () => switchToTerminal(8),
+    // Terminal shortcuts Alt+1-9 (generated handlers)
+    ...Object.fromEntries(
+      Array.from({ length: 9 }, (_, i) => [
+        `terminal.goTo${i + 1}`,
+        () => switchToTerminal(i)
+      ])
+    ),
 
     // File explorer
     'fileExplorer.toggle': toggleFileExplorer,
