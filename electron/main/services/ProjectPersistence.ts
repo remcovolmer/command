@@ -3,10 +3,14 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
+// NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
+type ProjectType = 'workspace' | 'project' | 'code'
+
 interface Project {
   id: string
   name: string
   path: string
+  type: ProjectType
   createdAt: number
   sortOrder: number
 }
@@ -21,13 +25,53 @@ interface Worktree {
   isLocked: boolean
 }
 
+interface PersistedSession {
+  terminalId: string
+  projectId: string
+  worktreeId: string | null
+  claudeSessionId: string
+  cwd: string
+  title: string
+  /**
+   * Timestamp when the session was closed/saved.
+   * Useful for:
+   * - Showing "last active" time to users
+   * - Filtering out stale sessions (e.g., older than 7 days)
+   * - Debugging session restoration issues
+   */
+  closedAt: number
+}
+
+// Validation patterns for session data integrity
+const SESSION_ID_REGEX = /^[a-zA-Z0-9_-]+$/
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Validates that a session object has the correct structure and valid data.
+ * Protects against corrupted persisted data causing runtime errors.
+ */
+function isValidSession(session: unknown): session is PersistedSession {
+  if (!session || typeof session !== 'object') return false
+  const s = session as Record<string, unknown>
+  return (
+    typeof s.terminalId === 'string' && UUID_REGEX.test(s.terminalId) &&
+    typeof s.projectId === 'string' && UUID_REGEX.test(s.projectId) &&
+    (s.worktreeId === null || (typeof s.worktreeId === 'string' && UUID_REGEX.test(s.worktreeId))) &&
+    typeof s.claudeSessionId === 'string' && SESSION_ID_REGEX.test(s.claudeSessionId) &&
+    typeof s.cwd === 'string' && s.cwd.length > 0 &&
+    typeof s.title === 'string' &&
+    typeof s.closedAt === 'number'
+  )
+}
+
 interface PersistedState {
   version: number
   projects: Project[]
   worktrees: Record<string, Worktree[]>  // projectId -> worktrees
+  sessions: PersistedSession[]  // Sessions to restore on startup
 }
 
-const STATE_VERSION = 2
+const STATE_VERSION = 3
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -52,7 +96,16 @@ export class ProjectPersistence {
             return this.migrateState(parsed)
           }
 
-          return parsed as PersistedState
+          // Filter out any invalid sessions to prevent runtime errors from corrupted data
+          const validSessions = (parsed.sessions || []).filter(isValidSession)
+          if (validSessions.length !== (parsed.sessions || []).length) {
+            console.warn(`Filtered out ${(parsed.sessions || []).length - validSessions.length} invalid session(s) from persisted state`)
+          }
+
+          return {
+            ...parsed,
+            sessions: validSessions,
+          } as PersistedState
         } else {
           console.warn('Invalid state file structure, using default state')
         }
@@ -65,24 +118,58 @@ export class ProjectPersistence {
       version: STATE_VERSION,
       projects: [],
       worktrees: {},
+      sessions: [],
     }
   }
 
-  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]> }): PersistedState {
-    // Migrate from version 1 to 2: add worktrees
+  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]>; sessions?: PersistedSession[] }): PersistedState {
+    // Migrate from version 1 to current: add worktrees and sessions
     if (oldState.version === 1) {
-      return {
-        version: STATE_VERSION,
+      // First migrate to v2, then to v3
+      const v2State = {
+        version: 2,
         projects: oldState.projects,
         worktrees: {},
+        sessions: [],
+      }
+      return this.migrateState(v2State)
+    }
+
+    // Migrate from version 2 to 3: add project type
+    if (oldState.version === 2) {
+      // Filter out malformed projects before migration
+      const validProjects = oldState.projects.filter(p =>
+        p && typeof p === 'object' &&
+        typeof p.id === 'string' &&
+        typeof p.path === 'string'
+      )
+      const migratedProjects = validProjects.map(p => ({
+        ...p,
+        type: 'code' as const,
+      }))
+      return {
+        version: STATE_VERSION,
+        projects: migratedProjects,
+        worktrees: oldState.worktrees ?? {},
       }
     }
 
-    // Default migration: ensure worktrees exist
+    // Migrate from version 2 to 3: add sessions
+    if (oldState.version === 2) {
+      return {
+        version: STATE_VERSION,
+        projects: oldState.projects,
+        worktrees: oldState.worktrees ?? {},
+        sessions: [],
+      }
+    }
+
+    // Default migration: ensure all fields exist
     return {
       version: STATE_VERSION,
       projects: oldState.projects,
       worktrees: oldState.worktrees ?? {},
+      sessions: oldState.sessions ?? [],
     }
   }
 
@@ -106,7 +193,7 @@ export class ProjectPersistence {
     return [...this.state.projects].sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
-  addProject(projectPath: string, name?: string): Project {
+  addProject(projectPath: string, name?: string, type: ProjectType = 'code'): Project {
     // Check if project already exists
     const existing = this.state.projects.find(p => p.path === projectPath)
     if (existing) {
@@ -120,6 +207,7 @@ export class ProjectPersistence {
       id: randomUUID(),
       name: projectName,
       path: projectPath,
+      type,
       createdAt: Date.now(),
       sortOrder: this.state.projects.length,
     }
@@ -235,4 +323,21 @@ export class ProjectPersistence {
       this.saveState()
     }
   }
+
+  // Session methods for restore-on-startup
+  getSessions(): PersistedSession[] {
+    return [...this.state.sessions]
+  }
+
+  setSessions(sessions: PersistedSession[]): void {
+    this.state.sessions = sessions
+    this.saveState()
+  }
+
+  clearSessions(): void {
+    this.state.sessions = []
+    this.saveState()
+  }
 }
+
+export type { PersistedSession }
