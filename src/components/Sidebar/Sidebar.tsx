@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Star, X } from 'lucide-react'
+import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Star, X, Terminal as TerminalIcon } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
-import type { TerminalSession, Worktree, Project } from '../../types'
+import type { TerminalSession, Worktree, Project, TerminalState } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { SortableProjectList } from './SortableProjectList'
 import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
@@ -316,27 +316,60 @@ export function Sidebar() {
                   {/* Show terminals when workspace is active */}
                   {isActive && workspaceTerminals.length > 0 && (
                     <ul className="ml-6 mt-1 space-y-0.5 border-l border-border pl-3">
-                      {workspaceTerminals.map((terminal) => (
-                        <li
-                          key={terminal.id}
-                          onClick={() => setActiveTerminal(terminal.id)}
-                          className={`
-                            group flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm
-                            ${activeTerminalId === terminal.id
-                              ? 'bg-muted text-sidebar-foreground'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-sidebar-foreground'}
-                          `}
-                        >
-                          <span className="flex-1 truncate">{terminal.title}</span>
-                          <button
-                            onClick={(e) => handleCloseTerminal(e, terminal.id)}
-                            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                            title="Close Terminal"
+                      {workspaceTerminals.map((terminal) => {
+                        // Claude Code state colors (same as SortableProjectItem)
+                        const stateColors: Record<TerminalState, string> = {
+                          busy: 'text-blue-500',
+                          permission: 'text-orange-500',
+                          question: 'text-orange-500',
+                          done: 'text-green-500',
+                          stopped: 'text-red-500',
+                        }
+                        const stateDots: Record<TerminalState, string> = {
+                          busy: 'bg-blue-500',
+                          permission: 'bg-orange-500',
+                          question: 'bg-orange-500',
+                          done: 'bg-green-500',
+                          stopped: 'bg-red-500',
+                        }
+                        const inputStates = ['done', 'permission', 'question'] as const
+                        const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
+                        const visibleStates = ['busy', 'done', 'permission', 'question'] as const
+                        const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
+
+                        return (
+                          <li
+                            key={terminal.id}
+                            onClick={() => setActiveTerminal(terminal.id)}
+                            className={`
+                              group flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm
+                              ${activeTerminalId === terminal.id
+                                ? 'bg-sidebar-accent text-sidebar-foreground'
+                                : 'text-muted-foreground hover:bg-muted/50 hover:text-sidebar-foreground'}
+                            `}
                           >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </li>
-                      ))}
+                            <TerminalIcon
+                              className={`w-3 h-3 flex-shrink-0 ${stateColors[terminal.state]}`}
+                            />
+                            <span className="flex-1 text-xs truncate">{terminal.title}</span>
+                            {/* State indicator - shows for busy (static) and input states (blinking) */}
+                            {isVisibleState(terminal.state) && (
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${stateDots[terminal.state]} ${
+                                  isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
+                                }`}
+                              />
+                            )}
+                            <button
+                              onClick={(e) => handleCloseTerminal(e, terminal.id)}
+                              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
+                              title="Close Terminal"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </li>
+                        )
+                      })}
                     </ul>
                   )}
                   {/* Empty state for workspace with no terminals */}
