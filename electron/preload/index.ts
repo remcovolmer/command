@@ -10,6 +10,8 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:data',
   'terminal:state',
   'terminal:exit',
+  'terminal:title',
+  'session:restored',
   'app:close-request',
   'update:checking',
   'update:available',
@@ -175,6 +177,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) => callback(id, title)
       ipcRenderer.on('terminal:title', handler)
       return () => ipcRenderer.removeListener('terminal:title', handler)
+    },
+
+    onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => callback(session)
+      ipcRenderer.on('session:restored', handler)
+      return () => ipcRenderer.removeListener('session:restored', handler)
     },
   },
 
