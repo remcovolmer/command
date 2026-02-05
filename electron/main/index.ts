@@ -7,7 +7,7 @@ import { watch, existsSync, type FSWatcher } from 'node:fs'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
-import { ProjectPersistence } from './services/ProjectPersistence'
+import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
 import { GitService } from './services/GitService'
 import { WorktreeService } from './services/WorktreeService'
 import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
@@ -73,10 +73,10 @@ let githubService: GitHubService | null = null
 const fileWatchers = new Map<string, FSWatcher>()
 
 /**
- * Verify that a Claude session file exists
+ * Verify that a Claude session file exists (async version)
  * Sessions are stored in ~/.claude/projects/{encoded-path}/
  */
-function verifyClaudeSession(cwd: string, sessionId: string): boolean {
+async function verifyClaudeSessionAsync(cwd: string, sessionId: string): Promise<boolean> {
   try {
     // Claude encodes the path for the session directory
     // The session file is stored as {sessionId}.json
@@ -86,7 +86,20 @@ function verifyClaudeSession(cwd: string, sessionId: string): boolean {
     const encodedPath = cwd.replace(/[/\\:]/g, '-').replace(/^-/, '')
     const sessionPath = path.join(claudeDir, encodedPath, `${sessionId}.json`)
 
-    return existsSync(sessionPath)
+    await fs.access(sessionPath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Check if a path exists on disk (async version)
+ */
+async function pathExistsAsync(targetPath: string): Promise<boolean> {
+  try {
+    await fs.access(targetPath)
+    return true
   } catch {
     return false
   }
@@ -112,51 +125,64 @@ async function restoreSessions(): Promise<void> {
   const projects = projectPersistence.getProjects()
   const projectMap = new Map(projects.map(p => [p.id, p]))
 
-  for (const session of sessions) {
-    try {
+  // Pre-validate all sessions in parallel for better performance
+  const validationResults = await Promise.all(
+    sessions.map(async (session) => {
       // Verify project still exists
       const project = projectMap.get(session.projectId)
       if (!project) {
-        console.log(`[Session] Skipping session: project ${session.projectId} no longer exists`)
-        continue
+        return { session, valid: false, reason: `project ${session.projectId} no longer exists` }
       }
 
       // Verify worktree still exists (if applicable)
       if (session.worktreeId) {
         const worktree = projectPersistence.getWorktreeById(session.worktreeId)
         if (!worktree) {
-          console.log(`[Session] Skipping session: worktree ${session.worktreeId} no longer exists`)
-          continue
+          return { session, valid: false, reason: `worktree ${session.worktreeId} no longer exists` }
         }
         // Verify worktree path still exists on disk
-        if (!existsSync(worktree.path)) {
-          console.log(`[Session] Skipping session: worktree path ${worktree.path} no longer exists`)
-          continue
+        const worktreeExists = await pathExistsAsync(worktree.path)
+        if (!worktreeExists) {
+          return { session, valid: false, reason: `worktree path ${worktree.path} no longer exists` }
         }
       }
 
       // Verify CWD still exists
-      if (!existsSync(session.cwd)) {
-        console.log(`[Session] Skipping session: cwd ${session.cwd} no longer exists`)
-        continue
+      const cwdExists = await pathExistsAsync(session.cwd)
+      if (!cwdExists) {
+        return { session, valid: false, reason: `cwd ${session.cwd} no longer exists` }
       }
 
       // Verify Claude session file exists (optional - Claude handles gracefully if missing)
-      const sessionExists = verifyClaudeSession(session.cwd, session.claudeSessionId)
-      if (!sessionExists) {
+      const sessionFileExists = await verifyClaudeSessionAsync(session.cwd, session.claudeSessionId)
+
+      return { session, valid: true, sessionFileExists }
+    })
+  )
+
+  // Process validated sessions
+  for (const result of validationResults) {
+    if (!result.valid) {
+      console.log(`[Session] Skipping session: ${result.reason}`)
+      continue
+    }
+
+    const { session, sessionFileExists } = result
+
+    try {
+      if (!sessionFileExists) {
         console.log(`[Session] Session file not found for ${session.claudeSessionId}, starting fresh`)
       }
 
       // Create terminal with --resume flag (or fresh if session file missing)
-      const terminalId = terminalManager.createTerminal(
-        session.cwd,
-        'claude',
-        undefined,  // no initialInput
-        session.title || undefined,
-        session.projectId,
-        session.worktreeId ?? undefined,
-        sessionExists ? session.claudeSessionId : undefined  // only resume if session file exists
-      )
+      const terminalId = terminalManager.createTerminal({
+        cwd: session.cwd,
+        type: 'claude',
+        initialTitle: session.title || undefined,
+        projectId: session.projectId,
+        worktreeId: session.worktreeId ?? undefined,
+        resumeSessionId: sessionFileExists ? session.claudeSessionId : undefined,  // only resume if session file exists
+      })
 
       console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
 
@@ -282,14 +308,14 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
 
   // For worktree terminals, default to plan mode initial input
   const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
-  return terminalManager?.createTerminal(
+  return terminalManager?.createTerminal({
     cwd,
     type,
-    effectiveInitialInput,
+    initialInput: effectiveInitialInput,
     initialTitle,
     projectId,
-    worktreeId ?? undefined
-  )
+    worktreeId: worktreeId ?? undefined,
+  })
 })
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
@@ -763,15 +789,7 @@ app.on('before-quit', () => {
   // Persist Claude sessions for restoration on next startup
   if (hookWatcher && terminalManager && projectPersistence) {
     const terminalSessions = hookWatcher.getTerminalSessions()
-    const sessionsToSave: Array<{
-      terminalId: string
-      projectId: string
-      worktreeId: string | null
-      claudeSessionId: string
-      cwd: string
-      title: string
-      closedAt: number
-    }> = []
+    const sessionsToSave: PersistedSession[] = []
 
     for (const { terminalId, sessionId } of terminalSessions) {
       const info = terminalManager.getTerminalInfo(terminalId)

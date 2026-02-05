@@ -28,7 +28,36 @@ interface PersistedSession {
   claudeSessionId: string
   cwd: string
   title: string
+  /**
+   * Timestamp when the session was closed/saved.
+   * Useful for:
+   * - Showing "last active" time to users
+   * - Filtering out stale sessions (e.g., older than 7 days)
+   * - Debugging session restoration issues
+   */
   closedAt: number
+}
+
+// Validation patterns for session data integrity
+const SESSION_ID_REGEX = /^[a-zA-Z0-9_-]+$/
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Validates that a session object has the correct structure and valid data.
+ * Protects against corrupted persisted data causing runtime errors.
+ */
+function isValidSession(session: unknown): session is PersistedSession {
+  if (!session || typeof session !== 'object') return false
+  const s = session as Record<string, unknown>
+  return (
+    typeof s.terminalId === 'string' && UUID_REGEX.test(s.terminalId) &&
+    typeof s.projectId === 'string' && UUID_REGEX.test(s.projectId) &&
+    (s.worktreeId === null || (typeof s.worktreeId === 'string' && UUID_REGEX.test(s.worktreeId))) &&
+    typeof s.claudeSessionId === 'string' && SESSION_ID_REGEX.test(s.claudeSessionId) &&
+    typeof s.cwd === 'string' && s.cwd.length > 0 &&
+    typeof s.title === 'string' &&
+    typeof s.closedAt === 'number'
+  )
 }
 
 interface PersistedState {
@@ -63,7 +92,16 @@ export class ProjectPersistence {
             return this.migrateState(parsed)
           }
 
-          return parsed as PersistedState
+          // Filter out any invalid sessions to prevent runtime errors from corrupted data
+          const validSessions = (parsed.sessions || []).filter(isValidSession)
+          if (validSessions.length !== (parsed.sessions || []).length) {
+            console.warn(`Filtered out ${(parsed.sessions || []).length - validSessions.length} invalid session(s) from persisted state`)
+          }
+
+          return {
+            ...parsed,
+            sessions: validSessions,
+          } as PersistedState
         } else {
           console.warn('Invalid state file structure, using default state')
         }
