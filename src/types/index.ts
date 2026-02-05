@@ -1,8 +1,11 @@
 // Project types
+export type ProjectType = 'workspace' | 'project' | 'code';
+
 export interface Project {
   id: string;
   name: string;
   path: string;
+  type: ProjectType;
   createdAt: number;
   sortOrder: number;
 }
@@ -184,7 +187,7 @@ export interface ElectronAPI {
   };
   project: {
     list: () => Promise<Project[]>;
-    add: (path: string, name?: string) => Promise<Project>;
+    add: (path: string, name?: string, type?: ProjectType) => Promise<Project>;
     remove: (id: string) => Promise<void>;
     selectFolder: () => Promise<string | null>;
     reorder: (projectIds: string[]) => Promise<Project[]>;

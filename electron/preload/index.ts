@@ -21,10 +21,14 @@ const ALLOWED_LISTENER_CHANNELS = [
   'fs:fileChanged',
 ] as const
 
+// NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
+type ProjectType = 'workspace' | 'project' | 'code'
+
 interface Project {
   id: string
   name: string
   path: string
+  type: ProjectType
   createdAt: number
   sortOrder: number
 }
@@ -179,8 +183,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: (): Promise<Project[]> =>
       ipcRenderer.invoke('project:list'),
 
-    add: (path: string, name?: string): Promise<Project> =>
-      ipcRenderer.invoke('project:add', path, name),
+    add: (path: string, name?: string, type?: ProjectType): Promise<Project> =>
+      ipcRenderer.invoke('project:add', path, name, type),
 
     remove: (id: string): Promise<void> =>
       ipcRenderer.invoke('project:remove', id),

@@ -6,6 +6,7 @@ interface FileExplorerTabBarProps {
   gitChangeCount: number
   isGitLoading: boolean
   onRefresh: () => void
+  showGitTab?: boolean
 }
 
 export function FileExplorerTabBar({
@@ -14,11 +15,13 @@ export function FileExplorerTabBar({
   gitChangeCount,
   isGitLoading,
   onRefresh,
+  showGitTab = true,
 }: FileExplorerTabBarProps) {
-  const tabs = [
+  const allTabs = [
     { id: 'files' as const, label: 'Files', icon: FolderTree },
     { id: 'git' as const, label: 'Git', icon: GitBranch, badge: gitChangeCount },
   ]
+  const tabs = showGitTab ? allTabs : allTabs.filter(t => t.id !== 'git')
 
   return (
     <div className="flex items-center justify-between px-2 py-1 bg-sidebar-accent border-b border-border shrink-0">
