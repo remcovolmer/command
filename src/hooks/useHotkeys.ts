@@ -44,11 +44,16 @@ export function useHotkeys(
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Don't handle if typing in input, textarea, or contenteditable
+    // Exception: xterm.js uses a hidden textarea for keyboard input - allow hotkeys there
     const target = e.target as HTMLElement;
+    const isXtermTextarea = target.classList.contains('xterm-helper-textarea');
+
     if (
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.isContentEditable
+      !isXtermTextarea && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )
     ) {
       // Only allow escape and certain dialog shortcuts in inputs
       const config = configRef.current;
