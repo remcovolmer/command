@@ -2,8 +2,8 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch } from 'lucide-react'
-import type { Project, TerminalSession, Worktree, TerminalState } from '../../types'
+import { Plus, FolderOpen, X, GitBranch } from 'lucide-react'
+import type { Project, TerminalSession, Worktree } from '../../types'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { ContextMenu } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
@@ -12,7 +12,6 @@ interface SortableProjectItemProps {
   project: Project
   layoutId: string
   terminals: TerminalSession[]
-  directTerminals: TerminalSession[]
   worktrees: Worktree[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   isActive: boolean
@@ -24,14 +23,12 @@ interface SortableProjectItemProps {
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (id: string) => void
-  onCloseTerminal: (e: React.MouseEvent, id: string) => void
 }
 
 export const SortableProjectItem = memo(function SortableProjectItem({
   project,
   layoutId,
   terminals,
-  directTerminals,
   worktrees,
   getWorktreeTerminals,
   isActive,
@@ -43,7 +40,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   onCreateWorktree,
   onRemoveWorktree,
   onSelectTerminal,
-  onCloseTerminal,
 }: SortableProjectItemProps) {
   const shouldReduceMotion = useReducedMotion()
   const {
@@ -60,32 +56,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     transition,
     opacity: isDragging ? 0.4 : 1,
   }
-
-  // Claude Code state colors (5 states)
-  const stateColors: Record<TerminalState, string> = {
-    busy: 'text-blue-500',       // Blue - working
-    permission: 'text-orange-500', // Orange - needs permission
-    question: 'text-orange-500', // Orange - waiting for question answer
-    done: 'text-green-500',      // Green - finished, waiting for new prompt
-    stopped: 'text-red-500',     // Red - stopped/error
-  }
-
-  // State-specific dot colors for terminal indicators
-  const stateDots: Record<TerminalState, string> = {
-    busy: 'bg-blue-500',
-    permission: 'bg-orange-500',
-    question: 'bg-orange-500',
-    done: 'bg-green-500',
-    stopped: 'bg-red-500',
-  }
-
-  // States that require user input (show blinking indicator)
-  const inputStates = ['done', 'permission', 'question'] as const
-  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
-
-  // States that should show an indicator (busy shows static, input states blink)
-  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
-  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -163,7 +133,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             className="p-1 rounded hover:bg-border"
-            title="New Terminal"
+            title="New Chat"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -189,48 +159,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         </div>
       </div>
 
-      {/* Direct Terminals (not in worktree) */}
-      {directTerminals.length > 0 && (
-        <ul className="ml-6 mt-1 space-y-0.5 border-l border-border">
-          {directTerminals.map((terminal) => (
-            <li
-              key={terminal.id}
-              onClick={() => onSelectTerminal(terminal.id)}
-              className={`
-                group flex items-center gap-2 px-3 py-1.5 cursor-pointer
-                transition-colors duration-150
-                ${terminal.id === activeTerminalId
-                  ? 'bg-sidebar-accent text-sidebar-foreground rounded-md'
-                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
-              `}
-            >
-              <TerminalIcon
-                className={`w-3 h-3 flex-shrink-0 ${stateColors[terminal.state]}`}
-              />
-              <span className="flex-1 text-xs truncate">{terminal.title}</span>
-
-              {/* State indicator - shows for busy (static) and input states (blinking) */}
-              {isVisibleState(terminal.state) && (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${stateDots[terminal.state]} ${
-                    isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
-                  }`}
-                />
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={(e) => onCloseTerminal(e, terminal.id)}
-                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                title="Close Terminal"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
       {/* Worktrees */}
       {worktrees.map((worktree) => (
         <WorktreeItem
@@ -252,7 +180,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="w-3 h-3" />
-            New Terminal
+            New Chat
           </button>
         </div>
       )}

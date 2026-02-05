@@ -154,7 +154,7 @@ export function Sidebar() {
 
     const title = worktree
       ? worktree.name
-      : `Terminal ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
+      : `Chat ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
 
     const terminal: TerminalSession = {
       id: terminalId,
@@ -210,18 +210,8 @@ export function Sidebar() {
     }
   }
 
-  const handleCloseTerminal = (e: React.MouseEvent, terminalId: string) => {
-    e.stopPropagation()
-    api.terminal.close(terminalId)
-    removeTerminal(terminalId)
-  }
-
   const getProjectTerminals = useCallback((projectId: string): TerminalSession[] => {
     return Object.values(terminals).filter((t) => t.projectId === projectId)
-  }, [terminals])
-
-  const getProjectDirectTerminals = useCallback((projectId: string): TerminalSession[] => {
-    return Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null)
   }, [terminals])
 
   const getWorktreeTerminals = useCallback((worktreeId: string): TerminalSession[] => {
@@ -276,7 +266,6 @@ export function Sidebar() {
           <SortableProjectList
             projects={projects}
             getProjectTerminals={getProjectTerminals}
-            getProjectDirectTerminals={getProjectDirectTerminals}
             getProjectWorktrees={getProjectWorktrees}
             getWorktreeTerminals={getWorktreeTerminals}
             activeProjectId={activeProjectId}
@@ -287,7 +276,6 @@ export function Sidebar() {
             onCreateWorktree={handleCreateWorktree}
             onRemoveWorktree={handleRemoveWorktree}
             onSelectTerminal={setActiveTerminal}
-            onCloseTerminal={handleCloseTerminal}
             onReorder={reorderProjects}
           />
         )}

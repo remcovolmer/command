@@ -65,7 +65,7 @@ export function TerminalArea() {
       worktreeId: null,
       state: 'busy',
       lastActivity: Date.now(),
-      title: `Terminal ${projectTerminals.length + 1}`,
+      title: `Chat ${projectTerminals.length + 1}`,
       type: 'claude',
     }
     addTerminal(terminal)
@@ -199,14 +199,14 @@ export function TerminalArea() {
             {activeProject.name}
           </h2>
           <p className="text-muted-foreground mb-6">
-            No terminals running. Start a new terminal to begin.
+            No chats running. Start a new chat to begin.
           </p>
           <button
             onClick={handleCreateTerminal}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
-            New Terminal
+            New Chat
           </button>
         </div>
       </div>

@@ -128,17 +128,6 @@ export const WorktreeItem = memo(function WorktreeItem({
     }
   }, [terminal, onSelectTerminal, onCreateTerminal])
 
-  const stateDots: Record<string, string> = {
-    busy: 'bg-blue-500',
-    permission: 'bg-orange-500',
-    question: 'bg-orange-500',
-    done: 'bg-green-500',
-    stopped: 'bg-red-500',
-  }
-
-  const inputStates = ['done', 'permission', 'question'] as const
-  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
-
   // Merge button visibility
   const canMerge = prStatus && !prStatus.noPR &&
     prStatus.state === 'OPEN' &&
@@ -150,13 +139,9 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   const isActive = terminal?.id === activeTerminalId
 
-  // Only show dot for visible states (not idle/stopped)
-  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
-  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
-
   return (
     <div className="mt-0.5 border-l border-primary/30 ml-6">
-      {/* Row 1: Branch info + state dot + hover actions */}
+      {/* Row 1: Branch info + hover actions */}
       <div
         onClick={handleRowClick}
         className={`
@@ -176,17 +161,8 @@ export const WorktreeItem = memo(function WorktreeItem({
           {worktree.name}
         </span>
 
-        {/* Right side: State dot + hover actions */}
+        {/* Right side: hover actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Terminal state dot - only show for visible states */}
-          {terminal && isVisibleState(terminal.state) && (
-            <span
-              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${stateDots[terminal.state] ?? 'bg-gray-500'} ${
-                isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
-              }`}
-            />
-          )}
-
           {/* Hover actions */}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {ghAvailable?.installed && ghAvailable?.authenticated && (
