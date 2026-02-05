@@ -3,15 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { accessSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { ClaudeHookWatcher } from './ClaudeHookWatcher'
+import type { TerminalState, TerminalType } from '../../../src/types'
 
 const SHELL_READY_DELAY_MS = 100
 const CLAUDE_STARTUP_DELAY_MS = 3000
-
-// Claude Code terminal states (5 states)
-type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
-
-// Terminal types: 'claude' runs Claude Code, 'normal' is a plain shell
-type TerminalType = 'claude' | 'normal'
 
 interface TerminalInstance {
   id: string

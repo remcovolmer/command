@@ -8,12 +8,22 @@
 const fs = require('fs');
 const path = require('path');
 
+// Configuration constants
+const STALE_SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Read hook input from stdin
 let input = '';
 process.stdin.on('data', chunk => input += chunk);
 process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
+
+    // Validate session_id format to prevent prototype pollution
+    if (!data.session_id || !UUID_REGEX.test(data.session_id)) {
+      return; // Invalid session ID, skip
+    }
+
     const stateFile = path.join(
       process.env.HOME || process.env.USERPROFILE,
       '.claude',
@@ -76,14 +86,12 @@ process.stdin.on('end', () => {
       };
 
       // Read-merge-write pattern for multi-session support
-      let allStates = {};
+      // Use Object.create(null) to prevent prototype pollution
+      let allStates = Object.create(null);
       try {
         const existing = fs.readFileSync(stateFile, 'utf-8');
-        allStates = JSON.parse(existing);
-        // Handle legacy single-session format (migrate to multi-session)
-        if (allStates.session_id && !allStates[allStates.session_id]) {
-          allStates = {};
-        }
+        const parsed = JSON.parse(existing);
+        allStates = Object.assign(Object.create(null), parsed);
       } catch (e) {
         // Start fresh if file doesn't exist or is invalid
       }
@@ -91,16 +99,23 @@ process.stdin.on('end', () => {
       // Write this session's state keyed by session_id
       allStates[data.session_id] = stateData;
 
-      // Cleanup stale sessions (older than 1 hour)
-      const ONE_HOUR = 60 * 60 * 1000;
+      // Cleanup stale sessions
       const now = Date.now();
       for (const sid in allStates) {
-        if (allStates[sid].timestamp && now - allStates[sid].timestamp > ONE_HOUR) {
+        if (allStates[sid].timestamp && now - allStates[sid].timestamp > STALE_SESSION_TIMEOUT_MS) {
           delete allStates[sid];
         }
       }
 
-      fs.writeFileSync(stateFile, JSON.stringify(allStates, null, 2));
+      // Atomic write: temp file + rename to avoid TOCTOU race conditions
+      const tempFile = stateFile + '.tmp.' + process.pid;
+      try {
+        fs.writeFileSync(tempFile, JSON.stringify(allStates));
+        fs.renameSync(tempFile, stateFile);
+      } catch (writeErr) {
+        // Cleanup temp file on error
+        try { fs.unlinkSync(tempFile); } catch (e) {}
+      }
     }
   } catch (e) {
     // Silent fail - don't interfere with Claude Code

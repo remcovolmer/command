@@ -1,5 +1,6 @@
 import { TerminalIcon, Plus, X, LayoutGrid, FileText, Circle } from 'lucide-react'
-import type { TerminalSession, TerminalState, EditorTab } from '../../types'
+import type { TerminalSession, EditorTab } from '../../types'
+import { STATE_DOT_COLORS, isInputState } from '../../utils/terminalState'
 
 interface TerminalTabBarProps {
   terminals: TerminalSession[]
@@ -15,19 +16,6 @@ interface TerminalTabBarProps {
   onAdd: () => void
   canAdd: boolean
 }
-
-// Claude Code state dot colors (5 states)
-const stateDots: Record<TerminalState, string> = {
-  busy: 'bg-gray-400',       // Grey - working
-  permission: 'bg-orange-500', // Orange - needs permission
-  question: 'bg-orange-500', // Orange - waiting for question answer
-  done: 'bg-green-500',      // Green - finished, waiting for new prompt
-  stopped: 'bg-red-500',     // Red - stopped/error
-}
-
-// States that require user input (show blinking indicator)
-const inputStates = ['done', 'permission', 'question'] as const
-const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
 
 export function TerminalTabBar({
   terminals,
@@ -81,7 +69,7 @@ export function TerminalTabBar({
               {terminal.title}
             </span>
             <span
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${stateDots[terminal.state]} ${
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
                 isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
               }`}
             />

@@ -3,7 +3,12 @@ import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { homedir } from 'os'
 import type { TerminalState } from '../../../src/types'
+import { isValidTerminalState } from '../../../src/types'
 import { normalizePath } from '../utils/paths'
+
+// Configuration constants
+const POLL_INTERVAL_MS = 100
+const MAX_PENDING_QUEUE_SIZE = 10
 
 const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL
 
@@ -17,6 +22,22 @@ interface HookStateData {
 
 // Multi-session state file format: { [session_id]: HookStateData }
 type MultiSessionState = Record<string, HookStateData>
+
+/**
+ * Type guard to validate HookStateData shape at runtime
+ * Prevents crashes from malformed external JSON data
+ */
+function isHookStateData(value: unknown): value is HookStateData {
+  if (!value || typeof value !== 'object') return false
+  const obj = value as Record<string, unknown>
+  return (
+    typeof obj.session_id === 'string' &&
+    typeof obj.state === 'string' &&
+    typeof obj.timestamp === 'number' &&
+    typeof obj.hook_event === 'string'
+    // Note: cwd can be undefined
+  )
+}
 
 export class ClaudeHookWatcher {
   private watching: boolean = false
@@ -52,7 +73,7 @@ export class ClaudeHookWatcher {
     }
 
     // Poll for file changes (fs.watch is unreliable on Windows)
-    watchFile(this.stateFilePath, { interval: 100 }, () => {
+    watchFile(this.stateFilePath, { interval: POLL_INTERVAL_MS }, () => {
       this.onStateChange()
     })
     this.watching = true
@@ -152,14 +173,19 @@ export class ClaudeHookWatcher {
 
     const obj = parsed as Record<string, unknown>
 
-    // Check if this is legacy single-session format (has session_id at root)
-    if (obj.session_id && typeof obj.session_id === 'string' && obj.state) {
-      // Legacy format: wrap in multi-session structure
-      return { [obj.session_id as string]: obj as HookStateData }
+    // Check if this is legacy single-session format
+    if (isHookStateData(obj)) {
+      return { [obj.session_id]: obj }
     }
 
-    // Already multi-session format
-    return obj as MultiSessionState
+    // Multi-session format: validate each entry
+    const result: MultiSessionState = {}
+    for (const [key, value] of Object.entries(obj)) {
+      if (isHookStateData(value)) {
+        result[key] = value
+      }
+    }
+    return result
   }
 
   /**
@@ -170,9 +196,10 @@ export class ClaudeHookWatcher {
     if (!sessionId) return
 
     // Skip if we've already processed this timestamp for this session
+    // Use strict less-than to allow same-millisecond events (sub-millisecond timing edge case)
     const lastTimestamp = this.lastProcessedTimestamps.get(sessionId) || 0
-    if (hookState.timestamp <= lastTimestamp) {
-      return
+    if (hookState.timestamp < lastTimestamp) {
+      return  // Only skip if timestamp is older (not equal)
     }
     this.lastProcessedTimestamps.set(sessionId, hookState.timestamp)
 
@@ -259,8 +286,12 @@ export class ClaudeHookWatcher {
       }
     }
 
-    // All terminals have sessions - return first one (will update existing)
-    return terminals.values().next().value
+    // All terminals have sessions - log warning and return first one
+    if (isDev) {
+      console.warn(`[HookWatcher] All terminals in cwd "${normalizedCwd}" already have sessions. Using first terminal.`)
+    }
+    const first = terminals.values().next()
+    return first.done ? undefined : first.value
   }
 
   /**
@@ -290,7 +321,7 @@ export class ClaudeHookWatcher {
     }
 
     // Limit queue size to prevent memory issues
-    if (pending.length >= 10) {
+    if (pending.length >= MAX_PENDING_QUEUE_SIZE) {
       pending.shift()
     }
     pending.push(hookState)
@@ -304,6 +335,13 @@ export class ClaudeHookWatcher {
    * Process a state and emit to renderer
    */
   private processStateForTerminal(hookState: HookStateData, terminalId: string): void {
+    // Validate state before emitting
+    if (!isValidTerminalState(hookState.state)) {
+      if (isDev) {
+        console.warn(`[HookWatcher] Invalid state "${hookState.state}" for terminal ${terminalId}`)
+      }
+      return
+    }
     console.log(`[HookWatcher] Emitting state ${hookState.state} for terminal ${terminalId}`)
     this.sendToRenderer('terminal:state', terminalId, hookState.state)
   }
