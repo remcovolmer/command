@@ -25,6 +25,7 @@ import { ProjectDragPreview } from './ProjectDragPreview'
 interface SortableProjectListProps {
   projects: Project[]
   getProjectTerminals: (projectId: string) => TerminalSession[]
+  getProjectDirectTerminals: (projectId: string) => TerminalSession[]
   getProjectWorktrees: (projectId: string) => Worktree[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   activeProjectId: string | null
@@ -35,12 +36,14 @@ interface SortableProjectListProps {
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (terminalId: string) => void
+  onCloseTerminal: (e: React.MouseEvent, terminalId: string) => void
   onReorder: (projectIds: string[]) => void
 }
 
 export function SortableProjectList({
   projects,
   getProjectTerminals,
+  getProjectDirectTerminals,
   getProjectWorktrees,
   getWorktreeTerminals,
   activeProjectId,
@@ -51,6 +54,7 @@ export function SortableProjectList({
   onCreateWorktree,
   onRemoveWorktree,
   onSelectTerminal,
+  onCloseTerminal,
   onReorder,
 }: SortableProjectListProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -138,6 +142,7 @@ export function SortableProjectList({
       project={project}
       layoutId={project.id}
       terminals={getProjectTerminals(project.id)}
+      directTerminals={getProjectDirectTerminals(project.id)}
       worktrees={getProjectWorktrees(project.id)}
       getWorktreeTerminals={getWorktreeTerminals}
       isActive={project.id === activeProjectId}
@@ -149,6 +154,7 @@ export function SortableProjectList({
       onCreateWorktree={onCreateWorktree}
       onRemoveWorktree={onRemoveWorktree}
       onSelectTerminal={onSelectTerminal}
+      onCloseTerminal={onCloseTerminal}
     />
   )
 

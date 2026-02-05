@@ -247,6 +247,10 @@ export function Sidebar() {
     return Object.values(terminals).filter((t) => t.projectId === projectId)
   }, [terminals])
 
+  const getProjectDirectTerminals = useCallback((projectId: string): TerminalSession[] => {
+    return Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null)
+  }, [terminals])
+
   const getWorktreeTerminals = useCallback((worktreeId: string): TerminalSession[] => {
     return Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
   }, [terminals])
@@ -389,6 +393,7 @@ export function Sidebar() {
           <SortableProjectList
             projects={regularProjects}
             getProjectTerminals={getProjectTerminals}
+            getProjectDirectTerminals={getProjectDirectTerminals}
             getProjectWorktrees={getProjectWorktrees}
             getWorktreeTerminals={getWorktreeTerminals}
             activeProjectId={activeProjectId}
@@ -399,6 +404,7 @@ export function Sidebar() {
             onCreateWorktree={handleCreateWorktree}
             onRemoveWorktree={handleRemoveWorktree}
             onSelectTerminal={setActiveTerminal}
+            onCloseTerminal={handleCloseTerminal}
             onReorder={reorderProjects}
           />
         )}

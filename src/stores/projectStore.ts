@@ -283,7 +283,7 @@ export const useProjectStore = create<ProjectStore>()(
                 worktreeId: worktreeId ?? null,
                 state: 'done',
                 lastActivity: Date.now(),
-                title: 'Chat',
+                title: 'Terminal',
                 type: 'normal' as TerminalType,
               },
             },
