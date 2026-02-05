@@ -1,8 +1,11 @@
 // Project types
+export type ProjectType = 'workspace' | 'project' | 'code';
+
 export interface Project {
   id: string;
   name: string;
   path: string;
+  type: ProjectType;
   createdAt: number;
   sortOrder: number;
 }
@@ -171,6 +174,13 @@ export interface AppState {
 }
 
 // IPC API types
+export interface RestoredSession {
+  terminalId: string;
+  projectId: string;
+  worktreeId: string | null;
+  title: string;
+}
+
 export interface ElectronAPI {
   terminal: {
     create: (projectId: string, worktreeId?: string, type?: TerminalType) => Promise<string>;
@@ -181,10 +191,11 @@ export interface ElectronAPI {
     onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe;
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
     onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
+    onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
   };
   project: {
     list: () => Promise<Project[]>;
-    add: (path: string, name?: string) => Promise<Project>;
+    add: (path: string, name?: string, type?: ProjectType) => Promise<Project>;
     remove: (id: string) => Promise<void>;
     selectFolder: () => Promise<string | null>;
     reorder: (projectIds: string[]) => Promise<Project[]>;

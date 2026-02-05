@@ -3,6 +3,7 @@ import { GitBranch, Trash2, ExternalLink, GitMerge, AlertTriangle, CheckCircle2,
 import type { Worktree, TerminalSession, PRStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
 
 interface WorktreeItemProps {
   worktree: Worktree
@@ -93,7 +94,9 @@ export const WorktreeItem = memo(function WorktreeItem({
     try {
       const status = await api.github.getPRStatus(worktree.path)
       setPRStatus(worktree.id, status)
-    } catch {}
+    } catch (err) {
+      console.error('[WorktreeItem] Failed to refresh PR status:', err)
+    }
   }, [worktree.id, worktree.path, setPRStatus])
 
   const handleMerge = useCallback(async () => {
@@ -182,7 +185,7 @@ export const WorktreeItem = memo(function WorktreeItem({
           {/* Terminal state dot - only show for visible states */}
           {terminal && isVisibleState(terminal.state) && (
             <span
-              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${stateDots[terminal.state] ?? 'bg-gray-500'} ${
+              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
                 isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
               }`}
             />

@@ -10,6 +10,8 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:data',
   'terminal:state',
   'terminal:exit',
+  'terminal:title',
+  'session:restored',
   'app:close-request',
   'update:checking',
   'update:available',
@@ -21,10 +23,14 @@ const ALLOWED_LISTENER_CHANNELS = [
   'fs:fileChanged',
 ] as const
 
+// NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
+type ProjectType = 'workspace' | 'project' | 'code'
+
 interface Project {
   id: string
   name: string
   path: string
+  type: ProjectType
   createdAt: number
   sortOrder: number
 }
@@ -172,6 +178,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('terminal:title', handler)
       return () => ipcRenderer.removeListener('terminal:title', handler)
     },
+
+    onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => callback(session)
+      ipcRenderer.on('session:restored', handler)
+      return () => ipcRenderer.removeListener('session:restored', handler)
+    },
   },
 
   // Project operations
@@ -179,8 +191,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: (): Promise<Project[]> =>
       ipcRenderer.invoke('project:list'),
 
-    add: (path: string, name?: string): Promise<Project> =>
-      ipcRenderer.invoke('project:add', path, name),
+    add: (path: string, name?: string, type?: ProjectType): Promise<Project> =>
+      ipcRenderer.invoke('project:add', path, name, type),
 
     remove: (id: string): Promise<void> =>
       ipcRenderer.invoke('project:remove', id),

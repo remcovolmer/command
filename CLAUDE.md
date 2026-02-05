@@ -9,6 +9,7 @@ npm install          # Install dependencies
 npm run dev          # Run in development mode (Vite dev server + Electron)
 npm run build        # Build for production (TypeScript + Vite + electron-builder)
 npm run test         # Run Vitest tests
+npm run test -- path/to/test.ts  # Run a single test file
 npm run rebuild      # Rebuild native modules (node-pty)
 npm run release:patch  # Bump patch version, push with tags
 npm run release:minor  # Bump minor version, push with tags
@@ -17,7 +18,7 @@ npm run release:major  # Bump major version, push with tags
 
 ## Workflow Orchestration
 
-### 1. Plan Mode De fault
+### 1. Plan Mode Default
 
 - Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 - If something goes sideways, STOP and re-plan immediately - don't keep pushing
@@ -85,31 +86,18 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | **Terminal** | Plain shell in right sidebar for quick tasks (`npm install`, etc.) |
 | **Worktree** | Git worktree for parallel feature development |
 
-### Directory Structure
+### Main Process Services (`electron/main/services/`)
 
-```
-├── electron/
-│   ├── main/              # Electron main process
-│   │   ├── index.ts       # App entry, window management, IPC handlers
-│   │   └── services/
-│   │       ├── TerminalManager.ts    # PTY spawning via node-pty
-│   │       └── ProjectPersistence.ts # JSON file storage
-│   └── preload/
-│       └── index.ts       # Secure context bridge (window.electronAPI)
-│
-└── src/                   # React renderer
-    ├── components/
-    │   ├── Layout/        # MainLayout.tsx, TerminalArea.tsx
-    │   ├── Sidebar/       # Project/worktree list
-    │   └── Terminal/      # xterm.js component
-    ├── stores/
-    │   └── projectStore.ts  # Zustand state with persist
-    ├── utils/
-    │   ├── electron.ts      # API accessor
-    │   └── terminalEvents.ts # Centralized IPC subscriptions
-    └── types/
-        └── index.ts       # TypeScript types, ElectronAPI interface
-```
+| Service | Purpose |
+|---------|---------|
+| `TerminalManager.ts` | PTY spawning via node-pty, terminal state management |
+| `ClaudeHookWatcher.ts` | Watches Claude Code hooks to detect state changes (busy/permission/question/done) |
+| `HookInstaller.ts` | Installs Claude Code hooks for state detection |
+| `ProjectPersistence.ts` | JSON file storage in `userData/projects.json` |
+| `WorktreeService.ts` | Git worktree management (create, list, remove) |
+| `GitService.ts` | Git operations (status, fetch, pull, push) |
+| `GitHubService.ts` | GitHub PR status polling via `gh` CLI |
+| `UpdateService.ts` | Auto-updates via electron-updater |
 
 ### Process Architecture
 
@@ -117,9 +105,7 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 ┌─────────────────────────────────────────────────────────────┐
 │  Main Process (electron/main/)                              │
 │  ├── index.ts         - App lifecycle, IPC handlers         │
-│  └── services/                                              │
-│      ├── TerminalManager.ts   - PTY spawning via node-pty   │
-│      └── ProjectPersistence.ts - JSON file storage          │
+│  └── services/        - See table above                     │
 └─────────────────────────────────────────────────────────────┘
          ↕ IPC via contextBridge (secure)
 ┌─────────────────────────────────────────────────────────────┐
@@ -142,12 +128,14 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 - **State Management**: Zustand store (`projectStore.ts`) persists layouts; terminals recreated on startup
 - **Terminal Events**: Centralized subscription manager in `terminalEvents.ts` prevents listener leaks
 - **Shell Selection**: `TerminalManager.getShell()` auto-detects Git Bash on Windows, falls back to PowerShell. Override with `COMMAND_CENTER_SHELL` env var
+- **Claude State Detection**: `ClaudeHookWatcher` monitors hook files to detect 5 states: `busy`, `permission`, `question`, `done`, `stopped`
 
 ### Data Flow
 
 1. User adds project → `project:add` IPC → `ProjectPersistence` saves to `userData/projects.json`
 2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command
 3. Chat output → `terminal:data` event → `terminalEvents` routes to specific `Terminal` component → xterm.js renders
+4. Claude state changes → `ClaudeHookWatcher` detects hook file updates → `terminal:state` event → UI shows attention indicator
 
 ## Code Conventions
 
@@ -156,6 +144,7 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 - Tailwind CSS for styling
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
+- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
 
 ## Windows Development
 
@@ -170,3 +159,60 @@ If node-pty fails to compile:
 ## File Paths
 
 Always use complete absolute Windows paths with drive letters and backslashes for all file operations (workaround for a known bug).
+
+## Keyboard Shortcuts
+
+All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to view all shortcuts.
+
+### Navigation
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + ↑` | Previous project |
+| `Ctrl + ↓` | Next project |
+| `Ctrl + ←` | Previous terminal |
+| `Ctrl + →` | Next terminal |
+| `Ctrl + 1` | Focus sidebar |
+| `Ctrl + 2` | Focus terminal |
+| `Ctrl + 3` | Focus file explorer |
+
+### Terminal
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + T` | New terminal |
+| `Ctrl + W` | Close terminal |
+| `Ctrl + \` | Add to split view |
+| `Ctrl + Shift + \` | Remove from split view |
+| `Alt + 1-9` | Go to terminal 1-9 |
+
+### File Explorer
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + B` | Toggle file explorer |
+| `Ctrl + Shift + E` | Switch to files tab |
+| `Ctrl + Shift + G` | Switch to git tab |
+
+### Editor
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + Shift + W` | Close editor tab |
+| `Ctrl + Tab` | Next editor tab |
+| `Ctrl + Shift + Tab` | Previous editor tab |
+| `Ctrl + S` | Save file |
+
+### Worktree
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + Shift + N` | Create worktree |
+
+### UI & Settings
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + ,` | Open settings |
+| `Ctrl + Shift + T` | Toggle theme |
+| `Ctrl + /` | Show shortcuts |
+
+### Dialogs
+| Shortcut | Action |
+|----------|--------|
+| `Escape` | Close dialog |
+| `Enter` | Confirm dialog |
