@@ -151,6 +151,7 @@ export class ProjectPersistence {
         version: STATE_VERSION,
         projects: migratedProjects,
         worktrees: oldState.worktrees ?? {},
+        sessions: [],
       }
     }
 

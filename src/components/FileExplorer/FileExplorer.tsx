@@ -48,7 +48,6 @@ export function FileExplorer() {
   // Action selectors - grouped with useShallow for consistency
   const {
     clearDirectoryCache,
-    setActiveTab,
     setGitStatus,
     setGitStatusLoading,
     setSidecarTerminalCollapsed,

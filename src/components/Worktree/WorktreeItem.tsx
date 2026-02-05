@@ -112,7 +112,7 @@ export const WorktreeItem = memo(function WorktreeItem({
       await api.github.mergePR(projectPath, prStatus.number)
 
       // Remove the worktree since its branch is now deleted
-      await api.worktree.remove(projectPath, worktree.path)
+      await api.worktree.remove(worktree.id, true)
 
       api.notification.show('PR Merged', `PR #${prStatus.number} merged and worktree removed`)
     } catch (err) {

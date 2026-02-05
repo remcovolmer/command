@@ -136,7 +136,7 @@ async function restoreSessions(): Promise<void> {
 
       // Verify worktree still exists (if applicable)
       if (session.worktreeId) {
-        const worktree = projectPersistence.getWorktreeById(session.worktreeId)
+        const worktree = projectPersistence!.getWorktreeById(session.worktreeId)
         if (!worktree) {
           return { session, valid: false, reason: `worktree ${session.worktreeId} no longer exists` }
         }

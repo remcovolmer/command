@@ -195,6 +195,12 @@ export function Sidebar() {
     addTerminal(terminal)
   }
 
+  const handleCloseTerminal = (e: React.MouseEvent, terminalId: string) => {
+    e.stopPropagation()
+    api.terminal.close(terminalId)
+    removeTerminal(terminalId)
+  }
+
   const handleCreateWorktree = (projectId: string) => {
     setWorktreeDialogProjectId(projectId)
   }
