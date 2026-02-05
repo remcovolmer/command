@@ -6,6 +6,7 @@ import { getElectronAPI } from '../../utils/electron'
 
 interface WorktreeItemProps {
   worktree: Worktree
+  projectPath: string
   terminals: TerminalSession[]
   activeTerminalId: string | null
   onCreateTerminal: () => void
@@ -47,6 +48,7 @@ function ReviewBadge({ decision }: { decision: PRStatus['reviewDecision'] }) {
 
 export const WorktreeItem = memo(function WorktreeItem({
   worktree,
+  projectPath,
   terminals,
   activeTerminalId,
   onCreateTerminal,
@@ -98,19 +100,22 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   const handleMerge = useCallback(async () => {
     if (!prStatus?.number) return
-    const confirmed = window.confirm(`Merge & Squash PR #${prStatus.number}?\n\n${prStatus.title}`)
+    const confirmed = window.confirm(`Merge & Squash PR #${prStatus.number}?\n\nThis will also remove the worktree.`)
     if (!confirmed) return
 
     const api = getElectronAPI()
     try {
-      await api.github.mergePR(worktree.path, prStatus.number)
-      api.notification.show('PR Merged', `PR #${prStatus.number} merged successfully`)
-      handleRefresh()
+      // Merge from main project path (not worktree) to avoid branch-in-use error
+      await api.github.mergePR(projectPath, prStatus.number)
+
+      // Remove the worktree since its branch is now deleted
+      await api.worktree.remove(projectPath, worktree.path)
+
+      api.notification.show('PR Merged', `PR #${prStatus.number} merged and worktree removed`)
     } catch (err) {
       api.notification.show('Merge Failed', err instanceof Error ? err.message : 'Unknown error')
-      handleRefresh()
     }
-  }, [prStatus, worktree.path, handleRefresh])
+  }, [prStatus, projectPath, worktree.path])
 
   const handleOpenPR = useCallback(() => {
     if (prStatus?.url) {
