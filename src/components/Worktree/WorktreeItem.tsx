@@ -131,6 +131,21 @@ export const WorktreeItem = memo(function WorktreeItem({
     }
   }, [terminal, onSelectTerminal, onCreateTerminal])
 
+  // Claude Code state indicator dots
+  const stateDots: Record<string, string> = {
+    busy: 'bg-blue-500',
+    permission: 'bg-orange-500',
+    question: 'bg-orange-500',
+    done: 'bg-green-500',
+    stopped: 'bg-red-500',
+  }
+
+  const inputStates = ['done', 'permission', 'question'] as const
+  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
+
+  // Only show dot for visible states (not idle/stopped)
+  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
+  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
   // Merge button visibility
   const canMerge = prStatus && !prStatus.noPR &&
@@ -143,10 +158,9 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   const isActive = terminal?.id === activeTerminalId
 
-
   return (
     <div className="mt-0.5 border-l border-primary/30 ml-6">
-      {/* Row 1: Branch info + state dot + hover actions */}
+      {/* Row 1: Branch info + hover actions */}
       <div
         onClick={handleRowClick}
         className={`

@@ -76,7 +76,15 @@ npm run release:major  # Bump major version, push with tags
 
 ## Architecture
 
-This is an **Electron + React + TypeScript** desktop app for managing multiple Claude Code terminal instances.
+This is an **Electron + React + TypeScript** desktop app for managing multiple Claude Code sessions.
+
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| **Chat** | A Claude Code session (main center area) |
+| **Terminal** | Plain shell in right sidebar for quick tasks (`npm install`, etc.) |
+| **Worktree** | Git worktree for parallel feature development |
 
 ### Main Process Services (`electron/main/services/`)
 
@@ -125,8 +133,8 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 ### Data Flow
 
 1. User adds project → `project:add` IPC → `ProjectPersistence` saves to `userData/projects.json`
-2. User creates terminal → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command
-3. Terminal output → `terminal:data` event → `terminalEvents` routes to specific `Terminal` component → xterm.js renders
+2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command
+3. Chat output → `terminal:data` event → `terminalEvents` routes to specific `Terminal` component → xterm.js renders
 4. Claude state changes → `ClaudeHookWatcher` detects hook file updates → `terminal:state` event → UI shows attention indicator
 
 ## Code Conventions

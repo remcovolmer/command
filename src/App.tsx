@@ -152,8 +152,8 @@ function App() {
       const projectTerminals = getProjectTerminals(activeProjectId)
       if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
         api.notification.show(
-          'Terminal Limit',
-          `Maximum ${MAX_TERMINALS_PER_PROJECT} terminals per project`
+          'Chat Limit',
+          `Maximum ${MAX_TERMINALS_PER_PROJECT} chats per project`
         )
         return
       }
@@ -166,7 +166,7 @@ function App() {
           worktreeId: null,
           state: 'busy',
           lastActivity: Date.now(),
-          title: `Terminal ${projectTerminals.length + 1}`,
+          title: `Chat ${projectTerminals.length + 1}`,
           type: 'claude',
         }
         addTerminal(terminal)

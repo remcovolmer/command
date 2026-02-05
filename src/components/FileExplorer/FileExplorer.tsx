@@ -16,7 +16,7 @@ export function FileExplorer() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const projects = useProjectStore((s) => s.projects)
   const activeTab = useProjectStore((s) => s.fileExplorerActiveTab)
-  const activeWorktreeId = useProjectStore((s) => s.activeWorktreeId)
+  const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
 
   // Determine git context from active terminal (worktree or project root)
   const activeWorktree = useProjectStore((s) => {
@@ -30,7 +30,8 @@ export function FileExplorer() {
   const isGitLoading = useProjectStore((s) => gitContextId ? s.gitStatusLoading[gitContextId] : false)
 
   // Sidecar terminal state — select ID array with shallow equality to avoid re-renders
-  const sidecarContextKey = activeWorktreeId ?? activeProjectId
+  // Use activeWorktree (derived from active terminal) instead of activeWorktreeId to match Files/Git
+  const sidecarContextKey = activeWorktree?.id ?? activeProjectId
   const sidecarTerminalIds = useProjectStore(
     useShallow((s) => sidecarContextKey ? (s.sidecarTerminals[sidecarContextKey] ?? []) : [])
   )
@@ -88,7 +89,7 @@ export function FileExplorer() {
 
   const handleCreateTerminal = async () => {
     if (activeProjectId && sidecarContextKey) {
-      await createSidecarTerminal(sidecarContextKey, activeProjectId, activeWorktreeId ?? undefined)
+      await createSidecarTerminal(sidecarContextKey, activeProjectId, activeWorktree?.id ?? undefined)
     }
   }
 
@@ -187,7 +188,7 @@ export function FileExplorer() {
         <SidecarTerminalPanel
           contextKey={sidecarContextKey}
           projectId={activeProjectId}
-          worktreeId={activeWorktreeId ?? undefined}
+          worktreeId={activeWorktree?.id ?? undefined}
           terminals={sidecarTerminals}
           activeTerminalId={activeSidecarTerminalId}
           isCollapsed={sidecarTerminalCollapsed}

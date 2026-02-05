@@ -13,7 +13,6 @@ interface SortableProjectItemProps {
   project: Project
   layoutId: string
   terminals: TerminalSession[]
-  directTerminals: TerminalSession[]
   worktrees: Worktree[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   isActive: boolean
@@ -25,14 +24,12 @@ interface SortableProjectItemProps {
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (id: string) => void
-  onCloseTerminal: (e: React.MouseEvent, id: string) => void
 }
 
 export const SortableProjectItem = memo(function SortableProjectItem({
   project,
   layoutId,
   terminals,
-  directTerminals,
   worktrees,
   getWorktreeTerminals,
   isActive,
@@ -44,7 +41,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   onCreateWorktree,
   onRemoveWorktree,
   onSelectTerminal,
-  onCloseTerminal,
 }: SortableProjectItemProps) {
   const shouldReduceMotion = useReducedMotion()
   const {
@@ -151,7 +147,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             className="p-1 rounded hover:bg-border"
-            title="New Terminal"
+            title="New Chat"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -179,48 +175,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         </div>
       </div>
 
-      {/* Direct Terminals (not in worktree) */}
-      {directTerminals.length > 0 && (
-        <ul className="ml-6 mt-1 space-y-0.5 border-l border-border">
-          {directTerminals.map((terminal) => (
-            <li
-              key={terminal.id}
-              onClick={() => onSelectTerminal(terminal.id)}
-              className={`
-                group flex items-center gap-2 px-3 py-1.5 cursor-pointer
-                transition-colors duration-150
-                ${terminal.id === activeTerminalId
-                  ? 'bg-sidebar-accent text-sidebar-foreground rounded-md'
-                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
-              `}
-            >
-              <TerminalIcon
-                className={`w-3 h-3 flex-shrink-0 ${STATE_TEXT_COLORS[terminal.state]}`}
-              />
-              <span className="flex-1 text-xs truncate">{terminal.title}</span>
-
-              {/* State indicator - shows for busy (static) and input states (blinking) */}
-              {isVisibleState(terminal.state) && (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${STATE_DOT_COLORS[terminal.state]} ${
-                    isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
-                  }`}
-                />
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={(e) => onCloseTerminal(e, terminal.id)}
-                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                title="Close Terminal"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
       {/* Worktrees */}
       {worktrees.map((worktree) => (
         <WorktreeItem
@@ -242,7 +196,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="w-3 h-3" />
-            New Terminal
+            New Chat
           </button>
         </div>
       )}

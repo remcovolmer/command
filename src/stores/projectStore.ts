@@ -21,7 +21,6 @@ interface ProjectStore {
 
   // Worktree state
   worktrees: Record<string, Worktree>  // worktreeId -> Worktree
-  activeWorktreeId: string | null
 
   // File explorer state
   fileExplorerVisible: boolean
@@ -111,12 +110,10 @@ interface ProjectStore {
   setActiveTerminal: (id: string | null) => void
   getProjectTerminals: (projectId: string) => TerminalSession[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
-  getProjectDirectTerminals: (projectId: string) => TerminalSession[]
 
   // Worktree actions
   addWorktree: (worktree: Worktree) => void
   removeWorktree: (id: string) => void
-  setActiveWorktree: (id: string | null) => void
   getProjectWorktrees: (projectId: string) => Worktree[]
   loadWorktrees: (projectId: string) => Promise<void>
 
@@ -142,7 +139,6 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Worktree state
       worktrees: {},
-      activeWorktreeId: null,
 
       // File explorer state
       fileExplorerVisible: false,
@@ -287,7 +283,7 @@ export const useProjectStore = create<ProjectStore>()(
                 worktreeId: worktreeId ?? null,
                 state: 'done',
                 lastActivity: Date.now(),
-                title: 'Terminal',
+                title: 'Chat',
                 type: 'normal' as TerminalType,
               },
             },
@@ -464,12 +460,6 @@ export const useProjectStore = create<ProjectStore>()(
               ? newProjects[0]?.id ?? null
               : state.activeProjectId
 
-          // Update active worktree if it was in the removed project
-          const newActiveWorktreeId =
-            state.activeWorktreeId && !newWorktrees[state.activeWorktreeId]
-              ? null
-              : state.activeWorktreeId
-
           // Clean sidecar terminals for removed project/worktrees
           const removedTerminalIds = new Set(
             Object.keys(state.terminals).filter((tid) => state.terminals[tid].projectId === id)
@@ -501,7 +491,6 @@ export const useProjectStore = create<ProjectStore>()(
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
             activeProjectId: newActiveProjectId,
-            activeWorktreeId: newActiveWorktreeId,
             activeTerminalId:
               state.activeTerminalId &&
               newTerminals[state.activeTerminalId]
@@ -677,14 +666,6 @@ export const useProjectStore = create<ProjectStore>()(
         )
       },
 
-      getProjectDirectTerminals: (projectId) => {
-        const state = get()
-        const sidecarIds = new Set(Object.values(state.sidecarTerminals).flat())
-        return Object.values(state.terminals).filter(
-          (t) => t.projectId === projectId && t.worktreeId === null && !sidecarIds.has(t.id)
-        )
-      },
-
       // Worktree actions
       addWorktree: (worktree) =>
         set((state) => ({
@@ -705,18 +686,6 @@ export const useProjectStore = create<ProjectStore>()(
             }
           })
 
-          // Update active worktree if needed
-          let newActiveWorktreeId = state.activeWorktreeId
-          if (state.activeWorktreeId === id) {
-            // Find another worktree in the same project or null
-            const sameProjectWorktrees = Object.values(newWorktrees).filter(
-              (w) => w.projectId === removedWorktree?.projectId
-            )
-            newActiveWorktreeId = sameProjectWorktrees.length > 0
-              ? sameProjectWorktrees[0].id
-              : null
-          }
-
           // Update active terminal if it was in the removed worktree
           let newActiveTerminalId = state.activeTerminalId
           if (state.activeTerminalId && !newTerminals[state.activeTerminalId]) {
@@ -731,13 +700,9 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             worktrees: newWorktrees,
             terminals: newTerminals,
-            activeWorktreeId: newActiveWorktreeId,
             activeTerminalId: newActiveTerminalId,
           }
         }),
-
-      setActiveWorktree: (id) =>
-        set({ activeWorktreeId: id }),
 
       getProjectWorktrees: (projectId) => {
         const state = get()

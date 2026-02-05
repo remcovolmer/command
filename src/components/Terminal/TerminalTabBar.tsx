@@ -145,7 +145,7 @@ export function TerminalTabBar({
         <button
           onClick={onAdd}
           className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 transition-colors"
-          title="New Terminal"
+          title="New Chat"
         >
           <Plus className="w-4 h-4" />
         </button>
