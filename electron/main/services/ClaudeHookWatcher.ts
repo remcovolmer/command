@@ -46,6 +46,8 @@ export class ClaudeHookWatcher {
 
   // Session ID matching: session_id → terminal_id
   private sessionToTerminal: Map<string, string> = new Map()
+  // Reverse lookup: terminal_id → session_id (for persistence on close)
+  private terminalToSession: Map<string, string> = new Map()
   // Multiple terminals can share same cwd (e.g., split terminals)
   private cwdToTerminals: Map<string, Set<string>> = new Map()
 
@@ -64,6 +66,30 @@ export class ClaudeHookWatcher {
     if (!existsSync(claudeDir)) {
       mkdirSync(claudeDir, { recursive: true })
     }
+  }
+
+  // BiMap helper methods for session/terminal mapping
+  private setSessionMapping(sessionId: string, terminalId: string): void {
+    this.sessionToTerminal.set(sessionId, terminalId)
+    this.terminalToSession.set(terminalId, sessionId)
+  }
+
+  private clearSessionMappingBySession(sessionId: string): void {
+    const terminalId = this.sessionToTerminal.get(sessionId)
+    if (terminalId) {
+      this.terminalToSession.delete(terminalId)
+    }
+    this.sessionToTerminal.delete(sessionId)
+    this.lastProcessedTimestamps.delete(sessionId)
+  }
+
+  private clearSessionMappingByTerminal(terminalId: string): void {
+    const sessionId = this.terminalToSession.get(terminalId)
+    if (sessionId) {
+      this.sessionToTerminal.delete(sessionId)
+      this.lastProcessedTimestamps.delete(sessionId)
+    }
+    this.terminalToSession.delete(terminalId)
   }
 
   start(): void {
@@ -132,17 +158,12 @@ export class ClaudeHookWatcher {
       }
     }
 
-    // Remove from session mapping and cleanup timestamp tracking
-    for (const [sessionId, tid] of this.sessionToTerminal) {
-      if (tid === terminalId) {
-        this.sessionToTerminal.delete(sessionId)
-        this.lastProcessedTimestamps.delete(sessionId)
-        if (isDev) {
-          console.log(`[HookWatcher] Unregistered session ${sessionId} for terminal ${terminalId}`)
-        }
-        break
-      }
+    // Remove from session mapping (both directions)
+    const sessionId = this.terminalToSession.get(terminalId)
+    if (sessionId && isDev) {
+      console.log(`[HookWatcher] Unregistered session ${sessionId} for terminal ${terminalId}`)
     }
+    this.clearSessionMappingByTerminal(terminalId)
   }
 
   private onStateChange(): void {
@@ -222,9 +243,9 @@ export class ClaudeHookWatcher {
     if (!terminalId && normalizedCwd) {
       terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
       if (terminalId) {
-        // Associate this session with the found terminal
-        this.removeOldSessionForTerminal(terminalId)
-        this.sessionToTerminal.set(sessionId, terminalId)
+        // Associate this session with the found terminal using BiMap
+        this.clearSessionMappingByTerminal(terminalId)
+        this.setSessionMapping(sessionId, terminalId)
         if (isDev) {
           console.log(`[HookWatcher] Late association: session ${sessionId} with terminal ${terminalId}`)
         }
@@ -242,8 +263,7 @@ export class ClaudeHookWatcher {
 
     // On SessionEnd: cleanup session mapping
     if (hookState.hook_event === 'SessionEnd') {
-      this.sessionToTerminal.delete(sessionId)
-      this.lastProcessedTimestamps.delete(sessionId)
+      this.clearSessionMappingBySession(sessionId)
     }
   }
 
@@ -254,11 +274,11 @@ export class ClaudeHookWatcher {
     const terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
 
     if (terminalId) {
-      // Remove any old session mapping for this terminal
-      this.removeOldSessionForTerminal(terminalId)
+      // Remove any old session mapping for this terminal using BiMap
+      this.clearSessionMappingByTerminal(terminalId)
 
-      // Associate new session with terminal
-      this.sessionToTerminal.set(sessionId, terminalId)
+      // Associate new session with terminal using BiMap
+      this.setSessionMapping(sessionId, terminalId)
       if (isDev) {
         console.log(`[HookWatcher] Associated session ${sessionId} with terminal ${terminalId}`)
       }
@@ -292,22 +312,6 @@ export class ClaudeHookWatcher {
     }
     const first = terminals.values().next()
     return first.done ? undefined : first.value
-  }
-
-  /**
-   * Remove old session mapping for a terminal (when reassigning to new session)
-   */
-  private removeOldSessionForTerminal(terminalId: string): void {
-    for (const [oldSessionId, tid] of this.sessionToTerminal) {
-      if (tid === terminalId) {
-        this.sessionToTerminal.delete(oldSessionId)
-        this.lastProcessedTimestamps.delete(oldSessionId)
-        if (isDev) {
-          console.log(`[HookWatcher] Removed old session ${oldSessionId} for terminal ${terminalId}`)
-        }
-        break
-      }
-    }
   }
 
   /**
@@ -350,6 +354,16 @@ export class ClaudeHookWatcher {
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send(channel, ...args)
     }
+  }
+
+  /**
+   * Get all terminal-session mappings (for persistence on app close)
+   */
+  getTerminalSessions(): Array<{ terminalId: string; sessionId: string }> {
+    return Array.from(this.terminalToSession.entries()).map(([terminalId, sessionId]) => ({
+      terminalId,
+      sessionId,
+    }))
   }
 
   stop(): void {

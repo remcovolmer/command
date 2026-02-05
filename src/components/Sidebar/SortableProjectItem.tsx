@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch } from 'lucide-react'
+import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { ContextMenu } from './ContextMenu'
@@ -82,6 +82,11 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     },
   ]
 
+  // Show empty state for active project when there are no terminals
+  // Code projects also require no worktrees to show the empty state
+  const showEmptyState = isActive && terminals.length === 0 &&
+    (project.type !== 'code' || worktrees.length === 0)
+
   return (
     <motion.li
       ref={setNodeRef}
@@ -120,11 +125,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
         `}
       >
-        <FolderOpen
-          className={`w-4 h-4 flex-shrink-0 ${
-            isActive ? 'text-primary' : ''
-          }`}
-        />
+        {project.type === 'code' ? (
+          <Code
+            className={`w-4 h-4 flex-shrink-0 ${
+              isActive ? 'text-primary' : ''
+            }`}
+          />
+        ) : (
+          <FolderOpen
+            className={`w-4 h-4 flex-shrink-0 ${
+              isActive ? 'text-primary' : ''
+            }`}
+          />
+        )}
         <span className="flex-1 text-sm truncate" title={project.path}>
           {project.name}
         </span>
@@ -142,17 +155,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onCreateWorktree(project.id)
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-border"
-            title="New Worktree"
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-          </button>
+          {project.type === 'code' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onCreateWorktree(project.id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="p-1 rounded hover:bg-border"
+              title="New Worktree"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             onClick={(e) => onRemove(e, project.id)}
             onPointerDown={(e) => e.stopPropagation()}
@@ -219,8 +234,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         />
       ))}
 
-      {/* Empty state for active project */}
-      {isActive && terminals.length === 0 && worktrees.length === 0 && (
+      {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
+      {showEmptyState && (
         <div className="ml-6 pl-3 py-2 border-l border-border">
           <button
             onClick={() => onCreateTerminal(project.id)}

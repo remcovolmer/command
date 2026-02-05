@@ -1,10 +1,11 @@
 import { getElectronAPI } from './electron'
-import { isValidTerminalState, type TerminalState, type Unsubscribe } from '../types'
+import { isValidTerminalState, type TerminalState, type Unsubscribe, type RestoredSession } from '../types'
 
 type DataCallback = (data: string) => void
 type StateCallback = (state: TerminalState) => void
 type ExitCallback = (code: number) => void
 type TitleCallback = (title: string) => void
+type SessionRestoredCallback = (session: RestoredSession) => void
 
 /**
  * Centralized terminal event manager.
@@ -16,6 +17,7 @@ class TerminalEventManager {
   private stateCallbacks = new Map<string, StateCallback>()
   private exitCallbacks = new Map<string, ExitCallback>()
   private titleCallbacks = new Map<string, TitleCallback>()
+  private sessionRestoredCallbacks: SessionRestoredCallback[] = []
   private initialized = false
   private unsubscribers: Unsubscribe[] = []
 
@@ -56,6 +58,14 @@ class TerminalEventManager {
         if (callback) callback(title)
       })
     )
+
+    this.unsubscribers.push(
+      api.terminal.onSessionRestored((session) => {
+        for (const callback of this.sessionRestoredCallbacks) {
+          callback(session)
+        }
+      })
+    )
   }
 
   subscribe(
@@ -80,6 +90,18 @@ class TerminalEventManager {
   }
 
   /**
+   * Subscribe to session restored events (for adding restored terminals to store)
+   */
+  onSessionRestored(callback: SessionRestoredCallback): () => void {
+    this.init()
+    this.sessionRestoredCallbacks.push(callback)
+    return () => {
+      const index = this.sessionRestoredCallbacks.indexOf(callback)
+      if (index !== -1) this.sessionRestoredCallbacks.splice(index, 1)
+    }
+  }
+
+  /**
    * Cleanup all IPC listeners. Call when app is shutting down.
    */
   dispose() {
@@ -89,6 +111,7 @@ class TerminalEventManager {
     this.stateCallbacks.clear()
     this.exitCallbacks.clear()
     this.titleCallbacks.clear()
+    this.sessionRestoredCallbacks = []
     this.initialized = false
   }
 }
