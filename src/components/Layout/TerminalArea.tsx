@@ -52,8 +52,8 @@ export function TerminalArea() {
     // Check terminal limit
     if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
       api.notification.show(
-        'Terminal Limit',
-        `Maximum ${MAX_TERMINALS_PER_PROJECT} terminals per project`
+        'Chat Limit',
+        `Maximum ${MAX_TERMINALS_PER_PROJECT} chats per project`
       )
       return
     }
