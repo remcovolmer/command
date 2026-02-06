@@ -98,7 +98,9 @@
       "Bash(dir:*)",
       "Bash(python3:*)",
       "Bash(git log:*)",
-      "Bash(gh release:*)"
+      "Bash(gh release:*)",
+      "Bash(grep:*)",
+      "Bash(git status:*)"
     ]
   }
 }
