@@ -25,6 +25,17 @@ function App() {
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
 
+  // Refocus the active terminal's xterm textarea (e.g. after closing dialogs)
+  const refocusActiveTerminal = useCallback(() => {
+    requestAnimationFrame(() => {
+      const terminal = document.querySelector('[data-terminal-active="true"]')
+      if (terminal) {
+        const textarea = terminal.querySelector('.xterm-helper-textarea') as HTMLElement
+        textarea?.focus()
+      }
+    })
+  }, [])
+
   // Use ref to access current value in callback without re-registering listener
   const hasActiveTerminalsRef = useRef(hasActiveTerminals)
   hasActiveTerminalsRef.current = hasActiveTerminals
@@ -266,6 +277,13 @@ function App() {
     }
   }, [theme])
 
+  // Restore terminal focus when window regains focus
+  useEffect(() => {
+    const handleWindowFocus = () => refocusActiveTerminal()
+    window.addEventListener('focus', handleWindowFocus)
+    return () => window.removeEventListener('focus', handleWindowFocus)
+  }, [refocusActiveTerminal])
+
   // Remove loading screen
   useEffect(() => {
     postMessage({ payload: 'removeLoading' }, '*')
@@ -279,6 +297,7 @@ function App() {
   const handleCancelClose = () => {
     setShowCloseDialog(false)
     api.app.cancelClose()
+    refocusActiveTerminal()
   }
 
   return (
@@ -288,13 +307,13 @@ function App() {
       {/* Settings Dialog */}
       <SettingsDialog
         isOpen={settingsDialogOpen}
-        onClose={() => setSettingsDialogOpen(false)}
+        onClose={() => { setSettingsDialogOpen(false); refocusActiveTerminal() }}
       />
 
       {/* Shortcuts Overlay */}
       <ShortcutsOverlay
         isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
+        onClose={() => { setShowShortcuts(false); refocusActiveTerminal() }}
       />
 
       {/* Close Confirmation Dialog */}
