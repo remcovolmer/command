@@ -326,6 +326,8 @@ ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
 
 ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: number) => {
   if (!isValidUUID(terminalId)) return
+  if (typeof cols !== 'number' || !Number.isFinite(cols)) return
+  if (typeof rows !== 'number' || !Number.isFinite(rows)) return
   const safeCols = clamp(cols, 1, 500)
   const safeRows = clamp(rows, 1, 200)
   terminalManager?.resizeTerminal(terminalId, safeCols, safeRows)

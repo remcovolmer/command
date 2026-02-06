@@ -4,7 +4,7 @@ import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
 import { TerminalIcon, Plus, Sparkles } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
-import type { TerminalSession } from '../../types'
+import { useCreateTerminal } from '../../hooks/useCreateTerminal'
 
 export function TerminalArea() {
   const api = useMemo(() => getElectronAPI(), [])
@@ -16,7 +16,6 @@ export function TerminalArea() {
     layouts,
     editorTabs,
     activeCenterTabId,
-    addTerminal,
     setActiveTerminal,
     removeTerminal,
     addToSplit,
@@ -25,6 +24,8 @@ export function TerminalArea() {
     setActiveCenterTab,
     closeEditorTab,
   } = useProjectStore()
+
+  const { createTerminal } = useCreateTerminal()
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const projectTerminals = useMemo(
@@ -49,27 +50,9 @@ export function TerminalArea() {
   const handleCreateTerminal = async () => {
     if (!activeProjectId) return
 
-    // Check terminal limit
-    if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
-      api.notification.show(
-        'Chat Limit',
-        `Maximum ${MAX_TERMINALS_PER_PROJECT} chats per project`
-      )
-      return
-    }
-
-    const terminalId = await api.terminal.create(activeProjectId)
-    const terminal: TerminalSession = {
-      id: terminalId,
-      projectId: activeProjectId,
-      worktreeId: null,
-      state: 'busy',
-      lastActivity: Date.now(),
-      title: `Chat ${projectTerminals.length + 1}`,
-      type: 'claude',
-    }
-    addTerminal(terminal)
-    setActiveCenterTab(terminalId)
+    await createTerminal(activeProjectId, {
+      onCreated: (terminalId) => setActiveCenterTab(terminalId),
+    })
   }
 
   const handleCloseTerminal = useCallback(

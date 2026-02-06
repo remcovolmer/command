@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Terminal as TerminalIcon, X } from 'lucide-react'
 import type { TerminalSession } from '../../types'
 import {
@@ -15,7 +16,7 @@ interface TerminalListItemProps {
   className?: string // Optional custom container styles
 }
 
-export function TerminalListItem({
+export const TerminalListItem = memo(function TerminalListItem({
   terminal,
   isActive,
   onSelect,
@@ -54,4 +55,4 @@ export function TerminalListItem({
       </button>
     </li>
   )
-}
+})
