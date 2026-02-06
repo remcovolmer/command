@@ -99,6 +99,8 @@
       "Bash(python3:*)",
       "Bash(git log:*)",
       "Bash(gh release:*)",
+      "Bash(grep:*)",
+      "Bash(git status:*)",
       "WebFetch(domain:claudelog.com)"
     ]
   }
