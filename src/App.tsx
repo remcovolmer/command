@@ -41,15 +41,17 @@ function App() {
     return unsubscribe
   }, [api])
 
-  // Helper to get visual order of projects (active first, then inactive)
+  // Helper to get visual order of projects (workspaces → active regular → inactive regular)
   const getProjectVisualOrder = useCallback(() => {
     const { projects, terminals } = useProjectStore.getState()
     if (projects.length === 0) return []
 
     const terminalValues = Object.values(terminals)
-    const activeProjects = projects.filter(p => terminalValues.some(t => t.projectId === p.id))
-    const inactiveProjects = projects.filter(p => !terminalValues.some(t => t.projectId === p.id))
-    return [...activeProjects, ...inactiveProjects]
+    const workspaces = projects.filter(p => p.type === 'workspace')
+    const regular = projects.filter(p => p.type !== 'workspace')
+    const activeRegular = regular.filter(p => terminalValues.some(t => t.projectId === p.id))
+    const inactiveRegular = regular.filter(p => !terminalValues.some(t => t.projectId === p.id))
+    return [...workspaces, ...activeRegular, ...inactiveRegular]
   }, [])
 
   // Helper to switch to terminal by index (1-9)
