@@ -286,6 +286,10 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     throw new Error('Invalid terminal type')
   }
 
+  // Look up project for settings and path
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === projectId)
+
   // Determine the working directory and initial title
   let cwd: string
   let initialTitle: string | undefined
@@ -300,9 +304,6 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     // Use worktree name as terminal title
     initialTitle = worktree.name
   } else {
-    // Use project path
-    const projects = projectPersistence?.getProjects() ?? []
-    const project = projects.find(p => p.id === projectId)
     cwd = project?.path ?? process.cwd()
   }
 
@@ -315,6 +316,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     initialTitle,
     projectId,
     worktreeId: worktreeId ?? undefined,
+    dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
   })
 })
 
@@ -351,6 +353,18 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
   return projectPersistence?.removeProject(id)
+})
+
+ipcMain.handle('project:update', async (_event, id: string, updates: Record<string, unknown>) => {
+  if (!isValidUUID(id)) throw new Error('Invalid project ID')
+  const allowedUpdates: Record<string, unknown> = {}
+  if (updates.settings && typeof updates.settings === 'object') {
+    allowedUpdates.settings = updates.settings
+  }
+  if (typeof updates.name === 'string') {
+    allowedUpdates.name = updates.name
+  }
+  return projectPersistence?.updateProject(id, allowedUpdates)
 })
 
 ipcMain.handle('project:select-folder', async () => {

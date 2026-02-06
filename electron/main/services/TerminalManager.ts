@@ -19,6 +19,7 @@ export interface CreateTerminalOptions {
   projectId?: string
   worktreeId?: string
   resumeSessionId?: string
+  dangerouslySkipPermissions?: boolean
 }
 
 interface TerminalInstance {
@@ -133,9 +134,10 @@ export class TerminalManager {
     // Send initial state and start Claude Code (only for Claude terminals)
     if (type === 'claude') {
       this.sendToRenderer('terminal:state', id, 'busy')
-      const claudeCommand = resumeSessionId
-        ? `claude --resume "${resumeSessionId}"\r`
-        : 'claude\r'
+      const flags: string[] = []
+      if (resumeSessionId) flags.push(`--resume "${resumeSessionId}"`)
+      if (options.dangerouslySkipPermissions) flags.push('--dangerously-skip-permissions')
+      const claudeCommand = `claude${flags.length ? ' ' + flags.join(' ') : ''}\r`
       const claudeTimeout = setTimeout(() => {
         if (this.terminals.has(id)) ptyProcess.write(claudeCommand)
       }, SHELL_READY_DELAY_MS)
