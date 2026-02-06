@@ -98,7 +98,8 @@
       "Bash(dir:*)",
       "Bash(python3:*)",
       "Bash(git log:*)",
-      "Bash(gh release:*)"
+      "Bash(gh release:*)",
+      "WebFetch(domain:claudelog.com)"
     ]
   }
 }

@@ -156,7 +156,7 @@ async function restoreSessions(): Promise<void> {
       // Verify Claude session file exists (optional - Claude handles gracefully if missing)
       const sessionFileExists = await verifyClaudeSessionAsync(session.cwd, session.claudeSessionId)
 
-      return { session, valid: true, sessionFileExists }
+      return { session, project, valid: true, sessionFileExists }
     })
   )
 
@@ -167,7 +167,7 @@ async function restoreSessions(): Promise<void> {
       continue
     }
 
-    const { session, sessionFileExists } = result
+    const { session, project, sessionFileExists } = result
 
     try {
       if (!sessionFileExists) {
@@ -182,6 +182,7 @@ async function restoreSessions(): Promise<void> {
         projectId: session.projectId,
         worktreeId: session.worktreeId ?? undefined,
         resumeSessionId: sessionFileExists ? session.claudeSessionId : undefined,  // only resume if session file exists
+        dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
       })
 
       console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
@@ -358,8 +359,11 @@ ipcMain.handle('project:remove', async (_event, id: string) => {
 ipcMain.handle('project:update', async (_event, id: string, updates: Record<string, unknown>) => {
   if (!isValidUUID(id)) throw new Error('Invalid project ID')
   const allowedUpdates: Record<string, unknown> = {}
-  if (updates.settings && typeof updates.settings === 'object') {
-    allowedUpdates.settings = updates.settings
+  if (updates.settings && typeof updates.settings === 'object' && !Array.isArray(updates.settings)) {
+    const s = updates.settings as Record<string, unknown>
+    allowedUpdates.settings = {
+      dangerouslySkipPermissions: s.dangerouslySkipPermissions === true,
+    }
   }
   if (typeof updates.name === 'string') {
     allowedUpdates.name = updates.name
