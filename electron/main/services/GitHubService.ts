@@ -113,9 +113,28 @@ export class GitHubService {
   }
 
   async mergePR(projectPath: string, prNumber: number): Promise<void> {
+    // Get branch name before merging so we can clean up after
+    let branchName: string | null = null
+    try {
+      const { stdout } = await execFileAsync(
+        'gh',
+        ['pr', 'view', prNumber.toString(), '--json', 'headRefName', '--jq', '.headRefName'],
+        {
+          cwd: projectPath,
+          timeout: GH_TIMEOUT,
+          windowsHide: true,
+          env: { ...process.env, GH_PAGER: '' },
+        }
+      )
+      branchName = stdout.trim() || null
+    } catch {
+      // Continue without branch name
+    }
+
+    // Merge without --delete-branch to avoid failure when a worktree uses the branch
     await execFileAsync(
       'gh',
-      ['pr', 'merge', prNumber.toString(), '--squash', '--delete-branch'],
+      ['pr', 'merge', prNumber.toString(), '--squash'],
       {
         cwd: projectPath,
         timeout: 30_000,
@@ -123,6 +142,30 @@ export class GitHubService {
         env: { ...process.env, GH_PAGER: '' },
       }
     )
+
+    // Best-effort: delete remote branch (GitHub may have already done this)
+    if (branchName) {
+      try {
+        await execFileAsync(
+          'git',
+          ['push', 'origin', '--delete', branchName],
+          { cwd: projectPath, timeout: 15_000, windowsHide: true }
+        )
+      } catch {
+        // Already deleted or no permission — fine
+      }
+
+      // Best-effort: delete local branch (will fail if worktree uses it — that's OK)
+      try {
+        await execFileAsync(
+          'git',
+          ['branch', '-D', branchName],
+          { cwd: projectPath, timeout: 10_000, windowsHide: true }
+        )
+      } catch {
+        // Branch in use by worktree — will be cleaned up when worktree is removed
+      }
+    }
   }
 
   startPolling(key: string, projectPath: string) {

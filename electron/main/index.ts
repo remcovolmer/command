@@ -712,6 +712,19 @@ ipcMain.handle('worktree:remove', async (_event, worktreeId: string, force: bool
   // Remove the worktree using git
   await worktreeService!.removeWorktree(project.path, worktree.path, force)
 
+  // Delete the local branch now that the worktree is gone
+  if (worktree.branch) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        execFile('git', ['branch', '-D', worktree.branch], { cwd: project.path, timeout: 10_000 }, (err) => {
+          if (err) reject(err); else resolve()
+        })
+      })
+    } catch {
+      // Branch may already be deleted or is the current branch — fine
+    }
+  }
+
   // Remove from persistence
   projectPersistence!.removeWorktree(worktreeId)
 })
