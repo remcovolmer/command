@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
-import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
+import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { terminalEvents } from '../../utils/terminalEvents'
@@ -10,6 +10,7 @@ import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
 import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
 import { TerminalListItem } from './TerminalListItem'
+import { useCreateTerminal } from '../../hooks/useCreateTerminal'
 
 export function Sidebar() {
   // Use granular selectors to prevent unnecessary re-renders
@@ -55,6 +56,7 @@ export function Sidebar() {
   )
 
   const api = useMemo(() => getElectronAPI(), [])
+  const { createTerminal } = useCreateTerminal()
 
   // State for worktree dialog
   const [worktreeDialogProjectId, setWorktreeDialogProjectId] = useState<string | null>(null)
@@ -71,7 +73,9 @@ export function Sidebar() {
 
   // Load app version on mount
   useEffect(() => {
-    api.update.getVersion().then(setAppVersion)
+    api.update.getVersion().then(setAppVersion).catch((error) => {
+      console.error('Failed to get app version:', error)
+    })
   }, [api])
 
   // Load projects on mount
@@ -79,15 +83,21 @@ export function Sidebar() {
     loadProjects().then(() => {
       // Load worktrees for all projects after projects are loaded
       projects.forEach((project) => {
-        loadWorktrees(project.id)
+        loadWorktrees(project.id).catch((error) => {
+          console.error(`Failed to load worktrees for project ${project.id}:`, error)
+        })
       })
+    }).catch((error) => {
+      console.error('Failed to load projects:', error)
     })
   }, [loadProjects])
 
   // Load worktrees when projects change
   useEffect(() => {
     projects.forEach((project) => {
-      loadWorktrees(project.id)
+      loadWorktrees(project.id).catch((error) => {
+        console.error(`Failed to load worktrees for project ${project.id}:`, error)
+      })
     })
   }, [projects.length, loadWorktrees])
 
@@ -145,59 +155,25 @@ export function Sidebar() {
 
   const handleRemoveProject = async (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation()
-    await api.project.remove(projectId)
-    removeProject(projectId)
+    try {
+      await api.project.remove(projectId)
+      removeProject(projectId)
+    } catch (error) {
+      console.error('Failed to remove project:', error)
+    }
   }
 
   const handleCreateTerminal = async (projectId: string, worktreeId?: string) => {
-    // Enforce 1:1 worktree-terminal coupling
-    if (worktreeId) {
-      const existing = Object.values(terminals).find((t) => t.worktreeId === worktreeId)
-      if (existing) {
-        // Already has a terminal — just select it
-        setActiveTerminal(existing.id)
-        return
-      }
-    }
-
-    // Check terminal limit (max per project)
-    const projectTerminals = Object.values(terminals).filter(
-      (t) => t.projectId === projectId
-    )
-    if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
-      api.notification.show(
-        'Chat Limit',
-        `Maximum ${MAX_TERMINALS_PER_PROJECT} chats per project`
-      )
-      return
-    }
-
-    const terminalId = await api.terminal.create(projectId, worktreeId)
-
-    // For worktree terminals, use the worktree name as the tab title
-    const worktree = worktreeId
-      ? Object.values(worktrees).find((w) => w.id === worktreeId)
-      : null
-
-    const title = worktree
-      ? worktree.name
-      : `Chat ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
-
-    const terminal: TerminalSession = {
-      id: terminalId,
-      projectId,
-      worktreeId: worktreeId ?? null,
-      state: 'busy',
-      lastActivity: Date.now(),
-      title,
-      type: 'claude',
-    }
-    addTerminal(terminal)
+    await createTerminal(projectId, { worktreeId })
   }
 
-  const handleCloseTerminal = (e: React.MouseEvent, terminalId: string) => {
+  const handleCloseTerminal = async (e: React.MouseEvent, terminalId: string) => {
     e.stopPropagation()
-    api.terminal.close(terminalId)
+    try {
+      await api.terminal.close(terminalId)
+    } catch (error) {
+      console.error('Failed to close terminal:', error)
+    }
     removeTerminal(terminalId)
   }
 
@@ -208,20 +184,20 @@ export function Sidebar() {
   const handleWorktreeCreated = (worktree: Worktree) => {
     addWorktree(worktree)
     // Automatically create a terminal in the new worktree
-    handleCreateTerminal(worktree.projectId, worktree.id)
+    createTerminal(worktree.projectId, { worktreeId: worktree.id })
   }
 
   const handleRemoveWorktree = async (worktreeId: string) => {
-    // Check for uncommitted changes
-    const hasChanges = await api.worktree.hasChanges(worktreeId)
-    if (hasChanges) {
-      const confirmed = window.confirm(
-        'This worktree has uncommitted changes. Are you sure you want to remove it?'
-      )
-      if (!confirmed) return
-    }
-
     try {
+      // Check for uncommitted changes
+      const hasChanges = await api.worktree.hasChanges(worktreeId)
+      if (hasChanges) {
+        const confirmed = window.confirm(
+          'This worktree has uncommitted changes. Are you sure you want to remove it?'
+        )
+        if (!confirmed) return
+      }
+
       // Close all terminals in worktree first
       const terminalsToClose = Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
       terminalsToClose.forEach((t) => {
