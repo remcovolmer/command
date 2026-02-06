@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, Keyboard, Settings } from 'lucide-react'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import { HotkeySection } from './HotkeySection'
+import { GeneralSection } from './GeneralSection'
 
 interface SettingsDialogProps {
   isOpen: boolean
@@ -71,11 +72,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === 'shortcuts' && <HotkeySection />}
-          {activeTab === 'general' && (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>General settings coming soon...</p>
-            </div>
-          )}
+          {activeTab === 'general' && <GeneralSection />}
         </div>
       </div>
     </div>

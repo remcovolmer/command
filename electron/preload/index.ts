@@ -26,6 +26,10 @@ const ALLOWED_LISTENER_CHANNELS = [
 // NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type ProjectType = 'workspace' | 'project' | 'code'
 
+interface ProjectSettings {
+  dangerouslySkipPermissions?: boolean
+}
+
 interface Project {
   id: string
   name: string
@@ -33,6 +37,7 @@ interface Project {
   type: ProjectType
   createdAt: number
   sortOrder: number
+  settings?: ProjectSettings
 }
 
 interface Worktree {
@@ -196,6 +201,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     remove: (id: string): Promise<void> =>
       ipcRenderer.invoke('project:remove', id),
+
+    update: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>): Promise<Project | null> =>
+      ipcRenderer.invoke('project:update', id, updates),
 
     selectFolder: (): Promise<string | null> =>
       ipcRenderer.invoke('project:select-folder'),

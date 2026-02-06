@@ -3,8 +3,12 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-// NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
+// NOTE: Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type ProjectType = 'workspace' | 'project' | 'code'
+
+interface ProjectSettings {
+  dangerouslySkipPermissions?: boolean
+}
 
 interface Project {
   id: string
@@ -13,6 +17,7 @@ interface Project {
   type: ProjectType
   createdAt: number
   sortOrder: number
+  settings?: ProjectSettings
 }
 
 interface Worktree {
@@ -71,7 +76,7 @@ interface PersistedState {
   sessions: PersistedSession[]  // Sessions to restore on startup
 }
 
-const STATE_VERSION = 3
+const STATE_VERSION = 4
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -135,7 +140,7 @@ export class ProjectPersistence {
       return this.migrateState(v2State)
     }
 
-    // Migrate from version 2 to 3: add project type
+    // Migrate from version 2 to current: add project type, sessions, settings
     if (oldState.version === 2) {
       // Filter out malformed projects before migration
       const validProjects = oldState.projects.filter(p =>
@@ -155,13 +160,13 @@ export class ProjectPersistence {
       }
     }
 
-    // Migrate from version 2 to 3: add sessions
-    if (oldState.version === 2) {
+    // Migrate from version 3 to 4: add project settings (no-op, settings is optional)
+    if (oldState.version === 3) {
       return {
         version: STATE_VERSION,
         projects: oldState.projects,
         worktrees: oldState.worktrees ?? {},
-        sessions: [],
+        sessions: oldState.sessions ?? [],
       }
     }
 
@@ -236,7 +241,8 @@ export class ProjectPersistence {
   updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'createdAt'>>): Project | null {
     const project = this.state.projects.find(p => p.id === id)
     if (project) {
-      Object.assign(project, updates)
+      if ('name' in updates && typeof updates.name === 'string') project.name = updates.name
+      if ('settings' in updates) project.settings = updates.settings
       this.saveState()
       return project
     }

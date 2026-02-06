@@ -1,6 +1,10 @@
 // Project types
 export type ProjectType = 'workspace' | 'project' | 'code';
 
+export interface ProjectSettings {
+  dangerouslySkipPermissions?: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -8,6 +12,7 @@ export interface Project {
   type: ProjectType;
   createdAt: number;
   sortOrder: number;
+  settings?: ProjectSettings;
 }
 
 // Worktree types
@@ -197,6 +202,7 @@ export interface ElectronAPI {
     list: () => Promise<Project[]>;
     add: (path: string, name?: string, type?: ProjectType) => Promise<Project>;
     remove: (id: string) => Promise<void>;
+    update: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>) => Promise<Project | null>;
     selectFolder: () => Promise<string | null>;
     reorder: (projectIds: string[]) => Promise<Project[]>;
   };

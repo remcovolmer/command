@@ -156,7 +156,7 @@ async function restoreSessions(): Promise<void> {
       // Verify Claude session file exists (optional - Claude handles gracefully if missing)
       const sessionFileExists = await verifyClaudeSessionAsync(session.cwd, session.claudeSessionId)
 
-      return { session, valid: true, sessionFileExists }
+      return { session, project, valid: true, sessionFileExists }
     })
   )
 
@@ -167,7 +167,7 @@ async function restoreSessions(): Promise<void> {
       continue
     }
 
-    const { session, sessionFileExists } = result
+    const { session, project, sessionFileExists } = result
 
     try {
       if (!sessionFileExists) {
@@ -182,6 +182,7 @@ async function restoreSessions(): Promise<void> {
         projectId: session.projectId,
         worktreeId: session.worktreeId ?? undefined,
         resumeSessionId: sessionFileExists ? session.claudeSessionId : undefined,  // only resume if session file exists
+        dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
       })
 
       console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
@@ -286,6 +287,10 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     throw new Error('Invalid terminal type')
   }
 
+  // Look up project for settings and path
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === projectId)
+
   // Determine the working directory and initial title
   let cwd: string
   let initialTitle: string | undefined
@@ -300,9 +305,6 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     // Use worktree name as terminal title
     initialTitle = worktree.name
   } else {
-    // Use project path
-    const projects = projectPersistence?.getProjects() ?? []
-    const project = projects.find(p => p.id === projectId)
     cwd = project?.path ?? process.cwd()
   }
 
@@ -315,6 +317,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     initialTitle,
     projectId,
     worktreeId: worktreeId ?? undefined,
+    dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
   })
 })
 
@@ -326,6 +329,8 @@ ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
 
 ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: number) => {
   if (!isValidUUID(terminalId)) return
+  if (typeof cols !== 'number' || !Number.isFinite(cols)) return
+  if (typeof rows !== 'number' || !Number.isFinite(rows)) return
   const safeCols = clamp(cols, 1, 500)
   const safeRows = clamp(rows, 1, 200)
   terminalManager?.resizeTerminal(terminalId, safeCols, safeRows)
@@ -351,6 +356,21 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
   return projectPersistence?.removeProject(id)
+})
+
+ipcMain.handle('project:update', async (_event, id: string, updates: Record<string, unknown>) => {
+  if (!isValidUUID(id)) throw new Error('Invalid project ID')
+  const allowedUpdates: Record<string, unknown> = {}
+  if (updates.settings && typeof updates.settings === 'object' && !Array.isArray(updates.settings)) {
+    const s = updates.settings as Record<string, unknown>
+    allowedUpdates.settings = {
+      dangerouslySkipPermissions: s.dangerouslySkipPermissions === true,
+    }
+  }
+  if (typeof updates.name === 'string') {
+    allowedUpdates.name = updates.name
+  }
+  return projectPersistence?.updateProject(id, allowedUpdates)
 })
 
 ipcMain.handle('project:select-folder', async () => {
