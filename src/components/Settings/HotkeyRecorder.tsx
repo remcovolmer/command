@@ -43,13 +43,12 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
   }, [])
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown, { capture: true })
-    window.addEventListener('keyup', handleKeyUp, { capture: true })
+    const controller = new AbortController()
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, { capture: true })
-      window.removeEventListener('keyup', handleKeyUp, { capture: true })
-    }
+    window.addEventListener('keydown', handleKeyDown, { capture: true, signal: controller.signal })
+    window.addEventListener('keyup', handleKeyUp, { capture: true, signal: controller.signal })
+
+    return () => controller.abort()
   }, [handleKeyDown, handleKeyUp])
 
   const handleSave = () => {
