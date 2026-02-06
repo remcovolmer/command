@@ -120,4 +120,7 @@ process.stdin.on('end', async () => {
   } catch (e) {
     // Silent fail - don't interfere with Claude Code
   }
+
+  // Ensure prompt exit — avoids lingering process blocking Claude Code
+  process.exit(0);
 });

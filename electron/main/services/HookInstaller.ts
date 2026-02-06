@@ -11,6 +11,8 @@ interface ClaudeSettings {
       hooks: Array<{
         type: string
         command: string
+        async?: boolean
+        timeout?: number
       }>
     }>
   }
@@ -71,7 +73,9 @@ export function installClaudeHooks(): void {
   const ourHook = {
     hooks: [{
       type: 'command',
-      command: `node "${normalizePath(hookScriptPath)}"`
+      command: `node "${normalizePath(hookScriptPath)}"`,
+      async: true,
+      timeout: 30
     }]
   }
 
@@ -85,28 +89,38 @@ export function installClaudeHooks(): void {
     'PermissionRequest'
   ]
 
-  let installed = false
+  let changed = false
   for (const event of hookEvents) {
     settings.hooks[event] = settings.hooks[event] || []
 
-    // Check if our hook is already installed
-    const hasOurHook = settings.hooks[event].some(
+    // Find existing hook entry
+    const existingIdx = settings.hooks[event].findIndex(
       (h) => h.hooks?.some((hh) => hh.command?.includes('claude-state-hook'))
     )
 
-    if (!hasOurHook) {
+    if (existingIdx === -1) {
+      // Not installed yet — add it
       settings.hooks[event].push(ourHook)
-      installed = true
+      changed = true
       console.log(`[HookInstaller] Added hook for ${event}`)
+    } else {
+      // Already installed — migrate if missing async or command path changed
+      const existing = settings.hooks[event][existingIdx]
+      const hookEntry = existing.hooks?.find((hh) => hh.command?.includes('claude-state-hook'))
+      if (hookEntry && (!hookEntry.async || hookEntry.command !== ourHook.hooks[0].command)) {
+        settings.hooks[event][existingIdx] = ourHook
+        changed = true
+        console.log(`[HookInstaller] Migrated hook for ${event} (async: true)`)
+      }
     }
   }
 
-  if (installed) {
+  if (changed) {
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-    console.log('[HookInstaller] Hooks installed successfully')
+    console.log('[HookInstaller] Hooks installed/updated successfully')
     console.log('[HookInstaller] Note: Restart Claude Code for hooks to take effect')
   } else {
-    console.log('[HookInstaller] Hooks already installed')
+    console.log('[HookInstaller] Hooks already up to date')
   }
 }
 
