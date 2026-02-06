@@ -140,7 +140,7 @@ export class ProjectPersistence {
       return this.migrateState(v2State)
     }
 
-    // Migrate from version 2 to 3: add project type
+    // Migrate from version 2 to current: add project type, sessions, settings
     if (oldState.version === 2) {
       // Filter out malformed projects before migration
       const validProjects = oldState.projects.filter(p =>
@@ -241,7 +241,8 @@ export class ProjectPersistence {
   updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'createdAt'>>): Project | null {
     const project = this.state.projects.find(p => p.id === id)
     if (project) {
-      Object.assign(project, updates)
+      if ('name' in updates && typeof updates.name === 'string') project.name = updates.name
+      if ('settings' in updates) project.settings = updates.settings
       this.saveState()
       return project
     }
