@@ -85,7 +85,10 @@ process.stdin.on('end', async () => {
         hook_event: hookEvent
       };
 
-      // Read-merge-write pattern for multi-session support
+      // Read-merge-write pattern for multi-session support.
+      // NOTE: With async hooks, concurrent writes are possible (e.g. rapid PreToolUse events).
+      // Last-writer-wins race is acceptable here because state is self-healing —
+      // the next hook event will overwrite with fresh state within milliseconds.
       // Use Object.create(null) to prevent prototype pollution
       let allStates = Object.create(null);
       try {

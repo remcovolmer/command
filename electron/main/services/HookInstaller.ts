@@ -75,7 +75,7 @@ export function installClaudeHooks(): void {
       type: 'command',
       command: `node "${normalizePath(hookScriptPath)}"`,
       async: true,
-      timeout: 30
+      timeout: 5
     }]
   }
 
@@ -116,9 +116,13 @@ export function installClaudeHooks(): void {
   }
 
   if (changed) {
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-    console.log('[HookInstaller] Hooks installed/updated successfully')
-    console.log('[HookInstaller] Note: Restart Claude Code for hooks to take effect')
+    try {
+      writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+      console.log('[HookInstaller] Hooks installed/updated successfully')
+      console.log('[HookInstaller] Note: Restart Claude Code for hooks to take effect')
+    } catch (e) {
+      console.error('[HookInstaller] Failed to write hooks:', e)
+    }
   } else {
     console.log('[HookInstaller] Hooks already up to date')
   }
