@@ -57,8 +57,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
     api.fs.watchFile(filePath)
 
     const unsubscribe = api.fs.onFileChanged((changedPath) => {
-      if (changedPath === filePath && !lastDirtyRef.current) {
-        // Reload content if no unsaved changes
+      if (changedPath === filePath) {
         api.fs.readFile(filePath).then((text) => {
           const editor = editorRef.current
           if (editor) {
@@ -70,6 +69,8 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
             }
           }
           savedContentRef.current = text
+          lastDirtyRef.current = false
+          setEditorDirty(tabId, false)
         }).catch((err) => {
           console.error('Failed to reload file:', err)
         })
@@ -80,7 +81,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
       api.fs.unwatchFile(filePath)
       unsubscribe()
     }
-  }, [filePath, api])
+  }, [filePath, api, tabId, setEditorDirty])
 
   const handleMount: OnMount = useCallback((editor) => {
     editorRef.current = editor

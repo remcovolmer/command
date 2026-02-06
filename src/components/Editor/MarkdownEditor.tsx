@@ -155,8 +155,7 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
     api.fs.watchFile(filePath)
 
     const unsubscribe = api.fs.onFileChanged((changedPath) => {
-      if (changedPath === filePath && !lastDirtyRef.current) {
-        // Reload content if no unsaved changes
+      if (changedPath === filePath) {
         api.fs.readFile(filePath).then((text) => {
           // Use the Milkdown replaceAll if available
           const replace = (window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace
@@ -168,6 +167,8 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
             savedContentRef.current = text
             currentContentRef.current = text
           }
+          lastDirtyRef.current = false
+          setEditorDirty(tabId, false)
         }).catch((err) => {
           console.error('Failed to reload file:', err)
         })
@@ -178,7 +179,7 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
       api.fs.unwatchFile(filePath)
       unsubscribe()
     }
-  }, [filePath, api])
+  }, [filePath, api, tabId, setEditorDirty])
 
   const handleContentChange = useCallback((markdown: string) => {
     currentContentRef.current = markdown
