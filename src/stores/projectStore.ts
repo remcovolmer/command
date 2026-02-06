@@ -99,6 +99,7 @@ interface ProjectStore {
   setProjects: (projects: Project[]) => void
   addProject: (project: Project) => void
   removeProject: (id: string) => void
+  updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>) => Promise<void>
   setActiveProject: (id: string | null) => void
   reorderProjects: (projectIds: string[]) => Promise<void>
 
@@ -514,6 +515,19 @@ export const useProjectStore = create<ProjectStore>()(
             activeCenterTabId: newActiveTerminalId,
           }
         }),
+
+      updateProject: async (id, updates) => {
+        const api = getElectronAPI()
+        try {
+          const result = await api.project.update(id, updates)
+          if (result) {
+            const projects = await api.project.list()
+            set({ projects })
+          }
+        } catch (error) {
+          console.error('Failed to update project:', error)
+        }
+      },
 
       reorderProjects: async (projectIds) => {
         const api = getElectronAPI()
