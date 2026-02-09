@@ -83,26 +83,50 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
     }
   }, [filePath, api, tabId, setEditorDirty])
 
+  const saveFile = useCallback(async () => {
+    const editor = editorRef.current
+    if (!editor) return
+    const value = editor.getValue()
+    try {
+      await api.fs.writeFile(filePath, value)
+      savedContentRef.current = value
+      setEditorDirty(tabId, false)
+      lastDirtyRef.current = false
+    } catch (err) {
+      console.error('Failed to save file:', err)
+    }
+  }, [api, filePath, tabId, setEditorDirty])
+
+  // Listen for global editor-save-request event (from hotkey system)
+  useEffect(() => {
+    if (!isActive) return
+    const handler = () => saveFile()
+    window.addEventListener('editor-save-request', handler)
+    return () => window.removeEventListener('editor-save-request', handler)
+  }, [isActive, saveFile])
+
+  // Backup Ctrl+S handler for when Monaco's addCommand doesn't fire
+  useEffect(() => {
+    if (!isActive) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        saveFile()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isActive, saveFile])
+
   const handleMount: OnMount = useCallback((editor) => {
     editorRef.current = editor
 
-    // Ctrl+S to save
+    // Monaco internal Ctrl+S (works when Monaco has focus)
     editor.addCommand(
-      // Monaco KeyMod.CtrlCmd | KeyCode.KeyS
       2048 | 49, // CtrlCmd = 2048, KeyS = 49
-      async () => {
-        const value = editor.getValue()
-        try {
-          await api.fs.writeFile(filePath, value)
-          savedContentRef.current = value
-          setEditorDirty(tabId, false)
-          lastDirtyRef.current = false
-        } catch (err) {
-          console.error('Failed to save file:', err)
-        }
-      }
+      () => saveFile()
     )
-  }, [api, filePath, tabId, setEditorDirty])
+  }, [saveFile])
 
   const handleChange = useCallback((value: string | undefined) => {
     if (value === undefined) return

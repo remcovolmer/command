@@ -54,11 +54,12 @@ function MilkdownEditorInner({ defaultValue, onContentChange }: MilkdownEditorIn
 interface EditorControlsProps {
   tabId: string
   filePath: string
+  isActive: boolean
   savedContentRef: React.MutableRefObject<string>
   currentContentRef: React.MutableRefObject<string>
 }
 
-function EditorControls({ tabId, filePath, savedContentRef, currentContentRef }: EditorControlsProps) {
+function EditorControls({ tabId, filePath, isActive, savedContentRef, currentContentRef }: EditorControlsProps) {
   const api = getElectronAPI()
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
   const [loading, getEditor] = useInstance()
@@ -77,8 +78,17 @@ function EditorControls({ tabId, filePath, savedContentRef, currentContentRef }:
     }
   }, [getEditor, loading, api, filePath, tabId, setEditorDirty, savedContentRef])
 
+  // Listen for global editor-save-request event (from hotkey system)
+  useEffect(() => {
+    if (!isActive) return
+    const handler = () => handleSave()
+    window.addEventListener('editor-save-request', handler)
+    return () => window.removeEventListener('editor-save-request', handler)
+  }, [isActive, handleSave])
+
   // Handle keyboard shortcut
   useEffect(() => {
+    if (!isActive) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
@@ -88,7 +98,7 @@ function EditorControls({ tabId, filePath, savedContentRef, currentContentRef }:
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleSave])
+  }, [isActive, handleSave])
 
   // Expose replaceAll for file watching updates
   useEffect(() => {
@@ -218,6 +228,7 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
         <EditorControls
           tabId={tabId}
           filePath={filePath}
+          isActive={isActive}
           savedContentRef={savedContentRef}
           currentContentRef={currentContentRef}
         />
