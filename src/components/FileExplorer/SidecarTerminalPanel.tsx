@@ -26,6 +26,7 @@ function SidecarTerminalInstance({
   isActive: boolean
 }) {
   const removeTerminal = useProjectStore((s) => s.removeTerminal)
+  const terminalProjectId = useProjectStore(s => s.terminals[terminalId]?.projectId ?? '')
 
   const handleExit = useCallback(() => {
     removeTerminal(terminalId)
@@ -34,6 +35,7 @@ function SidecarTerminalInstance({
   const containerRef = useXtermInstance({
     id: terminalId,
     isActive,
+    projectId: terminalProjectId,
     fontSize: 13,
     scrollback: 3000,
     onExit: handleExit,
