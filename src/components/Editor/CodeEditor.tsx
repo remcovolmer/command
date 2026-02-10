@@ -120,13 +120,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
 
   const handleMount: OnMount = useCallback((editor) => {
     editorRef.current = editor
-
-    // Monaco internal Ctrl+S (works when Monaco has focus)
-    editor.addCommand(
-      2048 | 49, // CtrlCmd = 2048, KeyS = 49
-      () => saveFile()
-    )
-  }, [saveFile])
+  }, [])
 
   const handleChange = useCallback((value: string | undefined) => {
     if (value === undefined) return
