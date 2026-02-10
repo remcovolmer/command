@@ -68,13 +68,13 @@ export function EditorContainer({ tabId, filePath, isActive }: EditorContainerPr
           <MarkdownEditor
             tabId={tabId}
             filePath={filePath}
-            isActive={true}
+            isActive={isActive}
           />
         ) : (
           <CodeEditor
             tabId={tabId}
             filePath={filePath}
-            isActive={true}
+            isActive={isActive}
           />
         )}
       </div>
