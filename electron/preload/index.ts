@@ -239,7 +239,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('shell:open-in-editor', path),
 
     openExternal: (url: string): Promise<void> =>
-      ipcRenderer.invoke('shell:openExternal', url),
+      ipcRenderer.invoke('shell:open-external', url),
   },
 
   // Notification operations

@@ -433,7 +433,7 @@ function validateFilePathInProject(filePath: string): string {
   const isInProject = projects.some(p => {
     const projectPath = path.resolve(p.path)
     const normalizedProject = isWin ? projectPath.toLowerCase() : projectPath
-    return normalizedResolved.startsWith(normalizedProject)
+    return normalizedResolved.startsWith(normalizedProject + path.sep) || normalizedResolved === normalizedProject
   })
 
   if (!isInProject) {
@@ -784,7 +784,7 @@ ipcMain.handle('shell:open-in-editor', async (_event, targetPath: string) => {
   })
 })
 
-ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+ipcMain.handle('shell:open-external', async (_event, url: string) => {
   if (typeof url !== 'string' || !url.match(/^https?:\/\//)) {
     throw new Error('Only HTTP/HTTPS URLs allowed')
   }

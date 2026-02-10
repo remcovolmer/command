@@ -3,7 +3,7 @@ import type { ElectronAPI } from '../types'
 
 // Matches file paths with extensions, optionally followed by :line or :line:col
 // Captures: relative paths (src/foo.ts), ./ paths, absolute Windows (C:\...) and Unix (/...) paths
-const FILE_PATH_RE = /(?:(?:[a-zA-Z]:)?(?:[/\\][\w.@~-]+)+\.\w+)(?::(\d+)(?::(\d+))?)?/g
+const FILE_PATH_RE = /(?:(?:[a-zA-Z]:)?(?:[/\\][\w.@~-]+)+\.\w+)(?::\d+(?::\d+)?)?/g
 
 function extractFileMatches(line: string): { path: string; start: number; end: number }[] {
   const matches: { path: string; start: number; end: number }[] = []
@@ -25,10 +25,27 @@ function extractFileMatches(line: string): { path: string; start: number; end: n
 export function createFileLinkProvider(
   terminal: Terminal,
   projectPath: string,
-  projectId: string,
   api: ElectronAPI,
-  openEditorTab: (filePath: string, fileName: string, projectId: string) => void,
+  openFile: (filePath: string, fileName: string) => void,
 ): ILinkProvider {
+  // Cache stat results to avoid redundant IPC calls across provideLinks invocations.
+  // Uses a max-size cap of 200 entries; oldest entries are evicted when the cap is reached.
+  const statCache = new Map<string, Promise<{ exists: boolean; isFile: boolean; resolved: string }>>()
+  const CACHE_MAX_SIZE = 200
+
+  function cachedStat(fullPath: string): Promise<{ exists: boolean; isFile: boolean; resolved: string }> {
+    const cached = statCache.get(fullPath)
+    if (cached) return cached
+    if (statCache.size >= CACHE_MAX_SIZE) {
+      // Evict the oldest entry (first key in insertion order)
+      const firstKey = statCache.keys().next().value
+      if (firstKey !== undefined) statCache.delete(firstKey)
+    }
+    const promise = api.fs.stat(fullPath)
+    statCache.set(fullPath, promise)
+    return promise
+  }
+
   return {
     provideLinks(bufferLineNumber: number, callback: (links: ILink[] | undefined) => void): void {
       const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
@@ -44,13 +61,16 @@ export function createFileLinkProvider(
         return
       }
 
+      // Cap to 10 matches per line to limit IPC stat calls
+      const cappedMatches = matches.slice(0, 10)
+
       Promise.all(
-        matches.map(async (m) => {
+        cappedMatches.map(async (m) => {
           const isAbsolute = /^[a-zA-Z]:[\\/]/.test(m.path) || m.path.startsWith('/')
           const fullPath = isAbsolute ? m.path : `${projectPath}/${m.path}`
 
           try {
-            const stat = await api.fs.stat(fullPath)
+            const stat = await cachedStat(fullPath)
             if (!stat.exists || !stat.isFile) return null
 
             const range: IBufferRange = {
@@ -64,7 +84,7 @@ export function createFileLinkProvider(
               range,
               text: lineText.substring(m.start, m.end),
               activate: () => {
-                openEditorTab(stat.resolved, fileName, projectId)
+                openFile(stat.resolved, fileName)
               },
             }
             return link
@@ -75,7 +95,7 @@ export function createFileLinkProvider(
       ).then((results) => {
         const links = results.filter((r): r is ILink => r !== null)
         callback(links.length > 0 ? links : undefined)
-      })
+      }).catch(() => { callback(undefined) })
     },
   }
 }

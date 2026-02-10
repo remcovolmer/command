@@ -155,7 +155,9 @@ export function useXtermInstance({
       const contextPath = worktree?.path || project?.path || ''
       if (contextPath) {
         terminal.registerLinkProvider(
-          createFileLinkProvider(terminal, contextPath, projectId, api, store.openEditorTab)
+          createFileLinkProvider(terminal, contextPath, api, (filePath, fileName) => {
+            store.openEditorTab(filePath, fileName, projectId)
+          })
         )
       }
     }
@@ -263,6 +265,8 @@ export function useXtermInstance({
       terminalRef.current = null
       fitAddonRef.current = null
     }
+  // Intentionally excludes: projectId, onExit, onTitle, fontSize, scrollback.
+  // This effect initializes once per terminal (guarded by hasInitializedRef).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, id, updateTerminalState, updateTerminalTitle, api, safeFit])
 
