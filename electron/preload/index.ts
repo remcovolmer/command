@@ -237,6 +237,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     openInEditor: (path: string): Promise<void> =>
       ipcRenderer.invoke('shell:open-in-editor', path),
+
+    openExternal: (url: string): Promise<void> =>
+      ipcRenderer.invoke('shell:openExternal', url),
   },
 
   // Notification operations
@@ -277,6 +280,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('fs:fileChanged', handler)
       return () => ipcRenderer.removeListener('fs:fileChanged', handler)
     },
+    stat: (filePath: string): Promise<{ exists: boolean; isFile: boolean; resolved: string }> =>
+      ipcRenderer.invoke('fs:stat', filePath),
   },
 
   // Git operations

@@ -503,6 +503,16 @@ ipcMain.handle('fs:unwatchFile', async (_event, filePath: string) => {
   }
 })
 
+ipcMain.handle('fs:stat', async (_event, filePath: string) => {
+  const resolved = validateFilePathInProject(filePath)
+  try {
+    const stat = await fs.stat(resolved)
+    return { exists: true, isFile: stat.isFile(), resolved }
+  } catch {
+    return { exists: false, isFile: false, resolved: '' }
+  }
+})
+
 // IPC Handlers for Git operations
 ipcMain.handle('git:status', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)
@@ -772,6 +782,13 @@ ipcMain.handle('shell:open-in-editor', async (_event, targetPath: string) => {
       else resolve()
     })
   })
+})
+
+ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+  if (typeof url !== 'string' || !url.match(/^https?:\/\//)) {
+    throw new Error('Only HTTP/HTTPS URLs allowed')
+  }
+  return shell.openExternal(url)
 })
 
 // IPC Handlers for App lifecycle

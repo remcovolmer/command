@@ -216,6 +216,7 @@ export interface ElectronAPI {
   shell: {
     openPath: (path: string) => Promise<string>;
     openInEditor: (path: string) => Promise<void>;
+    openExternal: (url: string) => Promise<void>;
   };
   notification: {
     show: (title: string, body: string) => void;
@@ -232,6 +233,7 @@ export interface ElectronAPI {
     watchFile: (filePath: string) => Promise<void>;
     unwatchFile: (filePath: string) => Promise<void>;
     onFileChanged: (callback: (filePath: string) => void) => Unsubscribe;
+    stat: (filePath: string) => Promise<{ exists: boolean; isFile: boolean; resolved: string }>;
   };
   git: {
     getStatus: (projectPath: string) => Promise<GitStatus>;

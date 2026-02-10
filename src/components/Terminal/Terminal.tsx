@@ -1,4 +1,5 @@
 import { useXtermInstance } from '../../hooks/useXtermInstance'
+import { useProjectStore } from '../../stores/projectStore'
 
 interface TerminalProps {
   id: string
@@ -6,9 +7,12 @@ interface TerminalProps {
 }
 
 export function Terminal({ id, isActive }: TerminalProps) {
+  const terminalProjectId = useProjectStore(s => s.terminals[id]?.projectId ?? '')
+
   const containerRef = useXtermInstance({
     id,
     isActive,
+    projectId: terminalProjectId,
     fontSize: 14,
   })
 
