@@ -240,6 +240,7 @@ export interface ElectronAPI {
     fetch: (projectPath: string) => Promise<string>;
     pull: (projectPath: string) => Promise<string>;
     push: (projectPath: string) => Promise<string>;
+    getRemoteUrl: (projectPath: string) => Promise<string | null>;
   };
   github: {
     checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;

@@ -294,6 +294,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:pull', projectPath),
     push: (projectPath: string): Promise<string> =>
       ipcRenderer.invoke('git:push', projectPath),
+    getRemoteUrl: (projectPath: string): Promise<string | null> =>
+      ipcRenderer.invoke('git:get-remote-url', projectPath),
   },
 
   // GitHub operations

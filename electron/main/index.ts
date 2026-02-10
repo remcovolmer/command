@@ -534,6 +534,11 @@ ipcMain.handle('git:push', async (_event, projectPath: string) => {
   return gitService?.push(projectPath)
 })
 
+ipcMain.handle('git:get-remote-url', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return gitService?.getRemoteUrl(projectPath) ?? null
+})
+
 // IPC Handlers for GitHub operations
 ipcMain.handle('github:check-available', async () => {
   const installed = await githubService!.isGhInstalled()

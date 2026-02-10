@@ -80,6 +80,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       label: 'Open in Antigravity',
       onClick: () => getElectronAPI().shell.openInEditor(project.path),
     },
+    ...(project.type === 'code' ? [{
+      label: 'Open on GitHub',
+      onClick: async () => {
+        try {
+          const url = await getElectronAPI().git.getRemoteUrl(project.path)
+          if (url) {
+            await getElectronAPI().shell.openExternal(url)
+          }
+        } catch {
+          // Remote URL unavailable or invalid
+        }
+      },
+    }] : []),
   ]
 
   // Show empty state for active project when there are no terminals

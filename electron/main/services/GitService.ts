@@ -212,6 +212,31 @@ export class GitService {
     return this.execGit(projectPath, ['push'])
   }
 
+  async getRemoteUrl(projectPath: string): Promise<string | null> {
+    try {
+      const url = await this.execGit(projectPath, ['config', '--get', 'remote.origin.url'])
+      if (!url) return null
+      return this.normalizeGitUrl(url)
+    } catch {
+      return null
+    }
+  }
+
+  private normalizeGitUrl(url: string): string {
+    // SCP-like SSH: git@github.com:owner/repo.git
+    const sshMatch = url.match(/^git@([^:]+):(.+?)(?:\.git)?$/)
+    if (sshMatch) {
+      return `https://${sshMatch[1]}/${sshMatch[2]}`
+    }
+    // URL-style SSH: ssh://git@github.com/owner/repo.git
+    const sshUrlMatch = url.match(/^ssh:\/\/[^@]+@([^/]+)\/(.+?)(?:\.git)?$/)
+    if (sshUrlMatch) {
+      return `https://${sshUrlMatch[1]}/${sshUrlMatch[2]}`
+    }
+    // HTTPS format: https://github.com/owner/repo.git
+    return url.replace(/\.git$/, '')
+  }
+
   private mapStatus(code: string): GitFileChange['status'] {
     switch (code) {
       case 'M':
