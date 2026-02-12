@@ -513,6 +513,49 @@ ipcMain.handle('fs:stat', async (_event, filePath: string) => {
   }
 })
 
+ipcMain.handle('fs:createFile', async (_event, filePath: string) => {
+  const resolved = validateFilePathInProject(filePath)
+  try {
+    await fs.access(resolved)
+    throw new Error('File already exists')
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'File already exists') throw err
+  }
+  await fs.writeFile(resolved, '', 'utf-8')
+})
+
+ipcMain.handle('fs:createDirectory', async (_event, dirPath: string) => {
+  const resolved = validateFilePathInProject(dirPath)
+  await fs.mkdir(resolved, { recursive: false })
+})
+
+ipcMain.handle('fs:rename', async (_event, oldPath: string, newPath: string) => {
+  const resolvedOld = validateFilePathInProject(oldPath)
+  const resolvedNew = validateFilePathInProject(newPath)
+  try {
+    await fs.access(resolvedNew)
+    throw new Error('Destination already exists')
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'Destination already exists') throw err
+  }
+  await fs.rename(resolvedOld, resolvedNew)
+})
+
+ipcMain.handle('fs:delete', async (_event, targetPath: string) => {
+  const resolved = validateFilePathInProject(targetPath)
+  const stat = await fs.stat(resolved)
+  if (stat.isDirectory()) {
+    await fs.rm(resolved, { recursive: true })
+  } else {
+    await fs.unlink(resolved)
+  }
+})
+
+ipcMain.handle('shell:show-item-in-folder', async (_event, filePath: string) => {
+  const resolved = validateFilePathInProject(filePath)
+  shell.showItemInFolder(resolved)
+})
+
 // IPC Handlers for Git operations
 ipcMain.handle('git:status', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)

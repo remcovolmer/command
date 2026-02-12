@@ -170,6 +170,41 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'file-explorer',
     enabled: true,
   },
+  'fileExplorer.newFile': {
+    key: 'n',
+    modifiers: ['ctrl', 'alt'],
+    description: 'New file in file explorer',
+    category: 'file-explorer',
+    enabled: true,
+  },
+  'fileExplorer.newFolder': {
+    key: 'n',
+    modifiers: ['ctrl', 'alt', 'shift'],
+    description: 'New folder in file explorer',
+    category: 'file-explorer',
+    enabled: true,
+  },
+  'fileExplorer.rename': {
+    key: 'F2',
+    modifiers: [],
+    description: 'Rename selected file/folder',
+    category: 'file-explorer',
+    enabled: true,
+  },
+  'fileExplorer.delete': {
+    key: 'Delete',
+    modifiers: [],
+    description: 'Delete selected file/folder',
+    category: 'file-explorer',
+    enabled: true,
+  },
+  'fileExplorer.copyPath': {
+    key: 'c',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Copy file path',
+    category: 'file-explorer',
+    enabled: true,
+  },
 
   // Editor
   'editor.closeTab': {
@@ -328,6 +363,9 @@ export function formatBinding(binding: HotkeyBinding): string {
       break;
     case 'Enter':
       keyDisplay = '↵';
+      break;
+    case 'Delete':
+      keyDisplay = 'Del';
       break;
     case ' ':
       keyDisplay = 'Space';

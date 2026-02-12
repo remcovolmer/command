@@ -75,6 +75,22 @@ interface ProjectStore {
   setActiveSidecarTerminal: (contextKey: string, id: string | null) => void
   getSidecarTerminals: (contextKey: string) => TerminalSession[]
 
+  // File explorer interaction state (ephemeral, not persisted)
+  fileExplorerSelectedPath: string | null
+  fileExplorerRenamingPath: string | null
+  fileExplorerCreating: { parentPath: string; type: 'file' | 'directory' } | null
+  fileExplorerDeletingEntry: FileSystemEntry | null
+
+  // File explorer interaction actions
+  setFileExplorerSelectedPath: (path: string | null) => void
+  startRename: (path: string) => void
+  cancelRename: () => void
+  startCreate: (parentPath: string, type: 'file' | 'directory') => void
+  cancelCreate: () => void
+  setDeletingEntry: (entry: FileSystemEntry | null) => void
+  clearDeletingEntry: () => void
+  refreshDirectory: (dirPath: string) => Promise<void>
+
   // File explorer actions
   toggleFileExplorer: () => void
   setFileExplorerVisible: (visible: boolean) => void
@@ -146,6 +162,12 @@ export const useProjectStore = create<ProjectStore>()(
       fileExplorerActiveTab: 'files',
       expandedPaths: {},
       directoryCache: {},
+
+      // File explorer interaction state (ephemeral)
+      fileExplorerSelectedPath: null,
+      fileExplorerRenamingPath: null,
+      fileExplorerCreating: null,
+      fileExplorerDeletingEntry: null,
 
       // Theme state (light is default)
       theme: 'light',
@@ -347,6 +369,43 @@ export const useProjectStore = create<ProjectStore>()(
         const state = get()
         const ids = state.sidecarTerminals[contextKey] ?? []
         return ids.map((id) => state.terminals[id]).filter(Boolean)
+      },
+
+      // File explorer interaction actions
+      setFileExplorerSelectedPath: (path) =>
+        set({ fileExplorerSelectedPath: path }),
+
+      startRename: (path) =>
+        set({ fileExplorerRenamingPath: path, fileExplorerCreating: null }),
+
+      cancelRename: () =>
+        set({ fileExplorerRenamingPath: null }),
+
+      startCreate: (parentPath, type) =>
+        set({ fileExplorerCreating: { parentPath, type }, fileExplorerRenamingPath: null }),
+
+      cancelCreate: () =>
+        set({ fileExplorerCreating: null }),
+
+      setDeletingEntry: (entry) =>
+        set({ fileExplorerDeletingEntry: entry }),
+
+      clearDeletingEntry: () =>
+        set({ fileExplorerDeletingEntry: null }),
+
+      refreshDirectory: async (dirPath) => {
+        const api = getElectronAPI()
+        try {
+          const entries = await api.fs.readDirectory(dirPath)
+          set((state) => ({
+            directoryCache: {
+              ...state.directoryCache,
+              [dirPath]: entries,
+            },
+          }))
+        } catch (error) {
+          console.error('Failed to refresh directory:', error)
+        }
       },
 
       // File explorer actions

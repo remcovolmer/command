@@ -5,6 +5,7 @@ import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
 import { FileExplorerTabBar } from './FileExplorerTabBar'
 import { SidecarTerminalPanel } from './SidecarTerminalPanel'
+import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { getElectronAPI } from '../../utils/electron'
 
 const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
@@ -17,6 +18,7 @@ export function FileExplorer() {
   const projects = useProjectStore((s) => s.projects)
   const activeTab = useProjectStore((s) => s.fileExplorerActiveTab)
   const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
+  const fileExplorerDeletingEntry = useProjectStore((s) => s.fileExplorerDeletingEntry)
 
   // Determine git context from active terminal (worktree or project root)
   const activeWorktree = useProjectStore((s) => {
@@ -200,6 +202,14 @@ export function FileExplorer() {
               setSidecarTerminalCollapsed(false)
             }
           }}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {fileExplorerDeletingEntry && activeProjectId && (
+        <DeleteConfirmDialog
+          entry={fileExplorerDeletingEntry}
+          projectId={activeProjectId}
         />
       )}
     </div>
