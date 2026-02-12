@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FileSystemEntry } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { getParentPath } from '../../utils/paths'
 
 interface DeleteConfirmDialogProps {
   entry: FileSystemEntry
@@ -13,6 +14,8 @@ export function DeleteConfirmDialog({ entry, projectId }: DeleteConfirmDialogPro
   const cancelRef = useRef<HTMLButtonElement>(null)
   const clearDeletingEntry = useProjectStore((s) => s.clearDeletingEntry)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
+  const cleanupAfterDelete = useProjectStore((s) => s.cleanupAfterDelete)
+  const [error, setError] = useState<string | null>(null)
 
   const isDirectory = entry.type === 'directory'
 
@@ -30,13 +33,6 @@ export function DeleteConfirmDialog({ entry, projectId }: DeleteConfirmDialogPro
     return () => document.removeEventListener('keydown', handleKey)
   }, [clearDeletingEntry])
 
-  const getParentPath = (filePath: string) => {
-    const sep = filePath.includes('\\') ? '\\' : '/'
-    const parts = filePath.split(sep)
-    parts.pop()
-    return parts.join(sep)
-  }
-
   const handleDelete = async () => {
     try {
       await api.fs.delete(entry.path)
@@ -50,34 +46,14 @@ export function DeleteConfirmDialog({ entry, projectId }: DeleteConfirmDialogPro
         state.closeEditorTab(tab.id)
       }
 
-      // Remove expandedPaths starting with deleted path
-      const currentPaths = state.expandedPaths[projectId] ?? []
-      const filteredPaths = currentPaths.filter(
-        (p) => p !== entry.path && !p.startsWith(entry.path + '\\') && !p.startsWith(entry.path + '/')
-      )
-      if (filteredPaths.length !== currentPaths.length) {
-        useProjectStore.setState((s) => ({
-          expandedPaths: { ...s.expandedPaths, [projectId]: filteredPaths },
-        }))
-      }
-
-      // Remove deleted path from directory cache
-      useProjectStore.setState((s) => {
-        const newCache = { ...s.directoryCache }
-        delete newCache[entry.path]
-        // Also remove any children caches
-        for (const key of Object.keys(newCache)) {
-          if (key.startsWith(entry.path + '\\') || key.startsWith(entry.path + '/')) {
-            delete newCache[key]
-          }
-        }
-        return { directoryCache: newCache }
-      })
+      // Clean up expandedPaths and directoryCache
+      cleanupAfterDelete(projectId, entry.path)
 
       clearDeletingEntry()
       await refreshDirectory(getParentPath(entry.path))
-    } catch (error) {
-      console.error('Failed to delete:', error)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Delete failed'
+      setError(msg)
     }
   }
 
@@ -97,6 +73,9 @@ export function DeleteConfirmDialog({ entry, projectId }: DeleteConfirmDialogPro
           <p className="text-sm text-destructive mb-4">
             This will permanently delete the folder and all its contents.
           </p>
+        )}
+        {error && (
+          <p className="text-sm text-destructive mb-4">{error}</p>
         )}
         <div className="flex justify-end gap-3">
           <button

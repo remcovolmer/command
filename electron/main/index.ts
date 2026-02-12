@@ -395,13 +395,27 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
     throw new Error('Invalid directory path')
   }
 
+  // Validate directory is within a registered project
+  const resolved = path.resolve(path.normalize(dirPath))
+  const projects = projectPersistence?.getProjects() ?? []
+  const isWin = process.platform === 'win32'
+  const normalizedResolved = isWin ? resolved.toLowerCase() : resolved
+  const isInProject = projects.some(p => {
+    const projectPath = path.resolve(p.path)
+    const normalizedProject = isWin ? projectPath.toLowerCase() : projectPath
+    return normalizedResolved.startsWith(normalizedProject + path.sep) || normalizedResolved === normalizedProject
+  })
+  if (!isInProject) {
+    throw new Error('Directory is outside of any registered project')
+  }
+
   try {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true })
+    const entries = await fs.readdir(resolved, { withFileTypes: true })
 
     const result = entries
       .map(entry => ({
         name: entry.name,
-        path: path.join(dirPath, entry.name),
+        path: path.join(resolved, entry.name),
         type: entry.isDirectory() ? 'directory' : 'file',
         extension: entry.isFile() ? path.extname(entry.name).slice(1).toLowerCase() : undefined,
       }))
@@ -515,13 +529,8 @@ ipcMain.handle('fs:stat', async (_event, filePath: string) => {
 
 ipcMain.handle('fs:createFile', async (_event, filePath: string) => {
   const resolved = validateFilePathInProject(filePath)
-  try {
-    await fs.access(resolved)
-    throw new Error('File already exists')
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message === 'File already exists') throw err
-  }
-  await fs.writeFile(resolved, '', 'utf-8')
+  // wx flag: create exclusively, fails if file already exists (atomic)
+  await fs.writeFile(resolved, '', { flag: 'wx' })
 })
 
 ipcMain.handle('fs:createDirectory', async (_event, dirPath: string) => {
@@ -543,6 +552,19 @@ ipcMain.handle('fs:rename', async (_event, oldPath: string, newPath: string) => 
 
 ipcMain.handle('fs:delete', async (_event, targetPath: string) => {
   const resolved = validateFilePathInProject(targetPath)
+
+  // Prevent deleting project root directories
+  const projects = projectPersistence?.getProjects() ?? []
+  const isWin = process.platform === 'win32'
+  const normalizedResolved = isWin ? resolved.toLowerCase() : resolved
+  const isProjectRoot = projects.some(p => {
+    const projectPath = path.resolve(p.path)
+    return (isWin ? projectPath.toLowerCase() : projectPath) === normalizedResolved
+  })
+  if (isProjectRoot) {
+    throw new Error('Cannot delete project root directory')
+  }
+
   const stat = await fs.stat(resolved)
   if (stat.isDirectory()) {
     await fs.rm(resolved, { recursive: true })

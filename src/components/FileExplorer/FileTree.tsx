@@ -6,6 +6,7 @@ import { getElectronAPI } from '../../utils/electron'
 import { FileTreeNode } from './FileTreeNode'
 import { ContextMenu, type ContextMenuEntry } from '../Sidebar/ContextMenu'
 import { isEditableFile } from '../../utils/editorLanguages'
+import { getFileIcon, getFolderIcon } from './fileIcons'
 
 interface FileTreeProps {
   project: Project
@@ -236,9 +237,11 @@ function RootCreateEntry({ type, projectPath, projectId }: { type: 'file' | 'dir
   return (
     <div className="flex items-center gap-1.5 py-1 px-2" style={{ paddingLeft: '8px' }}>
       <span className="w-4 flex-shrink-0" />
-      <span className="w-4 h-4 flex-shrink-0 text-muted-foreground">
-        {type === 'directory' ? '📁' : '📄'}
-      </span>
+      {(() => {
+        const ic = type === 'directory' ? getFolderIcon(false) : getFileIcon('new')
+        const Ic = ic.icon
+        return <Ic className="w-4 h-4 flex-shrink-0" style={{ color: ic.color }} />
+      })()}
       <div className="flex-1 min-w-0">
         <input
           ref={inputRef}

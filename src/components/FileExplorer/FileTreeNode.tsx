@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { getFileIcon, getFolderIcon } from './fileIcons'
 import { isEditableFile } from '../../utils/editorLanguages'
+import { getParentPath } from '../../utils/paths'
 
 interface FileTreeNodeProps {
   entry: FileSystemEntry
@@ -25,7 +26,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
   const renameInputRef = useRef<HTMLInputElement>(null)
   const createInputRef = useRef<HTMLInputElement>(null)
 
-  // Use specific selectors to avoid creating new references
+  // Use specific selectors to avoid unnecessary re-renders
   const isExpanded = useProjectStore(
     (s) => s.expandedPaths[projectId]?.includes(entry.path) ?? false
   )
@@ -34,13 +35,12 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
   )
   const toggleExpandedPath = useProjectStore((s) => s.toggleExpandedPath)
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
-  const directoryCache = useProjectStore((s) => s.directoryCache)
   const openEditorTab = useProjectStore((s) => s.openEditorTab)
   const cancelRename = useProjectStore((s) => s.cancelRename)
   const cancelCreate = useProjectStore((s) => s.cancelCreate)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
-  const fileExplorerRenamingPath = useProjectStore((s) => s.fileExplorerRenamingPath)
-  const fileExplorerCreating = useProjectStore((s) => s.fileExplorerCreating)
+  const setFileExplorerSelectedPath = useProjectStore((s) => s.setFileExplorerSelectedPath)
+  const updateExpandedPathsAfterRename = useProjectStore((s) => s.updateExpandedPathsAfterRename)
 
   const isDirectory = entry.type === 'directory'
 
@@ -85,7 +85,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
   }, [isCreating])
 
   const handleExpand = async () => {
-    if (!directoryCache[entry.path]) {
+    if (!children) {
       setIsLoading(true)
       try {
         const contents = await api.fs.readDirectory(entry.path)
@@ -104,6 +104,9 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
   const handleClick = async () => {
     if (isRenaming) return
 
+    // Track selected path for keyboard shortcuts
+    setFileExplorerSelectedPath(entry.path)
+
     if (!isDirectory) {
       if (isEditableFile(entry.name, entry.extension)) {
         openEditorTab(entry.path, entry.name, projectId)
@@ -111,33 +114,17 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
       return
     }
 
-    // If expanding and not cached, load contents
-    if (!isExpanded && !directoryCache[entry.path]) {
-      setIsLoading(true)
-      try {
-        const contents = await api.fs.readDirectory(entry.path)
-        setDirectoryContents(entry.path, contents)
-      } catch (error) {
-        console.error('Failed to load directory:', error)
-      } finally {
-        setIsLoading(false)
-      }
+    if (isExpanded) {
+      toggleExpandedPath(projectId, entry.path)
+    } else {
+      await handleExpand()
     }
-
-    toggleExpandedPath(projectId, entry.path)
   }
 
   const handleRightClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     onContextMenu(entry, e.clientX, e.clientY)
-  }
-
-  const getParentPath = (filePath: string) => {
-    const sep = filePath.includes('\\') ? '\\' : '/'
-    const parts = filePath.split(sep)
-    parts.pop()
-    return parts.join(sep)
   }
 
   const handleRenameSubmit = async () => {
@@ -158,16 +145,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
 
       // Update expandedPaths if renamed directory was expanded
       if (isDirectory) {
-        const state = useProjectStore.getState()
-        const currentPaths = state.expandedPaths[projectId] ?? []
-        const updatedPaths = currentPaths.map((p) =>
-          p === entry.path ? newPath : p.startsWith(entry.path + sep) ? newPath + p.slice(entry.path.length) : p
-        )
-        if (JSON.stringify(updatedPaths) !== JSON.stringify(currentPaths)) {
-          useProjectStore.setState((s) => ({
-            expandedPaths: { ...s.expandedPaths, [projectId]: updatedPaths },
-          }))
-        }
+        updateExpandedPathsAfterRename(projectId, entry.path, newPath)
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Rename failed'
@@ -182,11 +160,13 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
       return
     }
 
+    if (!isCreating) return
+
     const sep = entry.path.includes('\\') ? '\\' : '/'
     const newPath = entry.path + sep + trimmed
 
     try {
-      if (isCreating!.type === 'file') {
+      if (isCreating.type === 'file') {
         await api.fs.createFile(newPath)
       } else {
         await api.fs.createDirectory(newPath)
@@ -195,7 +175,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
       await refreshDirectory(entry.path)
 
       // Open the file in editor if it's a file
-      if (isCreating!.type === 'file' && isEditableFile(trimmed)) {
+      if (isCreating.type === 'file' && isEditableFile(trimmed)) {
         openEditorTab(newPath, trimmed, projectId)
       }
     } catch (error: unknown) {
@@ -210,9 +190,9 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
 
   const Icon = iconConfig.icon
 
-  // Check if children have entries being renamed or created
-  const childRenamingPath = fileExplorerRenamingPath
-  const childCreating = fileExplorerCreating
+  // Read renaming/creating state for children via props from parent
+  const fileExplorerRenamingPath = useProjectStore((s) => s.fileExplorerRenamingPath)
+  const fileExplorerCreating = useProjectStore((s) => s.fileExplorerCreating)
 
   return (
     <div>
@@ -285,9 +265,11 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
               style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}
             >
               <span className="w-4 flex-shrink-0" />
-              <span className="w-4 h-4 flex-shrink-0 text-muted-foreground">
-                {isCreating.type === 'directory' ? '📁' : '📄'}
-              </span>
+              {(() => {
+                const ic = isCreating.type === 'directory' ? getFolderIcon(false) : getFileIcon('new')
+                const Ic = ic.icon
+                return <Ic className="w-4 h-4 flex-shrink-0" style={{ color: ic.color }} />
+              })()}
               <div className="flex-1 min-w-0">
                 <input
                   ref={createInputRef}
@@ -318,10 +300,10 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
               entry={child}
               projectId={projectId}
               depth={depth + 1}
-              isRenaming={childRenamingPath === child.path}
+              isRenaming={fileExplorerRenamingPath === child.path}
               isCreating={
-                childCreating && childCreating.parentPath === child.path
-                  ? { type: childCreating.type }
+                fileExplorerCreating && fileExplorerCreating.parentPath === child.path
+                  ? { type: fileExplorerCreating.type }
                   : null
               }
               onContextMenu={onContextMenu}

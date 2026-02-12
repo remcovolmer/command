@@ -90,6 +90,8 @@ interface ProjectStore {
   setDeletingEntry: (entry: FileSystemEntry | null) => void
   clearDeletingEntry: () => void
   refreshDirectory: (dirPath: string) => Promise<void>
+  updateExpandedPathsAfterRename: (projectId: string, oldPath: string, newPath: string) => void
+  cleanupAfterDelete: (projectId: string, deletedPath: string) => void
 
   // File explorer actions
   toggleFileExplorer: () => void
@@ -408,6 +410,46 @@ export const useProjectStore = create<ProjectStore>()(
         }
       },
 
+      updateExpandedPathsAfterRename: (projectId, oldPath, newPath) => {
+        set((state) => {
+          const currentPaths = state.expandedPaths[projectId] ?? []
+          const sep = oldPath.includes('\\') ? '\\' : '/'
+          const updatedPaths = currentPaths.map((p) =>
+            p === oldPath ? newPath : p.startsWith(oldPath + sep) ? newPath + p.slice(oldPath.length) : p
+          )
+          if (JSON.stringify(updatedPaths) !== JSON.stringify(currentPaths)) {
+            return { expandedPaths: { ...state.expandedPaths, [projectId]: updatedPaths } }
+          }
+          return {}
+        })
+      },
+
+      cleanupAfterDelete: (projectId, deletedPath) => {
+        set((state) => {
+          // Remove expandedPaths starting with deleted path
+          const currentPaths = state.expandedPaths[projectId] ?? []
+          const filteredPaths = currentPaths.filter(
+            (p) => p !== deletedPath && !p.startsWith(deletedPath + '\\') && !p.startsWith(deletedPath + '/')
+          )
+
+          // Remove deleted path and children from directory cache
+          const newCache = { ...state.directoryCache }
+          delete newCache[deletedPath]
+          for (const key of Object.keys(newCache)) {
+            if (key.startsWith(deletedPath + '\\') || key.startsWith(deletedPath + '/')) {
+              delete newCache[key]
+            }
+          }
+
+          return {
+            expandedPaths: filteredPaths.length !== currentPaths.length
+              ? { ...state.expandedPaths, [projectId]: filteredPaths }
+              : state.expandedPaths,
+            directoryCache: newCache,
+          }
+        })
+      },
+
       // File explorer actions
       toggleFileExplorer: () =>
         set((state) => ({ fileExplorerVisible: !state.fileExplorerVisible })),
@@ -572,6 +614,11 @@ export const useProjectStore = create<ProjectStore>()(
             activeProjectId: id,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveTerminalId,
+            // Clear ephemeral file explorer state to prevent cross-project operations
+            fileExplorerSelectedPath: null,
+            fileExplorerRenamingPath: null,
+            fileExplorerCreating: null,
+            fileExplorerDeletingEntry: null,
           }
         }),
 
