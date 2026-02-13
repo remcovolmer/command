@@ -74,44 +74,22 @@ export function FileTree({ project }: FileTreeProps) {
   }, [])
 
   const buildMenuItems = useCallback((entry: FileSystemEntry | null): ContextMenuEntry[] => {
-    if (!entry) {
-      // Right-click on empty area -> root operations
-      return [
-        { label: 'New File', onClick: () => startCreate(project.path, 'file'), shortcut: 'Ctrl+Alt+N' },
-        { label: 'New Folder', onClick: () => startCreate(project.path, 'directory'), shortcut: 'Ctrl+Alt+Shift+N' },
-      ]
-    }
+    // Determine where new files/folders should be created
+    const createPath = !entry
+      ? project.path
+      : entry.type === 'directory'
+        ? entry.path
+        : getParentPath(entry.path)
 
-    if (entry.type === 'directory') {
-      return [
-        { label: 'New File', onClick: () => startCreate(entry.path, 'file') },
-        { label: 'New Folder', onClick: () => startCreate(entry.path, 'directory') },
-        { type: 'separator' },
-        { label: 'Rename', onClick: () => startRename(entry.path), shortcut: 'F2' },
-        {
-          label: 'Copy Path',
-          onClick: () => navigator.clipboard.writeText(entry.path),
-          shortcut: 'Ctrl+Shift+C',
-        },
-        {
-          label: 'Reveal in File Explorer',
-          onClick: () => api.shell.showItemInFolder(entry.path),
-        },
-        { type: 'separator' },
-        {
-          label: 'Delete',
-          onClick: () => setDeletingEntry(entry),
-          shortcut: 'Del',
-          variant: 'destructive',
-        },
-      ]
-    }
+    const items: ContextMenuEntry[] = [
+      { label: 'New File', onClick: () => startCreate(createPath, 'file'), shortcut: 'Ctrl+Alt+N' },
+      { label: 'New Folder', onClick: () => startCreate(createPath, 'directory'), shortcut: 'Ctrl+Alt+Shift+N' },
+    ]
 
-    // File - create new items in the same parent directory
-    const parentPath = getParentPath(entry.path)
+    if (!entry) return items
+
     return [
-      { label: 'New File', onClick: () => startCreate(parentPath, 'file') },
-      { label: 'New Folder', onClick: () => startCreate(parentPath, 'directory') },
+      ...items,
       { type: 'separator' },
       { label: 'Rename', onClick: () => startRename(entry.path), shortcut: 'F2' },
       {
