@@ -205,7 +205,7 @@ function SplitPanel({ terminal, isActive, isLast, onSelect }: SplitPanelProps) {
         </div>
       </Panel>
       {!isLast && (
-        <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
+        <PanelResizeHandle className="w-1 transition-colors" />
       )}
     </>
   )

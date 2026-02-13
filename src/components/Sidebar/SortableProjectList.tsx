@@ -167,7 +167,7 @@ export function SortableProjectList({
       {/* Active Projects Section */}
       {activeProjects.length > 0 && (
         <section className="mb-2">
-          <h3 className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <h3 className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em]">
             Active
           </h3>
           <DndContext
@@ -208,7 +208,7 @@ export function SortableProjectList({
       {/* Inactive Projects Section */}
       {inactiveProjects.length > 0 && (
         <section>
-          <h3 className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <h3 className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em]">
             Inactive
           </h3>
           <DndContext

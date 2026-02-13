@@ -320,17 +320,21 @@ function App() {
 
       {/* Close Confirmation Dialog */}
       {showCloseDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-card-foreground mb-2">
-              Close Application?
-            </h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              You have {Object.keys(terminals).length} active terminal
-              {Object.keys(terminals).length > 1 ? 's' : ''}. Closing the
-              application will terminate all running sessions.
-            </p>
-            <div className="flex justify-end gap-3">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-sidebar border border-border rounded-xl max-w-md mx-4 shadow-2xl">
+            <div className="px-5 py-3 border-b border-border/30 bg-sidebar-accent/30 rounded-t-xl">
+              <h2 className="text-sm font-semibold text-foreground">
+                Close Application?
+              </h2>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs text-muted-foreground">
+                You have {Object.keys(terminals).length} active terminal
+                {Object.keys(terminals).length > 1 ? 's' : ''}. Closing the
+                application will terminate all running sessions.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 px-5 py-3 border-t border-border/30">
               <button
                 onClick={handleCancelClose}
                 className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"

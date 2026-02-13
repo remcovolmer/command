@@ -23,17 +23,17 @@ export function ShortcutsOverlay({ isOpen, onClose }: ShortcutsOverlayProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         onClick={onClose}
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-4xl max-h-[85vh] bg-background rounded-lg shadow-xl border border-border flex flex-col">
+      <div className="relative w-full max-w-4xl max-h-[85vh] bg-sidebar rounded-xl shadow-2xl border border-border flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-sidebar-accent/30">
           <div className="flex items-center gap-2">
-            <Keyboard className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Keyboard Shortcuts</h2>
+            <Keyboard className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Keyboard Shortcuts</h2>
           </div>
           <button
             onClick={onClose}
@@ -44,7 +44,7 @@ export function ShortcutsOverlay({ isOpen, onClose }: ShortcutsOverlayProps) {
         </div>
 
         {/* Content - Grid Layout */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           <div className="grid grid-cols-2 gap-8">
             {HOTKEY_CATEGORY_ORDER.map(category => {
               const items = groupedHotkeys.get(category)
@@ -77,7 +77,7 @@ export function ShortcutsOverlay({ isOpen, onClose }: ShortcutsOverlayProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-border text-center">
+        <div className="px-5 py-3 border-t border-border/30 text-center">
           <p className="text-xs text-muted-foreground">
             Press <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted border border-border rounded">Ctrl + ,</kbd> to customize shortcuts
           </p>

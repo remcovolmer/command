@@ -252,7 +252,7 @@ export function Sidebar() {
       <div className="px-3 mb-2">
         <button
           onClick={handleAddProject}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-sidebar-accent hover:bg-muted text-sidebar-foreground text-sm font-medium transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary text-sm font-medium transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add project
@@ -267,7 +267,7 @@ export function Sidebar() {
       */}
       {workspaceProjects.length > 0 && (
         <div className="px-3 mb-2">
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">
+          <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
             Workspaces
           </h2>
           <ul className="space-y-1">
@@ -280,10 +280,10 @@ export function Sidebar() {
                     onClick={() => setActiveProject(workspace.id)}
                     className={`
                       group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
-                      border-2 transition-colors duration-150
+                      transition-colors duration-150
                       ${isActive
-                        ? 'border-primary/50 bg-primary/10 text-sidebar-foreground'
-                        : 'border-transparent text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
+                        ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
+                        : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
                     `}
                   >
                     <Star
@@ -314,7 +314,7 @@ export function Sidebar() {
                   </div>
                   {/* Show terminals for workspaces (always visible) */}
                   {workspaceTerminals.length > 0 && (
-                    <ul className="ml-6 mt-1 space-y-0.5 border-l border-border pl-3">
+                    <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30 pl-3">
                       {workspaceTerminals.map((terminal) => (
                         <TerminalListItem
                           key={terminal.id}
@@ -328,7 +328,7 @@ export function Sidebar() {
                   )}
                   {/* Empty state for workspace with no terminals */}
                   {workspaceTerminals.length === 0 && (
-                    <div className="ml-6 pl-3 py-2 border-l border-border">
+                    <div className="ml-6 pl-3 py-2 border-l border-border/30">
                       <button
                         onClick={() => handleCreateTerminal(workspace.id)}
                         className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
@@ -347,7 +347,7 @@ export function Sidebar() {
 
       {/* Projects Section */}
       <div className="px-3 py-2">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">
+        <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
           Projects
         </h2>
       </div>
@@ -387,84 +387,80 @@ export function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-border">
-        <div className="flex items-center gap-3">
-          <img src="favicon.png" alt="Command" className="w-8 h-8" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">
-              Command
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {appVersion ? `v${appVersion}` : ''}
-            </p>
+      <div className="px-3 py-2 border-t border-border">
+        <div className="flex items-center">
+          <span className="text-xs text-muted-foreground flex-1">
+            {appVersion ? `v${appVersion}` : ''}
+          </span>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={handleCheckForUpdate}
+              disabled={updateStatus === 'checking'}
+              className={`p-1.5 rounded-lg transition-colors ${
+                updateStatus === 'available'
+                  ? 'bg-green-500/20 text-green-500'
+                  : updateStatus === 'up-to-date'
+                  ? 'text-green-500'
+                  : updateStatus === 'error'
+                  ? 'text-red-500'
+                  : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
+              } disabled:opacity-50`}
+              title={
+                updateStatus === 'checking'
+                  ? 'Checking for updates...'
+                  : updateStatus === 'available'
+                  ? `Update available: v${latestVersion}`
+                  : updateStatus === 'up-to-date'
+                  ? 'Up to date'
+                  : updateStatus === 'error'
+                  ? 'Failed to check for updates'
+                  : 'Check for updates'
+              }
+            >
+              {updateStatus === 'checking' ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : updateStatus === 'available' || updateStatus === 'up-to-date' ? (
+                <Check className="w-4 h-4" />
+              ) : updateStatus === 'error' ? (
+                <AlertCircle className="w-4 h-4" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+              title={`${theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </button>
+            <button
+              onClick={() => setSettingsDialogOpen(true)}
+              className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+              title={`Settings (${formatBinding(hotkeyConfig['ui.openSettings'])})`}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <button
+              onClick={toggleFileExplorer}
+              className={`p-1.5 rounded-lg transition-colors ${
+                fileExplorerVisible
+                  ? 'bg-sidebar-accent text-primary'
+                  : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
+              }`}
+              title={`${fileExplorerVisible ? 'Hide Files' : 'Show Files'} (${formatBinding(hotkeyConfig['fileExplorer.toggle'])})`}
+            >
+              {fileExplorerVisible ? (
+                <PanelRightClose className="w-4 h-4" />
+              ) : (
+                <PanelRightOpen className="w-4 h-4" />
+              )}
+            </button>
           </div>
-          <button
-            onClick={handleCheckForUpdate}
-            disabled={updateStatus === 'checking'}
-            className={`p-2 rounded-lg transition-colors ${
-              updateStatus === 'available'
-                ? 'bg-green-500/20 text-green-500'
-                : updateStatus === 'up-to-date'
-                ? 'text-green-500'
-                : updateStatus === 'error'
-                ? 'text-red-500'
-                : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
-            } disabled:opacity-50`}
-            title={
-              updateStatus === 'checking'
-                ? 'Checking for updates...'
-                : updateStatus === 'available'
-                ? `Update available: v${latestVersion}`
-                : updateStatus === 'up-to-date'
-                ? 'Up to date'
-                : updateStatus === 'error'
-                ? 'Failed to check for updates'
-                : 'Check for updates'
-            }
-          >
-            {updateStatus === 'checking' ? (
-              <RefreshCw className="w-5 h-5 animate-spin" />
-            ) : updateStatus === 'available' || updateStatus === 'up-to-date' ? (
-              <Check className="w-5 h-5" />
-            ) : updateStatus === 'error' ? (
-              <AlertCircle className="w-5 h-5" />
-            ) : (
-              <RefreshCw className="w-5 h-5" />
-            )}
-          </button>
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
-            title={`${theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-5 h-5" />
-            ) : (
-              <Moon className="w-5 h-5" />
-            )}
-          </button>
-          <button
-            onClick={() => setSettingsDialogOpen(true)}
-            className="p-2 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
-            title={`Settings (${formatBinding(hotkeyConfig['ui.openSettings'])})`}
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-          <button
-            onClick={toggleFileExplorer}
-            className={`p-2 rounded-lg transition-colors ${
-              fileExplorerVisible
-                ? 'bg-sidebar-accent text-primary'
-                : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
-            }`}
-            title={`${fileExplorerVisible ? 'Hide Files' : 'Show Files'} (${formatBinding(hotkeyConfig['fileExplorer.toggle'])})`}
-          >
-            {fileExplorerVisible ? (
-              <PanelRightClose className="w-5 h-5" />
-            ) : (
-              <PanelRightOpen className="w-5 h-5" />
-            )}
-          </button>
         </div>
       </div>
     </div>

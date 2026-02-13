@@ -23,17 +23,17 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         onClick={onClose}
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-3xl max-h-[85vh] bg-background rounded-lg shadow-xl border border-border flex flex-col">
+      <div className="relative w-full max-w-3xl max-h-[85vh] bg-sidebar rounded-xl shadow-2xl border border-border flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-sidebar-accent/30">
           <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Settings</h2>
+            <Settings className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Settings</h2>
           </div>
           <button
             onClick={onClose}
@@ -44,7 +44,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-border px-6">
+        <div className="flex border-b border-border/30 px-5">
           <button
             onClick={() => setActiveTab('shortcuts')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
@@ -70,7 +70,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           {activeTab === 'shortcuts' && <HotkeySection />}
           {activeTab === 'general' && <GeneralSection />}
         </div>

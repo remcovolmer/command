@@ -38,7 +38,7 @@ export function MainLayout() {
         </Panel>
 
         {/* Resize Handle */}
-        <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
+        <PanelResizeHandle className="w-1 transition-colors" />
 
         {/* Terminal Area */}
         <Panel id="terminals" defaultSize={60} minSize={30}>
@@ -46,7 +46,7 @@ export function MainLayout() {
         </Panel>
 
         {/* Resize Handle for File Explorer */}
-        <PanelResizeHandle className={`w-1 bg-border hover:bg-primary transition-colors ${!fileExplorerVisible ? 'hidden' : ''}`} />
+        <PanelResizeHandle className={`w-1 transition-colors ${!fileExplorerVisible ? 'hidden' : ''}`} />
 
         {/* File Explorer (always rendered, but collapsible) */}
         <Panel
