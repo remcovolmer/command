@@ -2,11 +2,12 @@ import { useState, useCallback, useEffect } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Terminal } from './Terminal'
 import { EditorContainer } from '../Editor/EditorContainer'
-import type { TerminalSession, EditorTab } from '../../types'
+import { DiffEditorView } from '../Editor/DiffEditorView'
+import type { TerminalSession, CenterTab, DiffTab } from '../../types'
 
 interface TerminalViewportProps {
   terminals: TerminalSession[]
-  editorTabs: EditorTab[]
+  editorTabs: CenterTab[]
   activeTerminalId: string | null
   activeCenterTabId: string | null
   splitTerminalIds: string[]
@@ -152,14 +153,22 @@ export function TerminalViewport({
           />
         ))}
 
-        {/* Render all editor tabs (hidden if not active) */}
+        {/* Render all editor/diff tabs (hidden if not active) */}
         {editorTabs.map((tab) => (
-          <EditorContainer
-            key={tab.id}
-            tabId={tab.id}
-            filePath={tab.filePath}
-            isActive={isEditorActive && tab.id === activeCenterTabId}
-          />
+          tab.type === 'diff' ? (
+            <DiffEditorView
+              key={tab.id}
+              tab={tab as DiffTab}
+              isActive={isEditorActive && tab.id === activeCenterTabId}
+            />
+          ) : (
+            <EditorContainer
+              key={tab.id}
+              tabId={tab.id}
+              filePath={tab.filePath}
+              isActive={isEditorActive && tab.id === activeCenterTabId}
+            />
+          )
         ))}
       </div>
 

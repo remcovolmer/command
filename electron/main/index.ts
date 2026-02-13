@@ -604,6 +604,37 @@ ipcMain.handle('git:get-remote-url', async (_event, projectPath: string) => {
   return gitService?.getRemoteUrl(projectPath) ?? null
 })
 
+ipcMain.handle('git:commit-log', async (_event, projectPath: string, skip?: number, limit?: number) => {
+  validateProjectPath(projectPath)
+  const safeSkip = typeof skip === 'number' && skip >= 0 ? skip : 0
+  const safeLimit = typeof limit === 'number' && limit >= 1 && limit <= 500 ? limit : 100
+  return gitService?.getCommitLog(projectPath, safeSkip, safeLimit) ?? { commits: [], hasMore: false }
+})
+
+ipcMain.handle('git:commit-detail', async (_event, projectPath: string, commitHash: string) => {
+  validateProjectPath(projectPath)
+  if (typeof commitHash !== 'string' || !/^[0-9a-f]{7,40}$/i.test(commitHash)) {
+    throw new Error('Invalid commit hash')
+  }
+  return gitService?.getCommitDetail(projectPath, commitHash) ?? null
+})
+
+ipcMain.handle('git:file-at-commit', async (_event, projectPath: string, commitHash: string, filePath: string) => {
+  validateProjectPath(projectPath)
+  if (typeof commitHash !== 'string' || !/^[0-9a-f]{7,40}$/i.test(commitHash)) {
+    throw new Error('Invalid commit hash')
+  }
+  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+    throw new Error('Invalid file path')
+  }
+  return gitService?.getFileAtCommit(projectPath, commitHash, filePath) ?? null
+})
+
+ipcMain.handle('git:head-hash', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return gitService?.getHeadHash(projectPath) ?? null
+})
+
 // IPC Handlers for GitHub operations
 ipcMain.handle('github:check-available', async () => {
   const installed = await githubService!.isGhInstalled()

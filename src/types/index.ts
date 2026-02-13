@@ -70,6 +70,20 @@ export interface EditorTab {
   projectId: string;
 }
 
+// Diff tab types (read-only, for viewing commit diffs)
+export interface DiffTab {
+  id: string;
+  type: 'diff';
+  filePath: string;
+  fileName: string;
+  commitHash: string;
+  parentHash: string;  // empty string for initial commits
+  projectId: string;
+}
+
+// Union of all center tab types
+export type CenterTab = EditorTab | DiffTab;
+
 // File system types
 export interface FileSystemEntry {
   name: string;
@@ -101,6 +115,40 @@ export interface GitStatus {
   conflicted: GitFileChange[];
   isClean: boolean;
   error?: string;
+}
+
+// Git commit types
+export interface GitCommit {
+  hash: string;
+  shortHash: string;
+  message: string;       // first line only
+  authorName: string;
+  authorDate: string;    // ISO 8601
+  parentHashes: string[];
+}
+
+export interface GitCommitFile {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  additions: number;
+  deletions: number;
+  oldPath?: string;
+}
+
+export interface GitCommitDetail {
+  hash: string;
+  fullMessage: string;
+  authorName: string;
+  authorEmail: string;
+  authorDate: string;
+  files: GitCommitFile[];
+  isMerge: boolean;
+  parentHashes: string[];
+}
+
+export interface GitCommitLog {
+  commits: GitCommit[];
+  hasMore: boolean;
 }
 
 // GitHub PR types
@@ -246,6 +294,10 @@ export interface ElectronAPI {
     pull: (projectPath: string) => Promise<string>;
     push: (projectPath: string) => Promise<string>;
     getRemoteUrl: (projectPath: string) => Promise<string | null>;
+    getCommitLog: (projectPath: string, skip?: number, limit?: number) => Promise<GitCommitLog>;
+    getCommitDetail: (projectPath: string, commitHash: string) => Promise<GitCommitDetail | null>;
+    getFileAtCommit: (projectPath: string, commitHash: string, filePath: string) => Promise<string | null>;
+    getHeadHash: (projectPath: string) => Promise<string | null>;
   };
   github: {
     checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;

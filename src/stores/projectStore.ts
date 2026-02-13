@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, GitCommit, GitCommitLog, GitCommitDetail, CenterTab } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
@@ -39,8 +39,8 @@ interface ProjectStore {
   prStatus: Record<string, PRStatus>  // key (worktreeId or projectId) -> PRStatus
   ghAvailable: { installed: boolean; authenticated: boolean } | null
 
-  // Editor tab state
-  editorTabs: Record<string, EditorTab>  // tabId -> EditorTab
+  // Editor tab state (includes both file editor and diff tabs)
+  editorTabs: Record<string, CenterTab>  // tabId -> EditorTab | DiffTab
   activeCenterTabId: string | null  // can be terminal or editor tab (type derived from lookup)
 
   // Hotkey configuration
@@ -108,6 +108,22 @@ interface ProjectStore {
   // Git status actions
   setGitStatus: (projectId: string, status: GitStatus) => void
   setGitStatusLoading: (projectId: string, loading: boolean) => void
+
+  // Git commit log state (not persisted)
+  gitCommitLog: Record<string, { commits: GitCommit[]; hasMore: boolean; cursor: number }>
+  gitCommitLogLoading: Record<string, boolean>
+  expandedCommitHash: Record<string, string | null>
+  gitHeadHash: Record<string, string | null>
+
+  // Git commit log actions
+  setGitCommitLog: (contextId: string, log: GitCommitLog) => void
+  appendGitCommitLog: (contextId: string, log: GitCommitLog) => void
+  setGitCommitLogLoading: (contextId: string, loading: boolean) => void
+  setExpandedCommit: (contextId: string, hash: string | null) => void
+  setGitHeadHash: (contextId: string, hash: string | null) => void
+
+  // Diff tab actions
+  openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string) => void
 
   // GitHub PR status actions
   setPRStatus: (key: string, status: PRStatus) => void
@@ -178,6 +194,12 @@ export const useProjectStore = create<ProjectStore>()(
       gitStatus: {},
       gitStatusLoading: {},
 
+      // Git commit log state (not persisted)
+      gitCommitLog: {},
+      gitCommitLogLoading: {},
+      expandedCommitHash: {},
+      gitHeadHash: {},
+
       // GitHub PR status (not persisted)
       prStatus: {},
       ghAvailable: null,
@@ -239,7 +261,8 @@ export const useProjectStore = create<ProjectStore>()(
       setEditorDirty: (tabId, isDirty) =>
         set((state) => {
           const tab = state.editorTabs[tabId]
-          if (!tab || tab.isDirty === isDirty) return state
+          if (!tab || tab.type !== 'editor') return state
+          if (tab.isDirty === isDirty) return state
           return {
             editorTabs: {
               ...state.editorTabs,
@@ -514,6 +537,60 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           gitStatusLoading: { ...state.gitStatusLoading, [projectId]: loading },
         })),
+
+      // Git commit log actions
+      setGitCommitLog: (contextId, log) =>
+        set((state) => ({
+          gitCommitLog: {
+            ...state.gitCommitLog,
+            [contextId]: { commits: log.commits, hasMore: log.hasMore, cursor: log.commits.length },
+          },
+        })),
+
+      appendGitCommitLog: (contextId, log) =>
+        set((state) => {
+          const existing = state.gitCommitLog[contextId]
+          const commits = existing ? [...existing.commits, ...log.commits] : log.commits
+          return {
+            gitCommitLog: {
+              ...state.gitCommitLog,
+              [contextId]: { commits, hasMore: log.hasMore, cursor: commits.length },
+            },
+          }
+        }),
+
+      setGitCommitLogLoading: (contextId, loading) =>
+        set((state) => ({
+          gitCommitLogLoading: { ...state.gitCommitLogLoading, [contextId]: loading },
+        })),
+
+      setExpandedCommit: (contextId, hash) =>
+        set((state) => ({
+          expandedCommitHash: { ...state.expandedCommitHash, [contextId]: hash },
+        })),
+
+      setGitHeadHash: (contextId, hash) =>
+        set((state) => ({
+          gitHeadHash: { ...state.gitHeadHash, [contextId]: hash },
+        })),
+
+      // Diff tab actions
+      openDiffTab: (filePath, fileName, commitHash, parentHash, projectId) =>
+        set((state) => {
+          // Check if already open with same commit+file
+          const existing = Object.values(state.editorTabs).find(
+            (t) => t.type === 'diff' && (t as DiffTab).commitHash === commitHash && t.filePath === filePath
+          )
+          if (existing) {
+            return { activeCenterTabId: existing.id }
+          }
+          const id = `diff-${crypto.randomUUID()}`
+          const tab: DiffTab = { id, type: 'diff', filePath, fileName, commitHash, parentHash, projectId }
+          return {
+            editorTabs: { ...state.editorTabs, [id]: tab },
+            activeCenterTabId: id,
+          }
+        }),
 
       // GitHub PR status actions
       setPRStatus: (key, status) =>

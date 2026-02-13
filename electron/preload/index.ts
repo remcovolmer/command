@@ -87,6 +87,39 @@ interface GitStatus {
   error?: string
 }
 
+interface GitCommit {
+  hash: string
+  shortHash: string
+  message: string
+  authorName: string
+  authorDate: string
+  parentHashes: string[]
+}
+
+interface GitCommitFile {
+  path: string
+  status: 'added' | 'modified' | 'deleted' | 'renamed'
+  additions: number
+  deletions: number
+  oldPath?: string
+}
+
+interface GitCommitDetail {
+  hash: string
+  fullMessage: string
+  authorName: string
+  authorEmail: string
+  authorDate: string
+  files: GitCommitFile[]
+  isMerge: boolean
+  parentHashes: string[]
+}
+
+interface GitCommitLog {
+  commits: GitCommit[]
+  hasMore: boolean
+}
+
 // Update types
 interface PRCheckStatus {
   name: string
@@ -306,6 +339,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:push', projectPath),
     getRemoteUrl: (projectPath: string): Promise<string | null> =>
       ipcRenderer.invoke('git:get-remote-url', projectPath),
+    getCommitLog: (projectPath: string, skip?: number, limit?: number): Promise<GitCommitLog> =>
+      ipcRenderer.invoke('git:commit-log', projectPath, skip, limit),
+    getCommitDetail: (projectPath: string, commitHash: string): Promise<GitCommitDetail | null> =>
+      ipcRenderer.invoke('git:commit-detail', projectPath, commitHash),
+    getFileAtCommit: (projectPath: string, commitHash: string, filePath: string): Promise<string | null> =>
+      ipcRenderer.invoke('git:file-at-commit', projectPath, commitHash, filePath),
+    getHeadHash: (projectPath: string): Promise<string | null> =>
+      ipcRenderer.invoke('git:head-hash', projectPath),
   },
 
   // GitHub operations

@@ -81,7 +81,7 @@ export function TerminalArea() {
   const handleCloseEditor = useCallback(
     (tabId: string) => {
       const tab = editorTabs[tabId]
-      if (tab?.isDirty) {
+      if (tab?.type === 'editor' && tab.isDirty) {
         if (!window.confirm(`"${tab.fileName}" has unsaved changes. Close anyway?`)) {
           return
         }
