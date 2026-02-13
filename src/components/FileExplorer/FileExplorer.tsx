@@ -56,6 +56,9 @@ export function FileExplorer() {
     createSidecarTerminal,
     closeSidecarTerminal,
     setActiveSidecarTerminal,
+    setGitCommitLog,
+    setGitHeadHash,
+    gitHeadHash,
   } = useProjectStore(
     useShallow((s) => ({
       clearDirectoryCache: s.clearDirectoryCache,
@@ -66,6 +69,9 @@ export function FileExplorer() {
       createSidecarTerminal: s.createSidecarTerminal,
       closeSidecarTerminal: s.closeSidecarTerminal,
       setActiveSidecarTerminal: s.setActiveSidecarTerminal,
+      setGitCommitLog: s.setGitCommitLog,
+      setGitHeadHash: s.setGitHeadHash,
+      gitHeadHash: s.gitHeadHash,
     }))
   )
 
@@ -117,12 +123,21 @@ export function FileExplorer() {
     try {
       const status = await api.git.getStatus(gitPath)
       setGitStatus(gitContextId, status)
+
+      // Smart refresh: check if HEAD changed, refresh commit log if so
+      const newHead = await api.git.getHeadHash(gitPath)
+      const oldHead = gitHeadHash[gitContextId]
+      if (newHead && newHead !== oldHead) {
+        setGitHeadHash(gitContextId, newHead)
+        const log = await api.git.getCommitLog(gitPath)
+        setGitCommitLog(gitContextId, log)
+      }
     } catch (error) {
       console.error('Failed to fetch git status:', error)
     } finally {
       setGitStatusLoading(gitContextId, false)
     }
-  }, [api, gitPath, gitContextId, setGitStatus, setGitStatusLoading])
+  }, [api, gitPath, gitContextId, setGitStatus, setGitStatusLoading, gitHeadHash, setGitHeadHash, setGitCommitLog])
 
   const handleGitRefreshRef = useRef(handleGitRefresh)
   handleGitRefreshRef.current = handleGitRefresh

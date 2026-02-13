@@ -27,6 +27,39 @@ export interface GitStatus {
   error?: string
 }
 
+export interface GitCommit {
+  hash: string
+  shortHash: string
+  message: string
+  authorName: string
+  authorDate: string
+  parentHashes: string[]
+}
+
+export interface GitCommitFile {
+  path: string
+  status: 'added' | 'modified' | 'deleted' | 'renamed'
+  additions: number
+  deletions: number
+  oldPath?: string
+}
+
+export interface GitCommitDetail {
+  hash: string
+  fullMessage: string
+  authorName: string
+  authorEmail: string
+  authorDate: string
+  files: GitCommitFile[]
+  isMerge: boolean
+  parentHashes: string[]
+}
+
+export interface GitCommitLog {
+  commits: GitCommit[]
+  hasMore: boolean
+}
+
 export class GitService {
   private async execGit(cwd: string, args: string[]): Promise<string> {
     const { stdout } = await execFileAsync('git', args, {
@@ -210,6 +243,202 @@ export class GitService {
 
   async push(projectPath: string): Promise<string> {
     return this.execGit(projectPath, ['push'])
+  }
+
+  async getCommitLog(projectPath: string, skip = 0, limit = 100): Promise<GitCommitLog> {
+    try {
+      // Use a delimiter that won't appear in commit messages
+      const RECORD_SEP = '---COMMIT_RECORD---'
+      const FIELD_SEP = '---FIELD---'
+      const format = [
+        '%H',   // full hash
+        '%h',   // short hash
+        '%s',   // subject (first line)
+        '%an',  // author name
+        '%aI',  // author date ISO 8601
+        '%P',   // parent hashes (space-separated)
+      ].join(FIELD_SEP)
+
+      const output = await this.execGit(projectPath, [
+        'log',
+        `--skip=${skip}`,
+        `--max-count=${limit + 1}`, // fetch one extra to detect if there are more
+        `--format=${format}${RECORD_SEP}`,
+      ])
+
+      if (!output) {
+        return { commits: [], hasMore: false }
+      }
+
+      const records = output.split(RECORD_SEP).filter((r) => r.trim())
+      const hasMore = records.length > limit
+      const commits: GitCommit[] = records.slice(0, limit).map((record) => {
+        const fields = record.trim().split(FIELD_SEP)
+        return {
+          hash: fields[0] || '',
+          shortHash: fields[1] || '',
+          message: fields[2] || '',
+          authorName: fields[3] || '',
+          authorDate: fields[4] || '',
+          parentHashes: fields[5] ? fields[5].split(' ').filter(Boolean) : [],
+        }
+      })
+
+      return { commits, hasMore }
+    } catch {
+      return { commits: [], hasMore: false }
+    }
+  }
+
+  async getCommitDetail(projectPath: string, commitHash: string): Promise<GitCommitDetail | null> {
+    try {
+      // Get commit metadata
+      const FIELD_SEP = '---FIELD---'
+      const format = [
+        '%H',   // full hash
+        '%B',   // full body (message)
+        '%an',  // author name
+        '%ae',  // author email
+        '%aI',  // author date
+        '%P',   // parent hashes
+      ].join(FIELD_SEP)
+
+      const metaOutput = await this.execGit(projectPath, [
+        'show',
+        '--no-patch',
+        `--format=${format}`,
+        commitHash,
+      ])
+
+      const fields = metaOutput.split(FIELD_SEP)
+      const parentHashes = fields[5] ? fields[5].trim().split(' ').filter(Boolean) : []
+      const isMerge = parentHashes.length > 1
+
+      // Get file stats using diff-tree (diff against first parent)
+      let filesOutput: string
+      try {
+        if (parentHashes.length === 0) {
+          // Initial commit: diff against empty tree
+          filesOutput = await this.execGit(projectPath, [
+            'diff-tree',
+            '--no-commit-id',
+            '-r',
+            '--numstat',
+            '--diff-filter=ADMR',
+            commitHash,
+          ])
+        } else {
+          filesOutput = await this.execGit(projectPath, [
+            'diff-tree',
+            '--no-commit-id',
+            '-r',
+            '--numstat',
+            '--diff-filter=ADMR',
+            `${parentHashes[0]}`,
+            commitHash,
+          ])
+        }
+      } catch {
+        filesOutput = ''
+      }
+
+      // Get status letters for each file
+      let statusOutput: string
+      try {
+        if (parentHashes.length === 0) {
+          statusOutput = await this.execGit(projectPath, [
+            'diff-tree',
+            '--no-commit-id',
+            '-r',
+            '--name-status',
+            '--diff-filter=ADMR',
+            commitHash,
+          ])
+        } else {
+          statusOutput = await this.execGit(projectPath, [
+            'diff-tree',
+            '--no-commit-id',
+            '-r',
+            '--name-status',
+            '--diff-filter=ADMR',
+            `${parentHashes[0]}`,
+            commitHash,
+          ])
+        }
+      } catch {
+        statusOutput = ''
+      }
+
+      // Parse status output into a map
+      const statusMap = new Map<string, { status: GitCommitFile['status']; oldPath?: string }>()
+      for (const line of statusOutput.split('\n').filter(Boolean)) {
+        const parts = line.split('\t')
+        const statusCode = parts[0]?.[0]
+        if (statusCode === 'R') {
+          // Rename: R100\told\tnew
+          const oldPath = parts[1]
+          const newPath = parts[2]
+          if (newPath) {
+            statusMap.set(newPath, { status: 'renamed', oldPath })
+          }
+        } else {
+          const filePath = parts[1]
+          if (filePath) {
+            statusMap.set(filePath, {
+              status: statusCode === 'A' ? 'added' : statusCode === 'D' ? 'deleted' : 'modified',
+            })
+          }
+        }
+      }
+
+      // Parse numstat output
+      const files: GitCommitFile[] = []
+      for (const line of filesOutput.split('\n').filter(Boolean)) {
+        const parts = line.split('\t')
+        const additions = parts[0] === '-' ? 0 : parseInt(parts[0], 10) || 0
+        const deletions = parts[1] === '-' ? 0 : parseInt(parts[1], 10) || 0
+        const filePath = parts[2] || ''
+        if (!filePath) continue
+
+        const statusInfo = statusMap.get(filePath) ?? { status: 'modified' as const }
+        files.push({
+          path: filePath,
+          status: statusInfo.status,
+          additions,
+          deletions,
+          ...(statusInfo.oldPath ? { oldPath: statusInfo.oldPath } : {}),
+        })
+      }
+
+      return {
+        hash: fields[0] || '',
+        fullMessage: fields[1]?.trim() || '',
+        authorName: fields[2] || '',
+        authorEmail: fields[3] || '',
+        authorDate: fields[4] || '',
+        files,
+        isMerge,
+        parentHashes,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  async getFileAtCommit(projectPath: string, commitHash: string, filePath: string): Promise<string | null> {
+    try {
+      return await this.execGit(projectPath, ['show', `${commitHash}:${filePath}`])
+    } catch {
+      return null
+    }
+  }
+
+  async getHeadHash(projectPath: string): Promise<string | null> {
+    try {
+      return await this.execGit(projectPath, ['rev-parse', 'HEAD'])
+    } catch {
+      return null
+    }
   }
 
   async getRemoteUrl(projectPath: string): Promise<string | null> {

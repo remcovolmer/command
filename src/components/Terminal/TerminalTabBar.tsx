@@ -1,10 +1,10 @@
-import { TerminalIcon, Plus, X, LayoutGrid, FileText, Circle } from 'lucide-react'
-import type { TerminalSession, EditorTab } from '../../types'
+import { TerminalIcon, Plus, X, LayoutGrid, FileText, Circle, GitCompare } from 'lucide-react'
+import type { TerminalSession, CenterTab } from '../../types'
 import { STATE_DOT_COLORS, isInputState } from '../../utils/terminalState'
 
 interface TerminalTabBarProps {
   terminals: TerminalSession[]
-  editorTabs: EditorTab[]
+  editorTabs: CenterTab[]
   activeTerminalId: string | null
   activeCenterTabId: string | null
   splitTerminalIds: string[]
@@ -121,11 +121,15 @@ export function TerminalTabBar({
               }
             `}
           >
-            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+            {tab.type === 'diff' ? (
+              <GitCompare className="w-3.5 h-3.5 flex-shrink-0 text-blue-400" />
+            ) : (
+              <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+            )}
             <span className="text-sm font-medium whitespace-nowrap">
-              {tab.fileName}
+              {tab.type === 'diff' ? `${tab.fileName} (diff)` : tab.fileName}
             </span>
-            {tab.isDirty && (
+            {tab.type === 'editor' && tab.isDirty && (
               <Circle className="w-2 h-2 flex-shrink-0 fill-current text-orange-400" />
             )}
             <button
