@@ -156,7 +156,7 @@ export function FileTree({ project }: FileTreeProps) {
   }
 
   return (
-    <div className="py-1" onContextMenu={handleRootContextMenu}>
+    <div className="py-1 min-h-full" onContextMenu={handleRootContextMenu}>
       {/* Root-level create ghost entry */}
       {fileExplorerCreating && fileExplorerCreating.parentPath === project.path && (
         <RootCreateEntry type={fileExplorerCreating.type} projectPath={project.path} projectId={project.id} />
