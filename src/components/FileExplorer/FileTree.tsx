@@ -7,6 +7,7 @@ import { FileTreeNode } from './FileTreeNode'
 import { ContextMenu, type ContextMenuEntry } from '../Sidebar/ContextMenu'
 import { isEditableFile } from '../../utils/editorLanguages'
 import { getFileIcon, getFolderIcon } from './fileIcons'
+import { getParentPath } from '../../utils/paths'
 
 interface FileTreeProps {
   project: Project
@@ -106,8 +107,12 @@ export function FileTree({ project }: FileTreeProps) {
       ]
     }
 
-    // File
+    // File - create new items in the same parent directory
+    const parentPath = getParentPath(entry.path)
     return [
+      { label: 'New File', onClick: () => startCreate(parentPath, 'file') },
+      { label: 'New Folder', onClick: () => startCreate(parentPath, 'directory') },
+      { type: 'separator' },
       { label: 'Rename', onClick: () => startRename(entry.path), shortcut: 'F2' },
       {
         label: 'Copy Path',
