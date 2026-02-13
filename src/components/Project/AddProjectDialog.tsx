@@ -79,17 +79,17 @@ export function AddProjectDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         onClick={handleClose}
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-md bg-background rounded-lg shadow-xl border border-border">
+      <div className="relative w-full max-w-md bg-sidebar rounded-xl shadow-2xl border border-border">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-sidebar-accent/30">
           <div className="flex items-center gap-2">
-            <FolderOpen className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Add Project</h2>
+            <FolderOpen className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Add Project</h2>
           </div>
           <button
             onClick={handleClose}
@@ -100,7 +100,7 @@ export function AddProjectDialog({
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-4">
           {/* Project Type Selection */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
@@ -157,7 +157,7 @@ export function AddProjectDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-border/30">
           <button
             onClick={handleClose}
             disabled={creating}

@@ -42,7 +42,7 @@ export function TerminalTabBar({
   const activeIsEditor = activeCenterTabId != null && isEditorTabActive(activeCenterTabId)
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1 bg-sidebar-accent border-b border-border overflow-x-auto">
+    <div className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto">
       {/* Terminal tabs */}
       {terminals.map((terminal) => {
         const isActive = !activeIsEditor && terminal.id === (activeCenterTabId ?? activeTerminalId)
@@ -55,17 +55,17 @@ export function TerminalTabBar({
             onDragStart={(e) => handleDragStart(e, terminal.id)}
             onClick={() => onSelectTerminal(terminal.id)}
             className={`
-              group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer
+              group flex items-center gap-1.5 px-2.5 py-1 rounded-lg cursor-pointer
               transition-colors select-none
               ${
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-foreground border-b-2 border-primary'
+                  ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
               }
             `}
           >
             <TerminalIcon className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="text-sm font-medium whitespace-nowrap">
+            <span className="text-xs font-medium whitespace-nowrap">
               {terminal.title}
             </span>
             <span
@@ -112,11 +112,11 @@ export function TerminalTabBar({
             key={tab.id}
             onClick={() => onSelectEditor(tab.id)}
             className={`
-              group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer
+              group flex items-center gap-1.5 px-2.5 py-1 rounded-lg cursor-pointer
               transition-colors select-none
               ${
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-foreground border-b-2 border-primary'
+                  ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
               }
             `}
@@ -126,7 +126,7 @@ export function TerminalTabBar({
             ) : (
               <FileText className="w-3.5 h-3.5 flex-shrink-0" />
             )}
-            <span className="text-sm font-medium whitespace-nowrap">
+            <span className="text-xs font-medium whitespace-nowrap">
               {tab.type === 'diff' ? `${tab.fileName} (diff)` : tab.fileName}
             </span>
             {tab.type === 'editor' && tab.isDirty && (

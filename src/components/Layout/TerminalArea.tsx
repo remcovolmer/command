@@ -147,7 +147,9 @@ export function TerminalArea() {
       <div className="flex flex-col items-center justify-center h-full bg-background">
         <div className="text-center max-w-md mx-auto px-8">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <Sparkles className="w-10 h-10 text-primary" />
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-sm flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
           </div>
           <h2 className="text-2xl font-semibold text-foreground mb-3">
             Welcome to Command
@@ -155,13 +157,13 @@ export function TerminalArea() {
           <p className="text-muted-foreground mb-8">
             Select a project from the sidebar to start managing your Claude Code terminals.
           </p>
-          <div className="flex items-center justify-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-muted-foreground text-sm">
-              <TerminalIcon className="w-4 h-4" />
+          <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
+              <TerminalIcon className="w-3.5 h-3.5" />
               Multi-terminal support
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-muted-foreground text-sm">
-              <Plus className="w-4 h-4" />
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
+              <Plus className="w-3.5 h-3.5" />
               Up to {MAX_TERMINALS_PER_PROJECT} per project
             </div>
           </div>
@@ -175,18 +177,18 @@ export function TerminalArea() {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-sidebar">
         <div className="text-center max-w-md mx-auto px-8">
-          <div className="w-16 h-16 rounded-2xl bg-sidebar-accent flex items-center justify-center mx-auto mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-sm flex items-center justify-center mx-auto mb-8">
             <TerminalIcon className="w-8 h-8 text-primary" />
           </div>
           <h2 className="text-xl font-semibold text-sidebar-foreground mb-2">
             {activeProject.name}
           </h2>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-muted-foreground mb-8">
             No chats running. Start a new chat to begin.
           </p>
           <button
             onClick={handleCreateTerminal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-opacity shadow-md shadow-primary/20"
           >
             <Plus className="w-4 h-4" />
             New Chat
