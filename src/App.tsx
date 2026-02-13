@@ -224,6 +224,53 @@ function App() {
       setFileExplorerVisible(true)
       setFileExplorerActiveTab('git')
     },
+    'fileExplorer.newFile': () => {
+      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } = useProjectStore.getState()
+      if (!activeProjectId || !fileExplorerVisible) return
+      const project = projects.find(p => p.id === activeProjectId)
+      if (!project) return
+      // Determine parent: selected directory or project root
+      const parentPath = fileExplorerSelectedPath ?? project.path
+      useProjectStore.getState().startCreate(parentPath, 'file')
+    },
+    'fileExplorer.newFolder': () => {
+      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } = useProjectStore.getState()
+      if (!activeProjectId || !fileExplorerVisible) return
+      const project = projects.find(p => p.id === activeProjectId)
+      if (!project) return
+      const parentPath = fileExplorerSelectedPath ?? project.path
+      useProjectStore.getState().startCreate(parentPath, 'directory')
+    },
+    'fileExplorer.rename': () => {
+      // Only fire when file explorer has focus
+      if (!document.querySelector('[data-file-explorer]:focus-within')) return
+      const { fileExplorerSelectedPath } = useProjectStore.getState()
+      if (fileExplorerSelectedPath) {
+        useProjectStore.getState().startRename(fileExplorerSelectedPath)
+      }
+    },
+    'fileExplorer.delete': () => {
+      // Only fire when file explorer has focus
+      if (!document.querySelector('[data-file-explorer]:focus-within')) return
+      const { fileExplorerSelectedPath, directoryCache } = useProjectStore.getState()
+      if (!fileExplorerSelectedPath) return
+      // Find the entry in the cache
+      for (const entries of Object.values(directoryCache)) {
+        const found = entries.find(e => e.path === fileExplorerSelectedPath)
+        if (found) {
+          useProjectStore.getState().setDeletingEntry(found)
+          break
+        }
+      }
+    },
+    'fileExplorer.copyPath': () => {
+      // Only fire when file explorer has focus
+      if (!document.querySelector('[data-file-explorer]:focus-within')) return
+      const { fileExplorerSelectedPath } = useProjectStore.getState()
+      if (fileExplorerSelectedPath) {
+        navigator.clipboard.writeText(fileExplorerSelectedPath)
+      }
+    },
 
     // Editor
     'editor.closeTab': () => {

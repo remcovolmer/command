@@ -240,6 +240,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     openExternal: (url: string): Promise<void> =>
       ipcRenderer.invoke('shell:open-external', url),
+    showItemInFolder: (filePath: string): Promise<void> =>
+      ipcRenderer.invoke('shell:show-item-in-folder', filePath),
   },
 
   // Notification operations
@@ -282,6 +284,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     stat: (filePath: string): Promise<{ exists: boolean; isFile: boolean; resolved: string }> =>
       ipcRenderer.invoke('fs:stat', filePath),
+    createFile: (filePath: string): Promise<void> =>
+      ipcRenderer.invoke('fs:createFile', filePath),
+    createDirectory: (dirPath: string): Promise<void> =>
+      ipcRenderer.invoke('fs:createDirectory', dirPath),
+    rename: (oldPath: string, newPath: string): Promise<void> =>
+      ipcRenderer.invoke('fs:rename', oldPath, newPath),
+    delete: (targetPath: string): Promise<void> =>
+      ipcRenderer.invoke('fs:delete', targetPath),
   },
 
   // Git operations

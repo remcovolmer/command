@@ -217,6 +217,7 @@ export interface ElectronAPI {
     openPath: (path: string) => Promise<string>;
     openInEditor: (path: string) => Promise<void>;
     openExternal: (url: string) => Promise<void>;
+    showItemInFolder: (filePath: string) => Promise<void>;
   };
   notification: {
     show: (title: string, body: string) => void;
@@ -234,6 +235,10 @@ export interface ElectronAPI {
     unwatchFile: (filePath: string) => Promise<void>;
     onFileChanged: (callback: (filePath: string) => void) => Unsubscribe;
     stat: (filePath: string) => Promise<{ exists: boolean; isFile: boolean; resolved: string }>;
+    createFile: (filePath: string) => Promise<void>;
+    createDirectory: (dirPath: string) => Promise<void>;
+    rename: (oldPath: string, newPath: string) => Promise<void>;
+    delete: (targetPath: string) => Promise<void>;
   };
   git: {
     getStatus: (projectPath: string) => Promise<GitStatus>;
