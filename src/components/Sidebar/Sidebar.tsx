@@ -184,7 +184,8 @@ export function Sidebar() {
   const handleWorktreeCreated = (worktree: Worktree) => {
     addWorktree(worktree)
     // Automatically create a terminal in the new worktree
-    createTerminal(worktree.projectId, { worktreeId: worktree.id })
+    // Pass title explicitly to avoid stale closure on worktrees state
+    createTerminal(worktree.projectId, { worktreeId: worktree.id, title: worktree.name })
   }
 
   const handleRemoveWorktree = async (worktreeId: string) => {

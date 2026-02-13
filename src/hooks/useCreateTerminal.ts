@@ -5,6 +5,8 @@ import type { TerminalSession } from '../types'
 
 interface CreateTerminalOptions {
   worktreeId?: string
+  /** Explicit title for the tab (bypasses worktree lookup) */
+  title?: string
   /** Called after the terminal is created and added to the store */
   onCreated?: (terminalId: string) => void
 }
@@ -27,7 +29,7 @@ export function useCreateTerminal() {
 
   const createTerminal = useCallback(
     async (projectId: string, options?: CreateTerminalOptions) => {
-      const { worktreeId, onCreated } = options ?? {}
+      const { worktreeId, title: explicitTitle, onCreated } = options ?? {}
 
       // Enforce 1:1 worktree-terminal coupling
       if (worktreeId) {
@@ -58,9 +60,9 @@ export function useCreateTerminal() {
         ? Object.values(worktrees).find((w) => w.id === worktreeId)
         : null
 
-      const title = worktree
-        ? worktree.name
-        : `Chat ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
+      const title = explicitTitle
+        ?? (worktree ? worktree.name : null)
+        ?? `Chat ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
 
       const terminal: TerminalSession = {
         id: terminalId,
