@@ -48,6 +48,11 @@ export type HotkeyAction =
   | 'fileExplorer.toggle'
   | 'fileExplorer.filesTab'
   | 'fileExplorer.gitTab'
+  | 'fileExplorer.newFile'
+  | 'fileExplorer.newFolder'
+  | 'fileExplorer.rename'
+  | 'fileExplorer.delete'
+  | 'fileExplorer.copyPath'
   // Editor
   | 'editor.closeTab'
   | 'editor.nextTab'
