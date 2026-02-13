@@ -21,7 +21,6 @@ interface CreateTerminalOptions {
 export function useCreateTerminal() {
   const api = useMemo(() => getElectronAPI(), [])
   const terminals = useProjectStore((s) => s.terminals)
-  const worktrees = useProjectStore((s) => s.worktrees)
   const addTerminal = useProjectStore((s) => s.addTerminal)
   const setActiveTerminal = useProjectStore((s) => s.setActiveTerminal)
 
@@ -54,8 +53,9 @@ export function useCreateTerminal() {
       const terminalId = await api.terminal.create(projectId, worktreeId)
 
       // For worktree terminals, use the worktree name as the tab title
+      // Use getState() to read fresh worktrees (closure may be stale after addWorktree)
       const worktree = worktreeId
-        ? Object.values(worktrees).find((w) => w.id === worktreeId)
+        ? Object.values(useProjectStore.getState().worktrees).find((w) => w.id === worktreeId)
         : null
 
       const title = worktree
@@ -77,7 +77,7 @@ export function useCreateTerminal() {
 
       return terminalId
     },
-    [api, terminals, worktrees, addTerminal, setActiveTerminal]
+    [api, terminals, addTerminal, setActiveTerminal]
   )
 
   return { createTerminal }
