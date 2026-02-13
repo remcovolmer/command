@@ -34,10 +34,10 @@ export function FileExplorerTabBar({
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={`
-                flex items-center gap-1.5 px-2 py-1 rounded text-sm
+                flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium
                 transition-colors
                 ${isActive
-                  ? 'bg-sidebar text-sidebar-foreground'
+                  ? 'bg-sidebar text-sidebar-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
                 }
               `}
@@ -45,7 +45,7 @@ export function FileExplorerTabBar({
               <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
               {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1 py-0.5 rounded">
+                <span className="text-xs bg-primary/15 text-primary px-1 py-0.5 rounded-full">
                   {tab.badge}
                 </span>
               )}

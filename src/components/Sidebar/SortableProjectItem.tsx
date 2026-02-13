@@ -134,7 +134,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing
           transition-colors duration-150
           ${isActive
-            ? 'bg-sidebar-accent text-sidebar-foreground'
+            ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
             : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
         `}
       >
@@ -194,7 +194,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
       {/* Direct Chats (not in worktree) */}
       {directTerminals.length > 0 && (
-        <ul className="ml-6 mt-1 space-y-0.5 border-l border-border">
+        <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30">
           {directTerminals.map((terminal) => (
             <li
               key={terminal.id}
@@ -203,7 +203,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                 group flex items-center gap-2 px-3 py-1.5 cursor-pointer
                 transition-colors duration-150
                 ${terminal.id === activeTerminalId
-                  ? 'bg-sidebar-accent text-sidebar-foreground rounded-md'
+                  ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-md'
                   : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
               `}
             >
@@ -250,7 +250,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
       {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
       {showEmptyState && (
-        <div className="ml-6 pl-3 py-2 border-l border-border">
+        <div className="ml-6 pl-3 py-2 border-l border-border/30">
           <button
             onClick={() => onCreateTerminal(project.id)}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"

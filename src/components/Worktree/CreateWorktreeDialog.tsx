@@ -122,17 +122,17 @@ export function CreateWorktreeDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         onClick={onClose}
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-md bg-background rounded-lg shadow-xl border border-border">
+      <div className="relative w-full max-w-md bg-sidebar rounded-xl shadow-2xl border border-border">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-sidebar-accent/30">
           <div className="flex items-center gap-2">
-            <GitBranch className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">New Worktree</h2>
+            <GitBranch className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">New Worktree</h2>
           </div>
           <button
             onClick={onClose}
@@ -143,7 +143,7 @@ export function CreateWorktreeDialog({
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -260,7 +260,7 @@ export function CreateWorktreeDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-border/30">
           <button
             onClick={onClose}
             disabled={creating}
