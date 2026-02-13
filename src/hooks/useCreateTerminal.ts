@@ -5,8 +5,6 @@ import type { TerminalSession } from '../types'
 
 interface CreateTerminalOptions {
   worktreeId?: string
-  /** Explicit title for the tab (bypasses worktree lookup) */
-  title?: string
   /** Called after the terminal is created and added to the store */
   onCreated?: (terminalId: string) => void
 }
@@ -23,13 +21,12 @@ interface CreateTerminalOptions {
 export function useCreateTerminal() {
   const api = useMemo(() => getElectronAPI(), [])
   const terminals = useProjectStore((s) => s.terminals)
-  const worktrees = useProjectStore((s) => s.worktrees)
   const addTerminal = useProjectStore((s) => s.addTerminal)
   const setActiveTerminal = useProjectStore((s) => s.setActiveTerminal)
 
   const createTerminal = useCallback(
     async (projectId: string, options?: CreateTerminalOptions) => {
-      const { worktreeId, title: explicitTitle, onCreated } = options ?? {}
+      const { worktreeId, onCreated } = options ?? {}
 
       // Enforce 1:1 worktree-terminal coupling
       if (worktreeId) {
@@ -56,13 +53,14 @@ export function useCreateTerminal() {
       const terminalId = await api.terminal.create(projectId, worktreeId)
 
       // For worktree terminals, use the worktree name as the tab title
+      // Use getState() to read fresh worktrees (closure may be stale after addWorktree)
       const worktree = worktreeId
-        ? Object.values(worktrees).find((w) => w.id === worktreeId)
+        ? Object.values(useProjectStore.getState().worktrees).find((w) => w.id === worktreeId)
         : null
 
-      const title = explicitTitle
-        ?? (worktree ? worktree.name : null)
-        ?? `Chat ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
+      const title = worktree
+        ? worktree.name
+        : `Chat ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
 
       const terminal: TerminalSession = {
         id: terminalId,
@@ -79,7 +77,7 @@ export function useCreateTerminal() {
 
       return terminalId
     },
-    [api, terminals, worktrees, addTerminal, setActiveTerminal]
+    [api, terminals, addTerminal, setActiveTerminal]
   )
 
   return { createTerminal }
