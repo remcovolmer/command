@@ -4,6 +4,7 @@ import type { Worktree, TerminalSession, PRStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
+import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
 
 interface WorktreeItemProps {
   worktree: Worktree
@@ -105,30 +106,29 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   const handleMerge = useCallback(async () => {
     if (!prStatus?.number) return
-    const confirmed = window.confirm(`Merge & Squash PR #${prStatus.number}?\n\nThis will also remove the worktree.`)
-    if (!confirmed) return
 
     const api = getElectronAPI()
     try {
+      // Check for uncommitted changes before merging
+      const hasChanges = await api.worktree.hasChanges(worktree.id)
+      const message = hasChanges
+        ? `Merge & Squash PR #${prStatus.number}?\n\nWARNING: This worktree has uncommitted changes that will be lost.\n\nThis will also remove the worktree.`
+        : `Merge & Squash PR #${prStatus.number}?\n\nThis will also remove the worktree.`
+      const confirmed = window.confirm(message)
+      if (!confirmed) return
+
       // Merge from main project path (not worktree) to avoid branch-in-use error
       await api.github.mergePR(projectPath, prStatus.number)
 
-      // Close all terminals in worktree before removal (prevents EBUSY on Windows)
-      const terminalsToClose = terminals.filter((t) => t.state !== 'stopped')
-      terminalsToClose.forEach((t) => {
-        api.terminal.close(t.id)
-        removeTerminal(t.id)
-      })
-
-      // Wait for Windows to release file handles
-      if (terminalsToClose.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-      }
+      // Close active terminals before removal (prevents EBUSY on Windows)
+      await closeWorktreeTerminals(terminals, removeTerminal)
 
       // Remove the worktree (also deletes local branch)
       try {
-        await api.worktree.remove(worktree.id, true)
-      } catch {
+        await api.worktree.remove(worktree.id, hasChanges)
+      } catch (err) {
+        console.error('[WorktreeItem] Worktree removal failed after merge:', err)
+        api.github.stopPolling(worktree.id)
         api.notification.show('PR Merged', `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`)
         return
       }
