@@ -46,6 +46,25 @@ describe('projectStore activeCenterTabId', () => {
     })
   })
 
+  describe('getProjectTerminals', () => {
+    test('excludes sidecar and normal terminals', () => {
+      const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1' })
+      const sidecar = makeTerminal({ id: 'sidecar-1', projectId: 'proj-1', type: 'normal' })
+      const t2 = makeTerminal({ id: 'term-2', projectId: 'proj-1' })
+
+      useProjectStore.setState({
+        terminals: { 'term-1': t1, 'sidecar-1': sidecar, 'term-2': t2 },
+        sidecarTerminals: { 'proj-1': ['sidecar-1'] },
+      })
+
+      const result = useProjectStore.getState().getProjectTerminals('proj-1')
+      const ids = result.map((t) => t.id)
+      expect(ids).toContain('term-1')
+      expect(ids).toContain('term-2')
+      expect(ids).not.toContain('sidecar-1')
+    })
+  })
+
   describe('removeTerminal', () => {
     test('closing active terminal switches activeCenterTabId to next visible terminal', () => {
       const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1' })
@@ -224,6 +243,29 @@ describe('projectStore activeCenterTabId', () => {
       expect(state.activeTerminalId).toBeNull()
       expect(state.activeCenterTabId).toBeNull()
     })
+
+    test('preserves activeCenterTabId when non-active project is removed', () => {
+      const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1' })
+      const t2 = makeTerminal({ id: 'term-2', projectId: 'proj-2' })
+
+      useProjectStore.setState({
+        terminals: { 'term-1': t1, 'term-2': t2 },
+        activeTerminalId: 'term-1',
+        activeCenterTabId: 'term-1',
+        activeProjectId: 'proj-1',
+        projects: [
+          { id: 'proj-1', name: 'Project 1', path: '/proj1' },
+          { id: 'proj-2', name: 'Project 2', path: '/proj2' },
+        ],
+      })
+
+      useProjectStore.getState().removeProject('proj-2')
+
+      const state = useProjectStore.getState()
+      expect(state.activeTerminalId).toBe('term-1')
+      expect(state.activeCenterTabId).toBe('term-1')
+      expect(state.activeProjectId).toBe('proj-1')
+    })
   })
 
   describe('removeWorktree', () => {
@@ -244,6 +286,35 @@ describe('projectStore activeCenterTabId', () => {
       const state = useProjectStore.getState()
       expect(state.activeTerminalId).toBe('term-2')
       expect(state.activeCenterTabId).toBe('term-2')
+      expect(state.terminals['term-1']).toBeUndefined()
+    })
+
+    test('preserves editor tab in activeCenterTabId when worktree is removed', () => {
+      const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1', worktreeId: 'wt-1' })
+
+      useProjectStore.setState({
+        terminals: { 'term-1': t1 },
+        activeTerminalId: 'term-1',
+        activeCenterTabId: 'editor-tab-1',
+        activeProjectId: 'proj-1',
+        editorTabs: {
+          'editor-tab-1': {
+            id: 'editor-tab-1',
+            type: 'editor',
+            filePath: '/test.ts',
+            fileName: 'test.ts',
+            isDirty: false,
+            projectId: 'proj-1',
+          },
+        },
+        worktrees: { 'wt-1': { id: 'wt-1', projectId: 'proj-1', name: 'feature', path: '/wt1', branch: 'feature' } },
+      })
+
+      useProjectStore.getState().removeWorktree('wt-1')
+
+      const state = useProjectStore.getState()
+      expect(state.activeCenterTabId).toBe('editor-tab-1')
+      expect(state.activeTerminalId).toBeNull()
       expect(state.terminals['term-1']).toBeUndefined()
     })
 

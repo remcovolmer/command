@@ -871,10 +871,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectTerminals: (projectId) => {
         const state = get()
-        const sidecarIds = new Set(Object.values(state.sidecarTerminals).flat())
-        return Object.values(state.terminals).filter(
-          (t) => t.projectId === projectId && !sidecarIds.has(t.id)
-        )
+        return getVisibleTerminals(state.terminals, state.sidecarTerminals, projectId)
       },
 
       getWorktreeTerminals: (worktreeId) => {
