@@ -4,6 +4,7 @@ import type { Worktree, TerminalSession, PRStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
+import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
 
 interface WorktreeItemProps {
   worktree: Worktree
@@ -60,6 +61,8 @@ export const WorktreeItem = memo(function WorktreeItem({
   const ghAvailable = useProjectStore((s) => s.ghAvailable)
   const setPRStatus = useProjectStore((s) => s.setPRStatus)
   const setGhAvailable = useProjectStore((s) => s.setGhAvailable)
+  const removeTerminal = useProjectStore((s) => s.removeTerminal)
+  const removeWorktree = useProjectStore((s) => s.removeWorktree)
 
   // The single terminal for this worktree (1:1 model)
   const terminal = terminals[0] ?? null
@@ -103,22 +106,42 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   const handleMerge = useCallback(async () => {
     if (!prStatus?.number) return
-    const confirmed = window.confirm(`Merge & Squash PR #${prStatus.number}?\n\nThis will also remove the worktree.`)
-    if (!confirmed) return
 
     const api = getElectronAPI()
     try {
+      // Check for uncommitted changes before merging
+      const hasChanges = await api.worktree.hasChanges(worktree.id)
+      const message = hasChanges
+        ? `Merge & Squash PR #${prStatus.number}?\n\nWARNING: This worktree has uncommitted changes that will be lost.\n\nThis will also remove the worktree.`
+        : `Merge & Squash PR #${prStatus.number}?\n\nThis will also remove the worktree.`
+      const confirmed = window.confirm(message)
+      if (!confirmed) return
+
       // Merge from main project path (not worktree) to avoid branch-in-use error
       await api.github.mergePR(projectPath, prStatus.number)
 
-      // Remove the worktree since its branch is now deleted
-      await api.worktree.remove(worktree.id, true)
+      // Close active terminals before removal (prevents EBUSY on Windows)
+      await closeWorktreeTerminals(terminals, removeTerminal)
+
+      // Remove the worktree (also deletes local branch)
+      try {
+        await api.worktree.remove(worktree.id, hasChanges)
+      } catch (err) {
+        console.error('[WorktreeItem] Worktree removal failed after merge:', err)
+        api.github.stopPolling(worktree.id)
+        api.notification.show('PR Merged', `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`)
+        return
+      }
+
+      // Clean up store and stop polling
+      removeWorktree(worktree.id)
+      api.github.stopPolling(worktree.id)
 
       api.notification.show('PR Merged', `PR #${prStatus.number} merged and worktree removed`)
     } catch (err) {
       api.notification.show('Merge Failed', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [prStatus, projectPath, worktree.path])
+  }, [prStatus, projectPath, worktree.id, terminals, removeTerminal, removeWorktree])
 
   const handleOpenPR = useCallback(() => {
     if (prStatus?.url) {

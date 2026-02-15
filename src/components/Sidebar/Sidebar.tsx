@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { terminalEvents } from '../../utils/terminalEvents'
+import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
 import { SortableProjectList } from './SortableProjectList'
 import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
 import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
@@ -198,17 +199,9 @@ export function Sidebar() {
         if (!confirmed) return
       }
 
-      // Close all terminals in worktree first
-      const terminalsToClose = Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
-      terminalsToClose.forEach((t) => {
-        api.terminal.close(t.id)
-        removeTerminal(t.id)
-      })
-
-      // Add delay for Windows to release file handles
-      if (terminalsToClose.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-      }
+      // Close active terminals before removal (prevents EBUSY on Windows)
+      const worktreeTerminals = Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
+      await closeWorktreeTerminals(worktreeTerminals, removeTerminal)
 
       await api.worktree.remove(worktreeId, hasChanges)
       removeWorktree(worktreeId)
