@@ -60,6 +60,8 @@ export const WorktreeItem = memo(function WorktreeItem({
   const ghAvailable = useProjectStore((s) => s.ghAvailable)
   const setPRStatus = useProjectStore((s) => s.setPRStatus)
   const setGhAvailable = useProjectStore((s) => s.setGhAvailable)
+  const removeTerminal = useProjectStore((s) => s.removeTerminal)
+  const removeWorktree = useProjectStore((s) => s.removeWorktree)
 
   // The single terminal for this worktree (1:1 model)
   const terminal = terminals[0] ?? null
@@ -111,14 +113,35 @@ export const WorktreeItem = memo(function WorktreeItem({
       // Merge from main project path (not worktree) to avoid branch-in-use error
       await api.github.mergePR(projectPath, prStatus.number)
 
-      // Remove the worktree since its branch is now deleted
-      await api.worktree.remove(worktree.id, true)
+      // Close all terminals in worktree before removal (prevents EBUSY on Windows)
+      const terminalsToClose = terminals.filter((t) => t.state !== 'stopped')
+      terminalsToClose.forEach((t) => {
+        api.terminal.close(t.id)
+        removeTerminal(t.id)
+      })
+
+      // Wait for Windows to release file handles
+      if (terminalsToClose.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      // Remove the worktree (also deletes local branch)
+      try {
+        await api.worktree.remove(worktree.id, true)
+      } catch {
+        api.notification.show('PR Merged', `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`)
+        return
+      }
+
+      // Clean up store and stop polling
+      removeWorktree(worktree.id)
+      api.github.stopPolling(worktree.id)
 
       api.notification.show('PR Merged', `PR #${prStatus.number} merged and worktree removed`)
     } catch (err) {
       api.notification.show('Merge Failed', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [prStatus, projectPath, worktree.path])
+  }, [prStatus, projectPath, worktree.id, terminals, removeTerminal, removeWorktree])
 
   const handleOpenPR = useCallback(() => {
     if (prStatus?.url) {
