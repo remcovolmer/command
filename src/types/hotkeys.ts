@@ -48,6 +48,7 @@ export type HotkeyAction =
   | 'fileExplorer.toggle'
   | 'fileExplorer.filesTab'
   | 'fileExplorer.gitTab'
+  | 'fileExplorer.tasksTab'
   | 'fileExplorer.newFile'
   | 'fileExplorer.newFolder'
   | 'fileExplorer.rename'

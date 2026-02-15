@@ -170,6 +170,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'file-explorer',
     enabled: true,
   },
+  'fileExplorer.tasksTab': {
+    key: 'k',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Switch to tasks tab',
+    category: 'file-explorer',
+    enabled: true,
+  },
   'fileExplorer.newFile': {
     key: 'n',
     modifiers: ['ctrl', 'alt'],

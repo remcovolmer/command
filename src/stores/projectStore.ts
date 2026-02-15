@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, GitCommit, GitCommitLog, GitCommitDetail, CenterTab } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, GitCommit, GitCommitLog, GitCommitDetail, CenterTab, TasksData } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
@@ -24,7 +24,7 @@ interface ProjectStore {
 
   // File explorer state
   fileExplorerVisible: boolean
-  fileExplorerActiveTab: 'files' | 'git'
+  fileExplorerActiveTab: 'files' | 'git' | 'tasks'
   expandedPaths: Record<string, string[]>
   directoryCache: Record<string, FileSystemEntry[]>
 
@@ -96,7 +96,7 @@ interface ProjectStore {
   // File explorer actions
   toggleFileExplorer: () => void
   setFileExplorerVisible: (visible: boolean) => void
-  setFileExplorerActiveTab: (tab: 'files' | 'git') => void
+  setFileExplorerActiveTab: (tab: 'files' | 'git' | 'tasks') => void
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string) => void
@@ -124,6 +124,14 @@ interface ProjectStore {
 
   // Diff tab actions
   openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string) => void
+
+  // Tasks state (not persisted - reload from disk)
+  tasksData: Record<string, TasksData>        // keyed by project.id
+  tasksLoading: Record<string, boolean>
+
+  // Tasks actions
+  setTasksData: (projectId: string, data: TasksData) => void
+  setTasksLoading: (projectId: string, loading: boolean) => void
 
   // GitHub PR status actions
   setPRStatus: (key: string, status: PRStatus) => void
@@ -203,6 +211,10 @@ export const useProjectStore = create<ProjectStore>()(
       // GitHub PR status (not persisted)
       prStatus: {},
       ghAvailable: null,
+
+      // Tasks state
+      tasksData: {},
+      tasksLoading: {},
 
       // Editor tab state
       editorTabs: {},
@@ -593,6 +605,16 @@ export const useProjectStore = create<ProjectStore>()(
         }),
 
       // GitHub PR status actions
+      // Tasks setters
+      setTasksData: (projectId, data) =>
+        set((state) => ({
+          tasksData: { ...state.tasksData, [projectId]: data },
+        })),
+      setTasksLoading: (projectId, loading) =>
+        set((state) => ({
+          tasksLoading: { ...state.tasksLoading, [projectId]: loading },
+        })),
+
       setPRStatus: (key, status) =>
         set((state) => ({
           prStatus: { ...state.prStatus, [key]: status },

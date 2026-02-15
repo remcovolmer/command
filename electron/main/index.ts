@@ -14,6 +14,7 @@ import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
 import { installClaudeHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
 import { GitHubService } from './services/GitHubService'
+import { TaskService } from './services/TaskService'
 import { randomUUID } from 'node:crypto'
 
 // Validation helpers
@@ -68,6 +69,7 @@ let worktreeService: WorktreeService | null = null
 let hookWatcher: ClaudeHookWatcher | null = null
 let updateService: UpdateService | null = null
 let githubService: GitHubService | null = null
+let taskService: TaskService | null = null
 
 // File watchers for live updates (path -> watcher)
 const fileWatchers = new Map<string, FSWatcher>()
@@ -244,6 +246,7 @@ async function createWindow() {
   updateService.initialize(win)
   githubService = new GitHubService()
   githubService.setWindow(win)
+  taskService = new TaskService()
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -633,6 +636,37 @@ ipcMain.handle('git:file-at-commit', async (_event, projectPath: string, commitH
 ipcMain.handle('git:head-hash', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)
   return gitService?.getHeadHash(projectPath) ?? null
+})
+
+// IPC Handlers for Tasks operations
+ipcMain.handle('tasks:scan', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return taskService?.parseAllTasks(projectPath) ?? null
+})
+
+ipcMain.handle('tasks:update', async (_event, projectPath: string, update: { filePath: string; lineNumber: number; action: 'toggle' | 'edit' | 'delete'; newText?: string }) => {
+  validateProjectPath(projectPath)
+  return taskService?.updateTask(projectPath, update) ?? null
+})
+
+ipcMain.handle('tasks:add', async (_event, projectPath: string, task: { filePath: string; section: string; text: string }) => {
+  validateProjectPath(projectPath)
+  return taskService?.addTask(projectPath, task) ?? null
+})
+
+ipcMain.handle('tasks:delete', async (_event, projectPath: string, filePath: string, lineNumber: number) => {
+  validateProjectPath(projectPath)
+  return taskService?.deleteTask(projectPath, filePath, lineNumber) ?? null
+})
+
+ipcMain.handle('tasks:move', async (_event, projectPath: string, move: { filePath: string; lineNumber: number; targetSection: string; targetFilePath?: string }) => {
+  validateProjectPath(projectPath)
+  return taskService?.moveTask(projectPath, move) ?? null
+})
+
+ipcMain.handle('tasks:create-file', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return taskService?.createTemplateFile(projectPath) ?? null
 })
 
 // IPC Handlers for GitHub operations
