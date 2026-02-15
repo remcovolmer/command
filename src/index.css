@@ -164,7 +164,7 @@ body {
 }
 
 .terminal-container .xterm-viewport {
-  overflow-y: auto !important;
+  overflow-y: scroll !important;
 }
 
 /* Notification indicator animations - Simplified Claude Code states (4 states) */
