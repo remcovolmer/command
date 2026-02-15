@@ -55,6 +55,7 @@ export function useXtermInstance({
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
   const updateTerminalTitle = useProjectStore((s) => s.updateTerminalTitle)
   const theme = useProjectStore((s) => s.theme)
+  const terminalState = useProjectStore((s) => s.terminals[id]?.state)
   const api = useMemo(() => getElectronAPI(), [])
 
   // Safe fit function with retry logic for race conditions
@@ -298,6 +299,17 @@ export function useXtermInstance({
       return () => clearTimeout(timer)
     }
   }, [isActive, safeFit])
+
+  // Re-fit when terminal state changes (e.g. Claude finishes)
+  // State changes trigger re-renders that can desync xterm viewport dimensions
+  useEffect(() => {
+    if (isActive && terminalRef.current && isReadyRef.current) {
+      const timer = setTimeout(() => {
+        safeFit()
+      }, FOCUS_REFIT_DELAY_MS)
+      return () => clearTimeout(timer)
+    }
+  }, [terminalState, isActive, safeFit])
 
   return containerRef
 }
