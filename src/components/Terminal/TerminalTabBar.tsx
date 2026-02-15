@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { TerminalIcon, Plus, X, LayoutGrid, FileText, Circle, GitCompare } from 'lucide-react'
 import type { TerminalSession, CenterTab } from '../../types'
 import { STATE_DOT_COLORS, isInputState } from '../../utils/terminalState'
@@ -31,6 +32,17 @@ export function TerminalTabBar({
   onAdd,
   canAdd,
 }: TerminalTabBarProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Scroll active tab into view when it changes
+  useEffect(() => {
+    if (!activeCenterTabId || !containerRef.current) return
+    const el = containerRef.current.querySelector(
+      `[data-tab-id="${activeCenterTabId}"]`
+    )
+    el?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+  }, [activeCenterTabId])
+
   const handleDragStart = (e: React.DragEvent, terminalId: string) => {
     e.dataTransfer.setData('terminalId', terminalId)
     e.dataTransfer.effectAllowed = 'move'
@@ -42,7 +54,7 @@ export function TerminalTabBar({
   const activeIsEditor = activeCenterTabId != null && isEditorTabActive(activeCenterTabId)
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto">
+    <div ref={containerRef} className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto">
       {/* Terminal tabs */}
       {terminals.map((terminal) => {
         const isActive = !activeIsEditor && terminal.id === (activeCenterTabId ?? activeTerminalId)
@@ -51,6 +63,7 @@ export function TerminalTabBar({
         return (
           <div
             key={terminal.id}
+            data-tab-id={terminal.id}
             draggable
             onDragStart={(e) => handleDragStart(e, terminal.id)}
             onClick={() => onSelectTerminal(terminal.id)}
@@ -110,6 +123,7 @@ export function TerminalTabBar({
         return (
           <div
             key={tab.id}
+            data-tab-id={tab.id}
             onClick={() => onSelectEditor(tab.id)}
             className={`
               group flex items-center gap-1.5 px-2.5 py-1 rounded-lg cursor-pointer

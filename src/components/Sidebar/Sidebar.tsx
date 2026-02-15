@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
@@ -70,6 +70,16 @@ export function Sidebar() {
   // State for update check
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'up-to-date' | 'error'>('idle')
   const [latestVersion, setLatestVersion] = useState<string>('')
+
+  // Scroll active project into view when it changes
+  const projectScrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!activeProjectId || !projectScrollRef.current) return
+    const el = projectScrollRef.current.querySelector(
+      `[data-project-id="${activeProjectId}"]`
+    )
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [activeProjectId])
 
   // Load app version on mount
   useEffect(() => {
@@ -275,7 +285,7 @@ export function Sidebar() {
               const workspaceTerminals = getProjectTerminals(workspace.id)
               const isActive = activeProjectId === workspace.id
               return (
-                <li key={workspace.id}>
+                <li key={workspace.id} data-project-id={workspace.id}>
                   <div
                     onClick={() => setActiveProject(workspace.id)}
                     className={`
@@ -353,7 +363,7 @@ export function Sidebar() {
       </div>
 
       {/* Project List */}
-      <div className="flex-1 overflow-y-auto sidebar-scroll px-3">
+      <div ref={projectScrollRef} className="flex-1 overflow-y-auto sidebar-scroll px-3">
         {regularProjects.length === 0 ? (
           <div className="px-3 py-8 text-center">
             <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
