@@ -326,6 +326,17 @@ export function Sidebar() {
                       ))}
                     </ul>
                   )}
+                  {isActive && workspaceTerminals.length === 0 && (
+                    <div className="ml-6 pl-3 py-2 border-l border-border/30">
+                      <button
+                        onClick={() => handleCreateTerminal(workspace.id)}
+                        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        New Chat
+                      </button>
+                    </div>
+                  )}
                 </li>
               )
             })}
