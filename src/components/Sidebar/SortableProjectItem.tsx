@@ -103,6 +103,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   return (
     <motion.li
       ref={setNodeRef}
+      data-project-id={project.id}
       layoutId={layoutId}
       layout={shouldReduceMotion ? false : !isDragging}
       initial={false}
