@@ -11,6 +11,18 @@ export const MAX_TERMINALS_PER_PROJECT = 10
 /** Maximum number of editor tabs allowed per project */
 export const MAX_EDITOR_TABS = 15
 
+/** Returns center-area visible terminals for a project (excludes sidecar/normal terminals) */
+function getVisibleTerminals(
+  terminals: Record<string, TerminalSession>,
+  sidecarTerminals: Record<string, string[]>,
+  projectId: string
+): TerminalSession[] {
+  const sidecarIds = new Set(Object.values(sidecarTerminals).flat())
+  return Object.values(terminals).filter(
+    (t) => t.projectId === projectId && t.type !== 'normal' && !sidecarIds.has(t.id)
+  )
+}
+
 interface ProjectStore {
   // State
   projects: Project[]
@@ -662,6 +674,16 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
+          // Update active terminal/center tab if the removed project owned them
+          const newActiveTerminalId =
+            state.activeTerminalId && newTerminals[state.activeTerminalId]
+              ? state.activeTerminalId
+              : null
+          const newActiveCenterTabId =
+            state.activeProjectId === id
+              ? newActiveTerminalId
+              : state.activeCenterTabId
+
           return {
             projects: newProjects,
             terminals: newTerminals,
@@ -670,22 +692,16 @@ export const useProjectStore = create<ProjectStore>()(
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
             activeProjectId: newActiveProjectId,
-            activeTerminalId:
-              state.activeTerminalId &&
-              newTerminals[state.activeTerminalId]
-                ? state.activeTerminalId
-                : null,
+            activeTerminalId: newActiveTerminalId,
+            activeCenterTabId: newActiveCenterTabId,
           }
         }),
 
       setActiveProject: (id) =>
         set((state) => {
-          // When switching projects, also update active terminal
-          const projectTerminals = Object.values(state.terminals).filter(
-            (t) => t.projectId === id
-          )
-          const newActiveTerminalId =
-            projectTerminals.length > 0 ? projectTerminals[0].id : null
+          // When switching projects, also update active terminal (exclude sidecar/normal)
+          const visible = getVisibleTerminals(state.terminals, state.sidecarTerminals, id ?? '')
+          const newActiveTerminalId = visible.length > 0 ? visible[0].id : null
 
           return {
             activeProjectId: id,
@@ -736,16 +752,20 @@ export const useProjectStore = create<ProjectStore>()(
           const removedTerminal = newTerminals[id]
           delete newTerminals[id]
 
-          // Update active terminal if needed
+          // Update active terminal and center tab if needed
           let newActiveTerminalId = state.activeTerminalId
-          if (state.activeTerminalId === id) {
-            const sameProjectTerminals = Object.values(newTerminals).filter(
-              (t) => t.projectId === removedTerminal?.projectId
-            )
-            newActiveTerminalId =
-              sameProjectTerminals.length > 0
-                ? sameProjectTerminals[0].id
-                : null
+          let newActiveCenterTabId = state.activeCenterTabId
+
+          if (state.activeTerminalId === id || state.activeCenterTabId === id) {
+            const visible = getVisibleTerminals(newTerminals, state.sidecarTerminals, removedTerminal?.projectId ?? '')
+            const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
+
+            if (state.activeTerminalId === id) {
+              newActiveTerminalId = fallbackTerminalId
+            }
+            if (state.activeCenterTabId === id) {
+              newActiveCenterTabId = fallbackTerminalId
+            }
           }
 
           // Also remove from split layout if present
@@ -789,6 +809,7 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
+            activeCenterTabId: newActiveCenterTabId,
             layouts: newLayouts,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
@@ -850,10 +871,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectTerminals: (projectId) => {
         const state = get()
-        const sidecarIds = new Set(Object.values(state.sidecarTerminals).flat())
-        return Object.values(state.terminals).filter(
-          (t) => t.projectId === projectId && !sidecarIds.has(t.id)
-        )
+        return getVisibleTerminals(state.terminals, state.sidecarTerminals, projectId)
       },
 
       getWorktreeTerminals: (worktreeId) => {
@@ -883,21 +901,29 @@ export const useProjectStore = create<ProjectStore>()(
             }
           })
 
-          // Update active terminal if it was in the removed worktree
+          // Update active terminal and center tab if they were in the removed worktree
           let newActiveTerminalId = state.activeTerminalId
-          if (state.activeTerminalId && !newTerminals[state.activeTerminalId]) {
-            const projectTerminals = Object.values(newTerminals).filter(
-              (t) => t.projectId === removedWorktree?.projectId
-            )
-            newActiveTerminalId = projectTerminals.length > 0
-              ? projectTerminals[0].id
-              : null
+          let newActiveCenterTabId = state.activeCenterTabId
+          const activeTerminalGone = state.activeTerminalId && !newTerminals[state.activeTerminalId]
+          const activeCenterGone = state.activeCenterTabId && !newTerminals[state.activeCenterTabId] && !state.editorTabs[state.activeCenterTabId]
+
+          if (activeTerminalGone || activeCenterGone) {
+            const visible = getVisibleTerminals(newTerminals, state.sidecarTerminals, removedWorktree?.projectId ?? '')
+            const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
+
+            if (activeTerminalGone) {
+              newActiveTerminalId = fallbackTerminalId
+            }
+            if (activeCenterGone) {
+              newActiveCenterTabId = fallbackTerminalId
+            }
           }
 
           return {
             worktrees: newWorktrees,
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
+            activeCenterTabId: newActiveCenterTabId,
           }
         }),
 
