@@ -1,9 +1,12 @@
-import { FolderTree, GitBranch, RefreshCw } from 'lucide-react'
+import { FolderTree, GitBranch, ListTodo, RefreshCw } from 'lucide-react'
+
+type ExplorerTab = 'files' | 'git' | 'tasks'
 
 interface FileExplorerTabBarProps {
-  activeTab: 'files' | 'git'
-  onTabChange: (tab: 'files' | 'git') => void
+  activeTab: ExplorerTab
+  onTabChange: (tab: ExplorerTab) => void
   gitChangeCount: number
+  taskNowCount: number
   isGitLoading: boolean
   onRefresh: () => void
   showGitTab?: boolean
@@ -13,6 +16,7 @@ export function FileExplorerTabBar({
   activeTab,
   onTabChange,
   gitChangeCount,
+  taskNowCount,
   isGitLoading,
   onRefresh,
   showGitTab = true,
@@ -20,6 +24,7 @@ export function FileExplorerTabBar({
   const allTabs = [
     { id: 'files' as const, label: 'Files', icon: FolderTree },
     { id: 'git' as const, label: 'Git', icon: GitBranch, badge: gitChangeCount },
+    { id: 'tasks' as const, label: 'Tasks', icon: ListTodo, badge: taskNowCount },
   ]
   const tabs = showGitTab ? allTabs : allTabs.filter(t => t.id !== 'git')
 

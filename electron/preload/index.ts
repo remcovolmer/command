@@ -120,6 +120,52 @@ interface GitCommitLog {
   hasMore: boolean
 }
 
+// Task types
+interface TaskItem {
+  id: string
+  text: string
+  completed: boolean
+  section: string
+  filePath: string
+  lineNumber: number
+  dueDate?: string
+  personTags?: string[]
+  isOverdue?: boolean
+  isDueToday?: boolean
+}
+
+interface TaskSection {
+  name: string
+  priority: number
+  tasks: TaskItem[]
+}
+
+interface TasksData {
+  sections: TaskSection[]
+  files: string[]
+  totalOpen: number
+  nowCount: number
+}
+
+interface TaskUpdate {
+  filePath: string
+  lineNumber: number
+  action: 'toggle' | 'edit' | 'delete'
+  newText?: string
+}
+
+interface TaskMove {
+  filePath: string
+  lineNumber: number
+  targetSection: string
+}
+
+interface TaskAdd {
+  filePath: string
+  section: string
+  text: string
+}
+
 // Update types
 interface PRCheckStatus {
   name: string
@@ -347,6 +393,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:file-at-commit', projectPath, commitHash, filePath),
     getHeadHash: (projectPath: string): Promise<string | null> =>
       ipcRenderer.invoke('git:head-hash', projectPath),
+  },
+
+  // Task operations
+  tasks: {
+    scan: (projectPath: string): Promise<TasksData> =>
+      ipcRenderer.invoke('tasks:scan', projectPath),
+    update: (projectPath: string, update: TaskUpdate): Promise<TasksData> =>
+      ipcRenderer.invoke('tasks:update', projectPath, update),
+    add: (projectPath: string, task: TaskAdd): Promise<TasksData> =>
+      ipcRenderer.invoke('tasks:add', projectPath, task),
+    delete: (projectPath: string, filePath: string, lineNumber: number): Promise<TasksData> =>
+      ipcRenderer.invoke('tasks:delete', projectPath, filePath, lineNumber),
+    move: (projectPath: string, move: TaskMove): Promise<TasksData> =>
+      ipcRenderer.invoke('tasks:move', projectPath, move),
+    createFile: (projectPath: string): Promise<string> =>
+      ipcRenderer.invoke('tasks:create-file', projectPath),
   },
 
   // GitHub operations

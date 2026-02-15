@@ -224,6 +224,10 @@ function App() {
       setFileExplorerVisible(true)
       setFileExplorerActiveTab('git')
     },
+    'fileExplorer.tasksTab': () => {
+      setFileExplorerVisible(true)
+      setFileExplorerActiveTab('tasks')
+    },
     'fileExplorer.newFile': () => {
       const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } = useProjectStore.getState()
       if (!activeProjectId || !fileExplorerVisible) return

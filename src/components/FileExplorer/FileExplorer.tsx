@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
+import { TasksPanel } from './TasksPanel'
 import { FileExplorerTabBar } from './FileExplorerTabBar'
 import { SidecarTerminalPanel } from './SidecarTerminalPanel'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
@@ -145,6 +146,8 @@ export function FileExplorer() {
   const handleRefresh = () => {
     if (activeTab === 'files') {
       handleFilesRefresh()
+    } else if (activeTab === 'tasks') {
+      handleTasksRefresh()
     } else {
       handleGitRefresh()
     }
@@ -169,6 +172,23 @@ export function FileExplorer() {
       gitStatus.conflicted.length
     : 0
 
+  const tasksData = useProjectStore((s) => activeProjectId ? s.tasksData[activeProjectId] : null)
+  const taskNowCount = tasksData?.nowCount ?? 0
+
+  const handleTasksRefresh = useCallback(async () => {
+    if (!activeProject) return
+    const { setTasksLoading, setTasksData } = useProjectStore.getState()
+    setTasksLoading(activeProject.id, true)
+    try {
+      const data = await api.tasks.scan(activeProject.path)
+      setTasksData(activeProject.id, data)
+    } catch (error) {
+      console.error('Failed to scan tasks:', error)
+    } finally {
+      setTasksLoading(activeProject.id, false)
+    }
+  }, [api, activeProject])
+
   const hasTerminals = sidecarTerminals.length > 0
   const isExpanded = hasTerminals && !sidecarTerminalCollapsed
 
@@ -176,18 +196,21 @@ export function FileExplorer() {
     <div className="h-full flex flex-col bg-sidebar" data-file-explorer>
       {/* Tab Bar - at top */}
       <FileExplorerTabBar
-        activeTab={isLimitedProject ? 'files' : activeTab}
+        activeTab={isLimitedProject && activeTab === 'git' ? 'files' : activeTab}
         onTabChange={setActiveTab}
         gitChangeCount={totalGitChanges}
+        taskNowCount={taskNowCount}
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
         showGitTab={!isLimitedProject}
       />
 
-      {/* Files/Git Content - takes remaining space */}
+      {/* Files/Git/Tasks Content - takes remaining space */}
       <div className="flex-1 min-h-0 overflow-auto">
         {activeProject ? (
-          (isLimitedProject || activeTab === 'files') ? (
+          activeTab === 'tasks' ? (
+            <TasksPanel project={activeProject} />
+          ) : (isLimitedProject || activeTab === 'files') ? (
             <FileTree project={activeProject} />
           ) : (
             <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />

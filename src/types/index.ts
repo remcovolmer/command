@@ -176,6 +176,52 @@ export interface PRStatus {
   lastUpdated?: number;
 }
 
+// Task types
+export interface TaskItem {
+  id: string;                    // Generated: `${filePath}:${lineNumber}`
+  text: string;                  // Full task text (without checkbox syntax)
+  completed: boolean;            // true = [x], false = [ ]
+  section: string;               // Section name (e.g., "Now", "Next", custom)
+  filePath: string;              // Source TASKS.md file path
+  lineNumber: number;            // Line number in source file
+  dueDate?: string;              // Parsed from 📅 YYYY-MM-DD
+  personTags?: string[];         // Parsed from [[Name]] syntax
+  isOverdue?: boolean;           // Computed: dueDate < today
+  isDueToday?: boolean;          // Computed: dueDate === today
+}
+
+export interface TaskSection {
+  name: string;                  // Section heading text
+  priority: number;              // Sort order (Now=0, Next=1, Waiting=2, Later=3, Done=4, custom=5+)
+  tasks: TaskItem[];
+}
+
+export interface TasksData {
+  sections: TaskSection[];
+  files: string[];               // All discovered TASKS.md file paths
+  totalOpen: number;             // Count of uncompleted tasks
+  nowCount: number;              // Count of tasks in "Now" section (for badge)
+}
+
+export interface TaskUpdate {
+  filePath: string;
+  lineNumber: number;
+  action: 'toggle' | 'edit' | 'delete';
+  newText?: string;              // For 'edit' action
+}
+
+export interface TaskMove {
+  filePath: string;
+  lineNumber: number;
+  targetSection: string;         // Section name to move to
+}
+
+export interface TaskAdd {
+  filePath: string;              // Which TASKS.md to add to
+  section: string;               // Which section
+  text: string;                  // Task text
+}
+
 // Update types
 export interface UpdateCheckResult {
   updateAvailable: boolean;
@@ -318,6 +364,14 @@ export interface ElectronAPI {
     onProgress: (callback: (progress: UpdateProgressInfo) => void) => Unsubscribe;
     onDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => Unsubscribe;
     onError: (callback: (error: UpdateErrorInfo) => void) => Unsubscribe;
+  };
+  tasks: {
+    scan: (projectPath: string) => Promise<TasksData>;
+    update: (projectPath: string, update: TaskUpdate) => Promise<TasksData>;
+    add: (projectPath: string, task: TaskAdd) => Promise<TasksData>;
+    delete: (projectPath: string, filePath: string, lineNumber: number) => Promise<TasksData>;
+    move: (projectPath: string, move: TaskMove) => Promise<TasksData>;
+    createFile: (projectPath: string) => Promise<string>;
   };
   removeAllListeners: (channel: string) => void;
 }
