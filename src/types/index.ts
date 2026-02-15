@@ -194,7 +194,6 @@ export interface TaskSection {
   name: string;                  // Section heading text
   priority: number;              // Sort order (Now=0, Next=1, Waiting=2, Later=3, Done=4, custom=5+)
   tasks: TaskItem[];
-  isKnownSection: boolean;       // true for Now/Next/Waiting/Later/Done
 }
 
 export interface TasksData {
@@ -215,7 +214,6 @@ export interface TaskMove {
   filePath: string;
   lineNumber: number;
   targetSection: string;         // Section name to move to
-  targetFilePath?: string;       // If moving between files (default: same file)
 }
 
 export interface TaskAdd {

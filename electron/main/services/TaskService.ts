@@ -1,6 +1,5 @@
-import { readFile, writeFile, readdir, stat, rename } from 'node:fs/promises'
+import { readFile, writeFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import os from 'node:os'
 
 // Types duplicated here due to Electron process isolation
 export interface TaskItem {
@@ -20,7 +19,6 @@ export interface TaskSection {
   name: string
   priority: number
   tasks: TaskItem[]
-  isKnownSection: boolean
 }
 
 export interface TasksData {
@@ -41,7 +39,6 @@ export interface TaskMove {
   filePath: string
   lineNumber: number
   targetSection: string
-  targetFilePath?: string
 }
 
 export interface TaskAdd {
@@ -50,22 +47,9 @@ export interface TaskAdd {
   text: string
 }
 
-// Section name mapping: keyword → { canonical name, priority }
-const SECTION_ALIASES: Record<string, { name: string; priority: number }> = {}
-
-const SECTION_KEYWORDS: Array<{ keywords: string[]; name: string; priority: number }> = [
-  { keywords: ['now', 'current', 'active', 'in progress'], name: 'Now', priority: 0 },
-  { keywords: ['next', 'up next', 'soon', 'planned', 'todo'], name: 'Next', priority: 1 },
-  { keywords: ['waiting', 'blocked', 'on hold'], name: 'Waiting', priority: 2 },
-  { keywords: ['later', 'someday', 'backlog', 'ideas'], name: 'Later', priority: 3 },
-  { keywords: ['done', 'completed', 'finished'], name: 'Done', priority: 4 },
-]
-
-// Build alias lookup
-for (const group of SECTION_KEYWORDS) {
-  for (const keyword of group.keywords) {
-    SECTION_ALIASES[keyword] = { name: group.name, priority: group.priority }
-  }
+// Section priorities for the 5 canonical sections
+const SECTION_PRIORITIES: Record<string, number> = {
+  now: 0, next: 1, waiting: 2, later: 3, done: 4,
 }
 
 const TASKS_FILENAME = 'TASKS.md'
@@ -76,13 +60,13 @@ const DUE_DATE_REGEX = /📅\s*(\d{4}-\d{2}-\d{2})/
 const PERSON_TAG_REGEX = /\[\[([^\]]+)\]\]/g
 const H2_REGEX = /^## (.+)$/
 
-function mapSectionName(heading: string): { name: string; priority: number; isKnown: boolean } {
+function mapSectionName(heading: string): { name: string; priority: number } {
   const lower = heading.toLowerCase().trim()
-  const match = SECTION_ALIASES[lower]
-  if (match) {
-    return { name: match.name, priority: match.priority, isKnown: true }
+  const priority = SECTION_PRIORITIES[lower]
+  if (priority !== undefined) {
+    return { name: heading.trim(), priority }
   }
-  return { name: heading.trim(), priority: -1, isKnown: false }
+  return { name: heading.trim(), priority: -1 }
 }
 
 function computeDateFlags(dueDate: string | undefined): { isOverdue: boolean; isDueToday: boolean } {
@@ -103,7 +87,9 @@ function parseLine(line: string, filePath: string, lineNumber: number, section: 
   if (!match) return null
 
   const completed = match[1] === 'x'
-  const text = line.slice(match[0].length)
+  // Strip bold markers - they're a file format detail, not part of the task text
+  const rawText = line.slice(match[0].length)
+  const text = rawText.replace(/\*\*/g, '')
 
   // Extract due date
   const dueDateMatch = text.match(DUE_DATE_REGEX)
@@ -131,11 +117,6 @@ function parseLine(line: string, filePath: string, lineNumber: number, section: 
     ...(isOverdue ? { isOverdue } : {}),
     ...(isDueToday ? { isDueToday } : {}),
   }
-}
-
-function serializeTask(task: TaskItem): string {
-  const prefix = task.completed ? CHECKBOX_DONE : CHECKBOX_OPEN
-  return prefix + task.text
 }
 
 export class TaskService {
@@ -188,23 +169,16 @@ export class TaskService {
         const heading = h2Match[1]
         const mapped = mapSectionName(heading)
 
-        let priority: number
-        if (mapped.isKnown) {
-          priority = mapped.priority
-          currentSection = mapped.name
-        } else {
-          priority = customPriority++
-          currentSection = mapped.name
-        }
+        const priority = mapped.priority >= 0 ? mapped.priority : customPriority++
+        currentSection = mapped.name
 
-        // Check if section already exists (from another heading mapping to same canonical name)
+        // Check if section already exists
         const existing = sections.find(s => s.name === currentSection)
         if (!existing) {
           sections.push({
             name: currentSection,
             priority,
             tasks: [],
-            isKnownSection: mapped.isKnown,
           })
         }
         continue
@@ -229,21 +203,25 @@ export class TaskService {
     const files = await this.scanForTaskFiles(projectPath)
     const allSections: Map<string, TaskSection> = new Map()
 
-    for (const file of files) {
-      try {
-        const content = await readFile(file, 'utf-8')
-        const sections = this.parseTaskFile(content, file)
-
-        for (const section of sections) {
-          const existing = allSections.get(section.name)
-          if (existing) {
-            existing.tasks.push(...section.tasks)
-          } else {
-            allSections.set(section.name, { ...section })
-          }
+    const results = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const content = await readFile(file, 'utf-8')
+          return this.parseTaskFile(content, file)
+        } catch {
+          return [] // Skip files we can't read
         }
-      } catch {
-        // Skip files we can't read
+      })
+    )
+
+    for (const sections of results) {
+      for (const section of sections) {
+        const existing = allSections.get(section.name)
+        if (existing) {
+          existing.tasks.push(...section.tasks)
+        } else {
+          allSections.set(section.name, { ...section })
+        }
       }
     }
 
@@ -270,13 +248,7 @@ export class TaskService {
 
     const line = lines[lineIndex]
     if (!CHECKBOX_REGEX.test(line)) {
-      // Try to find the task nearby (±5 lines) for concurrent edit safety
-      const found = this.findTaskNearby(lines, lineIndex, line)
-      if (found === -1) {
-        throw new Error('Task not found at expected line')
-      }
-      // Use the found index instead
-      return this.applyUpdate(projectPath, update, lines, found)
+      throw new Error('Task not found at expected line - file may have changed')
     }
 
     return this.applyUpdate(projectPath, update, lines, lineIndex)
@@ -321,7 +293,7 @@ export class TaskService {
       }
     }
 
-    await this.atomicWrite(update.filePath, lines.join('\n'))
+    await writeFile(update.filePath, lines.join('\n'), 'utf-8')
     return this.parseAllTasks(projectPath)
   }
 
@@ -342,7 +314,7 @@ export class TaskService {
       lines.push('', '## ' + task.section, newLine)
     }
 
-    await this.atomicWrite(task.filePath, lines.join('\n'))
+    await writeFile(task.filePath, lines.join('\n'), 'utf-8')
     return this.parseAllTasks(projectPath)
   }
 
@@ -357,7 +329,6 @@ export class TaskService {
    * Move a task to a different section
    */
   async moveTask(projectPath: string, move: TaskMove): Promise<TasksData> {
-    const targetFile = move.targetFilePath ?? move.filePath
     const content = await readFile(move.filePath, 'utf-8')
     const lines = content.split(/\r?\n/)
     const lineIndex = move.lineNumber - 1
@@ -377,28 +348,13 @@ export class TaskService {
       taskLine = CHECKBOX_OPEN + taskLine.slice(CHECKBOX_DONE.length)
     }
 
-    if (targetFile === move.filePath) {
-      // Same file: insert at target section
-      const insertIndex = this.findSectionInsertIndex(lines, move.targetSection)
-      if (insertIndex !== -1) {
-        lines.splice(insertIndex, 0, taskLine)
-      } else {
-        lines.push('', '## ' + move.targetSection, taskLine)
-      }
-      await this.atomicWrite(move.filePath, lines.join('\n'))
+    const insertIndex = this.findSectionInsertIndex(lines, move.targetSection)
+    if (insertIndex !== -1) {
+      lines.splice(insertIndex, 0, taskLine)
     } else {
-      // Cross-file move
-      await this.atomicWrite(move.filePath, lines.join('\n'))
-      const targetContent = await readFile(targetFile, 'utf-8')
-      const targetLines = targetContent.split(/\r?\n/)
-      const insertIndex = this.findSectionInsertIndex(targetLines, move.targetSection)
-      if (insertIndex !== -1) {
-        targetLines.splice(insertIndex, 0, taskLine)
-      } else {
-        targetLines.push('', '## ' + move.targetSection, taskLine)
-      }
-      await this.atomicWrite(targetFile, targetLines.join('\n'))
+      lines.push('', '## ' + move.targetSection, taskLine)
     }
+    await writeFile(move.filePath, lines.join('\n'), 'utf-8')
 
     return this.parseAllTasks(projectPath)
   }
@@ -446,38 +402,4 @@ export class TaskService {
     return -1
   }
 
-  /**
-   * Try to find a task near the expected line (for concurrent edit safety)
-   */
-  private findTaskNearby(lines: string[], expectedIndex: number, _expectedContent: string): number {
-    // Search ±5 lines from expected position
-    for (let offset = 1; offset <= 5; offset++) {
-      for (const idx of [expectedIndex - offset, expectedIndex + offset]) {
-        if (idx >= 0 && idx < lines.length && CHECKBOX_REGEX.test(lines[idx])) {
-          return idx
-        }
-      }
-    }
-    return -1
-  }
-
-  /**
-   * Write file atomically: write to temp, then rename
-   */
-  private async atomicWrite(filePath: string, content: string): Promise<void> {
-    const tmpPath = filePath + '.tmp.' + process.pid
-    try {
-      await writeFile(tmpPath, content, 'utf-8')
-      await rename(tmpPath, filePath)
-    } catch (err) {
-      // Clean up temp file on failure
-      try {
-        const { unlink } = await import('node:fs/promises')
-        await unlink(tmpPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw err
-    }
-  }
 }

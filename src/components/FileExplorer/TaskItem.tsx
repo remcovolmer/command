@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Square, CheckSquare, Calendar, X, GripVertical } from 'lucide-react'
+import { Square, CheckSquare, Calendar, X, GripVertical, Pencil } from 'lucide-react'
 import type { TaskItem as TaskItemType } from '../../types'
 
 interface TaskItemProps {
@@ -22,6 +22,7 @@ export function TaskItem({
   onDragStart,
 }: TaskItemProps) {
   const [editing, setEditing] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [editText, setEditText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -33,15 +34,14 @@ export function TaskItem({
   }, [editing])
 
   const handleStartEdit = useCallback(() => {
-    // Strip bold markers for editing
-    const cleanText = task.text.replace(/\*\*/g, '')
-    setEditText(cleanText)
+    setEditText(task.text)
     setEditing(true)
+    setExpanded(false)
   }, [task.text])
 
   const handleSave = useCallback(() => {
     const trimmed = editText.trim()
-    if (trimmed && trimmed !== task.text.replace(/\*\*/g, '')) {
+    if (trimmed && trimmed !== task.text) {
       onEdit(task, trimmed)
     }
     setEditing(false)
@@ -56,9 +56,7 @@ export function TaskItem({
     }
   }, [handleSave])
 
-  // Clean display text (remove bold markers)
-  const displayText = task.text.replace(/\*\*/g, '')
-  // Extract filename from source path
+  const displayText = task.text
   const sourceLabel = task.filePath.split(/[/\\]/).slice(-2).join('/')
 
   return (
@@ -100,13 +98,13 @@ export function TaskItem({
           />
         ) : (
           <span
-            onClick={handleStartEdit}
-            className={`cursor-text block truncate ${
+            onClick={() => setExpanded(!expanded)}
+            className={`cursor-pointer block ${expanded ? 'whitespace-pre-wrap break-words' : 'truncate'} ${
               task.completed
                 ? 'line-through text-muted-foreground'
                 : 'text-sidebar-foreground'
             }`}
-            title={displayText}
+            title={expanded ? undefined : displayText}
           >
             {displayText}
           </span>
@@ -148,6 +146,15 @@ export function TaskItem({
           )}
         </div>
       </div>
+
+      {/* Edit button */}
+      <button
+        onClick={handleStartEdit}
+        className="mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Edit task"
+      >
+        <Pencil className="w-3 h-3 text-muted-foreground hover:text-sidebar-foreground" />
+      </button>
 
       {/* Delete button */}
       <button

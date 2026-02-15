@@ -196,7 +196,7 @@ export function FileExplorer() {
     <div className="h-full flex flex-col bg-sidebar" data-file-explorer>
       {/* Tab Bar - at top */}
       <FileExplorerTabBar
-        activeTab={isLimitedProject ? 'files' : activeTab}
+        activeTab={isLimitedProject && activeTab === 'git' ? 'files' : activeTab}
         onTabChange={setActiveTab}
         gitChangeCount={totalGitChanges}
         taskNowCount={taskNowCount}
@@ -208,10 +208,10 @@ export function FileExplorer() {
       {/* Files/Git/Tasks Content - takes remaining space */}
       <div className="flex-1 min-h-0 overflow-auto">
         {activeProject ? (
-          (isLimitedProject || activeTab === 'files') ? (
+          activeTab === 'tasks' ? (
+            <TasksPanel project={activeProject} />
+          ) : (isLimitedProject || activeTab === 'files') ? (
             <FileTree project={activeProject} />
-          ) : activeTab === 'tasks' ? (
-            <TasksPanel project={activeProject} onRefresh={handleTasksRefresh} />
           ) : (
             <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
           )

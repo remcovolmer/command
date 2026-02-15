@@ -646,21 +646,49 @@ ipcMain.handle('tasks:scan', async (_event, projectPath: string) => {
 
 ipcMain.handle('tasks:update', async (_event, projectPath: string, update: { filePath: string; lineNumber: number; action: 'toggle' | 'edit' | 'delete'; newText?: string }) => {
   validateProjectPath(projectPath)
+  update.filePath = validateFilePathInProject(update.filePath)
+  if (typeof update.lineNumber !== 'number' || update.lineNumber < 1 || update.lineNumber > 100000) {
+    throw new Error('Invalid line number')
+  }
+  if (!['toggle', 'edit', 'delete'].includes(update.action)) {
+    throw new Error('Invalid action')
+  }
+  if (update.action === 'edit' && (typeof update.newText !== 'string' || update.newText.length === 0 || update.newText.length > 10000)) {
+    throw new Error('Invalid newText')
+  }
   return taskService?.updateTask(projectPath, update) ?? null
 })
 
 ipcMain.handle('tasks:add', async (_event, projectPath: string, task: { filePath: string; section: string; text: string }) => {
   validateProjectPath(projectPath)
+  task.filePath = validateFilePathInProject(task.filePath)
+  if (typeof task.section !== 'string' || task.section.length === 0 || task.section.length > 200) {
+    throw new Error('Invalid section name')
+  }
+  if (typeof task.text !== 'string' || task.text.length === 0 || task.text.length > 10000) {
+    throw new Error('Invalid task text')
+  }
   return taskService?.addTask(projectPath, task) ?? null
 })
 
 ipcMain.handle('tasks:delete', async (_event, projectPath: string, filePath: string, lineNumber: number) => {
   validateProjectPath(projectPath)
+  filePath = validateFilePathInProject(filePath)
+  if (typeof lineNumber !== 'number' || lineNumber < 1 || lineNumber > 100000) {
+    throw new Error('Invalid line number')
+  }
   return taskService?.deleteTask(projectPath, filePath, lineNumber) ?? null
 })
 
-ipcMain.handle('tasks:move', async (_event, projectPath: string, move: { filePath: string; lineNumber: number; targetSection: string; targetFilePath?: string }) => {
+ipcMain.handle('tasks:move', async (_event, projectPath: string, move: { filePath: string; lineNumber: number; targetSection: string }) => {
   validateProjectPath(projectPath)
+  move.filePath = validateFilePathInProject(move.filePath)
+  if (typeof move.lineNumber !== 'number' || move.lineNumber < 1 || move.lineNumber > 100000) {
+    throw new Error('Invalid line number')
+  }
+  if (typeof move.targetSection !== 'string' || move.targetSection.length === 0 || move.targetSection.length > 200) {
+    throw new Error('Invalid target section')
+  }
   return taskService?.moveTask(projectPath, move) ?? null
 })
 

@@ -7,10 +7,9 @@ import { TaskSection } from './TaskSection'
 
 interface TasksPanelProps {
   project: Project
-  onRefresh: () => void
 }
 
-export function TasksPanel({ project, onRefresh }: TasksPanelProps) {
+export function TasksPanel({ project }: TasksPanelProps) {
   const api = useMemo(() => getElectronAPI(), [])
   const tasksData = useProjectStore((s) => s.tasksData[project.id])
   const isLoading = useProjectStore((s) => s.tasksLoading[project.id])
@@ -66,10 +65,9 @@ export function TasksPanel({ project, onRefresh }: TasksPanelProps) {
     const debounceTimer = { current: null as ReturnType<typeof setTimeout> | null }
 
     const unsubscribe = api.fs.onFileChanged((filePath: string) => {
-      // Check if the changed file is one of our TASKS.md files
+      // Check if the changed file is one of our watched TASKS.md files
       if (watchedFilesRef.current.some(f =>
-        f.toLowerCase() === filePath.toLowerCase() ||
-        filePath.toLowerCase().endsWith('tasks.md')
+        f.toLowerCase() === filePath.toLowerCase()
       )) {
         if (debounceTimer.current) clearTimeout(debounceTimer.current)
         debounceTimer.current = setTimeout(() => {
@@ -153,7 +151,9 @@ export function TasksPanel({ project, onRefresh }: TasksPanelProps) {
     try {
       const raw = e.dataTransfer.getData('application/json')
       if (!raw) return
-      const { filePath, lineNumber, section: sourceSection } = JSON.parse(raw)
+      const parsed = JSON.parse(raw)
+      const { filePath, lineNumber, section: sourceSection } = parsed
+      if (typeof filePath !== 'string' || typeof lineNumber !== 'number' || typeof sourceSection !== 'string') return
       if (sourceSection === targetSection) return // Same section, no-op
 
       const data = await api.tasks.move(project.path, {

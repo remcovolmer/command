@@ -10,7 +10,7 @@ interface TaskSectionProps {
   onToggleTask: (task: TaskItemType) => void
   onEditTask: (task: TaskItemType, newText: string) => void
   onDeleteTask: (task: TaskItemType) => void
-  onAddTask: (section: string) => void
+  onAddTask: (text: string) => void
   onDragStart?: (e: React.DragEvent, task: TaskItemType) => void
   onDragOver?: (e: React.DragEvent) => void
   onDrop?: (e: React.DragEvent, targetSection: string) => void
@@ -78,7 +78,7 @@ export function TaskSection({
       }}
     >
       {/* Section header */}
-      <div className="flex items-center gap-1 px-2 py-1.5 hover:bg-sidebar-accent transition-colors">
+      <div className="group/header flex items-center gap-1 px-2 py-1.5 hover:bg-sidebar-accent transition-colors">
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1 flex-1 min-w-0"
@@ -101,9 +101,8 @@ export function TaskSection({
               setExpanded(true)
               setAdding(true)
             }}
-            className="p-0.5 rounded hover:bg-muted/50 transition-colors opacity-0 group-hover:opacity-100"
+            className="p-0.5 rounded hover:bg-muted/50 transition-colors opacity-0 group-hover/header:opacity-100"
             title="Add task"
-            style={{ opacity: undefined }} // Let CSS handle
           >
             <Plus className="w-3 h-3 text-muted-foreground hover:text-sidebar-foreground" />
           </button>

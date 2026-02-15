@@ -138,7 +138,6 @@ interface TaskSection {
   name: string
   priority: number
   tasks: TaskItem[]
-  isKnownSection: boolean
 }
 
 interface TasksData {
@@ -159,7 +158,6 @@ interface TaskMove {
   filePath: string
   lineNumber: number
   targetSection: string
-  targetFilePath?: string
 }
 
 interface TaskAdd {
