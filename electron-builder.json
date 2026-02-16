@@ -15,6 +15,11 @@
       "from": "electron/main/hooks",
       "to": "hooks",
       "filter": ["*.cjs"]
+    },
+    {
+      "from": "build",
+      "to": "build",
+      "filter": ["icon.ico"]
     }
   ],
   "win": {
