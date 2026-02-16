@@ -17,6 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { LayoutGroup, AnimatePresence } from 'motion/react'
+import { ChevronRight } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { SortableProjectItem } from './SortableProjectItem'
@@ -59,6 +60,9 @@ export function SortableProjectList({
 }: SortableProjectListProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const terminals = useProjectStore((s) => s.terminals)
+  const inactiveSectionCollapsed = useProjectStore((s) => s.inactiveSectionCollapsed)
+  const toggleInactiveSectionCollapsed = useProjectStore((s) => s.toggleInactiveSectionCollapsed)
+  const setActiveProject = useProjectStore((s) => s.setActiveProject)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -103,6 +107,22 @@ export function SortableProjectList({
     [draggedId, projects]
   )
 
+  // When collapsing, auto-switch away from inactive project if currently selected
+  const handleToggleInactive = () => {
+    if (!inactiveSectionCollapsed && activeProjectId) {
+      // About to collapse: check if selected project is inactive
+      const isSelectedInactive = inactiveProjects.some((p) => p.id === activeProjectId)
+      if (isSelectedInactive) {
+        // Switch to first active project or first workspace
+        const firstVisible = activeProjects[0] ?? projects.find((p) => p.type === 'workspace')
+        if (firstVisible) {
+          setActiveProject(firstVisible.id)
+        }
+      }
+    }
+    toggleInactiveSectionCollapsed()
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     setDraggedId(event.active.id as string)
   }
@@ -136,7 +156,7 @@ export function SortableProjectList({
     false
   )
 
-  const renderProjectItem = (project: Project, isDragging: boolean) => (
+  const renderProjectItem = (project: Project, isDragging: boolean, isInactive = false) => (
     <SortableProjectItem
       key={project.id}
       project={project}
@@ -146,6 +166,7 @@ export function SortableProjectList({
       worktrees={getProjectWorktrees(project.id)}
       getWorktreeTerminals={getWorktreeTerminals}
       isActive={project.id === activeProjectId}
+      isInactive={isInactive}
       activeTerminalId={activeTerminalId}
       isDragging={isDragging}
       onSelect={onSelect}
@@ -208,37 +229,50 @@ export function SortableProjectList({
       {/* Inactive Projects Section */}
       {inactiveProjects.length > 0 && (
         <section>
-          <h3 className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em]">
-            Inactive
-          </h3>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEndInactive}
+          <button
+            onClick={handleToggleInactive}
+            aria-expanded={!inactiveSectionCollapsed}
+            className="flex items-center gap-1 px-3 py-1.5 w-full text-left text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] hover:text-muted-foreground transition-colors"
           >
-            <SortableContext
-              items={inactiveProjectIds}
-              strategy={verticalListSortingStrategy}
+            <ChevronRight
+              aria-hidden="true"
+              className={`w-3 h-3 transition-transform duration-150 ${!inactiveSectionCollapsed ? 'rotate-90' : ''}`}
+            />
+            <span>Inactive</span>
+            {inactiveSectionCollapsed && (
+              <span className="normal-case tracking-normal font-normal">({inactiveProjects.length})</span>
+            )}
+          </button>
+          {!inactiveSectionCollapsed && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEndInactive}
             >
-              <AnimatePresence mode="popLayout">
-                <ul className="space-y-1">
-                  {inactiveProjects.map((project) =>
-                    renderProjectItem(project, project.id === draggedId)
-                  )}
-                </ul>
-              </AnimatePresence>
-            </SortableContext>
+              <SortableContext
+                items={inactiveProjectIds}
+                strategy={verticalListSortingStrategy}
+              >
+                <AnimatePresence mode="popLayout">
+                  <ul className="space-y-1">
+                    {inactiveProjects.map((project) =>
+                      renderProjectItem(project, project.id === draggedId, true)
+                    )}
+                  </ul>
+                </AnimatePresence>
+              </SortableContext>
 
-            <DragOverlay>
-              {draggedProject && inactiveProjectIds.includes(draggedProject.id) ? (
-                <ProjectDragPreview
-                  project={draggedProject}
-                  terminalCount={0}
-                />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {draggedProject && inactiveProjectIds.includes(draggedProject.id) ? (
+                  <ProjectDragPreview
+                    project={draggedProject}
+                    terminalCount={0}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          )}
         </section>
       )}
     </LayoutGroup>

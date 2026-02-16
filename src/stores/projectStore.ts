@@ -75,6 +75,10 @@ interface ProjectStore {
   // Settings dialog actions
   setSettingsDialogOpen: (open: boolean) => void
 
+  // Inactive section collapse state
+  inactiveSectionCollapsed: boolean
+  toggleInactiveSectionCollapsed: () => void
+
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
   sidecarTerminalCollapsed: boolean
@@ -328,6 +332,11 @@ export const useProjectStore = create<ProjectStore>()(
       // Settings dialog actions
       setSettingsDialogOpen: (open) =>
         set({ settingsDialogOpen: open }),
+
+      // Inactive section collapse state
+      inactiveSectionCollapsed: false,
+      toggleInactiveSectionCollapsed: () =>
+        set((state) => ({ inactiveSectionCollapsed: !state.inactiveSectionCollapsed })),
 
       // Sidecar terminal state
       sidecarTerminals: {},
@@ -1093,6 +1102,8 @@ export const useProjectStore = create<ProjectStore>()(
         expandedPaths: state.expandedPaths,
         // Sidecar terminal state (only collapse state, not terminal IDs)
         sidecarTerminalCollapsed: state.sidecarTerminalCollapsed,
+        // Inactive section collapse state
+        inactiveSectionCollapsed: state.inactiveSectionCollapsed,
         // Theme state
         theme: state.theme,
         // Hotkey configuration
