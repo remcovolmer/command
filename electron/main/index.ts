@@ -214,7 +214,9 @@ async function createWindow() {
 
   win = new BrowserWindow({
     title: 'Command',
-    icon: path.join(process.env.APP_ROOT, 'build', 'icon.ico'),
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, 'build', 'icon.ico')
+      : path.join(process.env.APP_ROOT, 'build', 'icon.ico'),
     width: 1400,
     height: 900,
     minWidth: 800,
