@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useCallback, useRef } from 'react'
 import { ListTodo, Plus, Loader2 } from 'lucide-react'
-import type { Project, TaskItem as TaskItemType, TasksData } from '../../types'
+import type { Project, TaskItem as TaskItemType, FileWatchEvent } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
+import { pathsMatch } from '../../utils/paths'
 import { TaskSection } from './TaskSection'
 
 interface TasksPanelProps {
@@ -16,8 +18,8 @@ export function TasksPanel({ project }: TasksPanelProps) {
   const setTasksData = useProjectStore((s) => s.setTasksData)
   const setTasksLoading = useProjectStore((s) => s.setTasksLoading)
 
-  // Track watched files for cleanup
-  const watchedFilesRef = useRef<string[]>([])
+  // Track TASKS.md file paths for matching watcher events
+  const taskFilesRef = useRef<string[]>([])
 
   // Initial load
   useEffect(() => {
@@ -30,8 +32,7 @@ export function TasksPanel({ project }: TasksPanelProps) {
     try {
       const data = await api.tasks.scan(project.path)
       setTasksData(project.id, data)
-      // Set up file watching for discovered TASKS.md files
-      setupWatchers(data.files)
+      taskFilesRef.current = data.files
     } catch (error) {
       console.error('Failed to scan tasks:', error)
     } finally {
@@ -40,52 +41,30 @@ export function TasksPanel({ project }: TasksPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id, project.path, api])
 
-  const setupWatchers = useCallback(async (files: string[]) => {
-    // Unwatch old files
-    for (const file of watchedFilesRef.current) {
-      try {
-        await api.fs.unwatchFile(file)
-      } catch {
-        // Ignore
-      }
-    }
-    // Watch new files
-    watchedFilesRef.current = files
-    for (const file of files) {
-      try {
-        await api.fs.watchFile(file)
-      } catch {
-        // Ignore
-      }
-    }
-  }, [api])
+  // Subscribe to centralized file watcher for TASKS.md changes
+  const loadTasksRef = useRef(loadTasks)
+  loadTasksRef.current = loadTasks
 
-  // Listen for file changes and debounce reload
   useEffect(() => {
     const debounceTimer = { current: null as ReturnType<typeof setTimeout> | null }
 
-    const unsubscribe = api.fs.onFileChanged((filePath: string) => {
-      // Check if the changed file is one of our watched TASKS.md files
-      if (watchedFilesRef.current.some(f =>
-        f.toLowerCase() === filePath.toLowerCase()
-      )) {
+    const handleWatchEvents = (events: FileWatchEvent[]) => {
+      const isTaskFile = events.some((event) =>
+        taskFilesRef.current.some((f) => pathsMatch(f, event.path))
+      )
+      if (isTaskFile) {
         if (debounceTimer.current) clearTimeout(debounceTimer.current)
         debounceTimer.current = setTimeout(() => {
-          loadTasks()
+          loadTasksRef.current()
         }, 300)
       }
-    })
-
-    return () => {
-      unsubscribe()
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
-      // Cleanup watchers
-      for (const file of watchedFilesRef.current) {
-        api.fs.unwatchFile(file).catch(() => {})
-      }
-      watchedFilesRef.current = []
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    fileWatcherEvents.subscribe(project.id, 'tasks-panel', handleWatchEvents)
+    return () => {
+      fileWatcherEvents.unsubscribe(project.id, 'tasks-panel')
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    }
   }, [project.id])
 
   const handleToggle = useCallback(async (task: TaskItemType) => {
