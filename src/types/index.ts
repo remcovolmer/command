@@ -348,9 +348,6 @@ export interface ElectronAPI {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;
     readFile: (filePath: string) => Promise<string>;
     writeFile: (filePath: string, content: string) => Promise<void>;
-    watchFile: (filePath: string) => Promise<void>;
-    unwatchFile: (filePath: string) => Promise<void>;
-    onFileChanged: (callback: (filePath: string) => void) => Unsubscribe;
     onWatchChanges: (callback: (events: FileWatchEvent[]) => void) => Unsubscribe;
     onWatchError: (callback: (error: FileWatchError) => void) => Unsubscribe;
     stat: (filePath: string) => Promise<{ exists: boolean; isFile: boolean; resolved: string }>;

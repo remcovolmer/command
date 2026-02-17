@@ -3,7 +3,6 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { watch, existsSync, type FSWatcher } from 'node:fs'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
@@ -73,8 +72,6 @@ let githubService: GitHubService | null = null
 let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
 
-// File watchers for live updates (path -> watcher)
-const fileWatchers = new Map<string, FSWatcher>()
 
 /**
  * Verify that a Claude session file exists (async version)
@@ -500,40 +497,6 @@ ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string)
     throw new Error('Content too large (max 10MB)')
   }
   await fs.writeFile(resolved, content, 'utf-8')
-})
-
-// File watching IPC handlers for live updates when Claude Code modifies files
-ipcMain.handle('fs:watchFile', async (_event, filePath: string) => {
-  const resolved = validateFilePathInProject(filePath)
-
-  // Already watching this file
-  if (fileWatchers.has(resolved)) return
-
-  try {
-    const watcher = watch(resolved, (eventType) => {
-      if (eventType === 'change') {
-        win?.webContents.send('fs:fileChanged', filePath)
-      }
-    })
-
-    watcher.on('error', (err) => {
-      console.error('[fs:watchFile] Watcher error:', err)
-      fileWatchers.delete(resolved)
-    })
-
-    fileWatchers.set(resolved, watcher)
-  } catch (error) {
-    console.error('[fs:watchFile] Failed to watch:', error)
-  }
-})
-
-ipcMain.handle('fs:unwatchFile', async (_event, filePath: string) => {
-  const resolved = validateFilePathInProject(filePath)
-  const watcher = fileWatchers.get(resolved)
-  if (watcher) {
-    watcher.close()
-    fileWatchers.delete(resolved)
-  }
 })
 
 ipcMain.handle('fs:stat', async (_event, filePath: string) => {
@@ -1051,11 +1014,6 @@ app.on('before-quit', () => {
   hookWatcher?.stop()
   githubService?.destroy()
   terminalManager?.destroy()
-  // Close all file watchers
-  for (const watcher of fileWatchers.values()) {
-    watcher.close()
-  }
-  fileWatchers.clear()
 })
 
 app.on('window-all-closed', () => {

@@ -20,7 +20,6 @@ const ALLOWED_LISTENER_CHANNELS = [
   'update:downloaded',
   'update:error',
   'github:pr-status-update',
-  'fs:fileChanged',
   'fs:watch:changes',
   'fs:watch:error',
 ] as const
@@ -354,15 +353,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('fs:readFile', filePath),
     writeFile: (filePath: string, content: string): Promise<void> =>
       ipcRenderer.invoke('fs:writeFile', filePath, content),
-    watchFile: (filePath: string): Promise<void> =>
-      ipcRenderer.invoke('fs:watchFile', filePath),
-    unwatchFile: (filePath: string): Promise<void> =>
-      ipcRenderer.invoke('fs:unwatchFile', filePath),
-    onFileChanged: (callback: (filePath: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, filePath: string) => callback(filePath)
-      ipcRenderer.on('fs:fileChanged', handler)
-      return () => ipcRenderer.removeListener('fs:fileChanged', handler)
-    },
     onWatchChanges: (callback: (events: Array<{ type: string; projectId: string; path: string }>) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, events: Array<{ type: string; projectId: string; path: string }>) => callback(events)
       ipcRenderer.on('fs:watch:changes', handler)
