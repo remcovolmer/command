@@ -62,7 +62,6 @@ export function SortableProjectList({
   const terminals = useProjectStore((s) => s.terminals)
   const inactiveSectionCollapsed = useProjectStore((s) => s.inactiveSectionCollapsed)
   const toggleInactiveSectionCollapsed = useProjectStore((s) => s.toggleInactiveSectionCollapsed)
-  const setActiveProject = useProjectStore((s) => s.setActiveProject)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -106,22 +105,6 @@ export function SortableProjectList({
     () => (draggedId ? projects.find((p) => p.id === draggedId) : null),
     [draggedId, projects]
   )
-
-  // When collapsing, auto-switch away from inactive project if currently selected
-  const handleToggleInactive = () => {
-    if (!inactiveSectionCollapsed && activeProjectId) {
-      // About to collapse: check if selected project is inactive
-      const isSelectedInactive = inactiveProjects.some((p) => p.id === activeProjectId)
-      if (isSelectedInactive) {
-        // Switch to first active project or first workspace
-        const firstVisible = activeProjects[0] ?? projects.find((p) => p.type === 'workspace')
-        if (firstVisible) {
-          setActiveProject(firstVisible.id)
-        }
-      }
-    }
-    toggleInactiveSectionCollapsed()
-  }
 
   const handleDragStart = (event: DragStartEvent) => {
     setDraggedId(event.active.id as string)
@@ -230,7 +213,7 @@ export function SortableProjectList({
       {inactiveProjects.length > 0 && (
         <section>
           <button
-            onClick={handleToggleInactive}
+            onClick={toggleInactiveSectionCollapsed}
             aria-expanded={!inactiveSectionCollapsed}
             className="flex items-center gap-1 px-3 py-1.5 w-full text-left text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] hover:text-muted-foreground transition-colors"
           >

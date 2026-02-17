@@ -336,7 +336,29 @@ export const useProjectStore = create<ProjectStore>()(
       // Inactive section collapse state
       inactiveSectionCollapsed: false,
       toggleInactiveSectionCollapsed: () =>
-        set((state) => ({ inactiveSectionCollapsed: !state.inactiveSectionCollapsed })),
+        set((state) => {
+          const newCollapsed = !state.inactiveSectionCollapsed
+          // When collapsing, auto-switch away from inactive project if selected
+          if (newCollapsed && state.activeProjectId) {
+            const terminalValues = Object.values(state.terminals)
+            const hasTerminals = terminalValues.some(
+              (t) => t.projectId === state.activeProjectId
+            )
+            const activeProject = state.projects.find(p => p.id === state.activeProjectId)
+            if (activeProject && activeProject.type !== 'workspace' && !hasTerminals) {
+              const firstVisible = state.projects.find(
+                (p) => p.type !== 'workspace' && terminalValues.some((t) => t.projectId === p.id)
+              ) ?? state.projects.find((p) => p.type === 'workspace')
+              if (firstVisible) {
+                return {
+                  inactiveSectionCollapsed: newCollapsed,
+                  activeProjectId: firstVisible.id,
+                }
+              }
+            }
+          }
+          return { inactiveSectionCollapsed: newCollapsed }
+        }),
 
       // Sidecar terminal state
       sidecarTerminals: {},
