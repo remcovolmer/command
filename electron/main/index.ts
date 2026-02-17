@@ -15,6 +15,7 @@ import { installClaudeHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
 import { GitHubService } from './services/GitHubService'
 import { TaskService } from './services/TaskService'
+import { FileWatcherService } from './services/FileWatcherService'
 import { randomUUID } from 'node:crypto'
 
 // Validation helpers
@@ -70,6 +71,7 @@ let hookWatcher: ClaudeHookWatcher | null = null
 let updateService: UpdateService | null = null
 let githubService: GitHubService | null = null
 let taskService: TaskService | null = null
+let fileWatcherService: FileWatcherService | null = null
 
 // File watchers for live updates (path -> watcher)
 const fileWatchers = new Map<string, FSWatcher>()
@@ -249,6 +251,13 @@ async function createWindow() {
   githubService = new GitHubService()
   githubService.setWindow(win)
   taskService = new TaskService()
+  fileWatcherService = new FileWatcherService(win)
+
+  // Start file watchers for all existing projects
+  const existingProjects = projectPersistence.getProjects()
+  for (const project of existingProjects) {
+    fileWatcherService.startWatching(project.id, project.path)
+  }
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -356,10 +365,15 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
   if (type !== undefined && !validTypes.includes(type)) {
     throw new Error('Invalid project type')
   }
-  return projectPersistence?.addProject(projectPath, name, type)
+  const project = await projectPersistence?.addProject(projectPath, name, type)
+  if (project) {
+    fileWatcherService?.startWatching(project.id, project.path)
+  }
+  return project
 })
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
+  await fileWatcherService?.stopWatching(id)
   return projectPersistence?.removeProject(id)
 })
 
@@ -1030,6 +1044,10 @@ app.on('before-quit', () => {
     }
   }
 
+  // Stop file watchers before terminal cleanup to avoid EBUSY
+  fileWatcherService?.stopAll().catch(err => {
+    console.error('[FileWatcher] Cleanup error:', err)
+  })
   hookWatcher?.stop()
   githubService?.destroy()
   terminalManager?.destroy()
