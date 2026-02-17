@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { AlertTriangle } from 'lucide-react'
@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { getMonacoLanguage } from '../../utils/editorLanguages'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
-import { pathsMatch } from '../../utils/paths'
+import { normalizeFilePath } from '../../utils/paths'
 import type { FileWatchEvent } from '../../types'
 
 interface CodeEditorProps {
@@ -36,6 +36,8 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   const lastDirtyRef = useRef<boolean>(false)
   const isDeletedRef = useRef(isDeletedExternally)
   isDeletedRef.current = isDeletedExternally
+  const readSeqRef = useRef(0)
+  const normalizedPath = useMemo(() => normalizeFilePath(filePath), [filePath])
 
   // Load file
   useEffect(() => {
@@ -70,61 +72,57 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   // Centralized file watcher for live updates when Claude Code modifies the file
   useEffect(() => {
     if (!projectId) return
+    let cancelled = false
+
+    const reloadFile = () => {
+      const seq = ++readSeqRef.current
+      api.fs.readFile(filePath).then((text) => {
+        if (cancelled || seq !== readSeqRef.current) return  // stale or unmounted
+        const ed = editorRef.current
+        if (ed) {
+          const position = ed.getPosition()
+          ed.setValue(text)
+          if (position) ed.setPosition(position)
+        }
+        savedContentRef.current = text
+        lastDirtyRef.current = false
+        setEditorDirty(tabId, false)
+        setEditorTabDeletedExternally(tabId, false)
+      }).catch((err) => {
+        if (!cancelled) console.error('Failed to reload file:', err)
+      })
+    }
 
     const subscriberKey = `editor-${tabId}`
 
     const handleWatchEvents = (events: FileWatchEvent[]) => {
+      // Deduplicate: find the last relevant event for this file
+      let lastEvent: FileWatchEvent | null = null
       for (const event of events) {
-        if (!pathsMatch(event.path, filePath)) continue
+        if (event.path === normalizedPath) {
+          lastEvent = event
+        }
+      }
+      if (!lastEvent) return
 
-        if (event.type === 'file-changed') {
-          // Reload content on external change
-          api.fs.readFile(filePath).then((text) => {
-            const ed = editorRef.current
-            if (ed) {
-              const position = ed.getPosition()
-              ed.setValue(text)
-              if (position) {
-                ed.setPosition(position)
-              }
-            }
-            savedContentRef.current = text
-            lastDirtyRef.current = false
-            setEditorDirty(tabId, false)
-            // Clear deleted state if it was previously deleted and now changed
-            setEditorTabDeletedExternally(tabId, false)
-          }).catch((err) => {
-            console.error('Failed to reload file:', err)
-          })
-        } else if (event.type === 'file-removed') {
-          setEditorTabDeletedExternally(tabId, true)
-        } else if (event.type === 'file-added') {
-          // File was recreated after deletion
-          if (isDeletedRef.current) {
-            setEditorTabDeletedExternally(tabId, false)
-            api.fs.readFile(filePath).then((text) => {
-              const ed = editorRef.current
-              if (ed) {
-                const position = ed.getPosition()
-                ed.setValue(text)
-                if (position) {
-                  ed.setPosition(position)
-                }
-              }
-              savedContentRef.current = text
-              lastDirtyRef.current = false
-              setEditorDirty(tabId, false)
-            }).catch((err) => {
-              console.error('Failed to reload recreated file:', err)
-            })
-          }
+      if (lastEvent.type === 'file-changed') {
+        reloadFile()
+      } else if (lastEvent.type === 'file-removed') {
+        setEditorTabDeletedExternally(tabId, true)
+      } else if (lastEvent.type === 'file-added') {
+        if (isDeletedRef.current) {
+          setEditorTabDeletedExternally(tabId, false)
+          reloadFile()
         }
       }
     }
 
     fileWatcherEvents.subscribe(projectId, subscriberKey, handleWatchEvents)
-    return () => fileWatcherEvents.unsubscribe(projectId, subscriberKey)
-  }, [projectId, tabId, filePath, api, setEditorDirty, setEditorTabDeletedExternally])
+    return () => {
+      cancelled = true
+      fileWatcherEvents.unsubscribe(projectId, subscriberKey)
+    }
+  }, [projectId, tabId, filePath, normalizedPath, api, setEditorDirty, setEditorTabDeletedExternally])
 
   const saveFile = useCallback(async () => {
     const editor = editorRef.current

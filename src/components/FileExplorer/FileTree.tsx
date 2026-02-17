@@ -54,16 +54,22 @@ export function FileTree({ project }: FileTreeProps) {
           invalidatedDirs.add(parentDir)
         }
       }
+      // Check which dirs are currently cached BEFORE invalidating
+      const { directoryCache } = useProjectStore.getState()
+      const dirsToRefresh: string[] = []
       for (const dir of invalidatedDirs) {
-        // Also try with backslashes for Windows cache keys
-        invalidateDirectory(dir)
-        invalidateDirectory(dir.replace(/\//g, '\\'))
-        // If the directory is currently visible (was in cache), refresh it
-        const { directoryCache } = useProjectStore.getState()
-        if (directoryCache[dir] || directoryCache[dir.replace(/\//g, '\\')]) {
-          const refreshPath = directoryCache[dir] ? dir : dir.replace(/\//g, '\\')
-          refreshDirectory(refreshPath)
+        const backslashDir = dir.replace(/\//g, '\\')
+        if (directoryCache[dir]) {
+          dirsToRefresh.push(dir)
+        } else if (directoryCache[backslashDir]) {
+          dirsToRefresh.push(backslashDir)
         }
+        invalidateDirectory(dir)
+        invalidateDirectory(backslashDir)
+      }
+      // Refresh dirs that were visible
+      for (const dir of dirsToRefresh) {
+        refreshDirectory(dir)
       }
     }
     fileWatcherEvents.subscribe(project.id, 'file-tree', handleWatchEvents)

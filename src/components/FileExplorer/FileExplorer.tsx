@@ -169,6 +169,8 @@ export function FileExplorer() {
     if (!activeProjectId) return
 
     const handleWatchEvents = () => {
+      // Watcher is working again — stop fallback polling
+      if (watcherFailed) setWatcherFailed(false)
       // Debounce: wait 500ms after last event batch before refreshing
       if (gitDebounceRef.current) clearTimeout(gitDebounceRef.current)
       gitDebounceRef.current = setTimeout(() => {

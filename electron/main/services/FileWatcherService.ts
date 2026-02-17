@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { BrowserWindow } from 'electron'
 import path from 'node:path'
-import { existsSync } from 'node:fs'
+import { existsSync, watch as fsWatch, type FSWatcher as NodeFSWatcher } from 'node:fs'
 
 // Event type mapping from chokidar events to our event types
 type FileWatchEventType = 'file-added' | 'file-changed' | 'file-removed' | 'dir-added' | 'dir-removed'
@@ -14,7 +14,8 @@ interface FileWatchEvent {
 
 const BATCH_INTERVAL = 150  // ms — avoids Electron IPC memory leak at 100ms
 const MAX_BATCH_SIZE = 100  // flush early if batch grows too large
-const RESTART_DELAY = 5000  // ms before attempting watcher restart on error
+const INITIAL_RESTART_DELAY = 5000  // ms before first restart attempt
+const MAX_RESTART_ATTEMPTS = 3
 
 const IGNORE_PATTERNS = [
   '**/node_modules/**',
@@ -41,7 +42,7 @@ function isValidWatchPath(projectPath: string): boolean {
 }
 
 function normalizePath(filePath: string): string {
-  return path.resolve(filePath).replace(/\\/g, '/')
+  return path.resolve(filePath).replace(/\\/g, '/').toLowerCase()
 }
 
 /**
@@ -54,6 +55,8 @@ export class FileWatcherService {
   private batchBuffer = new Map<string, FileWatchEvent[]>()
   private batchTimers = new Map<string, NodeJS.Timeout>()
   private projectPaths = new Map<string, string>()  // projectId -> projectPath
+  private restartCounts = new Map<string, number>()
+  private headWatchers = new Map<string, NodeFSWatcher>()
 
   constructor(window: BrowserWindow) {
     this.window = window
@@ -99,10 +102,18 @@ export class FileWatcherService {
         console.error(`[FileWatcher] Error for project ${projectId}:`, message)
         this.sendToRenderer('fs:watch:error', { projectId, error: message })
 
-        // Attempt restart after delay
+        // Attempt restart with exponential backoff
+        const attempts = this.restartCounts.get(projectId) ?? 0
+        if (attempts >= MAX_RESTART_ATTEMPTS) {
+          console.error(`[FileWatcher] Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for project ${projectId}`)
+          return
+        }
+        this.restartCounts.set(projectId, attempts + 1)
+        const delay = INITIAL_RESTART_DELAY * Math.pow(2, attempts)
+
         setTimeout(() => {
           if (this.watchers.has(projectId)) {
-            console.log(`[FileWatcher] Attempting restart for project ${projectId}`)
+            console.log(`[FileWatcher] Restart attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS} for project ${projectId}`)
             this.stopWatching(projectId).then(() => {
               const savedPath = this.projectPaths.get(projectId)
               if (savedPath) {
@@ -112,10 +123,12 @@ export class FileWatcherService {
               console.error(`[FileWatcher] Restart failed for project ${projectId}:`, err)
             })
           }
-        }, RESTART_DELAY)
+        }, delay)
       })
 
       this.watchers.set(projectId, watcher)
+      this.restartCounts.delete(projectId)  // Reset retry count on successful start
+      this.startHeadWatcher(projectId, projectPath)
       console.log(`[FileWatcher] Started watching: ${projectPath} (project: ${projectId})`)
     } catch (error) {
       console.error(`[FileWatcher] Failed to start watching ${projectPath}:`, error)
@@ -130,12 +143,19 @@ export class FileWatcherService {
     this.batchTimers.delete(projectId)
     this.batchBuffer.delete(projectId)
     this.watchers.delete(projectId)
+    this.projectPaths.delete(projectId)
+    this.restartCounts.delete(projectId)
+
+    const headWatcher = this.headWatchers.get(projectId)
+    if (headWatcher) {
+      headWatcher.close()
+      this.headWatchers.delete(projectId)
+    }
 
     try {
       await watcher.close()
-      console.log(`[FileWatcher] Stopped watching project: ${projectId}`)
-    } catch (error) {
-      console.error(`[FileWatcher] Error closing watcher for ${projectId}:`, error)
+    } catch {
+      // Ignore close errors during shutdown
     }
   }
 
@@ -143,6 +163,29 @@ export class FileWatcherService {
     const stops = [...this.watchers.keys()].map(id => this.stopWatching(id))
     await Promise.all(stops)
     this.projectPaths.clear()
+  }
+
+  /**
+   * Watch .git/HEAD for git-only operations (commits, checkouts, rebases).
+   * Chokidar ignores .git/**, so we use Node's fs.watch for this single file.
+   */
+  private startHeadWatcher(projectId: string, projectPath: string): void {
+    const headPath = path.join(projectPath, '.git', 'HEAD')
+    if (!existsSync(headPath)) return
+
+    try {
+      const watcher = fsWatch(headPath, () => {
+        this.handleEvent(projectId, 'file-changed', headPath)
+      })
+      watcher.on('error', () => {
+        // Best-effort — silently stop on error
+        watcher.close()
+        this.headWatchers.delete(projectId)
+      })
+      this.headWatchers.set(projectId, watcher)
+    } catch {
+      // Best-effort — .git/HEAD watch is non-critical
+    }
   }
 
   private sendToRenderer(channel: string, ...args: unknown[]): void {
