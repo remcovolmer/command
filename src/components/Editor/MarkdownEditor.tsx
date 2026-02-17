@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
@@ -9,8 +9,12 @@ import { cursor } from '@milkdown/plugin-cursor'
 import { Milkdown, MilkdownProvider, useEditor, useInstance } from '@milkdown/react'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
+import { AlertTriangle } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
+import { normalizeFilePath } from '../../utils/paths'
+import type { FileWatchEvent } from '../../types'
 
 interface MarkdownEditorProps {
   tabId: string
@@ -122,12 +126,25 @@ function EditorControls({ tabId, filePath, isActive, savedContentRef, currentCon
 export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProps) {
   const api = getElectronAPI()
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
+  const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
+  const isDeletedExternally = useProjectStore((s) => {
+    const tab = s.editorTabs[tabId]
+    return tab?.type === 'editor' ? tab.isDeletedExternally ?? false : false
+  })
+  const projectId = useProjectStore((s) => {
+    const tab = s.editorTabs[tabId]
+    return tab?.type === 'editor' ? tab.projectId : null
+  })
 
   const [content, setContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const savedContentRef = useRef<string>('')
   const currentContentRef = useRef<string>('')
   const lastDirtyRef = useRef<boolean>(false)
+  const isDeletedRef = useRef(isDeletedExternally)
+  isDeletedRef.current = isDeletedExternally
+  const readSeqRef = useRef(0)
+  const normalizedPath = useMemo(() => normalizeFilePath(filePath), [filePath])
 
   // Load file
   useEffect(() => {
@@ -160,36 +177,61 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
     }
   }, [filePath, api])
 
-  // File watching for live updates
+  // Centralized file watcher for live updates
   useEffect(() => {
-    api.fs.watchFile(filePath)
+    if (!projectId) return
+    let cancelled = false
 
-    const unsubscribe = api.fs.onFileChanged((changedPath) => {
-      if (changedPath === filePath) {
-        api.fs.readFile(filePath).then((text) => {
-          // Use the Milkdown replaceAll if available
-          const replace = (window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace
-          if (replace) {
-            replace(text)
-          } else {
-            // Fallback: reset the component
-            setContent(text)
-            savedContentRef.current = text
-            currentContentRef.current = text
-          }
-          lastDirtyRef.current = false
-          setEditorDirty(tabId, false)
-        }).catch((err) => {
-          console.error('Failed to reload file:', err)
-        })
-      }
-    })
-
-    return () => {
-      api.fs.unwatchFile(filePath)
-      unsubscribe()
+    const reloadFile = () => {
+      const seq = ++readSeqRef.current
+      api.fs.readFile(filePath).then((text) => {
+        if (cancelled || seq !== readSeqRef.current) return
+        const replace = (window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace
+        if (replace) {
+          replace(text)
+        } else {
+          setContent(text)
+          savedContentRef.current = text
+          currentContentRef.current = text
+        }
+        lastDirtyRef.current = false
+        setEditorDirty(tabId, false)
+        setEditorTabDeletedExternally(tabId, false)
+      }).catch((err) => {
+        if (!cancelled) console.error('Failed to reload file:', err)
+      })
     }
-  }, [filePath, api, tabId, setEditorDirty])
+
+    const subscriberKey = `markdown-editor-${tabId}`
+
+    const handleWatchEvents = (events: FileWatchEvent[]) => {
+      // Deduplicate: find the last relevant event for this file
+      let lastEvent: FileWatchEvent | null = null
+      for (const event of events) {
+        if (event.path === normalizedPath) {
+          lastEvent = event
+        }
+      }
+      if (!lastEvent) return
+
+      if (lastEvent.type === 'file-changed') {
+        reloadFile()
+      } else if (lastEvent.type === 'file-removed') {
+        setEditorTabDeletedExternally(tabId, true)
+      } else if (lastEvent.type === 'file-added') {
+        if (isDeletedRef.current) {
+          setEditorTabDeletedExternally(tabId, false)
+          reloadFile()
+        }
+      }
+    }
+
+    fileWatcherEvents.subscribe(projectId, subscriberKey, handleWatchEvents)
+    return () => {
+      cancelled = true
+      fileWatcherEvents.unsubscribe(projectId, subscriberKey)
+    }
+  }, [projectId, tabId, filePath, normalizedPath, api, setEditorDirty, setEditorTabDeletedExternally])
 
   const handleContentChange = useCallback((markdown: string) => {
     currentContentRef.current = markdown
@@ -224,6 +266,12 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
 
   return (
     <div style={{ display: isActive ? 'block' : 'none', height: '100%', width: '100%' }}>
+      {isDeletedExternally && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>This file has been deleted. Save to recreate it.</span>
+        </div>
+      )}
       <MilkdownProvider>
         <EditorControls
           tabId={tabId}

@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
@@ -8,8 +8,10 @@ import { FileExplorerTabBar } from './FileExplorerTabBar'
 import { SidecarTerminalPanel } from './SidecarTerminalPanel'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { getElectronAPI } from '../../utils/electron'
+import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 
-const GIT_REFRESH_INTERVAL = 10000 // 10 seconds
+const GIT_DEBOUNCE_MS = 500
+const GIT_FALLBACK_POLL_INTERVAL = 10000 // 10 seconds — only used on watcher error
 
 export function FileExplorer() {
   const api = useMemo(() => getElectronAPI(), [])
@@ -159,11 +161,40 @@ export function FileExplorer() {
     }
   }, [gitContextId])
 
+  // Event-driven git refresh via file watcher (replaces 10s polling)
+  const gitDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [watcherFailed, setWatcherFailed] = useState(false)
+
   useEffect(() => {
-    if (!gitContextId) return
-    const interval = setInterval(() => handleGitRefreshRef.current(), GIT_REFRESH_INTERVAL)
+    if (!activeProjectId) return
+
+    const handleWatchEvents = () => {
+      // Watcher is working again — stop fallback polling
+      if (watcherFailed) setWatcherFailed(false)
+      // Debounce: wait 500ms after last event batch before refreshing
+      if (gitDebounceRef.current) clearTimeout(gitDebounceRef.current)
+      gitDebounceRef.current = setTimeout(() => {
+        handleGitRefreshRef.current()
+      }, GIT_DEBOUNCE_MS)
+    }
+
+    fileWatcherEvents.subscribe(activeProjectId, 'git-status', handleWatchEvents)
+    fileWatcherEvents.subscribeError(activeProjectId, 'git-status', () => {
+      setWatcherFailed(true)
+    })
+
+    return () => {
+      fileWatcherEvents.unsubscribe(activeProjectId, 'git-status')
+      if (gitDebounceRef.current) clearTimeout(gitDebounceRef.current)
+    }
+  }, [activeProjectId])
+
+  // Fallback polling only when watcher has failed
+  useEffect(() => {
+    if (!watcherFailed || !gitContextId) return
+    const interval = setInterval(() => handleGitRefreshRef.current(), GIT_FALLBACK_POLL_INTERVAL)
     return () => clearInterval(interval)
-  }, [gitContextId])
+  }, [watcherFailed, gitContextId])
 
   const totalGitChanges = gitStatus
     ? gitStatus.staged.length +

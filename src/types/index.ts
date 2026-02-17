@@ -68,6 +68,7 @@ export interface EditorTab {
   fileName: string;
   isDirty: boolean;
   projectId: string;
+  isDeletedExternally?: boolean;
 }
 
 // Diff tab types (read-only, for viewing commit diffs)
@@ -83,6 +84,28 @@ export interface DiffTab {
 
 // Union of all center tab types
 export type CenterTab = EditorTab | DiffTab;
+
+// File watcher types
+export const FILE_WATCH_EVENT_TYPES = [
+  'file-added',
+  'file-changed',
+  'file-removed',
+  'dir-added',
+  'dir-removed',
+] as const
+
+export type FileWatchEventType = typeof FILE_WATCH_EVENT_TYPES[number]
+
+export interface FileWatchEvent {
+  type: FileWatchEventType
+  projectId: string
+  path: string  // normalized absolute path with forward slashes
+}
+
+export interface FileWatchError {
+  projectId: string
+  error: string
+}
 
 // File system types
 export interface FileSystemEntry {
@@ -325,9 +348,8 @@ export interface ElectronAPI {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;
     readFile: (filePath: string) => Promise<string>;
     writeFile: (filePath: string, content: string) => Promise<void>;
-    watchFile: (filePath: string) => Promise<void>;
-    unwatchFile: (filePath: string) => Promise<void>;
-    onFileChanged: (callback: (filePath: string) => void) => Unsubscribe;
+    onWatchChanges: (callback: (events: FileWatchEvent[]) => void) => Unsubscribe;
+    onWatchError: (callback: (error: FileWatchError) => void) => Unsubscribe;
     stat: (filePath: string) => Promise<{ exists: boolean; isFile: boolean; resolved: string }>;
     createFile: (filePath: string) => Promise<void>;
     createDirectory: (dirPath: string) => Promise<void>;

@@ -3,7 +3,6 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { watch, existsSync, type FSWatcher } from 'node:fs'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
@@ -15,6 +14,7 @@ import { installClaudeHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
 import { GitHubService } from './services/GitHubService'
 import { TaskService } from './services/TaskService'
+import { FileWatcherService } from './services/FileWatcherService'
 import { randomUUID } from 'node:crypto'
 
 // Validation helpers
@@ -70,9 +70,8 @@ let hookWatcher: ClaudeHookWatcher | null = null
 let updateService: UpdateService | null = null
 let githubService: GitHubService | null = null
 let taskService: TaskService | null = null
+let fileWatcherService: FileWatcherService | null = null
 
-// File watchers for live updates (path -> watcher)
-const fileWatchers = new Map<string, FSWatcher>()
 
 /**
  * Verify that a Claude session file exists (async version)
@@ -249,6 +248,13 @@ async function createWindow() {
   githubService = new GitHubService()
   githubService.setWindow(win)
   taskService = new TaskService()
+  fileWatcherService = new FileWatcherService(win)
+
+  // Start file watchers for all existing projects
+  const existingProjects = projectPersistence.getProjects()
+  for (const project of existingProjects) {
+    fileWatcherService.startWatching(project.id, project.path)
+  }
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -356,10 +362,15 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
   if (type !== undefined && !validTypes.includes(type)) {
     throw new Error('Invalid project type')
   }
-  return projectPersistence?.addProject(projectPath, name, type)
+  const project = await projectPersistence?.addProject(projectPath, name, type)
+  if (project) {
+    fileWatcherService?.startWatching(project.id, project.path)
+  }
+  return project
 })
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
+  await fileWatcherService?.stopWatching(id)
   return projectPersistence?.removeProject(id)
 })
 
@@ -486,40 +497,6 @@ ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string)
     throw new Error('Content too large (max 10MB)')
   }
   await fs.writeFile(resolved, content, 'utf-8')
-})
-
-// File watching IPC handlers for live updates when Claude Code modifies files
-ipcMain.handle('fs:watchFile', async (_event, filePath: string) => {
-  const resolved = validateFilePathInProject(filePath)
-
-  // Already watching this file
-  if (fileWatchers.has(resolved)) return
-
-  try {
-    const watcher = watch(resolved, (eventType) => {
-      if (eventType === 'change') {
-        win?.webContents.send('fs:fileChanged', filePath)
-      }
-    })
-
-    watcher.on('error', (err) => {
-      console.error('[fs:watchFile] Watcher error:', err)
-      fileWatchers.delete(resolved)
-    })
-
-    fileWatchers.set(resolved, watcher)
-  } catch (error) {
-    console.error('[fs:watchFile] Failed to watch:', error)
-  }
-})
-
-ipcMain.handle('fs:unwatchFile', async (_event, filePath: string) => {
-  const resolved = validateFilePathInProject(filePath)
-  const watcher = fileWatchers.get(resolved)
-  if (watcher) {
-    watcher.close()
-    fileWatchers.delete(resolved)
-  }
 })
 
 ipcMain.handle('fs:stat', async (_event, filePath: string) => {
@@ -1030,14 +1007,13 @@ app.on('before-quit', () => {
     }
   }
 
+  // Stop file watchers before terminal cleanup to avoid EBUSY
+  fileWatcherService?.stopAll().catch(err => {
+    console.error('[FileWatcher] Cleanup error:', err)
+  })
   hookWatcher?.stop()
   githubService?.destroy()
   terminalManager?.destroy()
-  // Close all file watchers
-  for (const watcher of fileWatchers.values()) {
-    watcher.close()
-  }
-  fileWatchers.clear()
 })
 
 app.on('window-all-closed', () => {

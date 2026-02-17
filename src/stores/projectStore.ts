@@ -65,6 +65,7 @@ interface ProjectStore {
   openEditorTab: (filePath: string, fileName: string, projectId: string) => void
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
+  setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
   setActiveCenterTab: (id: string) => void
 
   // Hotkey actions
@@ -116,6 +117,7 @@ interface ProjectStore {
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string) => void
+  invalidateDirectory: (dirPath: string) => void
 
   // Theme actions
   toggleTheme: () => void
@@ -295,6 +297,19 @@ export const useProjectStore = create<ProjectStore>()(
             editorTabs: {
               ...state.editorTabs,
               [tabId]: { ...tab, isDirty },
+            },
+          }
+        }),
+
+      setEditorTabDeletedExternally: (tabId, isDeleted) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab || tab.type !== 'editor') return state
+          if (tab.isDeletedExternally === isDeleted) return state
+          return {
+            editorTabs: {
+              ...state.editorTabs,
+              [tabId]: { ...tab, isDeletedExternally: isDeleted },
             },
           }
         }),
@@ -573,6 +588,14 @@ export const useProjectStore = create<ProjectStore>()(
               delete newCache[path]
             }
           })
+          return { directoryCache: newCache }
+        }),
+
+      invalidateDirectory: (dirPath) =>
+        set((state) => {
+          if (!state.directoryCache[dirPath]) return state
+          const newCache = { ...state.directoryCache }
+          delete newCache[dirPath]
           return { directoryCache: newCache }
         }),
 

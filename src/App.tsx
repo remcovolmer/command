@@ -6,6 +6,7 @@ import { ShortcutsOverlay } from './components/Settings/ShortcutsOverlay'
 import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
+import { fileWatcherEvents } from './utils/fileWatcherEvents'
 
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
@@ -345,6 +346,12 @@ function App() {
     window.addEventListener('focus', handleWindowFocus)
     return () => window.removeEventListener('focus', handleWindowFocus)
   }, [refocusActiveTerminal])
+
+  // Initialize file watcher events (centralized IPC listener)
+  useEffect(() => {
+    fileWatcherEvents.init()
+    return () => fileWatcherEvents.dispose()
+  }, [])
 
   // Remove loading screen
   useEffect(() => {
