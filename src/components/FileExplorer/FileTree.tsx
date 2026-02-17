@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { Project, FileSystemEntry } from '../../types'
+import type { Project, FileSystemEntry, FileWatchEvent } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { FileTreeNode } from './FileTreeNode'
 import { ContextMenu, type ContextMenuEntry } from '../Sidebar/ContextMenu'
 import { isEditableFile } from '../../utils/editorLanguages'
@@ -33,6 +34,41 @@ export function FileTree({ project }: FileTreeProps) {
   const startCreate = useProjectStore((s) => s.startCreate)
   const setDeletingEntry = useProjectStore((s) => s.setDeletingEntry)
   const setFileExplorerSelectedPath = useProjectStore((s) => s.setFileExplorerSelectedPath)
+  const invalidateDirectory = useProjectStore((s) => s.invalidateDirectory)
+  const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
+
+  // Subscribe to file watcher events for cache invalidation
+  useEffect(() => {
+    const handleWatchEvents = (events: FileWatchEvent[]) => {
+      const invalidatedDirs = new Set<string>()
+      for (const event of events) {
+        if (
+          event.type === 'file-added' ||
+          event.type === 'file-removed' ||
+          event.type === 'dir-added' ||
+          event.type === 'dir-removed'
+        ) {
+          // Get parent directory (paths use forward slashes from the watcher)
+          const lastSlash = event.path.lastIndexOf('/')
+          const parentDir = lastSlash > 0 ? event.path.substring(0, lastSlash) : event.path
+          invalidatedDirs.add(parentDir)
+        }
+      }
+      for (const dir of invalidatedDirs) {
+        // Also try with backslashes for Windows cache keys
+        invalidateDirectory(dir)
+        invalidateDirectory(dir.replace(/\//g, '\\'))
+        // If the directory is currently visible (was in cache), refresh it
+        const { directoryCache } = useProjectStore.getState()
+        if (directoryCache[dir] || directoryCache[dir.replace(/\//g, '\\')]) {
+          const refreshPath = directoryCache[dir] ? dir : dir.replace(/\//g, '\\')
+          refreshDirectory(refreshPath)
+        }
+      }
+    }
+    fileWatcherEvents.subscribe(project.id, handleWatchEvents)
+    return () => fileWatcherEvents.unsubscribe(project.id)
+  }, [project.id, invalidateDirectory, refreshDirectory])
 
   // Load root directory on mount or when project changes
   useEffect(() => {

@@ -112,6 +112,7 @@ interface ProjectStore {
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string) => void
+  invalidateDirectory: (dirPath: string) => void
 
   // Theme actions
   toggleTheme: () => void
@@ -542,6 +543,14 @@ export const useProjectStore = create<ProjectStore>()(
               delete newCache[path]
             }
           })
+          return { directoryCache: newCache }
+        }),
+
+      invalidateDirectory: (dirPath) =>
+        set((state) => {
+          if (!state.directoryCache[dirPath]) return state
+          const newCache = { ...state.directoryCache }
+          delete newCache[dirPath]
           return { directoryCache: newCache }
         }),
 
