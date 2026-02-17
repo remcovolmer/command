@@ -252,6 +252,15 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     enabled: true,
   },
 
+  // Sidebar
+  'sidebar.toggleInactive': {
+    key: 'i',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle inactive projects section',
+    category: 'sidebar',
+    enabled: true,
+  },
+
   // UI & Settings
   'ui.openSettings': {
     key: ',',

@@ -171,6 +171,11 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 |----------|--------|
 | `Ctrl + Shift + N` | Create worktree |
 
+### Sidebar
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + Shift + I` | Toggle inactive projects section |
+
 ### UI & Settings
 | Shortcut | Action |
 |----------|--------|

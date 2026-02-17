@@ -53,14 +53,18 @@ function App() {
   }, [api])
 
   // Helper to get visual order of projects (workspaces → active regular → inactive regular)
+  // When inactiveSectionCollapsed, inactive projects are skipped from keyboard navigation
   const getProjectVisualOrder = useCallback(() => {
-    const { projects, terminals } = useProjectStore.getState()
+    const { projects, terminals, inactiveSectionCollapsed } = useProjectStore.getState()
     if (projects.length === 0) return []
 
     const terminalValues = Object.values(terminals)
     const workspaces = projects.filter(p => p.type === 'workspace')
     const regular = projects.filter(p => p.type !== 'workspace')
     const activeRegular = regular.filter(p => terminalValues.some(t => t.projectId === p.id))
+    if (inactiveSectionCollapsed) {
+      return [...workspaces, ...activeRegular]
+    }
     const inactiveRegular = regular.filter(p => !terminalValues.some(t => t.projectId === p.id))
     return [...workspaces, ...activeRegular, ...inactiveRegular]
   }, [])
@@ -306,6 +310,11 @@ function App() {
       // This is a fallback that triggers the active editor's save
       const event = new CustomEvent('editor-save-request')
       window.dispatchEvent(event)
+    },
+
+    // Sidebar
+    'sidebar.toggleInactive': () => {
+      useProjectStore.getState().toggleInactiveSectionCollapsed()
     },
 
     // UI & Settings

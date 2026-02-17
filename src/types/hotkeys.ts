@@ -8,6 +8,7 @@ export type HotkeyCategory =
   | 'file-explorer'
   | 'editor'
   | 'worktree'
+  | 'sidebar'
   | 'ui'
   | 'dialog';
 
@@ -61,6 +62,8 @@ export type HotkeyAction =
   | 'editor.save'
   // Worktree
   | 'worktree.create'
+  // Sidebar
+  | 'sidebar.toggleInactive'
   // UI & Settings
   | 'ui.openSettings'
   | 'ui.toggleTheme'
@@ -79,6 +82,7 @@ export const HOTKEY_CATEGORY_NAMES: Record<HotkeyCategory, string> = {
   'file-explorer': 'File Explorer',
   editor: 'Editor',
   worktree: 'Worktree',
+  sidebar: 'Sidebar',
   ui: 'UI & Settings',
   dialog: 'Dialogs',
 };
@@ -90,6 +94,7 @@ export const HOTKEY_CATEGORY_ORDER: HotkeyCategory[] = [
   'file-explorer',
   'editor',
   'worktree',
+  'sidebar',
   'ui',
   'dialog',
 ];

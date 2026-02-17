@@ -17,6 +17,7 @@ interface SortableProjectItemProps {
   worktrees: Worktree[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
   isActive: boolean
+  isInactive?: boolean
   activeTerminalId: string | null
   isDragging: boolean
   onSelect: (projectId: string) => void
@@ -36,6 +37,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   worktrees,
   getWorktreeTerminals,
   isActive,
+  isInactive = false,
   activeTerminalId,
   isDragging,
   onSelect,
@@ -235,8 +237,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         </ul>
       )}
 
-      {/* Worktrees */}
-      {worktrees.map((worktree) => (
+      {/* Worktrees - hidden for inactive projects unless selected */}
+      {(!isInactive || isActive) && worktrees.map((worktree) => (
         <WorktreeItem
           key={worktree.id}
           worktree={worktree}
