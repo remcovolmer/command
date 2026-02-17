@@ -5,3 +5,9 @@ export function getParentPath(filePath: string): string {
   parts.pop()
   return parts.join(sep)
 }
+
+/** Compare two file paths for equality, normalizing separators and case (Windows) */
+export function pathsMatch(a: string, b: string): boolean {
+  const normalize = (p: string) => p.replace(/\\/g, '/').toLowerCase()
+  return normalize(a) === normalize(b)
+}

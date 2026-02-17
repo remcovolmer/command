@@ -65,6 +65,7 @@ interface ProjectStore {
   openEditorTab: (filePath: string, fileName: string, projectId: string) => void
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
+  setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
   setActiveCenterTab: (id: string) => void
 
   // Hotkey actions
@@ -292,6 +293,19 @@ export const useProjectStore = create<ProjectStore>()(
             editorTabs: {
               ...state.editorTabs,
               [tabId]: { ...tab, isDirty },
+            },
+          }
+        }),
+
+      setEditorTabDeletedExternally: (tabId, isDeleted) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab || tab.type !== 'editor') return state
+          if (tab.isDeletedExternally === isDeleted) return state
+          return {
+            editorTabs: {
+              ...state.editorTabs,
+              [tabId]: { ...tab, isDeletedExternally: isDeleted },
             },
           }
         }),

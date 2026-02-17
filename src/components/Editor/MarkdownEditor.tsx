@@ -11,6 +11,9 @@ import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { getMarkdown, replaceAll } from '@milkdown/utils'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
+import { pathsMatch } from '../../utils/paths'
+import type { FileWatchEvent } from '../../types'
 
 interface MarkdownEditorProps {
   tabId: string
@@ -122,6 +125,10 @@ function EditorControls({ tabId, filePath, isActive, savedContentRef, currentCon
 export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProps) {
   const api = getElectronAPI()
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
+  const projectId = useProjectStore((s) => {
+    const tab = s.editorTabs[tabId]
+    return tab?.type === 'editor' ? tab.projectId : null
+  })
 
   const [content, setContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -160,36 +167,40 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
     }
   }, [filePath, api])
 
-  // File watching for live updates
+  // Centralized file watcher for live updates
   useEffect(() => {
-    api.fs.watchFile(filePath)
+    if (!projectId) return
 
-    const unsubscribe = api.fs.onFileChanged((changedPath) => {
-      if (changedPath === filePath) {
-        api.fs.readFile(filePath).then((text) => {
-          // Use the Milkdown replaceAll if available
-          const replace = (window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace
-          if (replace) {
-            replace(text)
-          } else {
-            // Fallback: reset the component
-            setContent(text)
-            savedContentRef.current = text
-            currentContentRef.current = text
-          }
-          lastDirtyRef.current = false
-          setEditorDirty(tabId, false)
-        }).catch((err) => {
-          console.error('Failed to reload file:', err)
-        })
+    const subscriberKey = `markdown-editor-${tabId}`
+
+    const handleWatchEvents = (events: FileWatchEvent[]) => {
+      for (const event of events) {
+        if (!pathsMatch(event.path, filePath)) continue
+
+        if (event.type === 'file-changed' || event.type === 'file-added') {
+          api.fs.readFile(filePath).then((text) => {
+            // Use the Milkdown replaceAll if available
+            const replace = (window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace
+            if (replace) {
+              replace(text)
+            } else {
+              // Fallback: reset the component
+              setContent(text)
+              savedContentRef.current = text
+              currentContentRef.current = text
+            }
+            lastDirtyRef.current = false
+            setEditorDirty(tabId, false)
+          }).catch((err) => {
+            console.error('Failed to reload file:', err)
+          })
+        }
       }
-    })
-
-    return () => {
-      api.fs.unwatchFile(filePath)
-      unsubscribe()
     }
-  }, [filePath, api, tabId, setEditorDirty])
+
+    fileWatcherEvents.subscribe(projectId, subscriberKey, handleWatchEvents)
+    return () => fileWatcherEvents.unsubscribe(projectId, subscriberKey)
+  }, [projectId, tabId, filePath, api, setEditorDirty])
 
   const handleContentChange = useCallback((markdown: string) => {
     currentContentRef.current = markdown

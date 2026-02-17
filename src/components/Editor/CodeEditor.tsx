@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
+import { AlertTriangle } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { getMonacoLanguage } from '../../utils/editorLanguages'
+import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
+import { pathsMatch } from '../../utils/paths'
+import type { FileWatchEvent } from '../../types'
 
 interface CodeEditorProps {
   tabId: string
@@ -15,12 +19,23 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   const api = getElectronAPI()
   const theme = useProjectStore((s) => s.theme)
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
+  const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
+  const isDeletedExternally = useProjectStore((s) => {
+    const tab = s.editorTabs[tabId]
+    return tab?.type === 'editor' ? tab.isDeletedExternally ?? false : false
+  })
+  const projectId = useProjectStore((s) => {
+    const tab = s.editorTabs[tabId]
+    return tab?.type === 'editor' ? tab.projectId : null
+  })
 
   const [content, setContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const savedContentRef = useRef<string>('')
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const lastDirtyRef = useRef<boolean>(false)
+  const isDeletedRef = useRef(isDeletedExternally)
+  isDeletedRef.current = isDeletedExternally
 
   // Load file
   useEffect(() => {
@@ -52,36 +67,64 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
     }
   }, [filePath, api])
 
-  // File watching for live updates when Claude Code modifies the file
+  // Centralized file watcher for live updates when Claude Code modifies the file
   useEffect(() => {
-    api.fs.watchFile(filePath)
+    if (!projectId) return
 
-    const unsubscribe = api.fs.onFileChanged((changedPath) => {
-      if (changedPath === filePath) {
-        api.fs.readFile(filePath).then((text) => {
-          const editor = editorRef.current
-          if (editor) {
-            // Preserve cursor position
-            const position = editor.getPosition()
-            editor.setValue(text)
-            if (position) {
-              editor.setPosition(position)
+    const subscriberKey = `editor-${tabId}`
+
+    const handleWatchEvents = (events: FileWatchEvent[]) => {
+      for (const event of events) {
+        if (!pathsMatch(event.path, filePath)) continue
+
+        if (event.type === 'file-changed') {
+          // Reload content on external change
+          api.fs.readFile(filePath).then((text) => {
+            const ed = editorRef.current
+            if (ed) {
+              const position = ed.getPosition()
+              ed.setValue(text)
+              if (position) {
+                ed.setPosition(position)
+              }
             }
+            savedContentRef.current = text
+            lastDirtyRef.current = false
+            setEditorDirty(tabId, false)
+            // Clear deleted state if it was previously deleted and now changed
+            setEditorTabDeletedExternally(tabId, false)
+          }).catch((err) => {
+            console.error('Failed to reload file:', err)
+          })
+        } else if (event.type === 'file-removed') {
+          setEditorTabDeletedExternally(tabId, true)
+        } else if (event.type === 'file-added') {
+          // File was recreated after deletion
+          if (isDeletedRef.current) {
+            setEditorTabDeletedExternally(tabId, false)
+            api.fs.readFile(filePath).then((text) => {
+              const ed = editorRef.current
+              if (ed) {
+                const position = ed.getPosition()
+                ed.setValue(text)
+                if (position) {
+                  ed.setPosition(position)
+                }
+              }
+              savedContentRef.current = text
+              lastDirtyRef.current = false
+              setEditorDirty(tabId, false)
+            }).catch((err) => {
+              console.error('Failed to reload recreated file:', err)
+            })
           }
-          savedContentRef.current = text
-          lastDirtyRef.current = false
-          setEditorDirty(tabId, false)
-        }).catch((err) => {
-          console.error('Failed to reload file:', err)
-        })
+        }
       }
-    })
-
-    return () => {
-      api.fs.unwatchFile(filePath)
-      unsubscribe()
     }
-  }, [filePath, api, tabId, setEditorDirty])
+
+    fileWatcherEvents.subscribe(projectId, subscriberKey, handleWatchEvents)
+    return () => fileWatcherEvents.unsubscribe(projectId, subscriberKey)
+  }, [projectId, tabId, filePath, api, setEditorDirty, setEditorTabDeletedExternally])
 
   const saveFile = useCallback(async () => {
     const editor = editorRef.current
@@ -92,10 +135,12 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
       savedContentRef.current = value
       setEditorDirty(tabId, false)
       lastDirtyRef.current = false
+      // Saving recreates the file if it was deleted
+      setEditorTabDeletedExternally(tabId, false)
     } catch (err) {
       console.error('Failed to save file:', err)
     }
-  }, [api, filePath, tabId, setEditorDirty])
+  }, [api, filePath, tabId, setEditorDirty, setEditorTabDeletedExternally])
 
   // Listen for global editor-save-request event (from hotkey system)
   useEffect(() => {
@@ -156,6 +201,13 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
 
   return (
     <div style={{ display: isActive ? 'block' : 'none', height: '100%', width: '100%' }}>
+      {/* File deleted externally banner */}
+      {isDeletedExternally && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>This file has been deleted. Save to recreate it.</span>
+        </div>
+      )}
       <Editor
         defaultValue={content}
         language={getMonacoLanguage(filePath)}
