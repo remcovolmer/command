@@ -66,8 +66,8 @@ export function FileTree({ project }: FileTreeProps) {
         }
       }
     }
-    fileWatcherEvents.subscribe(project.id, handleWatchEvents)
-    return () => fileWatcherEvents.unsubscribe(project.id)
+    fileWatcherEvents.subscribe(project.id, 'file-tree', handleWatchEvents)
+    return () => fileWatcherEvents.unsubscribe(project.id, 'file-tree')
   }, [project.id, invalidateDirectory, refreshDirectory])
 
   // Load root directory on mount or when project changes

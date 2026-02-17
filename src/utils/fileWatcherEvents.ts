@@ -7,10 +7,12 @@ type ErrorCallback = (error: FileWatchError) => void
 /**
  * Centralized file watcher event manager.
  * Registers IPC listeners once and dispatches to per-project callbacks.
+ * Supports multiple subscribers per project via unique subscriber keys.
  * Follows the same pattern as terminalEvents.ts.
  */
 class FileWatcherEventManager {
   private initialized = false
+  // Key: `${projectId}:${subscriberKey}` -> callback
   private changeCallbacks = new Map<string, ChangeCallback>()
   private errorCallbacks = new Map<string, ErrorCallback>()
   private unsubChanges: (() => void) | null = null
@@ -23,7 +25,7 @@ class FileWatcherEventManager {
     const api = getElectronAPI()
 
     this.unsubChanges = api.fs.onWatchChanges((events) => {
-      // Group by projectId and dispatch to per-project callbacks
+      // Group by projectId and dispatch to all subscribers for that project
       const byProject = new Map<string, FileWatchEvent[]>()
       for (const event of events) {
         const arr = byProject.get(event.projectId) ?? []
@@ -31,32 +33,49 @@ class FileWatcherEventManager {
         byProject.set(event.projectId, arr)
       }
       for (const [projectId, projectEvents] of byProject) {
-        this.changeCallbacks.get(projectId)?.(projectEvents)
+        for (const [key, callback] of this.changeCallbacks) {
+          if (key.startsWith(projectId + ':')) {
+            callback(projectEvents)
+          }
+        }
       }
     })
 
     this.unsubErrors = api.fs.onWatchError((error) => {
-      this.errorCallbacks.get(error.projectId)?.(error)
+      for (const [key, callback] of this.errorCallbacks) {
+        if (key.startsWith(error.projectId + ':')) {
+          callback(error)
+        }
+      }
     })
   }
 
-  subscribe(projectId: string, callback: ChangeCallback): void {
+  /**
+   * Subscribe to file change events for a project.
+   * @param projectId The project to subscribe to
+   * @param subscriberKey Unique key for this subscriber (e.g., 'file-tree', 'git-status')
+   * @param callback Called with batched events for this project
+   */
+  subscribe(projectId: string, subscriberKey: string, callback: ChangeCallback): void {
     this.init()
-    this.changeCallbacks.set(projectId, callback)
+    this.changeCallbacks.set(`${projectId}:${subscriberKey}`, callback)
   }
 
-  unsubscribe(projectId: string): void {
-    this.changeCallbacks.delete(projectId)
-    this.errorCallbacks.delete(projectId)
+  /**
+   * Unsubscribe a specific subscriber from a project.
+   */
+  unsubscribe(projectId: string, subscriberKey: string): void {
+    this.changeCallbacks.delete(`${projectId}:${subscriberKey}`)
+    this.errorCallbacks.delete(`${projectId}:${subscriberKey}`)
   }
 
-  subscribeError(projectId: string, callback: ErrorCallback): void {
+  subscribeError(projectId: string, subscriberKey: string, callback: ErrorCallback): void {
     this.init()
-    this.errorCallbacks.set(projectId, callback)
+    this.errorCallbacks.set(`${projectId}:${subscriberKey}`, callback)
   }
 
-  unsubscribeError(projectId: string): void {
-    this.errorCallbacks.delete(projectId)
+  unsubscribeError(projectId: string, subscriberKey: string): void {
+    this.errorCallbacks.delete(`${projectId}:${subscriberKey}`)
   }
 
   dispose(): void {
