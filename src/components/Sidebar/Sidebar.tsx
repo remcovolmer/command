@@ -12,6 +12,7 @@ import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
 import { TerminalListItem } from './TerminalListItem'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
+import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 
 export function Sidebar() {
   // Use granular selectors to prevent unnecessary re-renders
@@ -111,6 +112,40 @@ export function Sidebar() {
       })
     })
   }, [projects.length, loadWorktrees])
+
+  // React to externally-created worktrees via FileWatcher
+  useEffect(() => {
+    const debounceTimers = new Map<string, NodeJS.Timeout>()
+
+    for (const project of projects) {
+      fileWatcherEvents.subscribe(project.id, 'worktree-sidebar', (events) => {
+        const hasWorktreeChange = events.some(
+          (e) => (e.type === 'dir-added' || e.type === 'dir-removed') &&
+            e.path.includes('/.worktrees/')
+        )
+        if (!hasWorktreeChange) return
+
+        const existing = debounceTimers.get(project.id)
+        if (existing) clearTimeout(existing)
+        debounceTimers.set(
+          project.id,
+          setTimeout(() => {
+            loadWorktrees(project.id)
+            debounceTimers.delete(project.id)
+          }, 1000)
+        )
+      })
+    }
+
+    return () => {
+      for (const project of projects) {
+        fileWatcherEvents.unsubscribe(project.id, 'worktree-sidebar')
+      }
+      for (const timer of debounceTimers.values()) {
+        clearTimeout(timer)
+      }
+    }
+  }, [projects, loadWorktrees])
 
   // Listen for restored sessions (from previous app close)
   useEffect(() => {
