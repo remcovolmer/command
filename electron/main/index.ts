@@ -250,12 +250,6 @@ async function createWindow() {
   taskService = new TaskService()
   fileWatcherService = new FileWatcherService(win)
 
-  // Start file watchers for all existing projects
-  const existingProjects = projectPersistence.getProjects()
-  for (const project of existingProjects) {
-    fileWatcherService.startWatching(project.id, project.path)
-  }
-
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()
@@ -362,11 +356,7 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
   if (type !== undefined && !validTypes.includes(type)) {
     throw new Error('Invalid project type')
   }
-  const project = await projectPersistence?.addProject(projectPath, name, type)
-  if (project) {
-    fileWatcherService?.startWatching(project.id, project.path)
-  }
-  return project
+  return projectPersistence?.addProject(projectPath, name, type)
 })
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
@@ -403,6 +393,17 @@ ipcMain.handle('project:reorder', async (_event, projectIds: string[]) => {
   }
   projectPersistence?.reorderProjects(projectIds)
   return projectPersistence?.getProjects() ?? []
+})
+
+ipcMain.handle('project:setActiveWatcher', async (_event, projectId: string) => {
+  if (!isValidUUID(projectId)) {
+    throw new Error('Invalid project ID')
+  }
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === projectId)
+  if (!project) return
+
+  await fileWatcherService?.switchTo(project.id, project.path)
 })
 
 // IPC Handlers for File System operations

@@ -9,7 +9,7 @@ vi.mock('zustand/middleware', () => ({
 vi.mock('../src/utils/electron', () => ({
   getElectronAPI: () => ({
     terminal: { create: vi.fn(), close: vi.fn() },
-    project: { list: vi.fn(), update: vi.fn(), reorder: vi.fn() },
+    project: { list: vi.fn(), update: vi.fn(), reorder: vi.fn(), setActiveWatcher: vi.fn().mockResolvedValue(undefined) },
     worktree: { list: vi.fn() },
     fs: { readDirectory: vi.fn() },
   }),

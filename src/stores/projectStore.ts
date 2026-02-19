@@ -117,7 +117,7 @@ interface ProjectStore {
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string) => void
-  invalidateDirectory: (dirPath: string) => void
+  invalidateDirectories: (dirPaths: string[]) => void
 
   // Theme actions
   toggleTheme: () => void
@@ -591,11 +591,14 @@ export const useProjectStore = create<ProjectStore>()(
           return { directoryCache: newCache }
         }),
 
-      invalidateDirectory: (dirPath) =>
+      invalidateDirectories: (dirPaths) =>
         set((state) => {
-          if (!state.directoryCache[dirPath]) return state
+          const toDelete = dirPaths.filter(dir => state.directoryCache[dir])
+          if (toDelete.length === 0) return state
           const newCache = { ...state.directoryCache }
-          delete newCache[dirPath]
+          for (const dir of toDelete) {
+            delete newCache[dir]
+          }
           return { directoryCache: newCache }
         }),
 
@@ -1156,4 +1159,18 @@ export const useProjectStore = create<ProjectStore>()(
       }),
     }
   )
+)
+
+// Centralized watcher: whenever activeProjectId changes, notify the main process.
+// This ensures ALL code paths that modify activeProjectId trigger a watcher switch
+// (setActiveProject, setActiveTerminal, addProject, removeProject, loadProjects, etc.)
+useProjectStore.subscribe(
+  (state, prevState) => {
+    if (state.activeProjectId && state.activeProjectId !== prevState.activeProjectId) {
+      const api = getElectronAPI()
+      api.project.setActiveWatcher(state.activeProjectId).catch((err: unknown) => {
+        console.error('Failed to switch active watcher:', err)
+      })
+    }
+  }
 )

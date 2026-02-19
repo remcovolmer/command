@@ -58,8 +58,28 @@ export class FileWatcherService {
   private restartCounts = new Map<string, number>()
   private headWatchers = new Map<string, NodeFSWatcher>()
 
+  private switchLock: Promise<void> = Promise.resolve()
+
   constructor(window: BrowserWindow) {
     this.window = window
+  }
+
+  /**
+   * Atomically switch to watching a single project.
+   * Serialized: concurrent calls queue instead of interleaving.
+   */
+  async switchTo(projectId: string, projectPath: string): Promise<void> {
+    this.switchLock = this.switchLock.then(async () => {
+      // Skip teardown/setup if already watching the right project
+      const currentIds = [...this.watchers.keys()]
+      if (currentIds.length === 1 && currentIds[0] === projectId) return
+
+      await this.stopAll()
+      this.startWatching(projectId, projectPath)
+    }).catch(err => {
+      console.error('[FileWatcher] switchTo failed:', err)
+    })
+    return this.switchLock
   }
 
   startWatching(projectId: string, projectPath: string): void {
@@ -78,10 +98,6 @@ export class FileWatcherService {
         ignored: IGNORE_PATTERNS,
         followSymlinks: false,
         atomic: true,
-        awaitWriteFinish: {
-          stabilityThreshold: 100,
-          pollInterval: 50,
-        },
         ignorePermissionErrors: true,
         usePolling: false,
         persistent: true,

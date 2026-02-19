@@ -290,6 +290,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     reorder: (projectIds: string[]): Promise<Project[]> =>
       ipcRenderer.invoke('project:reorder', projectIds),
+
+    setActiveWatcher: (projectId: string): Promise<void> =>
+      ipcRenderer.invoke('project:setActiveWatcher', projectId),
   },
 
   // Worktree operations

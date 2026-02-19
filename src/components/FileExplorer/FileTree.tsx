@@ -34,7 +34,7 @@ export function FileTree({ project }: FileTreeProps) {
   const startCreate = useProjectStore((s) => s.startCreate)
   const setDeletingEntry = useProjectStore((s) => s.setDeletingEntry)
   const setFileExplorerSelectedPath = useProjectStore((s) => s.setFileExplorerSelectedPath)
-  const invalidateDirectory = useProjectStore((s) => s.invalidateDirectory)
+  const invalidateDirectories = useProjectStore((s) => s.invalidateDirectories)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
 
   // Subscribe to file watcher events for cache invalidation
@@ -56,17 +56,19 @@ export function FileTree({ project }: FileTreeProps) {
       }
       // Check which dirs are currently cached BEFORE invalidating
       const { directoryCache } = useProjectStore.getState()
+      const allDirsToInvalidate: string[] = []
       const dirsToRefresh: string[] = []
       for (const dir of invalidatedDirs) {
         const backslashDir = dir.replace(/\//g, '\\')
+        allDirsToInvalidate.push(dir, backslashDir)
         if (directoryCache[dir]) {
           dirsToRefresh.push(dir)
         } else if (directoryCache[backslashDir]) {
           dirsToRefresh.push(backslashDir)
         }
-        invalidateDirectory(dir)
-        invalidateDirectory(backslashDir)
       }
+      // Single batched state update for all invalidations
+      invalidateDirectories(allDirsToInvalidate)
       // Refresh dirs that were visible
       for (const dir of dirsToRefresh) {
         refreshDirectory(dir)
@@ -74,7 +76,7 @@ export function FileTree({ project }: FileTreeProps) {
     }
     fileWatcherEvents.subscribe(project.id, 'file-tree', handleWatchEvents)
     return () => fileWatcherEvents.unsubscribe(project.id, 'file-tree')
-  }, [project.id, invalidateDirectory, refreshDirectory])
+  }, [project.id, invalidateDirectories, refreshDirectory])
 
   // Load root directory on mount or when project changes
   useEffect(() => {
