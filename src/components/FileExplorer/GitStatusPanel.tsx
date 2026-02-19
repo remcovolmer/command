@@ -297,11 +297,11 @@ function FileChangeItem({
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-1 ml-4 text-sm hover:bg-sidebar-accent rounded transition-colors"
+      className="flex items-center gap-2 px-3 py-1 ml-4 text-sm hover:bg-sidebar-accent rounded transition-colors min-w-0"
       title={file.path}
     >
       <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} />
-      <span className="text-sidebar-foreground truncate">{fileName}</span>
+      <span className="text-sidebar-foreground truncate min-w-0">{fileName}</span>
     </div>
   )
 }
