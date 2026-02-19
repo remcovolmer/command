@@ -47,7 +47,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration()
 
 // Set application name for Windows 10+ notifications
-if (process.platform === 'win32') app.setAppUserModelId('Claude Code Command Center')
+if (process.platform === 'win32') app.setAppUserModelId('com.remcovolmer.command')
 
 // Use separate userData folder for dev mode to allow running alongside production
 if (VITE_DEV_SERVER_URL) {
