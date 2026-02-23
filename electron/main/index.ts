@@ -261,6 +261,12 @@ async function createWindow() {
   automationService.startAllSchedulers()
   automationService.checkMissedRuns()
 
+  // Garbage-collect stale automation worktrees in background
+  const allProjects = projectPersistence.getProjects()
+  automationService.garbageCollectWorktrees(allProjects.map(p => p.path)).catch(err =>
+    console.error('[Automation] Worktree GC failed:', err)
+  )
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()

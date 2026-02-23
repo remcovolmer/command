@@ -1,7 +1,7 @@
 ---
 title: "feat: Add automations system for scheduled and event-driven Claude Code tasks"
 type: feat
-status: active
+status: completed
 date: 2026-02-23
 origin: docs/brainstorms/2026-02-23-automations-brainstorm.md
 ---
@@ -197,12 +197,12 @@ Add event channels to `ALLOWED_LISTENER_CHANNELS` in preload.
    - Add event channels to `ALLOWED_LISTENER_CHANNELS`
 
 **Acceptance criteria:**
-- [ ] `AutomationPersistence` can CRUD automations and runs to `userData/automations.json`
-- [ ] `AutomationRunner` can spawn `claude -p` in a worktree and capture JSON output
-- [ ] `AutomationRunner` handles timeout, abort, and process cleanup
-- [ ] IPC channels registered and typed
-- [ ] App startup initializes AutomationService
-- [ ] App shutdown kills running automations gracefully
+- [x] `AutomationPersistence` can CRUD automations and runs to `userData/automations.json`
+- [x] `AutomationRunner` can spawn `claude -p` in a worktree and capture JSON output
+- [x] `AutomationRunner` handles timeout, abort, and process cleanup
+- [x] IPC channels registered and typed
+- [x] App startup initializes AutomationService
+- [x] App shutdown kills running automations gracefully
 
 #### Phase 2: Scheduling — Cron Triggers
 
@@ -237,11 +237,11 @@ Zero dependencies, native TypeScript, `nextRun()` for UI display.
    - Called on: app startup (after schedulers init) + `powerMonitor.resume`
 
 **Acceptance criteria:**
-- [ ] Cron automations fire at scheduled times
-- [ ] Timers survive window minimize (background timer throttling disabled)
-- [ ] Missed runs detected on app startup and wake-from-sleep
-- [ ] Missed run policy: run-once (most recent missed only, max 24h age)
-- [ ] Enable/disable correctly starts/stops schedulers
+- [x] Cron automations fire at scheduled times
+- [x] Timers survive window minimize (background timer throttling disabled)
+- [x] Missed runs detected on app startup and wake-from-sleep
+- [x] Missed run policy: run-once (most recent missed only, max 24h age)
+- [x] Enable/disable correctly starts/stops schedulers
 
 #### Phase 3: Event Triggers
 
@@ -275,11 +275,11 @@ Zero dependencies, native TypeScript, `nextRun()` for UI display.
    - Cooldown/debounce: file-change triggers have configurable `cooldownSeconds` (default 60s). Track `lastTriggeredAt` per automation, skip if within cooldown.
 
 **Acceptance criteria:**
-- [ ] Claude "done" state triggers matching automations
-- [ ] PR merged / checks passed triggers matching automations
-- [ ] File change triggers with glob matching and cooldown
-- [ ] Event triggers respect enabled/disabled state
-- [ ] No duplicate triggers within cooldown window
+- [x] Claude "done" state triggers matching automations
+- [x] PR merged / checks passed triggers matching automations
+- [x] File change triggers with glob matching and cooldown
+- [x] Event triggers respect enabled/disabled state
+- [x] No duplicate triggers within cooldown window
 
 #### Phase 4: UI — Automations Tab & Triage Inbox
 
@@ -345,17 +345,17 @@ Zero dependencies, native TypeScript, `nextRun()` for UI display.
     - Dispatches to `AutomationsPanel` component
 
 **Acceptance criteria:**
-- [ ] Automations tab visible in FileExplorer with badge for unread runs
-- [ ] Create dialog validates all inputs and saves automation
-- [ ] Edit existing automation (re-open dialog with pre-filled values)
-- [ ] Delete automation with confirmation
-- [ ] Enable/disable toggle works inline
-- [ ] Triage inbox shows run results with status badges
-- [ ] Run detail view shows full output
-- [ ] Manual trigger button ("Run now") on each automation
-- [ ] Stop button on running automations
-- [ ] Hotkey `Ctrl+Shift+A` switches to automations tab
-- [ ] All UI follows existing Tailwind/dialog/component patterns
+- [x] Automations tab visible in FileExplorer with badge for unread runs
+- [x] Create dialog validates all inputs and saves automation
+- [x] Edit existing automation (re-open dialog with pre-filled values)
+- [x] Delete automation with confirmation
+- [x] Enable/disable toggle works inline
+- [x] Triage inbox shows run results with status badges
+- [x] Run detail view shows full output
+- [x] Manual trigger button ("Run now") on each automation
+- [x] Stop button on running automations
+- [x] Hotkey `Ctrl+Shift+A` switches to automations tab
+- [x] All UI follows existing Tailwind/dialog/component patterns
 
 #### Phase 5: Integration & Polish
 
@@ -378,11 +378,11 @@ Zero dependencies, native TypeScript, `nextRun()` for UI display.
    - Auto-refresh when runs complete (via IPC events)
 
 **Acceptance criteria:**
-- [ ] Orphaned worktrees cleaned up on startup
-- [ ] Project deletion cascades to automations
-- [ ] App close warns about running automations
-- [ ] Running automations marked as failed on unexpected shutdown
-- [ ] Next run time displayed for cron automations
+- [x] Orphaned worktrees cleaned up on startup
+- [x] Project deletion cascades to automations
+- [x] App close warns about running automations
+- [x] Running automations marked as failed on unexpected shutdown
+- [x] Next run time displayed for cron automations
 
 ## System-Wide Impact
 
@@ -419,33 +419,33 @@ New IPC namespace `automation:*` follows existing patterns:
 
 ### Functional Requirements
 
-- [ ] Users can create automations with name, prompt, trigger, and target project(s)
-- [ ] Schedule triggers fire at configured cron times
-- [ ] Event triggers fire on Claude done, PR merged/checks passed, file changes
-- [ ] Each run executes `claude -p` in an isolated worktree
-- [ ] Run results appear in triage inbox with status and output
-- [ ] Users can enable/disable, edit, delete automations
-- [ ] Users can manually trigger, stop running, and review results
-- [ ] Missed cron runs detected and fired once on app startup/resume
+- [x] Users can create automations with name, prompt, trigger, and target project(s)
+- [x] Schedule triggers fire at configured cron times
+- [x] Event triggers fire on Claude done, PR merged/checks passed, file changes
+- [x] Each run executes `claude -p` in an isolated worktree
+- [x] Run results appear in triage inbox with status and output
+- [x] Users can enable/disable, edit, delete automations
+- [x] Users can manually trigger, stop running, and review results
+- [x] Missed cron runs detected and fired once on app startup/resume
 
 ### Non-Functional Requirements
 
-- [ ] Max 3 concurrent automation runs
-- [ ] Default 30-minute timeout per run (configurable)
-- [ ] Output buffer capped at 10MB
-- [ ] Max 50 runs retained per automation
-- [ ] Worktree GC on startup (remove `auto-*` branches >24h old)
-- [ ] File change triggers debounced with configurable cooldown (default 60s)
-- [ ] App close warns about running automations
+- [x] Max 3 concurrent automation runs
+- [x] Default 30-minute timeout per run (configurable)
+- [x] Output buffer capped at 10MB
+- [x] Max 50 runs retained per automation
+- [x] Worktree GC on startup (remove `auto-*` branches >24h old)
+- [x] File change triggers debounced with configurable cooldown (default 60s)
+- [x] App close warns about running automations
 
 ### Quality Gates
 
-- [ ] All new IPC handlers validate inputs (UUID format, string lengths)
-- [ ] Path validation on worktree creation (existing `validateFilePathInProject` pattern)
-- [ ] Process cleanup on Windows uses `taskkill /T /F` for process trees
-- [ ] Promise chain serialization for concurrent worktree operations
-- [ ] Tests for AutomationPersistence CRUD + migration
-- [ ] Tests for AutomationRunner timeout + abort + output parsing
+- [x] All new IPC handlers validate inputs (UUID format, string lengths)
+- [x] Path validation on worktree creation (existing `validateFilePathInProject` pattern)
+- [x] Process cleanup on Windows uses `taskkill /T /F` for process trees
+- [x] Promise chain serialization for concurrent worktree operations
+- [x] Tests for AutomationPersistence CRUD + migration
+- [x] Tests for AutomationRunner timeout + abort + output parsing
 
 ## Dependencies & Prerequisites
 
