@@ -346,6 +346,16 @@ ipcMain.on('terminal:close', (_event, terminalId: string) => {
   terminalManager?.closeTerminal(terminalId)
 })
 
+ipcMain.on('terminal:evict', (_event, terminalId: string) => {
+  if (!isValidUUID(terminalId)) return
+  terminalManager?.evictTerminal(terminalId)
+})
+
+ipcMain.on('terminal:restore', (_event, terminalId: string) => {
+  if (!isValidUUID(terminalId)) return
+  terminalManager?.restoreTerminal(terminalId)
+})
+
 // IPC Handlers for Project operations
 ipcMain.handle('project:list', async () => {
   return projectPersistence?.getProjects() ?? []

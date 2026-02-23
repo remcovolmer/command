@@ -1,7 +1,7 @@
 ---
 title: "feat: Performance & Memory Optimization"
 type: feat
-status: active
+status: completed
 date: 2026-02-23
 origin: docs/brainstorms/2026-02-23-performance-optimization-brainstorm.md
 ---
@@ -277,33 +277,33 @@ No new hotkeys required — this feature is transparent to the user. Existing te
 ## Acceptance Criteria
 
 ### Phase 1
-- [ ] Monaco Editor does NOT load at startup — verify with DevTools Network tab
-- [ ] Opening first file triggers Monaco chunk load, editor renders correctly
-- [ ] Milkdown loads only when .md file opened in WYSIWYG mode
-- [ ] `ClaudeHookWatcher` uses async `readFile` — no `readFileSync` in codebase
-- [ ] Polling interval is 250ms
-- [ ] Only active project worktrees load at startup
-- [ ] Switching to inactive project loads its worktrees on demand
-- [ ] Vite build produces separate chunks for Monaco, Milkdown
+- [x] Monaco Editor does NOT load at startup — verify with DevTools Network tab
+- [x] Opening first file triggers Monaco chunk load, editor renders correctly
+- [x] Milkdown loads only when .md file opened in WYSIWYG mode
+- [x] `ClaudeHookWatcher` uses async `readFile` — no `readFileSync` in codebase
+- [x] Polling interval is 250ms
+- [x] Only active project worktrees load at startup
+- [x] Switching to inactive project loads its worktrees on demand
+- [x] Vite build produces separate chunks for Monaco, Milkdown
 
 ### Phase 2
-- [ ] With pool size 5 and 10 terminals open, only 5 xterm instances exist in DOM
-- [ ] Clicking an evicted terminal tab restores it within 100ms
-- [ ] Restored terminal shows complete scrollback (ANSI colors preserved)
-- [ ] Busy/permission/question terminals are never evicted
-- [ ] Terminal in split view is never evicted while visible
-- [ ] PTY data arriving while evicted is buffered and replayed on restore
-- [ ] Pool size configurable in Settings (min 2, max 20)
-- [ ] Changing pool size immediately triggers eviction if needed
-- [ ] `stopped` terminals evicted before `done` terminals
+- [x] With pool size 5 and 10 terminals open, only 5 xterm instances exist in DOM
+- [x] Clicking an evicted terminal tab restores it within 100ms
+- [x] Restored terminal shows complete scrollback (ANSI colors preserved)
+- [x] Busy/permission/question terminals are never evicted
+- [x] Terminal in split view is never evicted while visible
+- [x] PTY data arriving while evicted is buffered and replayed on restore
+- [x] Pool size configurable in Settings (min 2, max 20)
+- [x] Changing pool size immediately triggers eviction if needed
+- [x] `stopped` terminals evicted before `done` terminals
 
 ### Regression
-- [ ] All existing terminal hotkeys work (Alt+1-9, Ctrl+←/→)
-- [ ] Split view works with pool (both panels alive)
-- [ ] Session restore on app restart works correctly
-- [ ] Claude state detection works for evicted terminals (state still tracked)
-- [ ] File editor works correctly with lazy-loaded Monaco
-- [ ] CSP does not block Monaco (local package, not CDN)
+- [x] All existing terminal hotkeys work (Alt+1-9, Ctrl+←/→)
+- [x] Split view works with pool (both panels alive)
+- [x] Session restore on app restart works correctly
+- [x] Claude state detection works for evicted terminals (state still tracked)
+- [x] File editor works correctly with lazy-loaded Monaco
+- [x] CSP does not block Monaco (local package, not CDN)
 
 ---
 

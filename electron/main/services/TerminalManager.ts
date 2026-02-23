@@ -43,6 +43,12 @@ export class TerminalManager {
   private terminalInputBuffers: Map<string, string> = new Map()
   private terminalTitled: Map<string, boolean> = new Map()
 
+  // Eviction buffering: stores PTY data for terminals whose xterm is evicted
+  private evictedTerminals: Set<string> = new Set()
+  private evictedBuffers: Map<string, string[]> = new Map()
+  private evictedBufferSizes: Map<string, number> = new Map()
+  private readonly MAX_BUFFER_SIZE = 1_048_576 // 1MB per terminal
+
   constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher) {
     this.window = window
     this.hookWatcher = hookWatcher || null
@@ -105,8 +111,13 @@ export class TerminalManager {
     }
 
     ptyProcess.onData((data) => {
-      // Forward data to renderer
-      this.sendToRenderer('terminal:data', id, data)
+      if (this.evictedTerminals.has(id)) {
+        // Buffer data for evicted terminal
+        this.bufferEvictedData(id, data)
+      } else {
+        // Forward data to renderer
+        this.sendToRenderer('terminal:data', id, data)
+      }
     })
 
     ptyProcess.onExit(({ exitCode }) => {
@@ -273,6 +284,11 @@ export class TerminalManager {
       this.terminalInputBuffers.delete(terminalId)
       this.terminalTitled.delete(terminalId)
 
+      // Clean up eviction state
+      this.evictedTerminals.delete(terminalId)
+      this.evictedBuffers.delete(terminalId)
+      this.evictedBufferSizes.delete(terminalId)
+
       if (terminal.pty) {
         // On Windows, kill the entire process tree to ensure child processes (like claude) are cleaned up
         if (process.platform === 'win32') {
@@ -321,6 +337,60 @@ export class TerminalManager {
     return Array.from(this.terminals.values())
       .filter(t => t.type === 'claude')
       .map(t => t.id)
+  }
+
+  /**
+   * Mark a terminal as evicted — start buffering its PTY data
+   */
+  evictTerminal(terminalId: string): void {
+    if (!this.terminals.has(terminalId)) return
+    this.evictedTerminals.add(terminalId)
+    this.evictedBuffers.set(terminalId, [])
+    this.evictedBufferSizes.set(terminalId, 0)
+  }
+
+  /**
+   * Restore a terminal — flush buffered data to renderer and resume forwarding
+   */
+  restoreTerminal(terminalId: string): void {
+    if (!this.evictedTerminals.has(terminalId)) return
+
+    // Flush buffered data to renderer
+    const buffer = this.evictedBuffers.get(terminalId)
+    if (buffer && buffer.length > 0) {
+      const combined = buffer.join('')
+      this.sendToRenderer('terminal:data', terminalId, combined)
+    }
+
+    // Clean up eviction state
+    this.evictedTerminals.delete(terminalId)
+    this.evictedBuffers.delete(terminalId)
+    this.evictedBufferSizes.delete(terminalId)
+  }
+
+  /**
+   * Buffer PTY data for an evicted terminal with size cap
+   */
+  private bufferEvictedData(terminalId: string, data: string): void {
+    const buffer = this.evictedBuffers.get(terminalId)
+    if (!buffer) return
+
+    const currentSize = this.evictedBufferSizes.get(terminalId) || 0
+    const dataSize = data.length
+
+    if (currentSize + dataSize > this.MAX_BUFFER_SIZE) {
+      // Trim oldest data to make room
+      let excess = (currentSize + dataSize) - this.MAX_BUFFER_SIZE
+      while (excess > 0 && buffer.length > 0) {
+        const removed = buffer.shift()!
+        excess -= removed.length
+      }
+      this.evictedBufferSizes.set(terminalId, Math.max(0, currentSize - (currentSize + dataSize - this.MAX_BUFFER_SIZE) + dataSize))
+    } else {
+      this.evictedBufferSizes.set(terminalId, currentSize + dataSize)
+    }
+
+    buffer.push(data)
   }
 
   /**

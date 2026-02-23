@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Terminal } from './Terminal'
 import { EditorSkeleton } from '../Editor/EditorSkeleton'
+import { useTerminalPool } from '../../hooks/useTerminalPool'
+import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, CenterTab, DiffTab } from '../../types'
 
 const EditorContainer = lazy(() =>
@@ -36,6 +38,10 @@ export function TerminalViewport({
 }: TerminalViewportProps) {
   const [dragOver, setDragOver] = useState<'left' | 'right' | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+
+  // Terminal LRU pool — manage eviction based on active terminal
+  const allTerminals = useProjectStore(s => s.terminals)
+  useTerminalPool(allTerminals, activeTerminalId, splitTerminalIds)
 
   // Listen for drag events on the document to show drop zones
   useEffect(() => {
