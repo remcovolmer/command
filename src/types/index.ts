@@ -245,6 +245,45 @@ export interface TaskAdd {
   text: string;                  // Task text
 }
 
+// Automation types
+export type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled';
+
+export type AutomationTrigger =
+  | { type: 'schedule'; cron: string }
+  | { type: 'claude-done'; projectId?: string }
+  | { type: 'git-event'; event: 'pr-merged' | 'pr-opened' | 'checks-passed' }
+  | { type: 'file-change'; patterns: string[]; cooldownSeconds: number };
+
+export interface Automation {
+  id: string;
+  name: string;
+  prompt: string;
+  projectIds: string[];
+  trigger: AutomationTrigger;
+  enabled: boolean;
+  baseBranch?: string;
+  timeoutMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+  lastRunAt?: string;
+}
+
+export interface AutomationRun {
+  id: string;
+  automationId: string;
+  projectId: string;
+  status: AutomationRunStatus;
+  startedAt: string;
+  completedAt?: string;
+  result?: string;
+  sessionId?: string;
+  exitCode?: number;
+  durationMs?: number;
+  error?: string;
+  read: boolean;
+  worktreeBranch?: string;
+}
+
 // Update types
 export interface UpdateCheckResult {
   updateAvailable: boolean;
@@ -395,6 +434,22 @@ export interface ElectronAPI {
     delete: (projectPath: string, filePath: string, lineNumber: number) => Promise<TasksData>;
     move: (projectPath: string, move: TaskMove) => Promise<TasksData>;
     createFile: (projectPath: string) => Promise<string>;
+  };
+  automation: {
+    list: () => Promise<Automation[]>;
+    create: (automation: Omit<Automation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Automation>;
+    update: (id: string, updates: Partial<Omit<Automation, 'id' | 'createdAt'>>) => Promise<Automation | null>;
+    delete: (id: string) => Promise<void>;
+    toggle: (id: string) => Promise<Automation | null>;
+    trigger: (id: string) => Promise<void>;
+    stopRun: (runId: string) => Promise<void>;
+    listRuns: (automationId?: string, limit?: number) => Promise<AutomationRun[]>;
+    markRead: (runId: string) => Promise<void>;
+    deleteRun: (runId: string) => Promise<void>;
+    getNextRun: (automationId: string) => Promise<string | null>;
+    onRunStarted: (callback: (run: AutomationRun) => void) => Unsubscribe;
+    onRunCompleted: (callback: (run: AutomationRun) => void) => Unsubscribe;
+    onRunFailed: (callback: (run: AutomationRun) => void) => Unsubscribe;
   };
   removeAllListeners: (channel: string) => void;
 }

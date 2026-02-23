@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, Notification, Menu } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, dialog, Notification, Menu, powerMonitor } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -15,6 +15,7 @@ import { UpdateService } from './services/UpdateService'
 import { GitHubService } from './services/GitHubService'
 import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
+import { AutomationService } from './services/AutomationService'
 import { randomUUID } from 'node:crypto'
 
 // Validation helpers
@@ -55,6 +56,9 @@ if (VITE_DEV_SERVER_URL) {
   app.setPath('userData', devUserData)
 }
 
+// Prevent Chromium from throttling timers when window is minimized (needed for cron schedulers)
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+
 // Skip single instance lock in test mode to allow Playwright to launch multiple instances
 if (process.env.NODE_ENV !== 'test' && !app.requestSingleInstanceLock()) {
   app.quit()
@@ -71,6 +75,7 @@ let updateService: UpdateService | null = null
 let githubService: GitHubService | null = null
 let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
+let automationService: AutomationService | null = null
 
 
 /**
@@ -249,6 +254,12 @@ async function createWindow() {
   githubService.setWindow(win)
   taskService = new TaskService()
   fileWatcherService = new FileWatcherService(win)
+  automationService = new AutomationService(worktreeService)
+  automationService.setWindow(win)
+  automationService.setProjectPersistence(projectPersistence)
+  automationService.registerEventTriggers(hookWatcher, githubService, fileWatcherService)
+  automationService.startAllSchedulers()
+  automationService.checkMissedRuns()
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -361,6 +372,7 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
   await fileWatcherService?.stopWatching(id)
+  automationService?.onProjectDeleted(id)
   return projectPersistence?.removeProject(id)
 })
 
@@ -961,6 +973,101 @@ ipcMain.handle('update:get-version', () => {
   return updateService?.getCurrentVersion() ?? app.getVersion()
 })
 
+// ─── Automation IPC handlers ───
+
+ipcMain.handle('automation:list', async () => {
+  return automationService?.getAutomations() ?? []
+})
+
+ipcMain.handle('automation:create', async (_event, data: Record<string, unknown>) => {
+  if (!automationService) throw new Error('AutomationService not initialized')
+  const name = typeof data.name === 'string' ? data.name.slice(0, 100) : ''
+  const prompt = typeof data.prompt === 'string' ? data.prompt.slice(0, 50000) : ''
+  if (!name || !prompt) throw new Error('Name and prompt are required')
+
+  const projectIds = Array.isArray(data.projectIds) ? data.projectIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id as string)) : []
+  if (projectIds.length === 0) throw new Error('At least one project is required')
+
+  return automationService.createAutomation({
+    name,
+    prompt,
+    projectIds: projectIds as string[],
+    trigger: data.trigger as { type: 'schedule'; cron: string } | { type: 'claude-done'; projectId?: string } | { type: 'git-event'; event: 'pr-merged' | 'pr-opened' | 'checks-passed' } | { type: 'file-change'; patterns: string[]; cooldownSeconds: number },
+    enabled: data.enabled !== false,
+    baseBranch: typeof data.baseBranch === 'string' ? data.baseBranch : undefined,
+    timeoutMinutes: typeof data.timeoutMinutes === 'number' ? clamp(data.timeoutMinutes, 1, 120) : 30,
+  })
+})
+
+ipcMain.handle('automation:update', async (_event, id: string, updates: Record<string, unknown>) => {
+  if (!isValidUUID(id)) throw new Error('Invalid automation ID')
+  if (!automationService) throw new Error('AutomationService not initialized')
+  const allowedUpdates: Record<string, unknown> = {}
+  if (typeof updates.name === 'string') allowedUpdates.name = updates.name.slice(0, 100)
+  if (typeof updates.prompt === 'string') allowedUpdates.prompt = updates.prompt.slice(0, 50000)
+  if (Array.isArray(updates.projectIds)) allowedUpdates.projectIds = updates.projectIds.filter((id: unknown) => typeof id === 'string')
+  if (updates.trigger) allowedUpdates.trigger = updates.trigger
+  if (typeof updates.enabled === 'boolean') allowedUpdates.enabled = updates.enabled
+  if (typeof updates.baseBranch === 'string') allowedUpdates.baseBranch = updates.baseBranch
+  if (typeof updates.timeoutMinutes === 'number') allowedUpdates.timeoutMinutes = clamp(updates.timeoutMinutes as number, 1, 120)
+  return automationService.updateAutomation(id, allowedUpdates)
+})
+
+ipcMain.handle('automation:delete', async (_event, id: string) => {
+  if (!isValidUUID(id)) throw new Error('Invalid automation ID')
+  automationService?.deleteAutomation(id)
+})
+
+ipcMain.handle('automation:toggle', async (_event, id: string) => {
+  if (!isValidUUID(id)) throw new Error('Invalid automation ID')
+  return automationService?.toggleAutomation(id)
+})
+
+ipcMain.handle('automation:trigger', async (_event, id: string) => {
+  if (!isValidUUID(id)) throw new Error('Invalid automation ID')
+  if (!automationService || !projectPersistence) throw new Error('Services not initialized')
+
+  const automation = automationService.getAutomation(id)
+  if (!automation) throw new Error('Automation not found')
+
+  // Trigger for each assigned project
+  const projects = projectPersistence.getProjects()
+  for (const projectId of automation.projectIds) {
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      // Fire and forget - don't await, let it run in background
+      automationService.triggerRun(id, project.path, projectId).catch(err => {
+        console.error(`[Automation] Run failed for ${id}:`, err)
+      })
+    }
+  }
+})
+
+ipcMain.handle('automation:stop-run', async (_event, runId: string) => {
+  if (!isValidUUID(runId)) throw new Error('Invalid run ID')
+  automationService?.stopRun(runId)
+})
+
+ipcMain.handle('automation:list-runs', async (_event, automationId?: string, limit?: number) => {
+  if (automationId && !isValidUUID(automationId)) throw new Error('Invalid automation ID')
+  return automationService?.getRuns(automationId, limit) ?? []
+})
+
+ipcMain.handle('automation:mark-read', async (_event, runId: string) => {
+  if (!isValidUUID(runId)) throw new Error('Invalid run ID')
+  automationService?.markRunRead(runId)
+})
+
+ipcMain.handle('automation:delete-run', async (_event, runId: string) => {
+  if (!isValidUUID(runId)) throw new Error('Invalid run ID')
+  automationService?.deleteRun(runId)
+})
+
+ipcMain.handle('automation:get-next-run', async (_event, automationId: string) => {
+  if (!isValidUUID(automationId)) throw new Error('Invalid automation ID')
+  return automationService?.getNextRunTime(automationId) ?? null
+})
+
 app.whenReady().then(async () => {
   await createWindow()
 
@@ -979,6 +1086,12 @@ app.whenReady().then(async () => {
       })
     }
   }, 5000) // 5 second delay
+
+  // Check for missed automation runs on wake from sleep
+  powerMonitor.on('resume', () => {
+    console.log('[PowerMonitor] System resumed from sleep, checking missed automation runs')
+    automationService?.checkMissedRuns()
+  })
 })
 
 app.on('before-quit', () => {
@@ -1007,6 +1120,11 @@ app.on('before-quit', () => {
       projectPersistence.setSessions(sessionsToSave)
     }
   }
+
+  // Stop automations (kills running processes, marks runs as failed)
+  automationService?.destroy().catch(err => {
+    console.error('[AutomationService] Cleanup error:', err)
+  })
 
   // Stop file watchers before terminal cleanup to avoid EBUSY
   fileWatcherService?.stopAll().catch(err => {
