@@ -1,9 +1,9 @@
-import type { TerminalSession } from '../types'
+import type { TerminalSession, TerminalState } from '../types'
 
 const MAX_SERIALIZED_SIZE = 2 * 1024 * 1024 // 2MB per terminal
 
 // Terminal states that are protected from eviction (require user attention)
-const PROTECTED_STATES = new Set(['busy', 'permission', 'question'])
+const PROTECTED_STATES: Set<TerminalState> = new Set(['busy', 'permission', 'question'])
 
 type SerializeFn = () => string | null
 type CleanupFn = () => void
@@ -136,9 +136,9 @@ export class TerminalPool {
 
   /**
    * Evict a specific terminal. Serializes its buffer, calls cleanup, marks as evicted.
-   * Returns true if eviction succeeded.
+   * Returns true if eviction succeeded. Caller is responsible for notifying main process.
    */
-  evict(terminalId: string, api: { terminal: { evict: (id: string) => void } }): boolean {
+  evict(terminalId: string): boolean {
     const serializeFn = this.serializers.get(terminalId)
     if (!serializeFn) return false
 
@@ -152,19 +152,22 @@ export class TerminalPool {
     this.storeBuffer(terminalId, serialized)
     this.evictedSet.add(terminalId)
 
-    // Notify main process to start buffering
-    api.terminal.evict(terminalId)
-
     // Destroy the xterm instance
-    const cleanupFn = this.cleanups.get(terminalId)
-    cleanupFn?.()
+    try {
+      const cleanupFn = this.cleanups.get(terminalId)
+      cleanupFn?.()
+    } catch (err) {
+      console.error(`[TerminalPool] Cleanup failed for ${terminalId}:`, err)
+    }
 
     return true
   }
 
   /** Update max pool size */
   setMaxSize(size: number): void {
-    this.maxSize = Math.max(2, Math.min(20, size))
+    const n = Number(size)
+    if (Number.isNaN(n)) return
+    this.maxSize = Math.max(2, Math.min(20, n))
   }
 
   getMaxSize(): number {

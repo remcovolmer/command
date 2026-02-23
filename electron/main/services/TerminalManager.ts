@@ -44,9 +44,7 @@ export class TerminalManager {
   private terminalTitled: Map<string, boolean> = new Map()
 
   // Eviction buffering: stores PTY data for terminals whose xterm is evicted
-  private evictedTerminals: Set<string> = new Set()
-  private evictedBuffers: Map<string, string[]> = new Map()
-  private evictedBufferSizes: Map<string, number> = new Map()
+  private evictedBuffers: Map<string, string> = new Map()
   private readonly MAX_BUFFER_SIZE = 1_048_576 // 1MB per terminal
 
   constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher) {
@@ -111,7 +109,7 @@ export class TerminalManager {
     }
 
     ptyProcess.onData((data) => {
-      if (this.evictedTerminals.has(id)) {
+      if (this.evictedBuffers.has(id)) {
         // Buffer data for evicted terminal
         this.bufferEvictedData(id, data)
       } else {
@@ -132,6 +130,7 @@ export class TerminalManager {
       this.terminals.delete(id)
       this.terminalInputBuffers.delete(id)
       this.terminalTitled.delete(id)
+      this.evictedBuffers.delete(id)
     })
 
     this.terminals.set(id, terminal)
@@ -285,9 +284,7 @@ export class TerminalManager {
       this.terminalTitled.delete(terminalId)
 
       // Clean up eviction state
-      this.evictedTerminals.delete(terminalId)
       this.evictedBuffers.delete(terminalId)
-      this.evictedBufferSizes.delete(terminalId)
 
       if (terminal.pty) {
         // On Windows, kill the entire process tree to ensure child processes (like claude) are cleaned up
@@ -344,53 +341,44 @@ export class TerminalManager {
    */
   evictTerminal(terminalId: string): void {
     if (!this.terminals.has(terminalId)) return
-    this.evictedTerminals.add(terminalId)
-    this.evictedBuffers.set(terminalId, [])
-    this.evictedBufferSizes.set(terminalId, 0)
+    this.evictedBuffers.set(terminalId, '')
   }
 
   /**
    * Restore a terminal — flush buffered data to renderer and resume forwarding
    */
   restoreTerminal(terminalId: string): void {
-    if (!this.evictedTerminals.has(terminalId)) return
+    const buffer = this.evictedBuffers.get(terminalId)
+    if (buffer === undefined) return
 
     // Flush buffered data to renderer
-    const buffer = this.evictedBuffers.get(terminalId)
-    if (buffer && buffer.length > 0) {
-      const combined = buffer.join('')
-      this.sendToRenderer('terminal:data', terminalId, combined)
+    if (buffer.length > 0) {
+      // Defer flush to next tick to guarantee renderer event handlers are registered
+      setImmediate(() => {
+        this.sendToRenderer('terminal:data', terminalId, buffer)
+      })
     }
 
-    // Clean up eviction state
-    this.evictedTerminals.delete(terminalId)
     this.evictedBuffers.delete(terminalId)
-    this.evictedBufferSizes.delete(terminalId)
   }
 
   /**
-   * Buffer PTY data for an evicted terminal with size cap
+   * Buffer PTY data for an evicted terminal with size cap.
+   * Uses single-string concatenation (V8 rope strings) instead of Array.shift() loop.
    */
   private bufferEvictedData(terminalId: string, data: string): void {
-    const buffer = this.evictedBuffers.get(terminalId)
-    if (!buffer) return
+    let buffer = this.evictedBuffers.get(terminalId)
+    if (buffer === undefined) return
 
-    const currentSize = this.evictedBufferSizes.get(terminalId) || 0
-    const dataSize = data.length
-
-    if (currentSize + dataSize > this.MAX_BUFFER_SIZE) {
-      // Trim oldest data to make room
-      let excess = (currentSize + dataSize) - this.MAX_BUFFER_SIZE
-      while (excess > 0 && buffer.length > 0) {
-        const removed = buffer.shift()!
-        excess -= removed.length
-      }
-      this.evictedBufferSizes.set(terminalId, Math.max(0, currentSize - (currentSize + dataSize - this.MAX_BUFFER_SIZE) + dataSize))
-    } else {
-      this.evictedBufferSizes.set(terminalId, currentSize + dataSize)
+    buffer += data
+    if (buffer.length > this.MAX_BUFFER_SIZE) {
+      // Trim from front at a line boundary
+      const excess = buffer.length - this.MAX_BUFFER_SIZE
+      const lineBreak = buffer.indexOf('\n', excess)
+      buffer = lineBreak !== -1 ? buffer.slice(lineBreak + 1) : buffer.slice(excess)
     }
 
-    buffer.push(data)
+    this.evictedBuffers.set(terminalId, buffer)
   }
 
   /**

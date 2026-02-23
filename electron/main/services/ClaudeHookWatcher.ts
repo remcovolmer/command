@@ -57,6 +57,8 @@ export class ClaudeHookWatcher {
 
   // Guard to prevent concurrent async reads
   private isReading: boolean = false
+  // Flag to re-read after current read completes (prevents dropped state changes)
+  private pendingRead: boolean = false
 
   // Queue for states arriving before terminal is registered
   private pendingStates: Map<string, HookStateData[]> = new Map()
@@ -171,20 +173,26 @@ export class ClaudeHookWatcher {
   }
 
   private async onStateChange(): Promise<void> {
-    if (this.isReading) return
+    if (this.isReading) {
+      this.pendingRead = true
+      return
+    }
     this.isReading = true
     try {
-      const content = await readFile(this.stateFilePath, 'utf-8')
-      const parsed = JSON.parse(content)
+      do {
+        this.pendingRead = false
+        const content = await readFile(this.stateFilePath, 'utf-8')
+        const parsed = JSON.parse(content)
 
-      // Handle both legacy single-session and new multi-session format
-      const allStates: MultiSessionState = this.normalizeStateFile(parsed)
+        // Handle both legacy single-session and new multi-session format
+        const allStates: MultiSessionState = this.normalizeStateFile(parsed)
 
-      // Process each session's state
-      for (const sessionId in allStates) {
-        const hookState = allStates[sessionId]
-        this.processSessionState(hookState)
-      }
+        // Process each session's state
+        for (const sessionId in allStates) {
+          const hookState = allStates[sessionId]
+          this.processSessionState(hookState)
+        }
+      } while (this.pendingRead)
     } catch (e) {
       // Ignore parse errors (file might be mid-write)
     } finally {

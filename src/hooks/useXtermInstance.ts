@@ -319,7 +319,12 @@ export function useXtermInstance({
     return () => {
       cleanupRef.current?.()
       cleanupRef.current = null
-      terminalPool.remove(id)
+      // Only remove from pool if terminal is actually closing (not just remounting).
+      // This preserves serialized buffers for evicted terminals across React remounts.
+      const terminals = useProjectStore.getState().terminals
+      if (!terminals[id]) {
+        terminalPool.remove(id)
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -332,10 +337,9 @@ export function useXtermInstance({
     }
   }, [theme])
 
-  // Focus terminal when active, touch pool LRU, and refit
+  // Focus terminal when active and refit
   useEffect(() => {
     if (isActive && terminalRef.current) {
-      terminalPool.touch(id)
       terminalRef.current.focus()
       // Force cursor refresh to ensure cursor is visible after focus
       terminalRef.current.refresh(0, terminalRef.current.rows - 1)
