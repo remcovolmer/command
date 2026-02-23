@@ -1,9 +1,15 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Terminal } from './Terminal'
-import { EditorContainer } from '../Editor/EditorContainer'
-import { DiffEditorView } from '../Editor/DiffEditorView'
+import { EditorSkeleton } from '../Editor/EditorSkeleton'
 import type { TerminalSession, CenterTab, DiffTab } from '../../types'
+
+const EditorContainer = lazy(() =>
+  import('../Editor/EditorContainer').then(m => ({ default: m.EditorContainer }))
+)
+const DiffEditorView = lazy(() =>
+  import('../Editor/DiffEditorView').then(m => ({ default: m.DiffEditorView }))
+)
 
 interface TerminalViewportProps {
   terminals: TerminalSession[]
@@ -153,23 +159,27 @@ export function TerminalViewport({
           />
         ))}
 
-        {/* Render all editor/diff tabs (hidden if not active) */}
-        {editorTabs.map((tab) => (
-          tab.type === 'diff' ? (
-            <DiffEditorView
-              key={tab.id}
-              tab={tab as DiffTab}
-              isActive={isEditorActive && tab.id === activeCenterTabId}
-            />
-          ) : (
-            <EditorContainer
-              key={tab.id}
-              tabId={tab.id}
-              filePath={tab.filePath}
-              isActive={isEditorActive && tab.id === activeCenterTabId}
-            />
-          )
-        ))}
+        {/* Render all editor/diff tabs (hidden if not active, lazy-loaded) */}
+        {editorTabs.length > 0 && (
+          <Suspense fallback={<EditorSkeleton />}>
+            {editorTabs.map((tab) => (
+              tab.type === 'diff' ? (
+                <DiffEditorView
+                  key={tab.id}
+                  tab={tab as DiffTab}
+                  isActive={isEditorActive && tab.id === activeCenterTabId}
+                />
+              ) : (
+                <EditorContainer
+                  key={tab.id}
+                  tabId={tab.id}
+                  filePath={tab.filePath}
+                  isActive={isEditorActive && tab.id === activeCenterTabId}
+                />
+              )
+            ))}
+          </Suspense>
+        )}
       </div>
 
       {/* Drop zones for creating split - only show if there are 2+ terminals */}

@@ -84,5 +84,22 @@ export default defineConfig(({ command }) => {
       },
     },
     clearScreen: false,
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
+              return 'monaco'
+            }
+            if (id.includes('@milkdown')) {
+              return 'milkdown'
+            }
+            if (id.includes('@dnd-kit')) {
+              return 'dnd'
+            }
+          },
+        },
+      },
+    },
   }
 })

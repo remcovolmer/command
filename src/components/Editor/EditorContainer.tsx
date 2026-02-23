@@ -1,7 +1,17 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { Code, Eye } from 'lucide-react'
+import { loader } from '@monaco-editor/react'
+import * as monaco from 'monaco-editor'
 import { CodeEditor } from './CodeEditor'
-import { MarkdownEditor } from './MarkdownEditor'
+import { EditorSkeleton } from './EditorSkeleton'
+
+// Configure Monaco to use local package instead of CDN
+// This runs when this chunk loads, before any <Editor> mounts
+loader.config({ monaco })
+
+const MarkdownEditor = lazy(() =>
+  import('./MarkdownEditor').then(m => ({ default: m.MarkdownEditor }))
+)
 
 interface EditorContainerProps {
   tabId: string
@@ -65,11 +75,13 @@ export function EditorContainer({ tabId, filePath, isActive }: EditorContainerPr
       {/* Editor area */}
       <div className="flex-1 min-h-0">
         {useWysiwyg ? (
-          <MarkdownEditor
-            tabId={tabId}
-            filePath={filePath}
-            isActive={isActive}
-          />
+          <Suspense fallback={<EditorSkeleton />}>
+            <MarkdownEditor
+              tabId={tabId}
+              filePath={filePath}
+              isActive={isActive}
+            />
+          </Suspense>
         ) : (
           <CodeEditor
             tabId={tabId}

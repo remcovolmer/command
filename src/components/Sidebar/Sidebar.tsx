@@ -90,28 +90,21 @@ export function Sidebar() {
     })
   }, [api])
 
-  // Load projects on mount
+  // Load projects on mount, then load worktrees only for active project
   useEffect(() => {
-    loadProjects().then(() => {
-      // Load worktrees for all projects after projects are loaded
-      projects.forEach((project) => {
-        loadWorktrees(project.id).catch((error) => {
-          console.error(`Failed to load worktrees for project ${project.id}:`, error)
-        })
-      })
-    }).catch((error) => {
+    loadProjects().catch((error) => {
       console.error('Failed to load projects:', error)
     })
   }, [loadProjects])
 
-  // Load worktrees when projects change
+  // Load worktrees for active project (deferred: other projects load on-demand when selected)
   useEffect(() => {
-    projects.forEach((project) => {
-      loadWorktrees(project.id).catch((error) => {
-        console.error(`Failed to load worktrees for project ${project.id}:`, error)
+    if (activeProjectId) {
+      loadWorktrees(activeProjectId).catch((error) => {
+        console.error(`Failed to load worktrees for project ${activeProjectId}:`, error)
       })
-    })
-  }, [projects.length, loadWorktrees])
+    }
+  }, [activeProjectId, loadWorktrees])
 
   // React to externally-created worktrees via FileWatcher
   useEffect(() => {
