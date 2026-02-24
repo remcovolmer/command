@@ -530,6 +530,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getNextRun: (automationId: string): Promise<string | null> =>
       ipcRenderer.invoke('automation:get-next-run', automationId),
 
+    checkPR: (runId: string): Promise<unknown> =>
+      ipcRenderer.invoke('automation:check-pr', runId),
+
     onRunStarted: (callback: (run: unknown) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, run: unknown) => callback(run)
       ipcRenderer.on('automation:run-started', handler)

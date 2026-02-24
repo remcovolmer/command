@@ -19,6 +19,7 @@ export class AutomationService {
   private runner: AutomationRunner
   private worktreeService: WorktreeService
   private projectPersistence: ProjectPersistence | null = null
+  private githubService: GitHubService | null = null
 
   // Track running automations to enforce concurrency
   private runningCount = 0
@@ -153,6 +154,8 @@ export class AutomationService {
     githubService: GitHubService,
     fileWatcherService: FileWatcherService,
   ): void {
+    this.githubService = githubService
+
     // 1. Claude "done" trigger
     const unsubHook = hookWatcher.addStateChangeListener((_terminalId, state) => {
       if (state !== 'done') return
@@ -332,6 +335,20 @@ export class AutomationService {
     this.persistence.removeRun(runId)
   }
 
+  async checkPRForRun(runId: string): Promise<AutomationRun | null> {
+    const run = this.persistence.getRun(runId)
+    if (!run || !run.worktreeBranch || !this.githubService || !this.projectPersistence) return null
+
+    const project = this.projectPersistence.getProjects().find(p => p.id === run.projectId)
+    if (!project) return null
+
+    const pr = await this.githubService.getPRForBranch(project.path, run.worktreeBranch)
+    if (!pr) return run
+
+    const updated = this.persistence.updateRun(runId, { prUrl: pr.url, prNumber: pr.number })
+    return updated
+  }
+
   stopRun(runId: string): void {
     this.runner.stopRun(runId)
   }
@@ -388,7 +405,7 @@ export class AutomationService {
           ? 'completed'
           : 'failed'
 
-      const updatedRun = this.persistence.updateRun(run.id, {
+      const runUpdate: Partial<AutomationRun> = {
         status,
         completedAt: new Date().toISOString(),
         result: result.output,
@@ -397,7 +414,21 @@ export class AutomationService {
         durationMs: result.durationMs,
         error: result.error,
         worktreeBranch: result.worktreeBranch || undefined,
-      })
+      }
+
+      // Check if Claude created a PR from the worktree branch
+      if (result.worktreeBranch && this.githubService && this.projectPersistence) {
+        const project = this.projectPersistence.getProjects().find(p => p.id === projectId)
+        if (project) {
+          const pr = await this.githubService.getPRForBranch(project.path, result.worktreeBranch)
+          if (pr) {
+            runUpdate.prUrl = pr.url
+            runUpdate.prNumber = pr.number
+          }
+        }
+      }
+
+      const updatedRun = this.persistence.updateRun(run.id, runUpdate)
 
       // Update lastRunAt on the automation
       this.persistence.updateAutomation(automationId, {

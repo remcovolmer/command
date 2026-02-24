@@ -112,6 +112,28 @@ export class GitHubService {
     }
   }
 
+  async getPRForBranch(projectPath: string, branchName: string): Promise<{ url: string; number: number } | null> {
+    try {
+      const { stdout } = await execFileAsync(
+        'gh',
+        ['pr', 'view', '--head', branchName, '--json', 'url,number'],
+        {
+          cwd: projectPath,
+          timeout: GH_TIMEOUT,
+          windowsHide: true,
+          env: { ...process.env, GH_PAGER: '' },
+        }
+      )
+      const data = JSON.parse(stdout)
+      if (data.url && data.number) {
+        return { url: data.url, number: data.number }
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
   async mergePR(projectPath: string, prNumber: number): Promise<void> {
     // Get branch name before merging so we can clean up after
     let branchName: string | null = null

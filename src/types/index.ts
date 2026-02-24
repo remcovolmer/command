@@ -282,6 +282,8 @@ export interface AutomationRun {
   error?: string;
   read: boolean;
   worktreeBranch?: string;
+  prUrl?: string;
+  prNumber?: number;
 }
 
 // Update types
@@ -447,6 +449,7 @@ export interface ElectronAPI {
     markRead: (runId: string) => Promise<void>;
     deleteRun: (runId: string) => Promise<void>;
     getNextRun: (automationId: string) => Promise<string | null>;
+    checkPR: (runId: string) => Promise<AutomationRun | null>;
     onRunStarted: (callback: (run: AutomationRun) => void) => Unsubscribe;
     onRunCompleted: (callback: (run: AutomationRun) => void) => Unsubscribe;
     onRunFailed: (callback: (run: AutomationRun) => void) => Unsubscribe;

@@ -1074,6 +1074,11 @@ ipcMain.handle('automation:get-next-run', async (_event, automationId: string) =
   return automationService?.getNextRunTime(automationId) ?? null
 })
 
+ipcMain.handle('automation:check-pr', async (_event, runId: string) => {
+  if (!isValidUUID(runId)) throw new Error('Invalid run ID')
+  return automationService?.checkPRForRun(runId) ?? null
+})
+
 app.whenReady().then(async () => {
   await createWindow()
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Zap, Plus, Play, Square, ToggleLeft, ToggleRight, Trash2, ChevronDown, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Loader2, Pencil } from 'lucide-react'
+import { Zap, Plus, Play, Square, ToggleLeft, ToggleRight, Trash2, ChevronDown, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Loader2, Pencil, ExternalLink } from 'lucide-react'
 import type { Automation, AutomationRun } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 
@@ -278,8 +278,17 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                       )}
 
                       {run.worktreeBranch && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                           Branch: <span className="font-mono text-foreground">{run.worktreeBranch}</span>
+                          {run.prUrl && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); window.electronAPI.shell.openExternal(run.prUrl!) }}
+                              className="text-[10px] text-primary hover:underline inline-flex items-center gap-0.5"
+                              title={`Open PR #${run.prNumber}`}
+                            >
+                              #{run.prNumber} <ExternalLink className="w-2.5 h-2.5" />
+                            </button>
+                          )}
                         </div>
                       )}
 

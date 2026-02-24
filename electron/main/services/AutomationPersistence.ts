@@ -40,6 +40,8 @@ interface AutomationRun {
   error?: string
   read: boolean
   worktreeBranch?: string
+  prUrl?: string
+  prNumber?: number
 }
 
 interface AutomationState {
