@@ -165,11 +165,11 @@ export class AutomationRunner {
           // Not valid JSON, use raw output
         }
 
-        // Check if worktree has changes
-        const hasChanges = await this.worktreeHasChanges(worktreePath)
+        // Check if worktree has uncommitted changes
+        const hasUncommitted = await this.worktreeHasChanges(worktreePath)
 
-        // Cleanup worktree if no changes
-        if (!hasChanges) {
+        // Cleanup worktree if no uncommitted changes (commits already live on branch/remote)
+        if (!hasUncommitted) {
           await this.cleanupWorktree(projectPath, worktreePath, branchName)
         }
 
@@ -187,8 +187,8 @@ export class AutomationRunner {
               : exitCode !== 0
                 ? stderr || `Process exited with code ${exitCode}`
                 : undefined,
-          worktreeBranch: hasChanges ? branchName : '',
-          worktreePath: hasChanges ? worktreePath : '',
+          worktreeBranch: branchName,
+          worktreePath: hasUncommitted ? worktreePath : '',
         })
       })
 
