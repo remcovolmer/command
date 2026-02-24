@@ -53,6 +53,10 @@ process.stdin.on('end', async () => {
         // Finished responding = done (green)
         state = 'done';
         break;
+      case 'SessionEnd':
+        // Session ended = done (green)
+        state = 'done';
+        break;
       case 'Notification':
         switch (data.notification_type) {
           case 'permission_prompt':
@@ -77,6 +81,20 @@ process.stdin.on('end', async () => {
     }
 
     if (state) {
+      // Skip redundant busy writes from PreToolUse — reduces process spawning by ~80%
+      // during active Claude work (PreToolUse fires for every tool call)
+      if (hookEvent === 'PreToolUse' && state === 'busy') {
+        try {
+          const existing = await fs.promises.readFile(stateFile, 'utf-8');
+          const parsed = JSON.parse(existing);
+          if (parsed[data.session_id]?.state === 'busy') {
+            process.exit(0); // Already busy, skip write
+          }
+        } catch (e) {
+          // File doesn't exist or can't parse, proceed with write
+        }
+      }
+
       const stateData = {
         session_id: data.session_id,
         cwd: data.cwd,

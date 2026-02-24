@@ -85,6 +85,7 @@ export function installClaudeHooks(): void {
     'Stop',
     'Notification',
     'SessionStart',
+    'SessionEnd',
     'UserPromptSubmit',
     'PermissionRequest'
   ]
