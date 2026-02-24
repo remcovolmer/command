@@ -101,7 +101,8 @@
       "Bash(gh release:*)",
       "Bash(grep:*)",
       "Bash(git status:*)",
-      "WebFetch(domain:claudelog.com)"
+      "WebFetch(domain:claudelog.com)",
+      "Bash(find:)"
     ]
   }
 }
