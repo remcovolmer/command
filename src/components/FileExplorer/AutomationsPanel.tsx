@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react'
 import { Zap, Plus, Play, Square, ToggleLeft, ToggleRight, Trash2, ChevronDown, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Loader2, Pencil, ExternalLink } from 'lucide-react'
 import type { Automation, AutomationRun } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
@@ -29,6 +29,75 @@ function triggerLabel(trigger: Automation['trigger']): string {
     case 'git-event': return `Git: ${trigger.event}`
     case 'file-change': return `Files: ${trigger.patterns.join(', ')}`
   }
+}
+
+/** Render inline markdown: **bold**, `code`, and URLs */
+function renderInline(text: string): ReactNode[] {
+  // Split on **bold**, `code`, and URLs — process in order
+  const parts: ReactNode[] = []
+  // Regex: URLs, **bold**, or `code`
+  const pattern = /(https?:\/\/[^\s)]+)|(\*\*(.+?)\*\*)|(`([^`]+)`)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    if (match[1]) {
+      // URL
+      parts.push(
+        <button
+          key={match.index}
+          onClick={(e) => { e.stopPropagation(); window.electronAPI.shell.openExternal(match![1]) }}
+          className="text-primary hover:underline break-all"
+        >
+          {match[1]}
+        </button>
+      )
+    } else if (match[2]) {
+      // **bold**
+      parts.push(<strong key={match.index} className="text-foreground font-semibold">{match[3]}</strong>)
+    } else if (match[4]) {
+      // `code`
+      parts.push(
+        <code key={match.index} className="bg-muted/60 px-1 py-0.5 rounded text-[10px] font-mono text-foreground">{match[5]}</code>
+      )
+    }
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+  return parts
+}
+
+/** Render result text with basic markdown: paragraphs, bold, code, links */
+function RunResultContent({ text }: { text: string }) {
+  const trimmed = text.substring(0, 2000)
+  const lines = trimmed.split('\n')
+
+  return (
+    <div className="text-xs text-muted-foreground space-y-1">
+      {lines.map((line, i) => {
+        const stripped = line.trim()
+        if (!stripped) return null
+
+        // Bullet point
+        if (/^[-•]\s/.test(stripped)) {
+          return (
+            <div key={i} className="flex gap-1.5 pl-1">
+              <span className="text-muted-foreground/60 shrink-0">{'•'}</span>
+              <span>{renderInline(stripped.replace(/^[-•]\s+/, ''))}</span>
+            </div>
+          )
+        }
+
+        return <div key={i}>{renderInline(stripped)}</div>
+      })}
+      {text.length > 2000 && <div className="text-muted-foreground/50">...truncated</div>}
+    </div>
+  )
 }
 
 function statusIcon(status: AutomationRun['status']) {
@@ -271,10 +340,9 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                       )}
 
                       {run.result && (
-                        <pre className="text-xs bg-background/50 rounded px-2 py-1 max-h-32 overflow-auto whitespace-pre-wrap font-mono">
-                          {run.result.substring(0, 2000)}
-                          {run.result.length > 2000 && '...'}
-                        </pre>
+                        <div className="bg-background/50 rounded px-2 py-1.5 max-h-40 overflow-auto">
+                          <RunResultContent text={run.result} />
+                        </div>
                       )}
 
                       {run.worktreeBranch && (
