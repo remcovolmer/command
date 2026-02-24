@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react
 import { Zap, Plus, Play, Square, ToggleLeft, ToggleRight, Trash2, ChevronDown, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Loader2, Pencil, ExternalLink } from 'lucide-react'
 import type { Automation, AutomationRun } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
+import { useProjectStore } from '../../stores/projectStore'
 
 interface AutomationsPanelProps {
   onCreateClick: () => void
@@ -218,8 +219,13 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
     ? runs.filter(r => !r.read && r.status !== 'running')
     : runs
 
+  const projects = useProjectStore(s => s.projects)
+
   const automationName = (automationId: string) =>
     automations.find(a => a.id === automationId)?.name ?? 'Unknown'
+
+  const projectName = (projectId: string) =>
+    projects.find(p => p.id === projectId)?.name ?? null
 
   if (loading) {
     return (
@@ -344,6 +350,9 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                   {statusIcon(run.status)}
                   <div className="flex-1 min-w-0">
                     <span className="text-xs truncate block">{automationName(run.automationId)}</span>
+                    {projectName(run.projectId) && (
+                      <span className="text-[10px] text-muted-foreground truncate block">{projectName(run.projectId)}</span>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0">
                     {formatRelativeTime(run.startedAt)}
