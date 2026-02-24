@@ -364,6 +364,22 @@ export class ClaudeHookWatcher {
     }
     console.log(`[HookWatcher] Emitting state ${hookState.state} for terminal ${terminalId}`)
     this.sendToRenderer('terminal:state', terminalId, hookState.state)
+
+    // Notify state change listeners (used by AutomationService for 'claude-done' triggers)
+    for (const cb of this.stateChangeCallbacks) {
+      try { cb(terminalId, hookState.state) } catch { /* listener error */ }
+    }
+  }
+
+  // --- State change listener registration ---
+  private stateChangeCallbacks: Array<(terminalId: string, state: string) => void> = []
+
+  addStateChangeListener(callback: (terminalId: string, state: string) => void): () => void {
+    this.stateChangeCallbacks.push(callback)
+    return () => {
+      const idx = this.stateChangeCallbacks.indexOf(callback)
+      if (idx !== -1) this.stateChangeCallbacks.splice(idx, 1)
+    }
   }
 
   private sendToRenderer(channel: string, ...args: unknown[]): void {

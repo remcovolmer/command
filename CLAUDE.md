@@ -152,6 +152,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + Shift + E` | Switch to files tab |
 | `Ctrl + Shift + G` | Switch to git tab |
 | `Ctrl + Shift + K` | Switch to tasks tab |
+| `Ctrl + Shift + A` | Switch to automations tab |
 | `Ctrl + Alt + N` | New file |
 | `Ctrl + Alt + Shift + N` | New folder |
 | `F2` | Rename selected |

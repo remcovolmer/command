@@ -37,7 +37,7 @@ interface ProjectStore {
 
   // File explorer state
   fileExplorerVisible: boolean
-  fileExplorerActiveTab: 'files' | 'git' | 'tasks'
+  fileExplorerActiveTab: 'files' | 'git' | 'tasks' | 'automations'
   expandedPaths: Record<string, string[]>
   directoryCache: Record<string, FileSystemEntry[]>
 
@@ -118,7 +118,7 @@ interface ProjectStore {
   // File explorer actions
   toggleFileExplorer: () => void
   setFileExplorerVisible: (visible: boolean) => void
-  setFileExplorerActiveTab: (tab: 'files' | 'git' | 'tasks') => void
+  setFileExplorerActiveTab: (tab: 'files' | 'git' | 'tasks' | 'automations') => void
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string) => void

@@ -232,7 +232,24 @@ export class FileWatcherService {
     const events = this.batchBuffer.get(projectId)
     if (events?.length) {
       this.sendToRenderer('fs:watch:changes', events)
+
+      // Notify file change listeners (used by AutomationService)
+      for (const cb of this.fileChangeCallbacks) {
+        try { cb(events) } catch { /* listener error */ }
+      }
+
       this.batchBuffer.set(projectId, [])
+    }
+  }
+
+  // --- File change listener registration ---
+  private fileChangeCallbacks: Array<(events: FileWatchEvent[]) => void> = []
+
+  onFileChanges(callback: (events: FileWatchEvent[]) => void): () => void {
+    this.fileChangeCallbacks.push(callback)
+    return () => {
+      const idx = this.fileChangeCallbacks.indexOf(callback)
+      if (idx !== -1) this.fileChangeCallbacks.splice(idx, 1)
     }
   }
 }

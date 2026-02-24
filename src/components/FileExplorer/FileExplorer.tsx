@@ -4,6 +4,8 @@ import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
 import { TasksPanel } from './TasksPanel'
+import { AutomationsPanel } from './AutomationsPanel'
+import { AutomationCreateDialog } from './AutomationCreateDialog'
 import { FileExplorerTabBar } from './FileExplorerTabBar'
 import { SidecarTerminalPanel } from './SidecarTerminalPanel'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
@@ -150,6 +152,8 @@ export function FileExplorer() {
       handleFilesRefresh()
     } else if (activeTab === 'tasks') {
       handleTasksRefresh()
+    } else if (activeTab === 'automations') {
+      // AutomationsPanel manages its own data loading
     } else {
       handleGitRefresh()
     }
@@ -206,6 +210,27 @@ export function FileExplorer() {
   const tasksData = useProjectStore((s) => activeProjectId ? s.tasksData[activeProjectId] : null)
   const taskNowCount = tasksData?.nowCount ?? 0
 
+  // Automation state
+  const [automationUnreadCount, setAutomationUnreadCount] = useState(0)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [editingAutomation, setEditingAutomation] = useState<import('../../types').Automation | null>(null)
+
+  // Load unread count on mount and when runs change
+  useEffect(() => {
+    const loadUnread = async () => {
+      try {
+        const runs = await api.automation.listRuns(undefined, 100) as import('../../types').AutomationRun[]
+        const unread = runs.filter(r => !r.read && r.status !== 'running').length
+        setAutomationUnreadCount(unread)
+      } catch { /* ignore */ }
+    }
+    loadUnread()
+
+    const unsubCompleted = api.automation.onRunCompleted(() => loadUnread())
+    const unsubFailed = api.automation.onRunFailed(() => loadUnread())
+    return () => { unsubCompleted(); unsubFailed() }
+  }, [api])
+
   const handleTasksRefresh = useCallback(async () => {
     if (!activeProject) return
     const { setTasksLoading, setTasksData } = useProjectStore.getState()
@@ -231,14 +256,20 @@ export function FileExplorer() {
         onTabChange={setActiveTab}
         gitChangeCount={totalGitChanges}
         taskNowCount={taskNowCount}
+        automationUnreadCount={automationUnreadCount}
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
         showGitTab={!isLimitedProject}
       />
 
-      {/* Files/Git/Tasks Content - takes remaining space */}
+      {/* Files/Git/Tasks/Automations Content - takes remaining space */}
       <div className="flex-1 min-h-0 overflow-auto">
-        {activeProject ? (
+        {activeTab === 'automations' ? (
+          <AutomationsPanel
+            onCreateClick={() => setShowCreateDialog(true)}
+            onEditClick={(automation) => { setEditingAutomation(automation); setShowCreateDialog(true) }}
+          />
+        ) : activeProject ? (
           activeTab === 'tasks' ? (
             <TasksPanel project={activeProject} />
           ) : (isLimitedProject || activeTab === 'files') ? (
@@ -281,6 +312,13 @@ export function FileExplorer() {
           projectId={activeProjectId}
         />
       )}
+
+      {/* Automation Create/Edit Dialog */}
+      <AutomationCreateDialog
+        isOpen={showCreateDialog}
+        onClose={() => { setShowCreateDialog(false); setEditingAutomation(null) }}
+        editAutomation={editingAutomation}
+      />
     </div>
   )
 }

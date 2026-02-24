@@ -113,6 +113,28 @@ export class GitHubService {
     }
   }
 
+  async getPRForBranch(projectPath: string, branchName: string): Promise<{ url: string; number: number } | null> {
+    try {
+      const { stdout } = await execFileAsync(
+        'gh',
+        ['pr', 'view', '--head', branchName, '--json', 'url,number'],
+        {
+          cwd: projectPath,
+          timeout: GH_TIMEOUT,
+          windowsHide: true,
+          env: { ...process.env, GH_PAGER: '' },
+        }
+      )
+      const data = JSON.parse(stdout)
+      if (data.url && data.number) {
+        return { url: data.url, number: data.number }
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
   async mergePR(projectPath: string, prNumber: number): Promise<void> {
     // Get branch name before merging so we can clean up after
     let branchName: string | null = null
@@ -218,16 +240,53 @@ export class GitHubService {
     }
   }
 
+  // Previous state tracking for event detection
+  private previousStates = new Map<string, PRStatus>()
+  private prEventCallbacks: Array<(projectPath: string, event: 'pr-merged' | 'pr-opened' | 'checks-passed') => void> = []
+
   private async pollOnce(key: string, projectPath: string) {
     if (this.activeRequests >= MAX_CONCURRENT) return
     this.activeRequests++
     try {
       const status = await this.getPRStatus(projectPath)
       this.sendToRenderer('github:pr-status-update', key, status)
+
+      // Detect state transitions for automation triggers
+      const prev = this.previousStates.get(key)
+      if (prev && !prev.noPR && !status.noPR) {
+        if (prev.state === 'OPEN' && status.state === 'MERGED') {
+          this.emitPREvent(projectPath, 'pr-merged')
+        }
+        // Detect checks passing
+        const prevAllPass = prev.statusCheckRollup?.every(c => c.bucket === 'pass') ?? false
+        const currAllPass = status.statusCheckRollup?.every(c => c.bucket === 'pass') ?? false
+        if (!prevAllPass && currAllPass && (status.statusCheckRollup?.length ?? 0) > 0) {
+          this.emitPREvent(projectPath, 'checks-passed')
+        }
+      }
+      // Detect new PR opened
+      if (prev?.noPR && !status.noPR && status.state === 'OPEN') {
+        this.emitPREvent(projectPath, 'pr-opened')
+      }
+      this.previousStates.set(key, status)
     } catch {
       // Silently ignore poll errors
     } finally {
       this.activeRequests--
+    }
+  }
+
+  private emitPREvent(projectPath: string, event: 'pr-merged' | 'pr-opened' | 'checks-passed') {
+    for (const cb of this.prEventCallbacks) {
+      try { cb(projectPath, event) } catch { /* listener error */ }
+    }
+  }
+
+  onPREvent(callback: (projectPath: string, event: 'pr-merged' | 'pr-opened' | 'checks-passed') => void): () => void {
+    this.prEventCallbacks.push(callback)
+    return () => {
+      const idx = this.prEventCallbacks.indexOf(callback)
+      if (idx !== -1) this.prEventCallbacks.splice(idx, 1)
     }
   }
 
@@ -239,5 +298,7 @@ export class GitHubService {
 
   destroy() {
     this.stopAllPolling()
+    this.prEventCallbacks.length = 0
+    this.previousStates.clear()
   }
 }

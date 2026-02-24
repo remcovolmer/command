@@ -22,6 +22,9 @@ const ALLOWED_LISTENER_CHANNELS = [
   'github:pr-status-update',
   'fs:watch:changes',
   'fs:watch:error',
+  'automation:run-started',
+  'automation:run-completed',
+  'automation:run-failed',
 ] as const
 
 // NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
@@ -495,6 +498,63 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: Electron.IpcRendererEvent, error: UpdateErrorInfo) => callback(error)
       ipcRenderer.on('update:error', handler)
       return () => ipcRenderer.removeListener('update:error', handler)
+    },
+  },
+
+  // Automation operations
+  automation: {
+    list: (): Promise<unknown[]> =>
+      ipcRenderer.invoke('automation:list'),
+
+    create: (automation: Record<string, unknown>): Promise<unknown> =>
+      ipcRenderer.invoke('automation:create', automation),
+
+    update: (id: string, updates: Record<string, unknown>): Promise<unknown> =>
+      ipcRenderer.invoke('automation:update', id, updates),
+
+    delete: (id: string): Promise<void> =>
+      ipcRenderer.invoke('automation:delete', id),
+
+    toggle: (id: string): Promise<unknown> =>
+      ipcRenderer.invoke('automation:toggle', id),
+
+    trigger: (id: string): Promise<void> =>
+      ipcRenderer.invoke('automation:trigger', id),
+
+    stopRun: (runId: string): Promise<void> =>
+      ipcRenderer.invoke('automation:stop-run', runId),
+
+    listRuns: (automationId?: string, limit?: number): Promise<unknown[]> =>
+      ipcRenderer.invoke('automation:list-runs', automationId, limit),
+
+    markRead: (runId: string): Promise<void> =>
+      ipcRenderer.invoke('automation:mark-read', runId),
+
+    deleteRun: (runId: string): Promise<void> =>
+      ipcRenderer.invoke('automation:delete-run', runId),
+
+    getNextRun: (automationId: string): Promise<string | null> =>
+      ipcRenderer.invoke('automation:get-next-run', automationId),
+
+    checkPR: (runId: string): Promise<unknown> =>
+      ipcRenderer.invoke('automation:check-pr', runId),
+
+    onRunStarted: (callback: (run: unknown) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, run: unknown) => callback(run)
+      ipcRenderer.on('automation:run-started', handler)
+      return () => ipcRenderer.removeListener('automation:run-started', handler)
+    },
+
+    onRunCompleted: (callback: (run: unknown) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, run: unknown) => callback(run)
+      ipcRenderer.on('automation:run-completed', handler)
+      return () => ipcRenderer.removeListener('automation:run-completed', handler)
+    },
+
+    onRunFailed: (callback: (run: unknown) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, run: unknown) => callback(run)
+      ipcRenderer.on('automation:run-failed', handler)
+      return () => ipcRenderer.removeListener('automation:run-failed', handler)
     },
   },
 

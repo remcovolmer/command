@@ -50,6 +50,7 @@ export type HotkeyAction =
   | 'fileExplorer.filesTab'
   | 'fileExplorer.gitTab'
   | 'fileExplorer.tasksTab'
+  | 'fileExplorer.automationsTab'
   | 'fileExplorer.newFile'
   | 'fileExplorer.newFolder'
   | 'fileExplorer.rename'
