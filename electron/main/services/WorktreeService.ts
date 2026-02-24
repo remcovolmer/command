@@ -51,7 +51,12 @@ export class WorktreeService {
       const content = readFileSync(gitignorePath, 'utf-8')
       const lines = content.split('\n').map(l => l.trim())
 
-      if (!lines.includes(ignoreEntry) && !lines.includes(`/${ignoreEntry}`)) {
+      const alreadyIgnored = lines.some((l: string) =>
+        l === ignoreEntry || l === `/${ignoreEntry}` ||
+        l === `${ignoreEntry}/` || l === `/${ignoreEntry}/`
+      )
+
+      if (!alreadyIgnored) {
         // Add to .gitignore with a newline before if file doesn't end with newline
         const newContent = content.endsWith('\n')
           ? `${ignoreEntry}\n`
@@ -393,6 +398,7 @@ export class WorktreeService {
     const worktreesDir = this.getWorktreesDir(projectPath)
     const normalizedCheck = path.normalize(checkPath)
     const normalizedWorktrees = path.normalize(worktreesDir)
-    return normalizedCheck.startsWith(normalizedWorktrees)
+    return normalizedCheck === normalizedWorktrees ||
+      normalizedCheck.startsWith(normalizedWorktrees + path.sep)
   }
 }
