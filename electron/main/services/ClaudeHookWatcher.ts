@@ -156,9 +156,10 @@ export class ClaudeHookWatcher {
         if (isDev) {
           console.log(`[HookWatcher] Unregistered terminal ${terminalId} from cwd: ${cwd}`)
         }
-        // Cleanup empty Sets
+        // Cleanup empty Sets and associated pending state
         if (terminals.size === 0) {
           this.cwdToTerminals.delete(cwd)
+          this.pendingStates.delete(cwd)
         }
         break
       }
@@ -404,5 +405,15 @@ export class ClaudeHookWatcher {
       this.watching = false
       console.log('[HookWatcher] Stopped watching')
     }
+  }
+
+  destroy(): void {
+    this.stop()
+    this.sessionToTerminal.clear()
+    this.terminalToSession.clear()
+    this.cwdToTerminals.clear()
+    this.lastProcessedTimestamps.clear()
+    this.pendingStates.clear()
+    this.stateChangeCallbacks.length = 0
   }
 }

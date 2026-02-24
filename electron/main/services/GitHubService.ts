@@ -214,6 +214,7 @@ export class GitHubService {
       clearInterval(entry.interval)
       this.pollingMap.delete(key)
     }
+    this.previousStates.delete(key)
   }
 
   stopAllPolling() {
