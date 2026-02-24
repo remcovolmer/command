@@ -152,7 +152,7 @@ export class WorktreeService {
 
       for (const line of output.split('\n')) {
         if (line.startsWith('worktree ')) {
-          if (current.path) {
+          if (current.path && current.head && current.branch) {
             worktrees.push(current as WorktreeInfo)
           }
           current = {
@@ -175,8 +175,8 @@ export class WorktreeService {
         }
       }
 
-      // Add last worktree
-      if (current.path) {
+      // Add last worktree (only if fully populated)
+      if (current.path && current.head && current.branch) {
         worktrees.push(current as WorktreeInfo)
       }
 
@@ -296,10 +296,13 @@ export class WorktreeService {
       return
     }
 
+    // Use the git-registered path for all git commands (avoids casing/separator mismatches)
+    const gitPath = worktree.path
+
     // Step 3: Check if locked and unlock if needed
     if (worktree.isLocked) {
       try {
-        await this.execGit(projectPath, ['worktree', 'unlock', worktreePath])
+        await this.execGit(projectPath, ['worktree', 'unlock', gitPath])
       } catch {
         // Unlock failed, continue anyway (might already be unlocked)
       }
@@ -311,16 +314,18 @@ export class WorktreeService {
       if (force) {
         args.push('--force')
       }
-      args.push(worktreePath)
+      args.push(gitPath)
       await this.execGit(projectPath, args)
     } catch (error) {
       // Step 5: If removal failed without force, retry with force
+      let lastError: unknown = error
       if (!force) {
         try {
-          await this.execGit(projectPath, ['worktree', 'remove', '--force', worktreePath])
+          await this.execGit(projectPath, ['worktree', 'remove', '--force', gitPath])
           return
-        } catch {
-          // Force removal also failed
+        } catch (forceError) {
+          // Prefer the force-retry error since it's more relevant
+          lastError = forceError
         }
       }
 
@@ -338,8 +343,8 @@ export class WorktreeService {
         // Prune failed
       }
 
-      // Re-throw with detailed error message
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Re-throw with detailed error message (use the most recent error)
+      const errorMessage = lastError instanceof Error ? lastError.message : String(lastError)
 
       // Parse git error and provide actionable message
       let userMessage = `Failed to remove worktree at ${worktreePath}`
@@ -370,7 +375,8 @@ export class WorktreeService {
       ])
       return output.length > 0
     } catch {
-      return false
+      // Assume dirty on error to avoid bypassing safety checks
+      return true
     }
   }
 
