@@ -394,6 +394,11 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
 ipcMain.handle('project:remove', async (_event, id: string) => {
   // Close all PTY terminals for this project BEFORE cleanup
   terminalManager?.closeTerminalsForProject(id)
+  // Stop GitHub polling for all worktrees under this project
+  const project = projectPersistence?.getProjects().find(p => p.id === id)
+  if (project?.path) {
+    githubService?.stopPollingByPathPrefix(project.path)
+  }
   await fileWatcherService?.stopWatching(id)
   automationService?.onProjectDeleted(id)
   return projectPersistence?.removeProject(id)

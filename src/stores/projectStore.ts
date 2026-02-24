@@ -801,12 +801,14 @@ export const useProjectStore = create<ProjectStore>()(
             delete newExpandedPaths[key]
           }
 
-          // Clean directoryCache entries under project path
+          // Clean directoryCache entries under project path (separator-aware)
           const projectPath = state.projects.find((p) => p.id === id)?.path
           const newDirectoryCache = { ...state.directoryCache }
           if (projectPath) {
             for (const key of Object.keys(newDirectoryCache)) {
-              if (key.startsWith(projectPath)) delete newDirectoryCache[key]
+              if (key === projectPath || key.startsWith(projectPath + '/') || key.startsWith(projectPath + '\\')) {
+                delete newDirectoryCache[key]
+              }
             }
           }
 
@@ -1079,8 +1081,29 @@ export const useProjectStore = create<ProjectStore>()(
           // Clean directoryCache entries under worktree path
           const newDirectoryCache = { ...state.directoryCache }
           if (removedWorktree) {
+            const wtPath = removedWorktree.path
             for (const key of Object.keys(newDirectoryCache)) {
-              if (key.startsWith(removedWorktree.path)) delete newDirectoryCache[key]
+              if (key === wtPath || key.startsWith(wtPath + '/') || key.startsWith(wtPath + '\\')) {
+                delete newDirectoryCache[key]
+              }
+            }
+          }
+
+          // Clean sidecar terminals for removed worktree
+          const removedTerminalIds = new Set(
+            Object.keys(state.terminals).filter((tid) => state.terminals[tid].worktreeId === id)
+          )
+          const newSidecarTerminals = { ...state.sidecarTerminals }
+          const newActiveSidecar = { ...state.activeSidecarTerminalId }
+          delete newSidecarTerminals[id]
+          delete newActiveSidecar[id]
+          for (const [contextKey, ids] of Object.entries(newSidecarTerminals)) {
+            const filtered = ids.filter((tid) => !removedTerminalIds.has(tid))
+            if (filtered.length === 0) {
+              delete newSidecarTerminals[contextKey]
+              delete newActiveSidecar[contextKey]
+            } else {
+              newSidecarTerminals[contextKey] = filtered
             }
           }
 
@@ -1091,7 +1114,7 @@ export const useProjectStore = create<ProjectStore>()(
           const activeCenterGone = state.activeCenterTabId && !newTerminals[state.activeCenterTabId] && !newEditorTabs[state.activeCenterTabId]
 
           if (activeTerminalGone || activeCenterGone) {
-            const visible = getVisibleTerminals(newTerminals, state.sidecarTerminals, removedWorktree?.projectId ?? '')
+            const visible = getVisibleTerminals(newTerminals, newSidecarTerminals, removedWorktree?.projectId ?? '')
             const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
 
             if (activeTerminalGone) {
@@ -1106,6 +1129,8 @@ export const useProjectStore = create<ProjectStore>()(
             worktrees: newWorktrees,
             terminals: newTerminals,
             editorTabs: newEditorTabs,
+            sidecarTerminals: newSidecarTerminals,
+            activeSidecarTerminalId: newActiveSidecar,
             prStatus: newPrStatus,
             gitCommitLog: newGitCommitLog,
             gitCommitLogLoading: newGitCommitLogLoading,

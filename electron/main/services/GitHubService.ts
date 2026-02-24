@@ -223,6 +223,14 @@ export class GitHubService {
     }
   }
 
+  stopPollingByPathPrefix(pathPrefix: string) {
+    for (const [key, entry] of this.pollingMap) {
+      if (entry.path === pathPrefix || entry.path.startsWith(pathPrefix + '/') || entry.path.startsWith(pathPrefix + '\\')) {
+        this.stopPolling(key)
+      }
+    }
+  }
+
   pauseAllPolling() {
     for (const [, entry] of this.pollingMap) {
       clearInterval(entry.interval)
