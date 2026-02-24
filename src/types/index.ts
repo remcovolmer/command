@@ -387,6 +387,7 @@ export interface ElectronAPI {
     onCloseRequest: (callback: () => void) => Unsubscribe;
     confirmClose: () => void;
     cancelClose: () => void;
+    storeHydrated: () => void;
   };
   fs: {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;

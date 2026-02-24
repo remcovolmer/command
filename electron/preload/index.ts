@@ -355,6 +355,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     cancelClose: (): void =>
       ipcRenderer.send('app:cancel-close'),
+
+    storeHydrated: (): void =>
+      ipcRenderer.send('store:hydrated'),
   },
 
   // File system operations

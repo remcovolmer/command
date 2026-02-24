@@ -193,6 +193,10 @@ interface ProjectStore {
   loadProjects: () => Promise<void>
 }
 
+// Guard to prevent subscriber from firing during Zustand hydration.
+// Set to true inside onRehydrateStorage once hydration completes.
+let isRendererReady = false
+
 export const useProjectStore = create<ProjectStore>()(
   persist(
     (set, get) => ({
@@ -1295,18 +1299,32 @@ export const useProjectStore = create<ProjectStore>()(
         // Terminal pool settings
         terminalPoolSize: state.terminalPoolSize,
       }),
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) {
+          console.error('Zustand hydration failed:', error)
+        }
+        // Signal main process that store is hydrated (triggers session restoration)
+        try {
+          const api = getElectronAPI()
+          api.app.storeHydrated()
+        } catch {
+          // Ignore if electronAPI not available (e.g., in tests)
+        }
+        // Sync persisted terminal pool size to the pool singleton
+        terminalPool.setMaxSize(useProjectStore.getState().terminalPoolSize)
+        // Mark renderer ready so the subscriber below starts processing
+        isRendererReady = true
+      },
     }
   )
 )
-
-// Sync persisted terminal pool size to the pool singleton on hydration
-terminalPool.setMaxSize(useProjectStore.getState().terminalPoolSize)
 
 // Centralized watcher: whenever activeProjectId changes, notify the main process.
 // This ensures ALL code paths that modify activeProjectId trigger a watcher switch
 // (setActiveProject, setActiveTerminal, addProject, removeProject, loadProjects, etc.)
 useProjectStore.subscribe(
   (state, prevState) => {
+    if (!isRendererReady) return
     if (state.activeProjectId && state.activeProjectId !== prevState.activeProjectId) {
       const api = getElectronAPI()
       api.project.setActiveWatcher(state.activeProjectId).catch((err: unknown) => {

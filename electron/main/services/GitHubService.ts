@@ -233,19 +233,25 @@ export class GitHubService {
 
   pauseAllPolling() {
     for (const [, entry] of this.pollingMap) {
+      clearTimeout(entry.initialTimer)
       clearInterval(entry.interval)
     }
   }
 
   resumeAllPolling() {
+    let staggerIndex = 0
     for (const [key, entry] of this.pollingMap) {
-      // Immediate fetch on resume
-      this.pollOnce(key, entry.path)
-      // Re-start interval
+      const delay = staggerIndex * 500
+      clearTimeout(entry.initialTimer)
       clearInterval(entry.interval)
-      entry.interval = setInterval(() => {
+      // Stagger both the initial poll AND the interval restart
+      entry.initialTimer = setTimeout(() => {
         this.pollOnce(key, entry.path)
-      }, POLL_INTERVAL)
+        entry.interval = setInterval(() => {
+          this.pollOnce(key, entry.path)
+        }, POLL_INTERVAL)
+      }, delay)
+      staggerIndex++
     }
   }
 

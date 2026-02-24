@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
+import fsAsync from 'node:fs/promises'
 import path from 'node:path'
 
 // NOTE: Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
@@ -85,46 +86,51 @@ export class ProjectPersistence {
   constructor() {
     const userDataPath = app.getPath('userData')
     this.stateFilePath = path.join(userDataPath, 'projects.json')
-    this.state = this.loadState()
+    this.state = this.defaultState()
   }
 
-  private loadState(): PersistedState {
+  /** Load persisted state from disk. Call after construction to unblock the main thread. */
+  async initialize(): Promise<void> {
+    this.state = await this.loadState()
+  }
+
+  private defaultState(): PersistedState {
+    return { version: STATE_VERSION, projects: [], worktrees: {}, sessions: [] }
+  }
+
+  private async loadState(): Promise<PersistedState> {
     try {
-      if (fs.existsSync(this.stateFilePath)) {
-        const data = fs.readFileSync(this.stateFilePath, 'utf-8')
-        const parsed = JSON.parse(data)
+      const data = await fsAsync.readFile(this.stateFilePath, 'utf-8')
+      const parsed = JSON.parse(data)
 
-        // Validate structure before using
-        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.projects)) {
-          // Handle version migrations if needed
-          if (parsed.version !== STATE_VERSION) {
-            return this.migrateState(parsed)
-          }
-
-          // Filter out any invalid sessions to prevent runtime errors from corrupted data
-          const validSessions = (parsed.sessions || []).filter(isValidSession)
-          if (validSessions.length !== (parsed.sessions || []).length) {
-            console.warn(`Filtered out ${(parsed.sessions || []).length - validSessions.length} invalid session(s) from persisted state`)
-          }
-
-          return {
-            ...parsed,
-            sessions: validSessions,
-          } as PersistedState
-        } else {
-          console.warn('Invalid state file structure, using default state')
+      // Validate structure before using
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.projects)) {
+        // Handle version migrations if needed
+        if (parsed.version !== STATE_VERSION) {
+          return this.migrateState(parsed)
         }
+
+        // Filter out any invalid sessions to prevent runtime errors from corrupted data
+        const validSessions = (parsed.sessions || []).filter(isValidSession)
+        if (validSessions.length !== (parsed.sessions || []).length) {
+          console.warn(`Filtered out ${(parsed.sessions || []).length - validSessions.length} invalid session(s) from persisted state`)
+        }
+
+        return {
+          ...parsed,
+          sessions: validSessions,
+        } as PersistedState
+      } else {
+        console.warn('Invalid state file structure, using default state')
       }
     } catch (error) {
-      console.error('Failed to load state:', error)
+      // File doesn't exist or is corrupted — use default state
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error('Failed to load state:', error)
+      }
     }
 
-    return {
-      version: STATE_VERSION,
-      projects: [],
-      worktrees: {},
-      sessions: [],
-    }
+    return this.defaultState()
   }
 
   private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]>; sessions?: PersistedSession[] }): PersistedState {
