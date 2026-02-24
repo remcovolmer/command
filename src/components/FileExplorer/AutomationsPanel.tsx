@@ -72,29 +72,56 @@ function renderInline(text: string): ReactNode[] {
   return parts
 }
 
-/** Render result text with basic markdown: paragraphs, bold, code, links */
+/** Render result text with basic markdown: paragraphs, bold, code, links, fenced code blocks */
 function RunResultContent({ text }: { text: string }) {
   const trimmed = text.substring(0, 2000)
   const lines = trimmed.split('\n')
+  const elements: ReactNode[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+    const stripped = line.trim()
+
+    // Fenced code block
+    if (stripped.startsWith('```')) {
+      const codeLines: string[] = []
+      i++ // skip opening ```
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i])
+        i++
+      }
+      i++ // skip closing ```
+      elements.push(
+        <pre key={`code-${i}`} className="bg-muted/60 rounded px-2 py-1.5 overflow-x-auto font-mono text-[10px] text-foreground whitespace-pre">
+          {codeLines.join('\n')}
+        </pre>
+      )
+      continue
+    }
+
+    // Empty line
+    if (!stripped) { i++; continue }
+
+    // Bullet point
+    if (/^[-•]\s/.test(stripped)) {
+      elements.push(
+        <div key={i} className="flex gap-1.5 pl-1">
+          <span className="text-muted-foreground/60 shrink-0">{'•'}</span>
+          <span>{renderInline(stripped.replace(/^[-•]\s+/, ''))}</span>
+        </div>
+      )
+      i++; continue
+    }
+
+    // Regular line
+    elements.push(<div key={i}>{renderInline(stripped)}</div>)
+    i++
+  }
 
   return (
     <div className="text-xs text-muted-foreground space-y-1">
-      {lines.map((line, i) => {
-        const stripped = line.trim()
-        if (!stripped) return null
-
-        // Bullet point
-        if (/^[-•]\s/.test(stripped)) {
-          return (
-            <div key={i} className="flex gap-1.5 pl-1">
-              <span className="text-muted-foreground/60 shrink-0">{'•'}</span>
-              <span>{renderInline(stripped.replace(/^[-•]\s+/, ''))}</span>
-            </div>
-          )
-        }
-
-        return <div key={i}>{renderInline(stripped)}</div>
-      })}
+      {elements}
       {text.length > 2000 && <div className="text-muted-foreground/50">...truncated</div>}
     </div>
   )
