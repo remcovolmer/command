@@ -251,6 +251,7 @@ async function createWindow() {
   // Initialize services
   terminalManager = new TerminalManager(win, hookWatcher)
   projectPersistence = new ProjectPersistence()
+  await projectPersistence.initialize()
   gitService = new GitService()
   worktreeService = new WorktreeService()
   updateService = new UpdateService()
@@ -263,21 +264,22 @@ async function createWindow() {
   automationService.setWindow(win)
   automationService.setProjectPersistence(projectPersistence)
   automationService.registerEventTriggers(hookWatcher, githubService, fileWatcherService)
-  automationService.startAllSchedulers()
-  automationService.checkMissedRuns()
-
-  // Garbage-collect stale automation worktrees in background
-  const allProjects = projectPersistence.getProjects()
-  automationService.garbageCollectWorktrees(allProjects.map(p => p.path)).catch(err =>
-    console.error('[Automation] Worktree GC failed:', err)
-  )
-
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()
   } else {
     win.loadFile(indexHtml)
   }
+
+  // Defer expensive automation startup until after first paint
+  win.webContents.once('did-finish-load', () => {
+    automationService?.startAllSchedulers()
+    automationService?.checkMissedRuns()
+    const allProjects = projectPersistence?.getProjects() ?? []
+    automationService?.garbageCollectWorktrees(allProjects.map(p => p.path)).catch(err =>
+      console.error('[Automation] Worktree GC failed:', err)
+    )
+  })
 
   // Pause/resume GitHub polling on focus/blur
   win.on('blur', () => {
@@ -1120,12 +1122,17 @@ ipcMain.handle('automation:check-pr', async (_event, runId: string) => {
 app.whenReady().then(async () => {
   await createWindow()
 
-  // Restore sessions from previous app close (with delay for store initialization)
-  setTimeout(() => {
+  // Restore sessions once the renderer store is hydrated (with fallback timeout)
+  let sessionsRestored = false
+  const doRestore = () => {
+    if (sessionsRestored) return
+    sessionsRestored = true
     restoreSessions().catch((err) => {
       console.error('Session restoration failed:', err)
     })
-  }, 1000) // 1 second delay for store init
+  }
+  ipcMain.once('store:hydrated', (_event) => doRestore())
+  setTimeout(doRestore, 3000) // Fallback if hydration signal never arrives
 
   // Check for updates after app is loaded (with delay to not block UI)
   setTimeout(() => {
