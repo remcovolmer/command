@@ -5,6 +5,8 @@ import { useProjectStore } from '../../stores/projectStore'
 export function GeneralSection() {
   const projects = useProjectStore((s) => s.projects)
   const updateProject = useProjectStore((s) => s.updateProject)
+  const terminalPoolSize = useProjectStore((s) => s.terminalPoolSize)
+  const setTerminalPoolSize = useProjectStore((s) => s.setTerminalPoolSize)
   const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
 
   if (projects.length === 0) {
@@ -34,6 +36,38 @@ export function GeneralSection() {
 
   return (
     <div className="space-y-6">
+      {/* Performance section */}
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-1">Performance</h3>
+        <p className="text-xs text-muted-foreground mb-3">Tune memory usage and performance.</p>
+
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-foreground" htmlFor="terminal-pool-size">
+                Active Terminal Limit
+              </label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Maximum xterm instances kept in memory. Inactive terminals beyond this limit are serialized and restored on demand.
+              </p>
+            </div>
+            <input
+              id="terminal-pool-size"
+              type="number"
+              min={2}
+              max={20}
+              value={terminalPoolSize}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10)
+                if (!isNaN(val)) setTerminalPoolSize(val)
+              }}
+              className="w-16 px-2 py-1 text-sm text-center rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Project settings section */}
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-1">Project Settings</h3>
         <p className="text-xs text-muted-foreground">Configure settings per project. Changes apply to new chats only.</p>

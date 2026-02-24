@@ -1,4 +1,5 @@
-import { watchFile, unwatchFile, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { watchFile, unwatchFile, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { homedir } from 'os'
@@ -7,7 +8,7 @@ import { isValidTerminalState } from '../../../src/types'
 import { normalizePath } from '../utils/paths'
 
 // Configuration constants
-const POLL_INTERVAL_MS = 100
+const POLL_INTERVAL_MS = 250
 const MAX_PENDING_QUEUE_SIZE = 10
 
 const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL
@@ -53,6 +54,11 @@ export class ClaudeHookWatcher {
 
   // Per-session timestamp tracking for deduplication
   private lastProcessedTimestamps: Map<string, number> = new Map()
+
+  // Guard to prevent concurrent async reads
+  private isReading: boolean = false
+  // Flag to re-read after current read completes (prevents dropped state changes)
+  private pendingRead: boolean = false
 
   // Queue for states arriving before terminal is registered
   private pendingStates: Map<string, HookStateData[]> = new Map()
@@ -166,21 +172,31 @@ export class ClaudeHookWatcher {
     this.clearSessionMappingByTerminal(terminalId)
   }
 
-  private onStateChange(): void {
+  private async onStateChange(): Promise<void> {
+    if (this.isReading) {
+      this.pendingRead = true
+      return
+    }
+    this.isReading = true
     try {
-      const content = readFileSync(this.stateFilePath, 'utf-8')
-      const parsed = JSON.parse(content)
+      do {
+        this.pendingRead = false
+        const content = await readFile(this.stateFilePath, 'utf-8')
+        const parsed = JSON.parse(content)
 
-      // Handle both legacy single-session and new multi-session format
-      const allStates: MultiSessionState = this.normalizeStateFile(parsed)
+        // Handle both legacy single-session and new multi-session format
+        const allStates: MultiSessionState = this.normalizeStateFile(parsed)
 
-      // Process each session's state
-      for (const sessionId in allStates) {
-        const hookState = allStates[sessionId]
-        this.processSessionState(hookState)
-      }
+        // Process each session's state
+        for (const sessionId in allStates) {
+          const hookState = allStates[sessionId]
+          this.processSessionState(hookState)
+        }
+      } while (this.pendingRead)
     } catch (e) {
       // Ignore parse errors (file might be mid-write)
+    } finally {
+      this.isReading = false
     }
   }
 

@@ -17,6 +17,11 @@ import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { randomUUID } from 'node:crypto'
 
+// Prevent EPIPE errors on console.log from crashing the app
+// (happens when parent terminal closes its stdout pipe)
+process.stdout?.on('error', () => {})
+process.stderr?.on('error', () => {})
+
 // Validation helpers
 const isValidUUID = (id: string): boolean =>
   typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
@@ -344,6 +349,16 @@ ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: n
 ipcMain.on('terminal:close', (_event, terminalId: string) => {
   if (!isValidUUID(terminalId)) return
   terminalManager?.closeTerminal(terminalId)
+})
+
+ipcMain.on('terminal:evict', (_event, terminalId: string) => {
+  if (!isValidUUID(terminalId)) return
+  terminalManager?.evictTerminal(terminalId)
+})
+
+ipcMain.on('terminal:restore', (_event, terminalId: string) => {
+  if (!isValidUUID(terminalId)) return
+  terminalManager?.restoreTerminal(terminalId)
 })
 
 // IPC Handlers for Project operations

@@ -30,6 +30,7 @@ export interface PRStatus {
 
 interface PollingEntry {
   interval: ReturnType<typeof setInterval>
+  initialTimer?: ReturnType<typeof setTimeout>
   path: string
 }
 
@@ -171,19 +172,23 @@ export class GitHubService {
   startPolling(key: string, projectPath: string) {
     if (this.pollingMap.has(key)) return
 
-    // Immediate first fetch
-    this.pollOnce(key, projectPath)
+    // Jittered first fetch to avoid thundering herd when multiple worktrees mount
+    const jitter = Math.floor(Math.random() * 4000) + 1000
+    const initialTimer = setTimeout(() => {
+      this.pollOnce(key, projectPath)
+    }, jitter)
 
     const interval = setInterval(() => {
       this.pollOnce(key, projectPath)
     }, POLL_INTERVAL)
 
-    this.pollingMap.set(key, { interval, path: projectPath })
+    this.pollingMap.set(key, { interval, path: projectPath, initialTimer })
   }
 
   stopPolling(key: string) {
     const entry = this.pollingMap.get(key)
     if (entry) {
+      clearTimeout(entry.initialTimer)
       clearInterval(entry.interval)
       this.pollingMap.delete(key)
     }

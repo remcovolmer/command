@@ -4,6 +4,7 @@ import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSyste
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
+import { terminalPool } from '../utils/terminalPool'
 
 /** Maximum number of terminals allowed per project */
 export const MAX_TERMINALS_PER_PROJECT = 10
@@ -57,6 +58,10 @@ interface ProjectStore {
 
   // Hotkey configuration
   hotkeyConfig: HotkeyConfig
+
+  // Terminal pool settings (persisted)
+  terminalPoolSize: number
+  setTerminalPoolSize: (size: number) => void
 
   // Settings dialog state
   settingsDialogOpen: boolean
@@ -241,6 +246,9 @@ export const useProjectStore = create<ProjectStore>()(
       // Hotkey configuration
       hotkeyConfig: DEFAULT_HOTKEY_CONFIG,
 
+      // Terminal pool settings
+      terminalPoolSize: 5,
+
       // Settings dialog state
       settingsDialogOpen: false,
 
@@ -343,6 +351,13 @@ export const useProjectStore = create<ProjectStore>()(
 
       resetAllHotkeys: () =>
         set({ hotkeyConfig: DEFAULT_HOTKEY_CONFIG }),
+
+      // Terminal pool settings
+      setTerminalPoolSize: (size) => {
+        const clamped = Math.max(2, Math.min(20, size))
+        set({ terminalPoolSize: clamped })
+        terminalPool.setMaxSize(clamped)
+      },
 
       // Settings dialog actions
       setSettingsDialogOpen: (open) =>
@@ -1156,10 +1171,15 @@ export const useProjectStore = create<ProjectStore>()(
         theme: state.theme,
         // Hotkey configuration
         hotkeyConfig: state.hotkeyConfig,
+        // Terminal pool settings
+        terminalPoolSize: state.terminalPoolSize,
       }),
     }
   )
 )
+
+// Sync persisted terminal pool size to the pool singleton on hydration
+terminalPool.setMaxSize(useProjectStore.getState().terminalPoolSize)
 
 // Centralized watcher: whenever activeProjectId changes, notify the main process.
 // This ensures ALL code paths that modify activeProjectId trigger a watcher switch

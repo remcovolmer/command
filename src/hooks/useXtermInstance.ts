@@ -3,11 +3,13 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { SerializeAddon } from '@xterm/addon-serialize'
 import { useProjectStore } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
 import { terminalEvents } from '../utils/terminalEvents'
 import { buildTerminalTheme, invalidateTerminalThemeCache } from '../utils/terminalTheme'
 import { createFileLinkProvider } from '../utils/fileLinkProvider'
+import { terminalPool } from '../utils/terminalPool'
 
 // Timing constants for terminal dimension calculations
 const FIT_RETRY_DELAY_MS = 50
@@ -45,6 +47,7 @@ export function useXtermInstance({
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const serializeAddonRef = useRef<SerializeAddon | null>(null)
   const isDisposedRef = useRef(false)
   const isReadyRef = useRef(false)
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -142,7 +145,40 @@ export function useXtermInstance({
     const unicodeAddon = new Unicode11Addon()
     terminal.loadAddon(unicodeAddon)
 
+    // Serialize addon for LRU pool eviction
+    const serializeAddon = new SerializeAddon()
+    terminal.loadAddon(serializeAddon)
+    serializeAddonRef.current = serializeAddon
+
     terminal.open(containerRef.current)
+
+    // Restore serialized buffer if this terminal was previously evicted
+    const wasEvicted = terminalPool.isEvicted(id)
+    const savedBuffer = terminalPool.getBuffer(id)
+    if (savedBuffer) {
+      terminal.write(savedBuffer)
+      terminalPool.clearBuffer(id)
+      terminalPool.markRestored(id)
+    }
+
+    // Register pool callbacks for LRU eviction
+    terminalPool.registerCallbacks(
+      id,
+      () => {
+        // Serializer: serialize the current scrollback buffer
+        try {
+          return serializeAddonRef.current?.serialize() ?? null
+        } catch {
+          return null
+        }
+      },
+      () => {
+        // Cleanup: destroy the xterm instance
+        cleanupRef.current?.()
+        cleanupRef.current = null
+      }
+    )
+    terminalPool.touch(id)
 
     // Activate Unicode 11 for correct character width calculations
     terminal.unicode.activeVersion = '11'
@@ -224,6 +260,11 @@ export function useXtermInstance({
       })
     )
 
+    // Flush main-process buffer after subscribing to events (ensures flushed data is captured)
+    if (wasEvicted) {
+      api.terminal.restore(id)
+    }
+
     const resizeObserver = new ResizeObserver(() => {
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current)
@@ -262,21 +303,30 @@ export function useXtermInstance({
       resizeObserver.disconnect()
       mutationObserver.disconnect()
       terminalEvents.unsubscribe(id)
+      terminalPool.unregisterCallbacks(id)
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
+      serializeAddonRef.current = null
     }
   // Intentionally excludes: projectId, onExit, onTitle, fontSize, scrollback.
   // This effect initializes once per terminal (guarded by hasInitializedRef).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, id, updateTerminalState, updateTerminalTitle, api, safeFit])
 
-  // Cleanup on unmount only
+  // Cleanup on unmount only (terminal closed or component removed)
   useEffect(() => {
     return () => {
       cleanupRef.current?.()
       cleanupRef.current = null
+      // Only remove from pool if terminal is actually closing (not just remounting).
+      // This preserves serialized buffers for evicted terminals across React remounts.
+      const terminals = useProjectStore.getState().terminals
+      if (!terminals[id]) {
+        terminalPool.remove(id)
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update terminal theme when app theme changes
@@ -298,7 +348,7 @@ export function useXtermInstance({
       }, FOCUS_REFIT_DELAY_MS)
       return () => clearTimeout(timer)
     }
-  }, [isActive, safeFit])
+  }, [isActive, id, safeFit])
 
   // Re-fit when terminal state changes (e.g. Claude finishes)
   // State changes trigger re-renders that can desync xterm viewport dimensions

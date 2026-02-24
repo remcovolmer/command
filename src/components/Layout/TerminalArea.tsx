@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
@@ -23,7 +24,22 @@ export function TerminalArea() {
     setSplitSizes,
     setActiveCenterTab,
     closeEditorTab,
-  } = useProjectStore()
+  } = useProjectStore(useShallow((s) => ({
+    activeProjectId: s.activeProjectId,
+    activeTerminalId: s.activeTerminalId,
+    terminals: s.terminals,
+    projects: s.projects,
+    layouts: s.layouts,
+    editorTabs: s.editorTabs,
+    activeCenterTabId: s.activeCenterTabId,
+    setActiveTerminal: s.setActiveTerminal,
+    removeTerminal: s.removeTerminal,
+    addToSplit: s.addToSplit,
+    removeFromSplit: s.removeFromSplit,
+    setSplitSizes: s.setSplitSizes,
+    setActiveCenterTab: s.setActiveCenterTab,
+    closeEditorTab: s.closeEditorTab,
+  })))
 
   const { createTerminal } = useCreateTerminal()
 

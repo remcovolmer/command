@@ -309,6 +309,8 @@ export interface ElectronAPI {
     write: (terminalId: string, data: string) => void;
     resize: (terminalId: string, cols: number, rows: number) => void;
     close: (terminalId: string) => void;
+    evict: (terminalId: string) => void;
+    restore: (terminalId: string) => void;
     onData: (callback: (id: string, data: string) => void) => Unsubscribe;
     onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe;
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;

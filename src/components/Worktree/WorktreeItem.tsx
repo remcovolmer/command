@@ -74,12 +74,13 @@ export const WorktreeItem = memo(function WorktreeItem({
     api.github.checkAvailable().then(setGhAvailable).catch(() => {})
   }, [ghAvailable, setGhAvailable])
 
-  // Start/stop polling for this worktree
+  // Start/stop polling for this worktree (GitHubService applies its own jitter)
   useEffect(() => {
     if (!ghAvailable?.installed || !ghAvailable?.authenticated) return
 
     const api = getElectronAPI()
     const key = worktree.id
+
     api.github.startPolling(key, worktree.path)
 
     const unsub = api.github.onPRStatusUpdate((k, status) => {

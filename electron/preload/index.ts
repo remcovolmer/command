@@ -239,6 +239,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: (terminalId: string): void =>
       ipcRenderer.send('terminal:close', terminalId),
 
+    evict: (terminalId: string): void =>
+      ipcRenderer.send('terminal:evict', terminalId),
+
+    restore: (terminalId: string): void =>
+      ipcRenderer.send('terminal:restore', terminalId),
+
     // Events from main process - return unsubscribe functions for cleanup
     onData: (callback: (id: string, data: string) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, id: string, data: string) => callback(id, data)
