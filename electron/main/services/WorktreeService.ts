@@ -16,11 +16,17 @@ export interface WorktreeInfo {
 export class WorktreeService {
   private static readonly WORKTREES_DIR = '.worktrees'
 
+  private normalizePath(p: string): string {
+    const normalized = path.resolve(path.normalize(p))
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+  }
+
   private async execGit(cwd: string, args: string[]): Promise<string> {
     const { stdout } = await execFileAsync('git', args, {
       cwd,
       maxBuffer: 10 * 1024 * 1024,
       windowsHide: true,
+      timeout: 30_000,
     })
     return stdout.trim()
   }
@@ -51,7 +57,12 @@ export class WorktreeService {
       const content = readFileSync(gitignorePath, 'utf-8')
       const lines = content.split('\n').map(l => l.trim())
 
-      if (!lines.includes(ignoreEntry) && !lines.includes(`/${ignoreEntry}`)) {
+      const alreadyIgnored = lines.some(l =>
+        l === ignoreEntry || l === `/${ignoreEntry}` ||
+        l === `${ignoreEntry}/` || l === `/${ignoreEntry}/`
+      )
+
+      if (!alreadyIgnored) {
         // Add to .gitignore with a newline before if file doesn't end with newline
         const newContent = content.endsWith('\n')
           ? `${ignoreEntry}\n`
@@ -275,20 +286,18 @@ export class WorktreeService {
 
     // Step 2: Check if worktree still exists in git's list
     const worktrees = await this.listWorktrees(projectPath)
-    const worktreeExists = worktrees.some(
-      wt => path.normalize(wt.path) === path.normalize(worktreePath)
+    const normalizedTarget = this.normalizePath(worktreePath)
+    const worktree = worktrees.find(
+      wt => this.normalizePath(wt.path) === normalizedTarget
     )
 
-    if (!worktreeExists) {
+    if (!worktree) {
       // Worktree was already pruned or doesn't exist in git
       return
     }
 
     // Step 3: Check if locked and unlock if needed
-    const worktree = worktrees.find(
-      wt => path.normalize(wt.path) === path.normalize(worktreePath)
-    )
-    if (worktree?.isLocked) {
+    if (worktree.isLocked) {
       try {
         await this.execGit(projectPath, ['worktree', 'unlock', worktreePath])
       } catch {
@@ -320,7 +329,7 @@ export class WorktreeService {
         await this.execGit(projectPath, ['worktree', 'prune'])
         const remaining = await this.listWorktrees(projectPath)
         const stillExists = remaining.some(
-          wt => path.normalize(wt.path) === path.normalize(worktreePath)
+          wt => this.normalizePath(wt.path) === normalizedTarget
         )
         if (!stillExists) {
           return // Successfully removed via prune
@@ -391,8 +400,9 @@ export class WorktreeService {
    */
   isWorktreePath(projectPath: string, checkPath: string): boolean {
     const worktreesDir = this.getWorktreesDir(projectPath)
-    const normalizedCheck = path.normalize(checkPath)
-    const normalizedWorktrees = path.normalize(worktreesDir)
-    return normalizedCheck.startsWith(normalizedWorktrees)
+    const normalizedCheck = this.normalizePath(checkPath)
+    const normalizedWorktrees = this.normalizePath(worktreesDir)
+    return normalizedCheck === normalizedWorktrees ||
+      normalizedCheck.startsWith(normalizedWorktrees + path.sep)
   }
 }

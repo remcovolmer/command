@@ -735,6 +735,17 @@ ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: 
   if (typeof branchName !== 'string' || branchName.length === 0 || branchName.length > 200) {
     throw new Error('Invalid branch name')
   }
+  if (branchName.startsWith('-')) {
+    throw new Error('Branch name must not start with "-"')
+  }
+  if (worktreeName !== undefined) {
+    if (typeof worktreeName !== 'string' || worktreeName.length === 0 || worktreeName.length > 200) {
+      throw new Error('Invalid worktree name')
+    }
+    if (/[/\\]|\.\./.test(worktreeName)) {
+      throw new Error('Worktree name must not contain path separators or ".."')
+    }
+  }
 
   const projects = projectPersistence?.getProjects() ?? []
   const project = projects.find(p => p.id === projectId)
@@ -877,6 +888,11 @@ ipcMain.handle('worktree:remove', async (_event, worktreeId: string, force: bool
     throw new Error(`Project not found: ${worktree.projectId}`)
   }
 
+  // Validate worktree path is within the managed .worktrees directory
+  if (!worktreeService!.isWorktreePath(project.path, worktree.path)) {
+    throw new Error('Worktree path is outside the managed directory')
+  }
+
   // Remove the worktree using git
   await worktreeService!.removeWorktree(project.path, worktree.path, force)
 
@@ -884,7 +900,7 @@ ipcMain.handle('worktree:remove', async (_event, worktreeId: string, force: bool
   if (worktree.branch) {
     try {
       await new Promise<void>((resolve, reject) => {
-        execFile('git', ['branch', '-D', worktree.branch], { cwd: project.path, timeout: 10_000 }, (err) => {
+        execFile('git', ['branch', '-D', '--', worktree.branch], { cwd: project.path, timeout: 10_000 }, (err) => {
           if (err) reject(err); else resolve()
         })
       })
