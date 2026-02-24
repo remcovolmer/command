@@ -392,6 +392,13 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
 })
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
+  // Close all PTY terminals for this project BEFORE cleanup
+  terminalManager?.closeTerminalsForProject(id)
+  // Stop GitHub polling for all worktrees under this project
+  const project = projectPersistence?.getProjects().find(p => p.id === id)
+  if (project?.path) {
+    githubService?.stopPollingByPathPrefix(project.path)
+  }
   await fileWatcherService?.stopWatching(id)
   automationService?.onProjectDeleted(id)
   return projectPersistence?.removeProject(id)
@@ -1172,13 +1179,13 @@ app.on('before-quit', () => {
   fileWatcherService?.stopAll().catch(err => {
     console.error('[FileWatcher] Cleanup error:', err)
   })
-  hookWatcher?.stop()
+  hookWatcher?.destroy()
   githubService?.destroy()
   terminalManager?.destroy()
 })
 
 app.on('window-all-closed', () => {
-  hookWatcher?.stop()
+  hookWatcher?.destroy()
   terminalManager?.closeAllTerminals()
   win = null
   if (process.platform !== 'darwin') app.quit()

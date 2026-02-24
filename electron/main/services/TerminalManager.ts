@@ -302,6 +302,17 @@ export class TerminalManager {
     }
   }
 
+  /**
+   * Close all terminals belonging to a specific project
+   */
+  closeTerminalsForProject(projectId: string): void {
+    for (const [id, terminal] of this.terminals) {
+      if (terminal.projectId === projectId) {
+        this.closeTerminal(id)
+      }
+    }
+  }
+
   closeAllTerminals(): void {
     for (const [id] of this.terminals) {
       this.closeTerminal(id)

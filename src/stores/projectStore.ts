@@ -718,10 +718,18 @@ export const useProjectStore = create<ProjectStore>()(
 
       removeProject: (id) =>
         set((state) => {
+          // Collect worktree IDs for this project (needed for keyed state cleanup)
+          const worktreeIds = Object.keys(state.worktrees).filter(
+            (wtId) => state.worktrees[wtId].projectId === id
+          )
+          const cleanKeys = [id, ...worktreeIds]
+
           // Remove all terminals for this project
           const newTerminals = { ...state.terminals }
           Object.keys(newTerminals).forEach((termId) => {
             if (newTerminals[termId].projectId === id) {
+              // Clean terminal from pool
+              terminalPool.remove(termId)
               delete newTerminals[termId]
             }
           })
@@ -751,13 +759,8 @@ export const useProjectStore = create<ProjectStore>()(
           )
           const newSidecarTerminals = { ...state.sidecarTerminals }
           const newActiveSidecar = { ...state.activeSidecarTerminalId }
-          // Remove project context key and any worktree context keys
           delete newSidecarTerminals[id]
           delete newActiveSidecar[id]
-          for (const wtId of Object.keys(newWorktrees)) {
-            // worktrees for this project were already deleted above
-          }
-          // Also clean any context keys whose terminals were all removed
           for (const [contextKey, ids] of Object.entries(newSidecarTerminals)) {
             const filtered = ids.filter((tid) => !removedTerminalIds.has(tid))
             if (filtered.length === 0) {
@@ -768,15 +771,57 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
+          // Clean editor tabs for this project
+          const newEditorTabs = { ...state.editorTabs }
+          for (const [tabId, tab] of Object.entries(newEditorTabs)) {
+            if (tab.projectId === id) delete newEditorTabs[tabId]
+          }
+
+          // Clean per-project/worktree keyed state
+          const newGitStatus = { ...state.gitStatus }
+          const newGitStatusLoading = { ...state.gitStatusLoading }
+          const newPrStatus = { ...state.prStatus }
+          const newGitCommitLog = { ...state.gitCommitLog }
+          const newGitCommitLogLoading = { ...state.gitCommitLogLoading }
+          const newExpandedCommitHash = { ...state.expandedCommitHash }
+          const newGitHeadHash = { ...state.gitHeadHash }
+          const newTasksData = { ...state.tasksData }
+          const newTasksLoading = { ...state.tasksLoading }
+          const newExpandedPaths = { ...state.expandedPaths }
+          for (const key of cleanKeys) {
+            delete newGitStatus[key]
+            delete newGitStatusLoading[key]
+            delete newPrStatus[key]
+            delete newGitCommitLog[key]
+            delete newGitCommitLogLoading[key]
+            delete newExpandedCommitHash[key]
+            delete newGitHeadHash[key]
+            delete newTasksData[key]
+            delete newTasksLoading[key]
+            delete newExpandedPaths[key]
+          }
+
+          // Clean directoryCache entries under project path (separator-aware)
+          const projectPath = state.projects.find((p) => p.id === id)?.path
+          const newDirectoryCache = { ...state.directoryCache }
+          if (projectPath) {
+            for (const key of Object.keys(newDirectoryCache)) {
+              if (key === projectPath || key.startsWith(projectPath + '/') || key.startsWith(projectPath + '\\')) {
+                delete newDirectoryCache[key]
+              }
+            }
+          }
+
           // Update active terminal/center tab if the removed project owned them
           const newActiveTerminalId =
             state.activeTerminalId && newTerminals[state.activeTerminalId]
               ? state.activeTerminalId
               : null
-          const newActiveCenterTabId =
-            state.activeProjectId === id
-              ? newActiveTerminalId
-              : state.activeCenterTabId
+          // Fix activeCenterTabId: check both terminals and remaining editor tabs
+          let newActiveCenterTabId = state.activeCenterTabId
+          if (state.activeProjectId === id || (newActiveCenterTabId && !newTerminals[newActiveCenterTabId] && !newEditorTabs[newActiveCenterTabId])) {
+            newActiveCenterTabId = newActiveTerminalId
+          }
 
           return {
             projects: newProjects,
@@ -788,6 +833,18 @@ export const useProjectStore = create<ProjectStore>()(
             activeProjectId: newActiveProjectId,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveCenterTabId,
+            editorTabs: newEditorTabs,
+            gitStatus: newGitStatus,
+            gitStatusLoading: newGitStatusLoading,
+            prStatus: newPrStatus,
+            gitCommitLog: newGitCommitLog,
+            gitCommitLogLoading: newGitCommitLogLoading,
+            expandedCommitHash: newExpandedCommitHash,
+            gitHeadHash: newGitHeadHash,
+            tasksData: newTasksData,
+            tasksLoading: newTasksLoading,
+            expandedPaths: newExpandedPaths,
+            directoryCache: newDirectoryCache,
           }
         }),
 
@@ -797,10 +854,13 @@ export const useProjectStore = create<ProjectStore>()(
           const visible = getVisibleTerminals(state.terminals, state.sidecarTerminals, id ?? '')
           const newActiveTerminalId = visible.length > 0 ? visible[0].id : null
 
+          // Clear directoryCache to prevent unbounded growth across project switches
+          // File tree reloads lazily when the user browses
           return {
             activeProjectId: id,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveTerminalId,
+            directoryCache: {},
             // Clear ephemeral file explorer state to prevent cross-project operations
             fileExplorerSelectedPath: null,
             fileExplorerRenamingPath: null,
@@ -991,18 +1051,70 @@ export const useProjectStore = create<ProjectStore>()(
           const newTerminals = { ...state.terminals }
           Object.keys(newTerminals).forEach((termId) => {
             if (newTerminals[termId].worktreeId === id) {
+              terminalPool.remove(termId)
               delete newTerminals[termId]
             }
           })
+
+          // Clean editor tabs for this worktree
+          const newEditorTabs = { ...state.editorTabs }
+          if (removedWorktree) {
+            for (const [tabId, tab] of Object.entries(newEditorTabs)) {
+              if ('filePath' in tab && tab.filePath.startsWith(removedWorktree.path)) {
+                delete newEditorTabs[tabId]
+              }
+            }
+          }
+
+          // Clean worktree-keyed state
+          const newPrStatus = { ...state.prStatus }
+          const newGitCommitLog = { ...state.gitCommitLog }
+          const newGitCommitLogLoading = { ...state.gitCommitLogLoading }
+          const newExpandedCommitHash = { ...state.expandedCommitHash }
+          const newGitHeadHash = { ...state.gitHeadHash }
+          delete newPrStatus[id]
+          delete newGitCommitLog[id]
+          delete newGitCommitLogLoading[id]
+          delete newExpandedCommitHash[id]
+          delete newGitHeadHash[id]
+
+          // Clean directoryCache entries under worktree path
+          const newDirectoryCache = { ...state.directoryCache }
+          if (removedWorktree) {
+            const wtPath = removedWorktree.path
+            for (const key of Object.keys(newDirectoryCache)) {
+              if (key === wtPath || key.startsWith(wtPath + '/') || key.startsWith(wtPath + '\\')) {
+                delete newDirectoryCache[key]
+              }
+            }
+          }
+
+          // Clean sidecar terminals for removed worktree
+          const removedTerminalIds = new Set(
+            Object.keys(state.terminals).filter((tid) => state.terminals[tid].worktreeId === id)
+          )
+          const newSidecarTerminals = { ...state.sidecarTerminals }
+          const newActiveSidecar = { ...state.activeSidecarTerminalId }
+          delete newSidecarTerminals[id]
+          delete newActiveSidecar[id]
+          for (const [contextKey, ids] of Object.entries(newSidecarTerminals)) {
+            const filtered = ids.filter((tid) => !removedTerminalIds.has(tid))
+            if (filtered.length === 0) {
+              delete newSidecarTerminals[contextKey]
+              delete newActiveSidecar[contextKey]
+            } else {
+              newSidecarTerminals[contextKey] = filtered
+            }
+          }
 
           // Update active terminal and center tab if they were in the removed worktree
           let newActiveTerminalId = state.activeTerminalId
           let newActiveCenterTabId = state.activeCenterTabId
           const activeTerminalGone = state.activeTerminalId && !newTerminals[state.activeTerminalId]
-          const activeCenterGone = state.activeCenterTabId && !newTerminals[state.activeCenterTabId] && !state.editorTabs[state.activeCenterTabId]
+          const activeCenterGone = state.activeCenterTabId && !newTerminals[state.activeCenterTabId] && !newEditorTabs[state.activeCenterTabId]
 
           if (activeTerminalGone || activeCenterGone) {
-            const visible = getVisibleTerminals(newTerminals, state.sidecarTerminals, removedWorktree?.projectId ?? '')
+            const visible = getVisibleTerminals(newTerminals, newSidecarTerminals, removedWorktree?.projectId ?? '')
             const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
 
             if (activeTerminalGone) {
@@ -1016,6 +1128,15 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             worktrees: newWorktrees,
             terminals: newTerminals,
+            editorTabs: newEditorTabs,
+            sidecarTerminals: newSidecarTerminals,
+            activeSidecarTerminalId: newActiveSidecar,
+            prStatus: newPrStatus,
+            gitCommitLog: newGitCommitLog,
+            gitCommitLogLoading: newGitCommitLogLoading,
+            expandedCommitHash: newExpandedCommitHash,
+            gitHeadHash: newGitHeadHash,
+            directoryCache: newDirectoryCache,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveCenterTabId,
           }

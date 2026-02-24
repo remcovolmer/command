@@ -214,11 +214,20 @@ export class GitHubService {
       clearInterval(entry.interval)
       this.pollingMap.delete(key)
     }
+    this.previousStates.delete(key)
   }
 
   stopAllPolling() {
     for (const [key] of this.pollingMap) {
       this.stopPolling(key)
+    }
+  }
+
+  stopPollingByPathPrefix(pathPrefix: string) {
+    for (const [key, entry] of this.pollingMap) {
+      if (entry.path === pathPrefix || entry.path.startsWith(pathPrefix + '/') || entry.path.startsWith(pathPrefix + '\\')) {
+        this.stopPolling(key)
+      }
     }
   }
 
