@@ -1012,6 +1012,11 @@ ipcMain.handle('update:download', async () => {
 })
 
 ipcMain.handle('update:install', async () => {
+  if (!updateService) return
+
+  // Set flag early so before-quit/window-all-closed skip their cleanup
+  updateService.isUpdateInProgress = true
+
   // Kill all child processes BEFORE triggering the NSIS installer.
   // Without this, node-pty processes block the installer from starting.
   terminalManager?.destroy()
@@ -1020,10 +1025,11 @@ ipcMain.handle('update:install', async () => {
   await fileWatcherService?.stopAll().catch(() => {})
   await automationService?.destroy().catch(() => {})
 
-  // Wait for processes to fully die before spawning installer
-  await new Promise(resolve => setTimeout(resolve, 500))
+  // Let OS fully reap child processes before spawning installer
+  const PROCESS_CLEANUP_DELAY_MS = 500
+  await new Promise(resolve => setTimeout(resolve, PROCESS_CLEANUP_DELAY_MS))
 
-  updateService?.quitAndInstall()
+  updateService.quitAndInstall()
 })
 
 ipcMain.handle('update:get-version', () => {
@@ -1162,7 +1168,8 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
-  // Skip cleanup if we're installing an update — already cleaned up in update:install handler
+  // Skip cleanup and session persistence during update — services already
+  // destroyed in update:install handler, sessions will be restored after restart
   if (updateService?.isUpdateInProgress) return
 
   // Persist Claude sessions for restoration on next startup

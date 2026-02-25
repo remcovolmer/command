@@ -5,11 +5,7 @@ import { BrowserWindow, app } from 'electron'
 
 export class UpdateService {
   private mainWindow: BrowserWindow | null = null
-  private _isUpdating = false
-
-  get isUpdateInProgress(): boolean {
-    return this._isUpdating
-  }
+  isUpdateInProgress = false
 
   initialize(window: BrowserWindow) {
     this.mainWindow = window
@@ -106,7 +102,6 @@ export class UpdateService {
       return
     }
 
-    this._isUpdating = true
     // Silent install + force run after. Non-silent mode shows NSIS UI that
     // detects the still-running process and fails. isForceRunAfter is also
     // ignored when isSilent=false.
