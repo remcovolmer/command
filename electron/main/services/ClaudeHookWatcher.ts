@@ -28,7 +28,7 @@ type MultiSessionState = Record<string, HookStateData>
  * Type guard to validate HookStateData shape at runtime
  * Prevents crashes from malformed external JSON data
  */
-function isHookStateData(value: unknown): value is HookStateData {
+export function isHookStateData(value: unknown): value is HookStateData {
   if (!value || typeof value !== 'object') return false
   const obj = value as Record<string, unknown>
   return (
@@ -38,6 +38,36 @@ function isHookStateData(value: unknown): value is HookStateData {
     typeof obj.hook_event === 'string'
     // Note: cwd can be undefined
   )
+}
+
+/**
+ * Normalize a state file object to multi-session format.
+ * Handles: clean multi-session, legacy single-session, and mixed format.
+ * Exported for testing.
+ */
+export function normalizeStateFile(parsed: unknown): MultiSessionState {
+  if (!parsed || typeof parsed !== 'object') {
+    return {}
+  }
+
+  const obj = parsed as Record<string, unknown>
+  const result: MultiSessionState = {}
+  let foundNested = false
+
+  // Iterate all top-level keys and collect valid session entries
+  for (const [key, value] of Object.entries(obj)) {
+    if (isHookStateData(value)) {
+      result[key] = value
+      foundNested = true
+    }
+  }
+
+  // Fallback: legacy single-session format (flat fields at root, no nested objects)
+  if (!foundNested && isHookStateData(parsed)) {
+    result[parsed.session_id] = parsed
+  }
+
+  return result
 }
 
 export class ClaudeHookWatcher {
@@ -186,7 +216,7 @@ export class ClaudeHookWatcher {
         const parsed = JSON.parse(content)
 
         // Handle both legacy single-session and new multi-session format
-        const allStates: MultiSessionState = this.normalizeStateFile(parsed)
+        const allStates: MultiSessionState = normalizeStateFile(parsed)
 
         // Process each session's state
         for (const sessionId in allStates) {
@@ -199,31 +229,6 @@ export class ClaudeHookWatcher {
     } finally {
       this.isReading = false
     }
-  }
-
-  /**
-   * Normalize state file to multi-session format (handles legacy single-session)
-   */
-  private normalizeStateFile(parsed: unknown): MultiSessionState {
-    if (!parsed || typeof parsed !== 'object') {
-      return {}
-    }
-
-    const obj = parsed as Record<string, unknown>
-
-    // Check if this is legacy single-session format
-    if (isHookStateData(obj)) {
-      return { [obj.session_id]: obj }
-    }
-
-    // Multi-session format: validate each entry
-    const result: MultiSessionState = {}
-    for (const [key, value] of Object.entries(obj)) {
-      if (isHookStateData(value)) {
-        result[key] = value
-      }
-    }
-    return result
   }
 
   /**
