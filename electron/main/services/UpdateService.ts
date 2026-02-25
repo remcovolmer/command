@@ -5,13 +5,14 @@ import { BrowserWindow, app } from 'electron'
 
 export class UpdateService {
   private mainWindow: BrowserWindow | null = null
+  isUpdateInProgress = false
 
   initialize(window: BrowserWindow) {
     this.mainWindow = window
 
     // Configuration
     autoUpdater.autoDownload = false // Let user choose when to download
-    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.autoInstallOnAppQuit = false // Prevent conflict with explicit quitAndInstall
     autoUpdater.autoRunAppAfterInstall = true
 
     // Setup event handlers
@@ -101,8 +102,10 @@ export class UpdateService {
       return
     }
 
-    // Force quit and install the update
-    autoUpdater.quitAndInstall(false, true)
+    // Silent install + force run after. Non-silent mode shows NSIS UI that
+    // detects the still-running process and fails. isForceRunAfter is also
+    // ignored when isSilent=false.
+    autoUpdater.quitAndInstall(true, true)
   }
 
   getCurrentVersion(): string {

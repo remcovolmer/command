@@ -1011,8 +1011,25 @@ ipcMain.handle('update:download', async () => {
   return updateService?.downloadUpdate()
 })
 
-ipcMain.handle('update:install', () => {
-  updateService?.quitAndInstall()
+ipcMain.handle('update:install', async () => {
+  if (!updateService) return
+
+  // Set flag early so before-quit/window-all-closed skip their cleanup
+  updateService.isUpdateInProgress = true
+
+  // Kill all child processes BEFORE triggering the NSIS installer.
+  // Without this, node-pty processes block the installer from starting.
+  terminalManager?.destroy()
+  hookWatcher?.destroy()
+  githubService?.destroy()
+  await fileWatcherService?.stopAll().catch(() => {})
+  await automationService?.destroy().catch(() => {})
+
+  // Let OS fully reap child processes before spawning installer
+  const PROCESS_CLEANUP_DELAY_MS = 500
+  await new Promise(resolve => setTimeout(resolve, PROCESS_CLEANUP_DELAY_MS))
+
+  updateService.quitAndInstall()
 })
 
 ipcMain.handle('update:get-version', () => {
@@ -1151,6 +1168,10 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  // Skip cleanup and session persistence during update — services already
+  // destroyed in update:install handler, sessions will be restored after restart
+  if (updateService?.isUpdateInProgress) return
+
   // Persist Claude sessions for restoration on next startup
   if (hookWatcher && terminalManager && projectPersistence) {
     const terminalSessions = hookWatcher.getTerminalSessions()
@@ -1192,6 +1213,11 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
+  // Skip cleanup if we're installing an update — already cleaned up in update:install handler
+  if (updateService?.isUpdateInProgress) {
+    win = null
+    return
+  }
   hookWatcher?.destroy()
   terminalManager?.closeAllTerminals()
   win = null
