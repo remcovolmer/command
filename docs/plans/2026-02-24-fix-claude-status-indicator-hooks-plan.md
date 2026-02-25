@@ -1,7 +1,7 @@
 ---
 title: "fix: Claude status indicator hooks broken on Windows"
 type: fix
-status: active
+status: completed
 date: 2026-02-24
 ---
 

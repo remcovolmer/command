@@ -50,11 +50,8 @@ process.stdin.on('end', async () => {
         state = 'busy';
         break;
       case 'Stop':
-        // Finished responding = done (green)
-        state = 'done';
-        break;
       case 'SessionEnd':
-        // Session ended = done (green)
+        // Finished or session ended = done (green)
         state = 'done';
         break;
       case 'Notification':
@@ -81,20 +78,6 @@ process.stdin.on('end', async () => {
     }
 
     if (state) {
-      // Skip redundant busy writes from PreToolUse — reduces process spawning by ~80%
-      // during active Claude work (PreToolUse fires for every tool call)
-      if (hookEvent === 'PreToolUse' && state === 'busy') {
-        try {
-          const existing = await fs.promises.readFile(stateFile, 'utf-8');
-          const parsed = JSON.parse(existing);
-          if (parsed[data.session_id]?.state === 'busy') {
-            process.exit(0); // Already busy, skip write
-          }
-        } catch (e) {
-          // File doesn't exist or can't parse, proceed with write
-        }
-      }
-
       const stateData = {
         session_id: data.session_id,
         cwd: data.cwd,
@@ -111,10 +94,18 @@ process.stdin.on('end', async () => {
       let allStates = Object.create(null);
       try {
         const existing = await fs.promises.readFile(stateFile, 'utf-8');
-        const parsed = JSON.parse(existing);
-        allStates = Object.assign(Object.create(null), parsed);
+        allStates = Object.assign(Object.create(null), JSON.parse(existing));
       } catch (e) {
         // Start fresh if file doesn't exist or is invalid
+      }
+
+      // Skip redundant busy writes from PreToolUse — reduces file writes by ~80%
+      // during active Claude work (PreToolUse fires for every tool call).
+      // Uses the already-read state to avoid a double file read.
+      if (hookEvent === 'PreToolUse' && state === 'busy') {
+        if (allStates[data.session_id]?.state === 'busy') {
+          process.exit(0); // Already busy, skip write
+        }
       }
 
       // Write this session's state keyed by session_id

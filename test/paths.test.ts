@@ -7,7 +7,13 @@ describe('normalizePath', () => {
   })
 
   test('converts backslashes to forward slashes', () => {
-    expect(normalizePath('C:\\Users\\foo\\bar')).toMatch(/c:\/users\/foo\/bar/i)
+    const result = normalizePath('C:\\Users\\foo\\bar')
+    // On Windows, also lowercased
+    if (process.platform === 'win32') {
+      expect(result).toBe('c:/users/foo/bar')
+    } else {
+      expect(result).toBe('C:/Users/foo/bar')
+    }
   })
 
   test('removes trailing slash', () => {
@@ -15,35 +21,29 @@ describe('normalizePath', () => {
     expect(result).not.toMatch(/\/$/)
   })
 
-  test('preserves root path slash (single char path)', () => {
-    // Single character path like "/" should not be stripped
+  test('preserves root path slash', () => {
     expect(normalizePath('/')).toBe('/')
   })
 
-  test('handles empty-ish paths', () => {
+  test('preserves Windows drive root (C:/)', () => {
+    if (process.platform === 'win32') {
+      expect(normalizePath('C:/')).toBe('c:/')
+      expect(normalizePath('C:\\')).toBe('c:/')
+    } else {
+      expect(normalizePath('C:/')).toBe('C:/')
+    }
+  })
+
+  test('handles empty and minimal paths', () => {
     expect(normalizePath('')).toBe('')
-    expect(normalizePath('.')).toBeTruthy()
+    expect(normalizePath('.')).toBe('.')
   })
 
   describe('Windows case normalization', () => {
-    test('lowercases drive letter on Windows', () => {
-      // On Windows (current platform), paths should be lowercased
+    test('produces identical output regardless of input casing', () => {
       if (process.platform === 'win32') {
         expect(normalizePath('C:\\Users\\Foo')).toBe('c:/users/foo')
         expect(normalizePath('c:\\Users\\Foo')).toBe('c:/users/foo')
-      }
-    })
-
-    test('lowercases entire path on Windows for consistent matching', () => {
-      if (process.platform === 'win32') {
-        const path1 = normalizePath('C:\\Users\\RemcoVolmer\\Code')
-        const path2 = normalizePath('c:\\Users\\RemcoVolmer\\Code')
-        expect(path1).toBe(path2)
-      }
-    })
-
-    test('mixed drive letter casing produces same result on Windows', () => {
-      if (process.platform === 'win32') {
         expect(normalizePath('C:/foo/bar')).toBe(normalizePath('c:/foo/bar'))
         expect(normalizePath('D:\\Project')).toBe(normalizePath('d:\\project'))
       }
@@ -52,7 +52,7 @@ describe('normalizePath', () => {
 
   test('handles paths with no backslashes', () => {
     const result = normalizePath('/usr/local/bin')
-    expect(result).toBe(process.platform === 'win32' ? '/usr/local/bin' : '/usr/local/bin')
+    expect(result).toBe('/usr/local/bin')
   })
 
   test('handles Windows UNC-style paths', () => {

@@ -52,17 +52,19 @@ export function normalizeStateFile(parsed: unknown): MultiSessionState {
 
   const obj = parsed as Record<string, unknown>
   const result: MultiSessionState = {}
+  let foundNested = false
 
   // Iterate all top-level keys and collect valid session entries
   for (const [key, value] of Object.entries(obj)) {
     if (isHookStateData(value)) {
       result[key] = value
+      foundNested = true
     }
   }
 
   // Fallback: legacy single-session format (flat fields at root, no nested objects)
-  if (Object.keys(result).length === 0 && isHookStateData(obj)) {
-    result[obj.session_id] = obj as unknown as HookStateData
+  if (!foundNested && isHookStateData(parsed)) {
+    result[parsed.session_id] = parsed
   }
 
   return result
@@ -214,7 +216,7 @@ export class ClaudeHookWatcher {
         const parsed = JSON.parse(content)
 
         // Handle both legacy single-session and new multi-session format
-        const allStates: MultiSessionState = this.normalizeStateFile(parsed)
+        const allStates: MultiSessionState = normalizeStateFile(parsed)
 
         // Process each session's state
         for (const sessionId in allStates) {
@@ -227,11 +229,6 @@ export class ClaudeHookWatcher {
     } finally {
       this.isReading = false
     }
-  }
-
-  /** Delegate to exported function for testability */
-  private normalizeStateFile(parsed: unknown): MultiSessionState {
-    return normalizeStateFile(parsed)
   }
 
   /**

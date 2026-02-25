@@ -6,8 +6,8 @@
  */
 export function normalizePath(path: string): string {
   let normalized = path.replace(/\\/g, '/')
-  // Remove trailing slash (except root like C:/)
-  if (normalized.length > 1 && normalized.endsWith('/')) {
+  // Remove trailing slash (except root like C:/ or /)
+  if (normalized.length > 1 && normalized.endsWith('/') && !/^[a-zA-Z]:\/$/.test(normalized)) {
     normalized = normalized.slice(0, -1)
   }
   // Windows: NTFS is case-insensitive, normalize to lowercase

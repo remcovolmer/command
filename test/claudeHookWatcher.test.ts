@@ -96,7 +96,7 @@ describe('normalizeStateFile', () => {
 
     const result = normalizeStateFile(input)
     // Should include the nested sessions, NOT short-circuit on legacy root
-    expect(Object.keys(result).length).toBeGreaterThanOrEqual(2)
+    expect(Object.keys(result)).toHaveLength(2)
     expect(result['session-1']).toBeDefined()
     expect(result['session-2']).toBeDefined()
     expect(result['session-1'].state).toBe('done')
