@@ -6,10 +6,13 @@ import path from 'node:path'
 // Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled'
 
+// Keep in sync with GitHubService.GitEvent
+type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict'
+
 type AutomationTrigger =
   | { type: 'schedule'; cron: string }
   | { type: 'claude-done'; projectId?: string }
-  | { type: 'git-event'; event: 'pr-merged' | 'pr-opened' | 'checks-passed' }
+  | { type: 'git-event'; event: GitEvent }
   | { type: 'file-change'; patterns: string[]; cooldownSeconds: number }
 
 interface Automation {

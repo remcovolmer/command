@@ -58,18 +58,30 @@ export class AutomationRunner {
     options: {
       timeoutMinutes?: number
       baseBranch?: string
+      sourceBranch?: string
     } = {}
   ): Promise<RunResult> {
-    const { timeoutMinutes = 30 } = options
+    const { timeoutMinutes = 30, sourceBranch } = options
     const timeoutMs = timeoutMinutes * 60 * 1000
     const startTime = Date.now()
 
     // Create worktree (serialized to prevent concurrent git operations)
-    const branchName = this.makeBranchName(automationId)
+    const worktreeDirName = this.makeBranchName(automationId)
+    let branchName = worktreeDirName
     let worktreePath: string
 
     try {
-      worktreePath = await this.serializedWorktreeCreate(projectPath, branchName)
+      if (sourceBranch) {
+        try {
+          worktreePath = await this.serializedWorktreeCreate(projectPath, sourceBranch, worktreeDirName)
+          branchName = sourceBranch
+        } catch (error) {
+          console.warn(`[AutomationRunner] Failed to checkout source branch "${sourceBranch}", falling back to HEAD: ${error instanceof Error ? error.message : String(error)}`)
+          worktreePath = await this.serializedWorktreeCreate(projectPath, worktreeDirName)
+        }
+      } else {
+        worktreePath = await this.serializedWorktreeCreate(projectPath, worktreeDirName)
+      }
     } catch (error) {
       return {
         success: false,
@@ -78,7 +90,7 @@ export class AutomationRunner {
         timedOut: false,
         durationMs: Date.now() - startTime,
         error: `Worktree creation failed: ${error instanceof Error ? error.message : String(error)}`,
-        worktreeBranch: branchName,
+        worktreeBranch: worktreeDirName,
         worktreePath: '',
       }
     }
@@ -279,11 +291,11 @@ export class AutomationRunner {
     return `auto-${shortId}-${Date.now()}`
   }
 
-  private async serializedWorktreeCreate(projectPath: string, branchName: string): Promise<string> {
+  private async serializedWorktreeCreate(projectPath: string, branchName: string, worktreeName?: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       this.worktreeLock = this.worktreeLock.then(async () => {
         try {
-          const result = await this.worktreeService.createWorktree(projectPath, branchName)
+          const result = await this.worktreeService.createWorktree(projectPath, branchName, worktreeName)
           resolve(result.path)
         } catch (error) {
           reject(error)
