@@ -12,10 +12,11 @@ import { WorktreeService } from './services/WorktreeService'
 import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
 import { installClaudeHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
-import { GitHubService, type GitEvent } from './services/GitHubService'
+import { GitHubService, type GitEvent, VALID_GIT_EVENTS } from './services/GitHubService'
 import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
+import type { AutomationTrigger } from './services/AutomationPersistence'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -36,9 +37,7 @@ function validateProjectPath(projectPath: string): void {
   }
 }
 
-const VALID_GIT_EVENTS: GitEvent[] = ['pr-merged', 'pr-opened', 'checks-passed', 'merge-conflict']
-
-function validateTrigger(raw: unknown): { type: 'schedule'; cron: string } | { type: 'claude-done'; projectId?: string } | { type: 'git-event'; event: GitEvent } | { type: 'file-change'; patterns: string[]; cooldownSeconds: number } {
+function validateTrigger(raw: unknown): AutomationTrigger {
   if (!raw || typeof raw !== 'object') throw new Error('Invalid trigger')
   const obj = raw as Record<string, unknown>
   switch (obj.type) {
@@ -54,7 +53,8 @@ function validateTrigger(raw: unknown): { type: 'schedule'; cron: string } | { t
       if (!Array.isArray(obj.patterns)) throw new Error('Invalid file patterns')
       const patterns = obj.patterns.filter((p: unknown): p is string => typeof p === 'string').map(p => p.slice(0, 500))
       if (patterns.length === 0) throw new Error('At least one file pattern required')
-      const cooldown = typeof obj.cooldownSeconds === 'number' ? Math.max(10, Math.min(3600, obj.cooldownSeconds)) : 60
+      if (patterns.length > 50) throw new Error('Too many file patterns (max 50)')
+      const cooldown = typeof obj.cooldownSeconds === 'number' ? clamp(obj.cooldownSeconds as number, 10, 3600) : 60
       return { type: 'file-change', patterns, cooldownSeconds: cooldown }
     }
     default:
@@ -1094,7 +1094,7 @@ ipcMain.handle('automation:update', async (_event, id: string, updates: Record<s
   const allowedUpdates: Record<string, unknown> = {}
   if (typeof updates.name === 'string') allowedUpdates.name = updates.name.slice(0, 100)
   if (typeof updates.prompt === 'string') allowedUpdates.prompt = updates.prompt.slice(0, 50000)
-  if (Array.isArray(updates.projectIds)) allowedUpdates.projectIds = updates.projectIds.filter((id: unknown) => typeof id === 'string')
+  if (Array.isArray(updates.projectIds)) allowedUpdates.projectIds = updates.projectIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id as string))
   if (updates.trigger) allowedUpdates.trigger = validateTrigger(updates.trigger)
   if (typeof updates.enabled === 'boolean') allowedUpdates.enabled = updates.enabled
   if (typeof updates.baseBranch === 'string') allowedUpdates.baseBranch = updates.baseBranch

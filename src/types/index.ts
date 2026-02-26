@@ -186,7 +186,6 @@ export interface PRStatus {
   number?: number;
   title?: string;
   url?: string;
-  headRefName?: string;
   state?: 'OPEN' | 'CLOSED' | 'MERGED';
   mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
   mergeStateStatus?: 'CLEAN' | 'DIRTY' | 'BLOCKED' | 'UNSTABLE' | 'UNKNOWN';
