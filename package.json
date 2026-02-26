@@ -1,6 +1,6 @@
 {
   "name": "command",
-  "version": "0.14.3",
+  "version": "0.14.4",
   "main": "dist-electron/main/index.js",
   "description": "Command center for managing multiple Claude Code terminal instances",
   "author": "Remco Volmer",
