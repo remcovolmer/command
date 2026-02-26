@@ -3,13 +3,15 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
+import type { GitEvent } from './GitHubService'
+
 // Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled'
 
 type AutomationTrigger =
   | { type: 'schedule'; cron: string }
   | { type: 'claude-done'; projectId?: string }
-  | { type: 'git-event'; event: 'pr-merged' | 'pr-opened' | 'checks-passed' }
+  | { type: 'git-event'; event: GitEvent }
   | { type: 'file-change'; patterns: string[]; cooldownSeconds: number }
 
 interface Automation {

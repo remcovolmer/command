@@ -248,10 +248,13 @@ export interface TaskAdd {
 // Automation types
 export type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled';
 
+// Keep in sync with GitHubService.GitEvent (main process)
+export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict';
+
 export type AutomationTrigger =
   | { type: 'schedule'; cron: string }
   | { type: 'claude-done'; projectId?: string }
-  | { type: 'git-event'; event: 'pr-merged' | 'pr-opened' | 'checks-passed' }
+  | { type: 'git-event'; event: GitEvent }
   | { type: 'file-change'; patterns: string[]; cooldownSeconds: number };
 
 export interface Automation {

@@ -7,7 +7,7 @@ import type { Automation, AutomationRun } from './AutomationPersistence'
 import type { WorktreeService } from './WorktreeService'
 import type { ProjectPersistence } from './ProjectPersistence'
 import type { ClaudeHookWatcher } from './ClaudeHookWatcher'
-import type { GitHubService } from './GitHubService'
+import type { GitHubService, GitEvent, PREventContext } from './GitHubService'
 import type { FileWatcherService } from './FileWatcherService'
 
 const MAX_CONCURRENT_RUNS = 3
@@ -164,8 +164,8 @@ export class AutomationService {
     this.eventUnsubscribers.push(unsubHook)
 
     // 2. Git PR event trigger
-    const unsubPR = githubService.onPREvent((projectPath, event) => {
-      this.handleGitEventTrigger(projectPath, event)
+    const unsubPR = githubService.onPREvent((projectPath, event, prContext) => {
+      this.handleGitEventTrigger(projectPath, event, prContext)
     })
     this.eventUnsubscribers.push(unsubPR)
 
@@ -186,7 +186,7 @@ export class AutomationService {
     }
   }
 
-  private handleGitEventTrigger(projectPath: string, event: 'pr-merged' | 'pr-opened' | 'checks-passed'): void {
+  private handleGitEventTrigger(projectPath: string, event: GitEvent, prContext: PREventContext): void {
     if (!this.projectPersistence) return
 
     const projects = this.projectPersistence.getProjects()
@@ -199,7 +199,7 @@ export class AutomationService {
       if (automation.trigger.event !== event) continue
       if (!automation.projectIds.includes(project.id)) continue
 
-      this.triggerRun(automation.id, project.path, project.id).catch(err => {
+      this.triggerRun(automation.id, project.path, project.id, prContext).catch(err => {
         console.error(`[AutomationService] Git event trigger failed:`, err)
       })
     }
@@ -355,7 +355,7 @@ export class AutomationService {
 
   // --- Trigger a run ---
 
-  async triggerRun(automationId: string, projectPath: string, projectId: string): Promise<void> {
+  async triggerRun(automationId: string, projectPath: string, projectId: string, prContext?: PREventContext): Promise<void> {
     const automation = this.persistence.getAutomation(automationId)
     if (!automation) {
       console.warn(`[AutomationService] Automation ${automationId} not found`)
@@ -374,6 +374,30 @@ export class AutomationService {
 
     const runId = randomUUID()
 
+    // Template replacement for PR context variables
+    const sanitize = (s: string, maxLen = 200): string =>
+      s.replace(/[\r\n\t]/g, ' ').replace(/[^\x20-\x7E]/g, '').slice(0, maxLen)
+
+    const templateVars: Record<string, string> = prContext ? {
+      number: String(prContext.number),
+      title: sanitize(prContext.title),
+      branch: sanitize(prContext.branch),
+      url: sanitize(prContext.url, 500),
+      mergeable: prContext.mergeable,
+      state: prContext.state,
+    } : {}
+
+    let resolvedPrompt = automation.prompt.replace(
+      /\{\{pr\.(\w+)\}\}/g,
+      (match, key: string) => {
+        if (key in templateVars) return templateVars[key]
+        if (prContext) {
+          console.warn(`[AutomationService] Unresolved template variable: ${match}`)
+        }
+        return ''
+      }
+    )
+
     // Create run record
     const run = this.persistence.addRun({
       automationId,
@@ -387,14 +411,20 @@ export class AutomationService {
     this.sendToRenderer('automation:run-started', run)
 
     try {
+      // Log when PR branch is empty (headRefName missing from API response)
+      if (prContext && !prContext.branch && prContext.state !== 'MERGED') {
+        console.warn(`[AutomationService] PR #${prContext.number} has no branch name, worktree will use HEAD`)
+      }
+
       const result = await this.runner.run(
         runId,
         automationId,
-        automation.prompt,
+        resolvedPrompt,
         projectPath,
         {
           timeoutMinutes: automation.timeoutMinutes,
           baseBranch: automation.baseBranch,
+          sourceBranch: prContext?.branch && prContext.state !== 'MERGED' ? prContext.branch : undefined,
         }
       )
 

@@ -12,10 +12,11 @@ import { WorktreeService } from './services/WorktreeService'
 import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
 import { installClaudeHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
-import { GitHubService } from './services/GitHubService'
+import { GitHubService, type GitEvent, VALID_GIT_EVENTS } from './services/GitHubService'
 import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
+import type { AutomationTrigger } from './services/AutomationPersistence'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -33,6 +34,31 @@ const clamp = (val: number, min: number, max: number): number =>
 function validateProjectPath(projectPath: string): void {
   if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
     throw new Error('Invalid project path')
+  }
+}
+
+function validateTrigger(raw: unknown): AutomationTrigger {
+  if (!raw || typeof raw !== 'object') throw new Error('Invalid trigger')
+  const obj = raw as Record<string, unknown>
+  switch (obj.type) {
+    case 'schedule':
+      if (typeof obj.cron !== 'string' || obj.cron.length === 0 || obj.cron.length > 100) throw new Error('Invalid cron expression')
+      return { type: 'schedule', cron: obj.cron }
+    case 'claude-done':
+      return { type: 'claude-done' }
+    case 'git-event':
+      if (!VALID_GIT_EVENTS.includes(obj.event as GitEvent)) throw new Error('Invalid git event type')
+      return { type: 'git-event', event: obj.event as GitEvent }
+    case 'file-change': {
+      if (!Array.isArray(obj.patterns)) throw new Error('Invalid file patterns')
+      const patterns = obj.patterns.filter((p: unknown): p is string => typeof p === 'string').map(p => p.slice(0, 500))
+      if (patterns.length === 0) throw new Error('At least one file pattern required')
+      if (patterns.length > 50) throw new Error('Too many file patterns (max 50)')
+      const cooldown = typeof obj.cooldownSeconds === 'number' ? clamp(obj.cooldownSeconds as number, 10, 3600) : 60
+      return { type: 'file-change', patterns, cooldownSeconds: cooldown }
+    }
+    default:
+      throw new Error('Unknown trigger type')
   }
 }
 
@@ -1055,7 +1081,7 @@ ipcMain.handle('automation:create', async (_event, data: Record<string, unknown>
     name,
     prompt,
     projectIds: projectIds as string[],
-    trigger: data.trigger as { type: 'schedule'; cron: string } | { type: 'claude-done'; projectId?: string } | { type: 'git-event'; event: 'pr-merged' | 'pr-opened' | 'checks-passed' } | { type: 'file-change'; patterns: string[]; cooldownSeconds: number },
+    trigger: validateTrigger(data.trigger),
     enabled: data.enabled !== false,
     baseBranch: typeof data.baseBranch === 'string' ? data.baseBranch : undefined,
     timeoutMinutes: typeof data.timeoutMinutes === 'number' ? clamp(data.timeoutMinutes, 1, 120) : 30,
@@ -1068,8 +1094,8 @@ ipcMain.handle('automation:update', async (_event, id: string, updates: Record<s
   const allowedUpdates: Record<string, unknown> = {}
   if (typeof updates.name === 'string') allowedUpdates.name = updates.name.slice(0, 100)
   if (typeof updates.prompt === 'string') allowedUpdates.prompt = updates.prompt.slice(0, 50000)
-  if (Array.isArray(updates.projectIds)) allowedUpdates.projectIds = updates.projectIds.filter((id: unknown) => typeof id === 'string')
-  if (updates.trigger) allowedUpdates.trigger = updates.trigger
+  if (Array.isArray(updates.projectIds)) allowedUpdates.projectIds = updates.projectIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id as string))
+  if (updates.trigger) allowedUpdates.trigger = validateTrigger(updates.trigger)
   if (typeof updates.enabled === 'boolean') allowedUpdates.enabled = updates.enabled
   if (typeof updates.baseBranch === 'string') allowedUpdates.baseBranch = updates.baseBranch
   if (typeof updates.timeoutMinutes === 'number') allowedUpdates.timeoutMinutes = clamp(updates.timeoutMinutes as number, 1, 120)
