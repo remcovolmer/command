@@ -16,13 +16,15 @@ npm run release:minor  # Bump minor version, push with tags
 npm run release:major  # Bump major version, push with tags
 ```
 
+Tests require a pre-build step (`npm run pretest` runs automatically). E2E tests use Playwright's Electron API. Unit tests exist for `TerminalPool` and `projectStore` in `test/`.
+
 ## Workflow Guidelines
 
 **Planning**: Enter plan mode for non-trivial tasks (3+ steps). If blocked, re-plan immediately.
 
 **Execution**: Use subagents for research/exploration. Run tests and verify before marking done.
 
-**Learning**: After corrections, document patterns in `tasks/lessons.md` to prevent recurrence.
+**Learning**: After corrections, document patterns in relevant todo files in `todos/` to prevent recurrence.
 
 ## Core Principles
 
@@ -32,80 +34,106 @@ npm run release:major  # Bump major version, push with tags
 
 ## Architecture
 
-This is an **Electron + React + TypeScript** desktop app for managing multiple Claude Code sessions.
+This is an **Electron + React + TypeScript** desktop app for managing multiple Claude Code sessions. One window with a project sidebar, terminal area (center), file explorer (right), and optional sidecar shell panels.
 
 ## Terminology
 
 | Term | Meaning |
 |------|---------|
-| **Chat** | A Claude Code session (main center area) |
-| **Terminal** | Plain shell in right sidebar for quick tasks (`npm install`, etc.) |
-| **Worktree** | Git worktree for parallel feature development |
-
-### Main Process Services (`electron/main/services/`)
-
-| Service | Purpose |
-|---------|---------|
-| `TerminalManager.ts` | PTY spawning via node-pty, terminal state management |
-| `ClaudeHookWatcher.ts` | Watches Claude Code hooks to detect state changes (busy/permission/question/done) |
-| `HookInstaller.ts` | Installs Claude Code hooks for state detection |
-| `ProjectPersistence.ts` | JSON file storage in `userData/projects.json` |
-| `WorktreeService.ts` | Git worktree management (create, list, remove) |
-| `GitService.ts` | Git operations (status, fetch, pull, push) |
-| `GitHubService.ts` | GitHub PR status polling via `gh` CLI |
-| `UpdateService.ts` | Auto-updates via electron-updater |
+| **Chat** | A Claude Code terminal session (`type: 'claude'`), shown in the center area |
+| **Terminal / Sidecar** | A plain shell (`type: 'normal'`) in a collapsible right-side panel for quick tasks |
+| **Worktree** | Git worktree for parallel feature development; terminals can be scoped to a worktree |
+| **Center Tab** | Either a terminal tab or an editor/diff tab in the main content area |
 
 ### Process Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Main Process (electron/main/)                              │
-│  ├── index.ts         - App lifecycle, IPC handlers         │
-│  └── services/        - See table above                     │
+│  ├── index.ts         - App lifecycle, ALL IPC handlers     │
+│  └── services/        - Business logic (see table below)    │
 └─────────────────────────────────────────────────────────────┘
-         ↕ IPC via contextBridge (secure)
+         ↕ IPC via contextBridge (secure, whitelist-based)
 ┌─────────────────────────────────────────────────────────────┐
 │  Preload (electron/preload/index.ts)                        │
-│  - Exposes window.electronAPI with terminal/project/app ops │
-│  - Whitelist-based channel security                         │
+│  - Exposes window.electronAPI with typed terminal/project/  │
+│    fs/git/automation/update operations                      │
 └─────────────────────────────────────────────────────────────┘
          ↕
 ┌─────────────────────────────────────────────────────────────┐
 │  Renderer (src/)                                            │
-│  ├── stores/projectStore.ts  - Zustand with persist         │
-│  ├── utils/terminalEvents.ts - Centralized IPC subscriptions│
-│  └── components/Terminal/    - xterm.js integration         │
+│  ├── stores/projectStore.ts  - Single Zustand store w/      │
+│  │                             persist middleware            │
+│  ├── hooks/                  - useHotkeys, useXtermInstance, │
+│  │                             useTerminalPool, etc.         │
+│  ├── utils/terminalEvents.ts - Centralized IPC dispatchers  │
+│  └── components/             - React UI                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Key Patterns
+### Main Process Services (`electron/main/services/`)
 
-- **IPC Communication**: All main↔renderer communication uses typed IPC via `window.electronAPI` (defined in `src/types/index.ts`)
-- **State Management**: Zustand store (`projectStore.ts`) persists layouts; terminals recreated on startup
-- **Terminal Events**: Centralized subscription manager in `terminalEvents.ts` prevents listener leaks
-- **Shell Selection**: `TerminalManager.getShell()` auto-detects Git Bash on Windows, falls back to PowerShell. Override with `COMMAND_CENTER_SHELL` env var
-- **Claude State Detection**: `ClaudeHookWatcher` monitors hook files to detect 5 states:
-  - `busy` (blue) - Claude is working
-  - `permission` (orange) - Needs tool/command permission
-  - `question` (orange) - Asked a question via AskUserQuestion
-  - `done` (green) - Finished, awaiting new prompt
-  - `stopped` (red) - Terminal stopped or error
+| Service | Purpose |
+|---------|---------|
+| `TerminalManager.ts` | PTY spawning via node-pty, data routing, session resume, auto-naming |
+| `ClaudeHookWatcher.ts` | Polls `~/.claude/command-center-state.json` every 250ms, maps session states to terminals via BiMap |
+| `HookInstaller.ts` | Injects `claude-state-hook.cjs` into `~/.claude/settings.json` for 6 Claude Code events |
+| `ProjectPersistence.ts` | JSON file storage in `userData/projects.json`, session persistence for resume |
+| `WorktreeService.ts` | Git worktree CRUD (create, list, remove, has-changes) |
+| `GitService.ts` | Git operations (status, fetch, pull, push, commit log/detail) |
+| `GitHubService.ts` | GitHub PR status polling via `gh` CLI |
+| `AutomationService.ts` | Cron-scheduled and event-triggered automations (max 3 concurrent) |
+| `AutomationRunner.ts` | Executes automation runs in isolated worktrees |
+| `AutomationPersistence.ts` | Stores automations and run history in `userData/automations.json` |
+| `FileWatcherService.ts` | Chokidar-based file watching for file explorer and automation triggers |
+| `TaskService.ts` | Scans project files for TODO/FIXME markers |
+| `UpdateService.ts` | Auto-updates via electron-updater |
+
+### Claude State Detection (Hook System)
+
+This is the core mechanism that powers the attention indicator:
+
+1. `HookInstaller` writes into `~/.claude/settings.json` to register `claude-state-hook.cjs` for events: `PreToolUse`, `Stop`, `SessionStart`, `UserPromptSubmit`, `PermissionRequest`, `Notification`
+2. When Claude Code fires an event, it executes the hook script which reads JSON from stdin
+3. The hook maps events to states and writes atomically to `~/.claude/command-center-state.json`
+4. `ClaudeHookWatcher` polls this file, matches sessions to terminals via a BiMap (session ID ↔ terminal ID), and emits `terminal:state` events
+5. States: `busy` (blue), `permission` (orange), `question` (orange), `done` (green), `stopped` (red)
+
+### Terminal Pool & LRU Eviction
+
+xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) limits active instances (default 5, configurable 2-20):
+
+- On terminal switch: `touch()` updates LRU order
+- When over limit: evicts least-recently-used terminal (serializes scrollback, destroys xterm DOM)
+- Protected from eviction: `busy`, `permission`, `question` states; active terminal; split-view terminals
+- Eviction preference: `stopped` terminals first, then oldest by LRU
+- Main process buffers PTY data for evicted terminals (1MB cap); replayed on restore
 
 ### Data Flow
 
 1. User adds project → `project:add` IPC → `ProjectPersistence` saves to `userData/projects.json`
-2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command
-3. Chat output → `terminal:data` event → `terminalEvents` routes to specific `Terminal` component → xterm.js renders
-4. Claude state changes → `ClaudeHookWatcher` detects hook file updates → `terminal:state` event → UI shows attention indicator
+2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command (with `--resume <sessionId>` if resuming)
+3. Chat output → `terminal:data` event → `TerminalEventManager` routes to specific `Terminal` component → xterm.js renders
+4. Claude state changes → hook file → `ClaudeHookWatcher` → `terminal:state` event → UI shows attention indicator
+5. On app close → `ClaudeHookWatcher.getTerminalSessions()` captures session IDs → persisted for resume on restart
+
+### Key Patterns
+
+- **IPC Communication**: All main↔renderer communication uses typed IPC via `window.electronAPI` (defined in `src/types/index.ts`). IPC channels are namespaced: `terminal:*`, `project:*`, `worktree:*`, `fs:*`, `git:*`, `github:*`, `automation:*`, `update:*`
+- **State Management**: Single Zustand store (`projectStore.ts`) with persist middleware. Key limits: `MAX_TERMINALS_PER_PROJECT = 10`, `MAX_EDITOR_TABS = 15`
+- **Center Tab System**: `activeCenterTabId` can point to either a terminal or an editor/diff tab. `removeTerminal` has a fallback chain (next terminal → last editor tab → null)
+- **Event Dispatchers**: `terminalEvents.ts` and `fileWatcherEvents.ts` register IPC listeners ONCE globally, then dispatch to per-terminal/per-project callback maps. This prevents listener memory leaks.
+- **Shell Selection**: `TerminalManager.getShell()` auto-detects Git Bash on Windows, falls back to PowerShell. Override with `COMMAND_CENTER_SHELL` env var
+- **Input Validation**: UUID format validation on all IDs, path length bounds, cols/rows clamping
 
 ## Code Conventions
 
 - Functional React components only
 - TypeScript strict mode
-- Tailwind CSS for styling
+- Tailwind CSS for styling (all colors via CSS variables for runtime theming)
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
-- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
+- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG with 42 actions), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
 
 ## Windows Development
 
@@ -123,7 +151,7 @@ Always use complete absolute Windows paths with drive letters and backslashes fo
 
 ## Keyboard Shortcuts
 
-All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to view all shortcuts.
+All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to view all shortcuts. The hotkey system supports recording custom bindings, conflict detection, and per-action enable/disable.
 
 ### Navigation
 | Shortcut | Action |
