@@ -3,7 +3,7 @@ import { X, Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import { useProjectStore } from '../../stores/projectStore'
-import type { Automation, AutomationTrigger } from '../../types'
+import type { Automation, AutomationTrigger, GitEvent } from '../../types'
 
 interface AutomationCreateDialogProps {
   isOpen: boolean
@@ -26,7 +26,7 @@ export function AutomationCreateDialog({
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
   const [triggerType, setTriggerType] = useState<TriggerType>('schedule')
   const [cron, setCron] = useState('0 9 * * *')
-  const [gitEvent, setGitEvent] = useState<'pr-merged' | 'pr-opened' | 'checks-passed'>('pr-merged')
+  const [gitEvent, setGitEvent] = useState<GitEvent>('pr-merged')
   const [filePatterns, setFilePatterns] = useState('')
   const [cooldownSeconds, setCooldownSeconds] = useState(60)
   const [timeoutMinutes, setTimeoutMinutes] = useState(30)
@@ -250,7 +250,14 @@ export function AutomationCreateDialog({
                 <option value="pr-merged">PR Merged</option>
                 <option value="pr-opened">PR Opened</option>
                 <option value="checks-passed">Checks Passed</option>
+                <option value="merge-conflict">Merge Conflict</option>
               </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {'Variables: {{pr.number}}, {{pr.title}}, {{pr.branch}}, {{pr.url}}, {{pr.mergeable}}, {{pr.state}}'}
+              </p>
+              <p className="text-xs text-yellow-500 mt-1">
+                {'Note: PR metadata (title, branch) is user-controlled. Use caution on public repos.'}
+              </p>
             </div>
           )}
 

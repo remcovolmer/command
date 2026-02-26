@@ -15,6 +15,7 @@ export interface PRStatus {
   number?: number
   title?: string
   url?: string
+  headRefName?: string
   state?: 'OPEN' | 'CLOSED' | 'MERGED'
   mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
   mergeStateStatus?: 'CLEAN' | 'DIRTY' | 'BLOCKED' | 'UNSTABLE' | 'UNKNOWN'
@@ -26,6 +27,17 @@ export interface PRStatus {
   loading?: boolean
   error?: string
   lastUpdated?: number
+}
+
+export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict'
+
+export interface PREventContext {
+  number: number
+  title: string
+  branch: string
+  url: string
+  mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
+  state: 'OPEN' | 'CLOSED' | 'MERGED'
 }
 
 interface PollingEntry {
@@ -74,7 +86,7 @@ export class GitHubService {
         'gh',
         [
           'pr', 'view',
-          '--json', 'number,title,state,url,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,additions,deletions,changedFiles',
+          '--json', 'number,title,state,url,headRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,additions,deletions,changedFiles',
         ],
         {
           cwd: projectPath,
@@ -90,6 +102,7 @@ export class GitHubService {
         number: data.number,
         title: data.title,
         url: data.url,
+        headRefName: data.headRefName,
         state: data.state,
         mergeable: data.mergeable,
         mergeStateStatus: data.mergeStateStatus,
@@ -257,7 +270,7 @@ export class GitHubService {
 
   // Previous state tracking for event detection
   private previousStates = new Map<string, PRStatus>()
-  private prEventCallbacks: Array<(projectPath: string, event: 'pr-merged' | 'pr-opened' | 'checks-passed') => void> = []
+  private prEventCallbacks: Array<(projectPath: string, event: GitEvent, prContext: PREventContext) => void> = []
 
   private async pollOnce(key: string, projectPath: string) {
     if (this.activeRequests >= MAX_CONCURRENT) return
@@ -268,20 +281,44 @@ export class GitHubService {
 
       // Detect state transitions for automation triggers
       const prev = this.previousStates.get(key)
+
+      // Build PR event context for callbacks
+      const buildContext = (s: PRStatus): PREventContext | null => {
+        if (s.number == null) return null
+        return {
+          number: s.number,
+          title: s.title ?? '',
+          branch: s.headRefName ?? '',
+          url: s.url ?? '',
+          mergeable: s.mergeable ?? 'UNKNOWN',
+          state: s.state ?? 'OPEN',
+        }
+      }
+
       if (prev && !prev.noPR && !status.noPR) {
+        const prContext = buildContext(status)
+        if (!prContext) {
+          this.previousStates.set(key, status)
+          return
+        }
         if (prev.state === 'OPEN' && status.state === 'MERGED') {
-          this.emitPREvent(projectPath, 'pr-merged')
+          this.emitPREvent(projectPath, 'pr-merged', prContext)
         }
         // Detect checks passing
         const prevAllPass = prev.statusCheckRollup?.every(c => c.bucket === 'pass') ?? false
         const currAllPass = status.statusCheckRollup?.every(c => c.bucket === 'pass') ?? false
         if (!prevAllPass && currAllPass && (status.statusCheckRollup?.length ?? 0) > 0) {
-          this.emitPREvent(projectPath, 'checks-passed')
+          this.emitPREvent(projectPath, 'checks-passed', prContext)
+        }
+        // Detect merge conflict transition
+        if (prev.mergeable !== 'CONFLICTING' && status.mergeable === 'CONFLICTING') {
+          this.emitPREvent(projectPath, 'merge-conflict', prContext)
         }
       }
       // Detect new PR opened
       if (prev?.noPR && !status.noPR && status.state === 'OPEN') {
-        this.emitPREvent(projectPath, 'pr-opened')
+        const ctx = buildContext(status)
+        if (ctx) this.emitPREvent(projectPath, 'pr-opened', ctx)
       }
       this.previousStates.set(key, status)
     } catch {
@@ -291,13 +328,13 @@ export class GitHubService {
     }
   }
 
-  private emitPREvent(projectPath: string, event: 'pr-merged' | 'pr-opened' | 'checks-passed') {
+  private emitPREvent(projectPath: string, event: GitEvent, prContext: PREventContext) {
     for (const cb of this.prEventCallbacks) {
-      try { cb(projectPath, event) } catch { /* listener error */ }
+      try { cb(projectPath, event, prContext) } catch { /* listener error */ }
     }
   }
 
-  onPREvent(callback: (projectPath: string, event: 'pr-merged' | 'pr-opened' | 'checks-passed') => void): () => void {
+  onPREvent(callback: (projectPath: string, event: GitEvent, prContext: PREventContext) => void): () => void {
     this.prEventCallbacks.push(callback)
     return () => {
       const idx = this.prEventCallbacks.indexOf(callback)
