@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest'
-import { isHookStateData, normalizeStateFile } from '../electron/main/services/ClaudeHookWatcher'
+import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { isHookStateData, normalizeStateFile, ClaudeHookWatcher } from '../electron/main/services/ClaudeHookWatcher'
 
 function makeHookState(overrides: Record<string, unknown> = {}) {
   return {
@@ -147,5 +147,226 @@ describe('normalizeStateFile', () => {
     expect(result['a15d1620-e873-44fa-bd47-bb20d1ff35c4']).toBeDefined()
     expect(result['0b5bf2fb-5249-40fc-a186-eee346141267'].state).toBe('done')
     expect(result['a15d1620-e873-44fa-bd47-bb20d1ff35c4'].state).toBe('busy')
+  })
+})
+
+// --- Session-terminal mapping tests ---
+// These test the fix for concurrent sessions stealing each other's terminal mapping
+
+vi.mock('fs', () => ({
+  existsSync: vi.fn(() => true),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  watchFile: vi.fn(),
+  unwatchFile: vi.fn(),
+}))
+
+vi.mock('fs/promises', () => ({
+  readFile: vi.fn(),
+}))
+
+function createMockWindow() {
+  return {
+    isDestroyed: () => false,
+    webContents: { send: vi.fn() },
+  } as unknown as import('electron').BrowserWindow
+}
+
+describe('ClaudeHookWatcher session-terminal mapping', () => {
+  let watcher: ClaudeHookWatcher
+  let mockWindow: ReturnType<typeof createMockWindow>
+
+  beforeEach(() => {
+    mockWindow = createMockWindow()
+    watcher = new ClaudeHookWatcher(mockWindow)
+  })
+
+  function processState(hookState: Record<string, unknown>) {
+    // Drive the private processSessionState via type cast
+    ;(watcher as any).processSessionState(hookState)
+  }
+
+  test('registers terminal and maps session on SessionStart', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    const sessions = watcher.getTerminalSessions()
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]).toEqual({ terminalId: 't1', sessionId: 's1' })
+  })
+
+  test('two terminals in same cwd get separate sessions', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    watcher.registerTerminal('t2', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1001,
+      hook_event: 'SessionStart',
+    })
+
+    const sessions = watcher.getTerminalSessions()
+    expect(sessions).toHaveLength(2)
+    const s1 = sessions.find(s => s.sessionId === 's1')
+    const s2 = sessions.find(s => s.sessionId === 's2')
+    expect(s1?.terminalId).toBe('t1')
+    expect(s2?.terminalId).toBe('t2')
+  })
+
+  test('concurrent sessions do not steal each other on non-SessionStart events', () => {
+    // Register two terminals, assign both sessions
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    watcher.registerTerminal('t2', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1001,
+      hook_event: 'SessionStart',
+    })
+
+    // Now s1 sends a PreToolUse event — should NOT steal t2
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 2000,
+      hook_event: 'PreToolUse',
+    })
+
+    // Verify mappings are stable
+    const sessions = watcher.getTerminalSessions()
+    const s1 = sessions.find(s => s.sessionId === 's1')
+    const s2 = sessions.find(s => s.sessionId === 's2')
+    expect(s1?.terminalId).toBe('t1')
+    expect(s2?.terminalId).toBe('t2')
+  })
+
+  test('third session without a free terminal queues state instead of stealing', () => {
+    // Only 2 terminals but 3 sessions
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    watcher.registerTerminal('t2', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1001,
+      hook_event: 'SessionStart',
+    })
+
+    // Third session sends a non-SessionStart event — should be queued, not steal
+    processState({
+      session_id: 's3',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 2000,
+      hook_event: 'PreToolUse',
+    })
+
+    // s1 and s2 mappings should be unaffected
+    const sessions = watcher.getTerminalSessions()
+    expect(sessions).toHaveLength(2)
+    expect(sessions.find(s => s.sessionId === 's1')?.terminalId).toBe('t1')
+    expect(sessions.find(s => s.sessionId === 's2')?.terminalId).toBe('t2')
+    // s3 should NOT be mapped
+    expect(sessions.find(s => s.sessionId === 's3')).toBeUndefined()
+  })
+
+  test('SessionStart steals terminal when old session is dead (no SessionEnd)', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    // Session s1 starts
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    // s1 dies without SessionEnd, s2 starts in same terminal
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 2000,
+      hook_event: 'SessionStart',
+    })
+
+    // s2 should have stolen the terminal
+    const sessions = watcher.getTerminalSessions()
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]).toEqual({ terminalId: 't1', sessionId: 's2' })
+  })
+
+  test('SessionEnd cleans up session mapping', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'done',
+      timestamp: 2000,
+      hook_event: 'SessionEnd',
+    })
+
+    expect(watcher.getTerminalSessions()).toHaveLength(0)
+  })
+
+  test('unregisterTerminal cleans up all mappings', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    watcher.unregisterTerminal('t1')
+
+    expect(watcher.getTerminalSessions()).toHaveLength(0)
   })
 })
