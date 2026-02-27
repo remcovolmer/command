@@ -31,6 +31,8 @@ export interface PRStatus {
 
 export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict'
 
+export const VALID_GIT_EVENTS: readonly GitEvent[] = ['pr-merged', 'pr-opened', 'checks-passed', 'merge-conflict'] as const
+
 export interface PREventContext {
   number: number
   title: string
@@ -282,21 +284,8 @@ export class GitHubService {
       // Detect state transitions for automation triggers
       const prev = this.previousStates.get(key)
 
-      // Build PR event context for callbacks
-      const buildContext = (s: PRStatus): PREventContext | null => {
-        if (s.number == null) return null
-        return {
-          number: s.number,
-          title: s.title ?? '',
-          branch: s.headRefName ?? '',
-          url: s.url ?? '',
-          mergeable: s.mergeable ?? 'UNKNOWN',
-          state: s.state ?? 'OPEN',
-        }
-      }
-
       if (prev && !prev.noPR && !status.noPR) {
-        const prContext = buildContext(status)
+        const prContext = this.buildPREventContext(status)
         if (!prContext) {
           this.previousStates.set(key, status)
           return
@@ -317,7 +306,7 @@ export class GitHubService {
       }
       // Detect new PR opened
       if (prev?.noPR && !status.noPR && status.state === 'OPEN') {
-        const ctx = buildContext(status)
+        const ctx = this.buildPREventContext(status)
         if (ctx) this.emitPREvent(projectPath, 'pr-opened', ctx)
       }
       this.previousStates.set(key, status)
@@ -325,6 +314,18 @@ export class GitHubService {
       // Silently ignore poll errors
     } finally {
       this.activeRequests--
+    }
+  }
+
+  private buildPREventContext(status: PRStatus): PREventContext | null {
+    if (status.number == null) return null
+    return {
+      number: status.number,
+      title: status.title ?? '',
+      branch: status.headRefName ?? '',
+      url: status.url ?? '',
+      mergeable: status.mergeable ?? 'UNKNOWN',
+      state: status.state ?? 'OPEN',
     }
   }
 

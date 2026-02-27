@@ -375,18 +375,28 @@ export class AutomationService {
     const runId = randomUUID()
 
     // Template replacement for PR context variables
-    let resolvedPrompt = automation.prompt
-    if (prContext) {
-      resolvedPrompt = resolvedPrompt
-        .replace(/\{\{pr\.number\}\}/g, String(prContext.number))
-        .replace(/\{\{pr\.title\}\}/g, prContext.title)
-        .replace(/\{\{pr\.branch\}\}/g, prContext.branch)
-        .replace(/\{\{pr\.url\}\}/g, prContext.url)
-        .replace(/\{\{pr\.mergeable\}\}/g, prContext.mergeable)
-        .replace(/\{\{pr\.state\}\}/g, prContext.state)
-    }
-    // Strip unresolved {{pr.*}} tokens (e.g., when manually triggered without PR context)
-    resolvedPrompt = resolvedPrompt.replace(/\{\{pr\.\w+\}\}/g, '')
+    const sanitize = (s: string, maxLen = 200): string =>
+      s.replace(/[\r\n\t]/g, ' ').replace(/[^\x20-\x7E]/g, '').slice(0, maxLen)
+
+    const templateVars: Record<string, string> = prContext ? {
+      number: String(prContext.number),
+      title: sanitize(prContext.title),
+      branch: sanitize(prContext.branch),
+      url: sanitize(prContext.url, 500),
+      mergeable: prContext.mergeable,
+      state: prContext.state,
+    } : {}
+
+    const resolvedPrompt = automation.prompt.replace(
+      /\{\{pr\.(\w+)\}\}/g,
+      (match, key: string) => {
+        if (key in templateVars) return templateVars[key]
+        if (prContext) {
+          console.warn(`[AutomationService] Unresolved template variable: ${match}`)
+        }
+        return ''
+      }
+    )
 
     // Create run record
     const run = this.persistence.addRun({

@@ -199,6 +199,19 @@ export class WorktreeService {
     return worktrees.some(wt => wt.branch === branchName)
   }
 
+  /** Ensures worktrees are created from up-to-date refs. */
+  private async fetchAndFastForward(projectPath: string): Promise<void> {
+    try {
+      await this.execGit(projectPath, ['fetch', 'origin'])
+    } catch {
+      return
+    }
+
+    try {
+      await this.execGit(projectPath, ['pull', '--ff-only'])
+    } catch {}
+  }
+
   /**
    * Create a new worktree
    */
@@ -209,6 +222,9 @@ export class WorktreeService {
   ): Promise<{ path: string; branch: string }> {
     // Ensure .worktrees directory exists
     await this.ensureWorktreesDir(projectPath)
+
+    // Fetch + fast-forward to ensure local is up to date
+    await this.fetchAndFastForward(projectPath)
 
     // Use branch name as worktree name if not provided
     // Replace / with - for branch names like feature/auth
