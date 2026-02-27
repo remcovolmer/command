@@ -200,17 +200,14 @@ export class GitService {
         i++ // Skip the next entry (original filename)
       }
 
-      // Check for conflicts (both modified, or unmerged)
+      // Check for merge conflicts using the exact unmerged status pairs
+      // from git porcelain v1: DD, AU, UD, UA, DU, AA, UU
+      const statusPair = indexStatus + workTreeStatus
       if (
-        ['U', 'A', 'D'].includes(indexStatus) &&
-        ['U', 'A', 'D'].includes(workTreeStatus)
+        statusPair === 'DD' || statusPair === 'AU' || statusPair === 'UD' ||
+        statusPair === 'UA' || statusPair === 'DU' || statusPair === 'AA' ||
+        statusPair === 'UU'
       ) {
-        conflicted.push({ path: filePath, status: 'conflicted', staged: false })
-        continue
-      }
-
-      // More specific conflict detection
-      if (indexStatus === 'U' || workTreeStatus === 'U') {
         conflicted.push({ path: filePath, status: 'conflicted', staged: false })
         continue
       }
@@ -247,33 +244,26 @@ export class GitService {
 
   async getCommitLog(projectPath: string, skip = 0, limit = 100): Promise<GitCommitLog> {
     try {
-      // Use a delimiter that won't appear in commit messages
-      const RECORD_SEP = '---COMMIT_RECORD---'
-      const FIELD_SEP = '---FIELD---'
-      const format = [
-        '%H',   // full hash
-        '%h',   // short hash
-        '%s',   // subject (first line)
-        '%an',  // author name
-        '%aI',  // author date ISO 8601
-        '%P',   // parent hashes (space-separated)
-      ].join(FIELD_SEP)
+      // Use NUL bytes as field separators — git strips NUL from commit messages
+      // so they can never appear in %s (subject). Records separated by newlines
+      // (safe because %s is single-line only).
+      const format = ['%H', '%h', '%s', '%an', '%aI', '%P'].join('%x00')
 
       const output = await this.execGit(projectPath, [
         'log',
         `--skip=${skip}`,
         `--max-count=${limit + 1}`, // fetch one extra to detect if there are more
-        `--format=${format}${RECORD_SEP}`,
+        `--format=${format}`,
       ])
 
       if (!output) {
         return { commits: [], hasMore: false }
       }
 
-      const records = output.split(RECORD_SEP).filter((r) => r.trim())
+      const records = output.split('\n').filter((r) => r.trim())
       const hasMore = records.length > limit
       const commits: GitCommit[] = records.slice(0, limit).map((record) => {
-        const fields = record.trim().split(FIELD_SEP)
+        const fields = record.split('\0')
         return {
           hash: fields[0] || '',
           shortHash: fields[1] || '',
@@ -292,16 +282,10 @@ export class GitService {
 
   async getCommitDetail(projectPath: string, commitHash: string): Promise<GitCommitDetail | null> {
     try {
-      // Get commit metadata
-      const FIELD_SEP = '---FIELD---'
-      const format = [
-        '%H',   // full hash
-        '%B',   // full body (message)
-        '%an',  // author name
-        '%ae',  // author email
-        '%aI',  // author date
-        '%P',   // parent hashes
-      ].join(FIELD_SEP)
+      // Get commit metadata using NUL bytes as field separators.
+      // Git strips NUL from commit messages so they never appear in %B.
+      // %B is placed LAST because it can span multiple lines.
+      const format = ['%H', '%an', '%ae', '%aI', '%P', '%B'].join('%x00')
 
       const metaOutput = await this.execGit(projectPath, [
         'show',
@@ -310,11 +294,12 @@ export class GitService {
         commitHash,
       ])
 
-      const fields = metaOutput.split(FIELD_SEP)
-      const parentHashes = fields[5] ? fields[5].trim().split(' ').filter(Boolean) : []
+      const fields = metaOutput.split('\0')
+      const parentHashes = fields[4] ? fields[4].trim().split(' ').filter(Boolean) : []
       const isMerge = parentHashes.length > 1
 
       // Get file stats using diff-tree (diff against first parent)
+      // -M enables rename detection so renames show as R instead of A+D
       let filesOutput: string
       try {
         if (parentHashes.length === 0) {
@@ -323,6 +308,7 @@ export class GitService {
             'diff-tree',
             '--no-commit-id',
             '-r',
+            '-M',
             '--numstat',
             '--diff-filter=ADMR',
             commitHash,
@@ -332,6 +318,7 @@ export class GitService {
             'diff-tree',
             '--no-commit-id',
             '-r',
+            '-M',
             '--numstat',
             '--diff-filter=ADMR',
             `${parentHashes[0]}`,
@@ -350,6 +337,7 @@ export class GitService {
             'diff-tree',
             '--no-commit-id',
             '-r',
+            '-M',
             '--name-status',
             '--diff-filter=ADMR',
             commitHash,
@@ -359,6 +347,7 @@ export class GitService {
             'diff-tree',
             '--no-commit-id',
             '-r',
+            '-M',
             '--name-status',
             '--diff-filter=ADMR',
             `${parentHashes[0]}`,
@@ -397,8 +386,18 @@ export class GitService {
         const parts = line.split('\t')
         const additions = parts[0] === '-' ? 0 : parseInt(parts[0], 10) || 0
         const deletions = parts[1] === '-' ? 0 : parseInt(parts[1], 10) || 0
-        const filePath = parts[2] || ''
+        let filePath = parts[2] || ''
         if (!filePath) continue
+
+        // With -M, numstat shows renames as "{prefix/}{old => new}" or "old => new"
+        if (filePath.includes(' => ')) {
+          const braceMatch = filePath.match(/^(.*?)\{.*? => (.*?)\}(.*)$/)
+          if (braceMatch) {
+            filePath = braceMatch[1] + braceMatch[2] + braceMatch[3]
+          } else {
+            filePath = filePath.split(' => ')[1].trim()
+          }
+        }
 
         const statusInfo = statusMap.get(filePath) ?? { status: 'modified' as const }
         files.push({
@@ -412,10 +411,10 @@ export class GitService {
 
       return {
         hash: fields[0] || '',
-        fullMessage: fields[1]?.trim() || '',
-        authorName: fields[2] || '',
-        authorEmail: fields[3] || '',
-        authorDate: fields[4] || '',
+        fullMessage: fields.slice(5).join('\0').trim() || '',
+        authorName: fields[1] || '',
+        authorEmail: fields[2] || '',
+        authorDate: fields[3] || '',
         files,
         isMerge,
         parentHashes,
