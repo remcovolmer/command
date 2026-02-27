@@ -200,6 +200,26 @@ export class WorktreeService {
   }
 
   /**
+   * Fetch latest remote info and fast-forward the current branch.
+   * Ensures worktrees are created from up-to-date refs (e.g. after a PR merge on GitHub).
+   * Both operations fail silently — network errors don't block worktree creation.
+   */
+  private async fetchAndUpdateMain(projectPath: string): Promise<void> {
+    try {
+      await this.execGit(projectPath, ['fetch', 'origin'])
+    } catch {
+      // Network error — continue with what we have
+      return
+    }
+
+    try {
+      await this.execGit(projectPath, ['pull', '--ff-only'])
+    } catch {
+      // Diverged or uncommitted changes — fetch alone still helps
+    }
+  }
+
+  /**
    * Create a new worktree
    */
   async createWorktree(
@@ -209,6 +229,9 @@ export class WorktreeService {
   ): Promise<{ path: string; branch: string }> {
     // Ensure .worktrees directory exists
     await this.ensureWorktreesDir(projectPath)
+
+    // Fetch + fast-forward to ensure local is up to date
+    await this.fetchAndUpdateMain(projectPath)
 
     // Use branch name as worktree name if not provided
     // Replace / with - for branch names like feature/auth
