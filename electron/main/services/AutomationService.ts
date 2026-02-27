@@ -387,7 +387,7 @@ export class AutomationService {
       state: prContext.state,
     } : {}
 
-    let resolvedPrompt = automation.prompt.replace(
+    const resolvedPrompt = automation.prompt.replace(
       /\{\{pr\.(\w+)\}\}/g,
       (match, key: string) => {
         if (key in templateVars) return templateVars[key]
