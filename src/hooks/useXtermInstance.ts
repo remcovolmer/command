@@ -118,6 +118,8 @@ export function useXtermInstance({
     if (hasInitializedRef.current) return
     if (!isActive) return
     if (!containerRef.current) return
+    // Container must have dimensions before xterm can open (avoids 'dimensions' error)
+    if (containerRef.current.clientWidth === 0 || containerRef.current.clientHeight === 0) return
 
     hasInitializedRef.current = true
     isDisposedRef.current = false
