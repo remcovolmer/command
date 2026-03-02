@@ -290,8 +290,6 @@ export function Sidebar() {
       {/* Logo Header */}
       <div className="flex items-center gap-2 px-4 py-5">
         <LogoIcon className="w-6 h-6 text-primary" />
-          </g>
-        </svg>
         <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
       </div>
 
