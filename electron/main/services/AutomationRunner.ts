@@ -40,7 +40,7 @@ export class AutomationRunner {
   }
 
   getActiveRuns(): Map<string, ActiveRun> {
-    return this.activeRuns
+    return new Map(this.activeRuns)
   }
 
   isRunning(automationId: string): boolean {
@@ -126,6 +126,7 @@ export class AutomationRunner {
       let totalBytes = 0
       let timedOut = false
       let killed = false
+      let settled = false
 
       // Timeout
       const timer = setTimeout(() => {
@@ -158,58 +159,81 @@ export class AutomationRunner {
       })
 
       child.on('close', async (exitCode) => {
+        if (settled) return
+        settled = true
         clearTimeout(timer)
         controller.signal.removeEventListener('abort', onAbort)
-        this.activeRuns.delete(runId)
 
-        const rawOutput = Buffer.concat(chunks).toString('utf-8')
-        const stderr = Buffer.concat(stderrChunks).toString('utf-8')
-        const durationMs = Date.now() - startTime
+        // If destroy() already cleared the map, it owns worktree cleanup
+        const ownsCleanup = this.activeRuns.delete(runId)
 
-        // Parse JSON output
-        let output = rawOutput
-        let sessionId: string | undefined
         try {
-          const parsed = JSON.parse(rawOutput)
-          output = parsed.result || rawOutput
-          sessionId = parsed.session_id
-        } catch {
-          // Not valid JSON, use raw output
+          const rawOutput = Buffer.concat(chunks).toString('utf-8')
+          const stderr = Buffer.concat(stderrChunks).toString('utf-8')
+          const durationMs = Date.now() - startTime
+
+          // Parse JSON output
+          let output = rawOutput
+          let sessionId: string | undefined
+          try {
+            const parsed = JSON.parse(rawOutput)
+            output = parsed.result || rawOutput
+            sessionId = parsed.session_id
+          } catch {
+            // Not valid JSON, use raw output
+          }
+
+          // Only do worktree cleanup if destroy() hasn't taken ownership
+          let hasUncommitted = false
+          if (ownsCleanup) {
+            hasUncommitted = await this.worktreeHasChanges(worktreePath)
+            if (!hasUncommitted) {
+              await this.cleanupWorktree(projectPath, worktreePath, branchName)
+            }
+          }
+
+          resolve({
+            success: exitCode === 0 && !timedOut && !killed,
+            output,
+            sessionId,
+            exitCode,
+            timedOut,
+            durationMs,
+            error: timedOut
+              ? `Timed out after ${timeoutMinutes} minutes`
+              : killed && totalBytes > MAX_OUTPUT_BYTES
+                ? `Output exceeded ${MAX_OUTPUT_BYTES} bytes`
+                : exitCode !== 0
+                  ? stderr || `Process exited with code ${exitCode}`
+                  : undefined,
+            worktreeBranch: branchName,
+            worktreePath: ownsCleanup && hasUncommitted ? worktreePath : '',
+          })
+        } catch (err) {
+          resolve({
+            success: false,
+            output: '',
+            exitCode,
+            timedOut: false,
+            durationMs: Date.now() - startTime,
+            error: err instanceof Error ? err.message : String(err),
+            worktreeBranch: branchName,
+            worktreePath: '',
+          })
         }
-
-        // Check if worktree has uncommitted changes
-        const hasUncommitted = await this.worktreeHasChanges(worktreePath)
-
-        // Cleanup worktree if no uncommitted changes (commits already live on branch/remote)
-        if (!hasUncommitted) {
-          await this.cleanupWorktree(projectPath, worktreePath, branchName)
-        }
-
-        resolve({
-          success: exitCode === 0 && !timedOut && !killed,
-          output,
-          sessionId,
-          exitCode,
-          timedOut,
-          durationMs,
-          error: timedOut
-            ? `Timed out after ${timeoutMinutes} minutes`
-            : killed && totalBytes > MAX_OUTPUT_BYTES
-              ? `Output exceeded ${MAX_OUTPUT_BYTES} bytes`
-              : exitCode !== 0
-                ? stderr || `Process exited with code ${exitCode}`
-                : undefined,
-          worktreeBranch: branchName,
-          worktreePath: hasUncommitted ? worktreePath : '',
-        })
       })
 
       child.on('error', async (err) => {
+        if (settled) return
+        settled = true
         clearTimeout(timer)
         controller.signal.removeEventListener('abort', onAbort)
-        this.activeRuns.delete(runId)
 
-        await this.cleanupWorktree(projectPath, worktreePath, branchName)
+        const ownsCleanup = this.activeRuns.delete(runId)
+
+        if (ownsCleanup) {
+          await this.cleanupWorktree(projectPath, worktreePath, branchName)
+        }
 
         resolve({
           success: false,
@@ -233,26 +257,29 @@ export class AutomationRunner {
   }
 
   async destroy(): Promise<void> {
-    // Kill all running processes
-    for (const run of this.activeRuns.values()) {
+    // Snapshot and clear before killing — close/error handlers check the map
+    // to decide whether destroy() owns cleanup, so clearing first prevents
+    // concurrent cleanup races
+    const runs = [...this.activeRuns.values()]
+    this.activeRuns.clear()
+
+    for (const run of runs) {
       this.killProcess(run.process)
     }
 
     // Wait for Windows handle release
-    if (this.activeRuns.size > 0) {
+    if (runs.length > 0) {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
 
-    // Cleanup worktrees
-    for (const run of this.activeRuns.values()) {
+    // Force cleanup all worktrees (close handlers skipped cleanup since map was cleared)
+    for (const run of runs) {
       try {
         await this.cleanupWorktree(run.projectPath, run.worktreePath, run.worktreeBranch)
       } catch {
         // Best-effort cleanup
       }
     }
-
-    this.activeRuns.clear()
   }
 
   async garbageCollectWorktrees(projectPath: string): Promise<number> {
@@ -292,16 +319,14 @@ export class AutomationRunner {
   }
 
   private async serializedWorktreeCreate(projectPath: string, branchName: string, worktreeName?: string): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      this.worktreeLock = this.worktreeLock.then(async () => {
-        try {
-          const result = await this.worktreeService.createWorktree(projectPath, branchName, worktreeName)
-          resolve(result.path)
-        } catch (error) {
-          reject(error)
-        }
-      }).catch(reject)
+    const op = this.worktreeLock.then(async () => {
+      const result = await this.worktreeService.createWorktree(projectPath, branchName, worktreeName)
+      return result.path
     })
+    // Keep the lock chain alive regardless of success/failure so subsequent
+    // operations aren't blocked or poisoned by a prior rejection
+    this.worktreeLock = op.then(() => {}, () => {})
+    return op
   }
 
   private async worktreeHasChanges(worktreePath: string): Promise<boolean> {
