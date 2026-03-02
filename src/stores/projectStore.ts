@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, GitCommit, GitCommitLog, GitCommitDetail, CenterTab, TasksData } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, GitCommit, GitCommitLog, GitCommitDetail, CenterTab, TasksData, AccountProfile } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
@@ -65,6 +65,23 @@ interface ProjectStore {
 
   // Settings dialog state
   settingsDialogOpen: boolean
+  settingsInitialTab: string | null
+
+  // Profile state
+  profiles: AccountProfile[]
+  activeProfileId: string | null
+  projectLocalConfigs: Record<string, boolean>  // projectId -> has local config
+
+  // Profile actions
+  loadProfiles: () => Promise<void>
+  addProfile: (name: string) => Promise<AccountProfile | null>
+  updateProfile: (id: string, updates: { name: string }) => Promise<void>
+  removeProfile: (id: string) => Promise<void>
+  setActiveProfile: (id: string | null) => Promise<void>
+  setProfileEnvVars: (profileId: string, vars: Record<string, string>) => Promise<void>
+  clearProfileEnvVars: (profileId: string) => Promise<void>
+  getProfileEnvKeys: (profileId: string) => Promise<string[]>
+  checkLocalConfig: (projectId: string) => Promise<void>
 
   // Editor tab actions
   openEditorTab: (filePath: string, fileName: string, projectId: string) => void
@@ -79,7 +96,7 @@ interface ProjectStore {
   resetAllHotkeys: () => void
 
   // Settings dialog actions
-  setSettingsDialogOpen: (open: boolean) => void
+  setSettingsDialogOpen: (open: boolean, initialTab?: string | null) => void
 
   // Inactive section collapse state
   inactiveSectionCollapsed: boolean
@@ -255,6 +272,118 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Settings dialog state
       settingsDialogOpen: false,
+      settingsInitialTab: null,
+
+      // Profile state
+      profiles: [],
+      activeProfileId: null,
+      projectLocalConfigs: {},
+
+      // Profile actions
+      loadProfiles: async () => {
+        const api = getElectronAPI()
+        try {
+          const profiles = await api.profile.list()
+          const activeProfileId = await api.profile.getActive()
+          set({ profiles, activeProfileId })
+        } catch (error) {
+          console.error('Failed to load profiles:', error)
+        }
+      },
+
+      addProfile: async (name) => {
+        const api = getElectronAPI()
+        try {
+          const profile = await api.profile.add(name)
+          set((state) => ({ profiles: [...state.profiles, profile] }))
+          return profile
+        } catch (error) {
+          console.error('Failed to add profile:', error)
+          return null
+        }
+      },
+
+      updateProfile: async (id, updates) => {
+        const api = getElectronAPI()
+        try {
+          const updated = await api.profile.update(id, updates)
+          if (updated) {
+            set((state) => ({
+              profiles: state.profiles.map(p => p.id === id ? updated : p),
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to update profile:', error)
+        }
+      },
+
+      removeProfile: async (id) => {
+        const api = getElectronAPI()
+        try {
+          await api.profile.remove(id)
+          set((state) => ({
+            profiles: state.profiles.filter(p => p.id !== id),
+            activeProfileId: state.activeProfileId === id ? null : state.activeProfileId,
+          }))
+        } catch (error) {
+          console.error('Failed to remove profile:', error)
+        }
+      },
+
+      setActiveProfile: async (id) => {
+        const api = getElectronAPI()
+        try {
+          await api.profile.setActive(id)
+          set({ activeProfileId: id })
+        } catch (error) {
+          console.error('Failed to set active profile:', error)
+        }
+      },
+
+      setProfileEnvVars: async (profileId, vars) => {
+        const api = getElectronAPI()
+        try {
+          await api.profile.setEnvVars(profileId, vars)
+          // Refresh profiles to get updated envVarCount
+          const profiles = await api.profile.list()
+          set({ profiles })
+        } catch (error) {
+          console.error('Failed to set env vars:', error)
+        }
+      },
+
+      clearProfileEnvVars: async (profileId) => {
+        const api = getElectronAPI()
+        try {
+          await api.profile.clearEnvVars(profileId)
+          const profiles = await api.profile.list()
+          set({ profiles })
+        } catch (error) {
+          console.error('Failed to clear env vars:', error)
+        }
+      },
+
+      getProfileEnvKeys: async (profileId) => {
+        const api = getElectronAPI()
+        try {
+          return await api.profile.getEnvVarKeys(profileId)
+        } catch (error) {
+          console.error('Failed to get env var keys:', error)
+          return []
+        }
+      },
+
+      checkLocalConfig: async (projectId) => {
+        const api = getElectronAPI()
+        try {
+          const hasConfig = await api.project.hasLocalConfig(projectId)
+          set((state) => ({
+            projectLocalConfigs: { ...state.projectLocalConfigs, [projectId]: hasConfig },
+          }))
+        } catch (error) {
+          console.error('Failed to check local config:', error)
+        }
+      },
 
       // Editor tab actions
       openEditorTab: (filePath, fileName, projectId) =>
@@ -364,8 +493,8 @@ export const useProjectStore = create<ProjectStore>()(
       },
 
       // Settings dialog actions
-      setSettingsDialogOpen: (open) =>
-        set({ settingsDialogOpen: open }),
+      setSettingsDialogOpen: (open, initialTab) =>
+        set({ settingsDialogOpen: open, settingsInitialTab: initialTab ?? null }),
 
       // Inactive section collapse state
       inactiveSectionCollapsed: false,
@@ -1273,6 +1402,9 @@ export const useProjectStore = create<ProjectStore>()(
           if (!state.activeProjectId && projects.length > 0) {
             set({ activeProjectId: projects[0].id })
           }
+
+          // Also load profiles
+          get().loadProfiles()
         } catch (error) {
           console.error('Failed to load projects:', error)
         }
@@ -1298,6 +1430,8 @@ export const useProjectStore = create<ProjectStore>()(
         hotkeyConfig: state.hotkeyConfig,
         // Terminal pool settings
         terminalPoolSize: state.terminalPoolSize,
+        // Profile state
+        activeProfileId: state.activeProfileId,
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {

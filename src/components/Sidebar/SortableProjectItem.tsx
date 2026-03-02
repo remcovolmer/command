@@ -2,8 +2,9 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code } from 'lucide-react'
+import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code, FileText, AlertTriangle } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
+import { useProjectStore } from '../../stores/projectStore'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { ContextMenu } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
@@ -57,6 +58,14 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     transition,
     isOver,
   } = useSortable({ id: project.id })
+
+  const projectLocalConfigs = useProjectStore((s) => s.projectLocalConfigs)
+  const profilesList = useProjectStore((s) => s.profiles)
+  const hasLocalConfig = projectLocalConfigs[project.id] ?? false
+  const authMode = project.settings?.authMode ?? 'subscription'
+  const profileId = project.settings?.profileId
+  const selectedProfile = profileId ? profilesList.find(p => p.id === profileId) : null
+  const hasMismatch = authMode === 'profile' && (!profileId || !selectedProfile || selectedProfile.envVarCount === 0)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -157,6 +166,24 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <span className="flex-1 text-sm truncate" title={project.path}>
           {project.name}
         </span>
+
+        {/* Indicators */}
+        {hasLocalConfig && (
+          <span title="Has local Claude config (.claude/settings.local.json)">
+            <FileText className="w-3 h-3 shrink-0 text-blue-400" />
+          </span>
+        )}
+        {hasMismatch && (
+          <span title={
+            !profileId
+              ? 'Auth mode is Profile but no profile selected'
+              : !selectedProfile
+              ? 'Selected profile no longer exists'
+              : 'Selected profile has no environment variables configured'
+          }>
+            <AlertTriangle className="w-3 h-3 shrink-0 text-yellow-500" />
+          </span>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

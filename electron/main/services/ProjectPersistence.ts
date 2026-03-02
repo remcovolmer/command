@@ -6,9 +6,18 @@ import path from 'node:path'
 
 // NOTE: Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type ProjectType = 'workspace' | 'project' | 'code'
+type AuthMode = 'subscription' | 'profile'
+
+interface AccountProfile {
+  id: string
+  name: string
+  envVarCount: number
+}
 
 interface ProjectSettings {
   dangerouslySkipPermissions?: boolean
+  authMode?: AuthMode
+  profileId?: string
 }
 
 interface Project {
@@ -75,9 +84,11 @@ interface PersistedState {
   projects: Project[]
   worktrees: Record<string, Worktree[]>  // projectId -> worktrees
   sessions: PersistedSession[]  // Sessions to restore on startup
+  profiles: AccountProfile[]
+  activeProfileId: string | null
 }
 
-const STATE_VERSION = 4
+const STATE_VERSION = 5
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -95,7 +106,7 @@ export class ProjectPersistence {
   }
 
   private defaultState(): PersistedState {
-    return { version: STATE_VERSION, projects: [], worktrees: {}, sessions: [] }
+    return { version: STATE_VERSION, projects: [], worktrees: {}, sessions: [], profiles: [], activeProfileId: null }
   }
 
   private async loadState(): Promise<PersistedState> {
@@ -133,10 +144,9 @@ export class ProjectPersistence {
     return this.defaultState()
   }
 
-  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]>; sessions?: PersistedSession[] }): PersistedState {
+  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]>; sessions?: PersistedSession[]; profiles?: AccountProfile[]; activeProfileId?: string | null }): PersistedState {
     // Migrate from version 1 to current: add worktrees and sessions
     if (oldState.version === 1) {
-      // First migrate to v2, then to v3
       const v2State = {
         version: 2,
         projects: oldState.projects,
@@ -148,7 +158,6 @@ export class ProjectPersistence {
 
     // Migrate from version 2 to current: add project type, sessions, settings
     if (oldState.version === 2) {
-      // Filter out malformed projects before migration
       const validProjects = oldState.projects.filter(p =>
         p && typeof p === 'object' &&
         typeof p.id === 'string' &&
@@ -158,21 +167,33 @@ export class ProjectPersistence {
         ...p,
         type: 'code' as const,
       }))
-      return {
-        version: STATE_VERSION,
+      return this.migrateState({
+        version: 3,
         projects: migratedProjects,
         worktrees: oldState.worktrees ?? {},
         sessions: [],
-      }
+      })
     }
 
     // Migrate from version 3 to 4: add project settings (no-op, settings is optional)
     if (oldState.version === 3) {
+      return this.migrateState({
+        version: 4,
+        projects: oldState.projects,
+        worktrees: oldState.worktrees ?? {},
+        sessions: oldState.sessions ?? [],
+      })
+    }
+
+    // Migrate from version 4 to 5: add profiles and activeProfileId
+    if (oldState.version === 4) {
       return {
         version: STATE_VERSION,
         projects: oldState.projects,
         worktrees: oldState.worktrees ?? {},
         sessions: oldState.sessions ?? [],
+        profiles: [],
+        activeProfileId: null,
       }
     }
 
@@ -182,6 +203,8 @@ export class ProjectPersistence {
       projects: oldState.projects,
       worktrees: oldState.worktrees ?? {},
       sessions: oldState.sessions ?? [],
+      profiles: oldState.profiles ?? [],
+      activeProfileId: oldState.activeProfileId ?? null,
     }
   }
 
@@ -351,6 +374,59 @@ export class ProjectPersistence {
     this.state.sessions = []
     this.saveState()
   }
+
+  // Profile methods
+  getProfiles(): AccountProfile[] {
+    return [...this.state.profiles]
+  }
+
+  addProfile(name: string): AccountProfile {
+    const profile: AccountProfile = {
+      id: randomUUID(),
+      name,
+      envVarCount: 0,
+    }
+    this.state.profiles.push(profile)
+    this.saveState()
+    return profile
+  }
+
+  updateProfile(id: string, updates: { name?: string; envVarCount?: number }): AccountProfile | null {
+    const profile = this.state.profiles.find(p => p.id === id)
+    if (!profile) return null
+    if (updates.name !== undefined) profile.name = updates.name
+    if (updates.envVarCount !== undefined) profile.envVarCount = updates.envVarCount
+    this.saveState()
+    return profile
+  }
+
+  removeProfile(id: string): void {
+    const index = this.state.profiles.findIndex(p => p.id === id)
+    if (index !== -1) {
+      this.state.profiles.splice(index, 1)
+      // Clear activeProfileId if it was pointing to the removed profile
+      if (this.state.activeProfileId === id) {
+        this.state.activeProfileId = null
+      }
+      // Clear profileId from any project that referenced this profile
+      for (const project of this.state.projects) {
+        if (project.settings?.profileId === id) {
+          project.settings.profileId = undefined
+          project.settings.authMode = 'subscription'
+        }
+      }
+      this.saveState()
+    }
+  }
+
+  getActiveProfileId(): string | null {
+    return this.state.activeProfileId
+  }
+
+  setActiveProfileId(id: string | null): void {
+    this.state.activeProfileId = id
+    this.saveState()
+  }
 }
 
-export type { PersistedSession }
+export type { PersistedSession, AccountProfile, AuthMode }

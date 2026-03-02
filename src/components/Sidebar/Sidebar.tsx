@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
+import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X, User } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
@@ -28,6 +28,8 @@ export function Sidebar() {
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
   const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
+  const profiles = useProjectStore((s) => s.profiles)
+  const activeProfileId = useProjectStore((s) => s.activeProfileId)
 
   // Group actions together with useShallow for stable reference
   const {
@@ -42,6 +44,7 @@ export function Sidebar() {
     loadProjects,
     loadWorktrees,
     reorderProjects,
+    checkLocalConfig,
   } = useProjectStore(
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
@@ -55,6 +58,7 @@ export function Sidebar() {
       loadProjects: s.loadProjects,
       loadWorktrees: s.loadWorktrees,
       reorderProjects: s.reorderProjects,
+      checkLocalConfig: s.checkLocalConfig,
     }))
   )
 
@@ -97,6 +101,13 @@ export function Sidebar() {
       console.error('Failed to load projects:', error)
     })
   }, [loadProjects])
+
+  // Check local config for all projects after they load
+  useEffect(() => {
+    for (const project of projects) {
+      checkLocalConfig(project.id)
+    }
+  }, [projects, checkLocalConfig])
 
   // Load worktrees for active project (deferred: other projects load on-demand when selected)
   useEffect(() => {
@@ -422,9 +433,25 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-3 py-2 border-t border-border">
         <div className="flex items-center">
-          <span className="text-xs text-muted-foreground flex-1">
-            {appVersion ? `v${appVersion}` : ''}
-          </span>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-xs text-muted-foreground shrink-0">
+              {appVersion ? `v${appVersion}` : ''}
+            </span>
+            {/* Active profile badge */}
+            <button
+              onClick={() => setSettingsDialogOpen(true, 'accounts')}
+              className={`truncate px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
+                activeProfileId
+                  ? 'text-primary bg-primary/10 hover:bg-primary/20'
+                  : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted'
+              }`}
+              title={activeProfileId ? `Active: ${profiles.find(p => p.id === activeProfileId)?.name}` : 'No active profile'}
+            >
+              {activeProfileId
+                ? profiles.find(p => p.id === activeProfileId)?.name ?? 'Unknown'
+                : 'No account'}
+            </button>
+          </div>
           <div className="flex items-center gap-0.5">
             <button
               onClick={handleCheckForUpdate}
