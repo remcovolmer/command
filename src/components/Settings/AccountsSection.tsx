@@ -59,6 +59,11 @@ export function AccountsSection() {
 
   const handleSaveEnvVars = useCallback(async () => {
     if (!envEditorProfileId) return
+    const emptyKeys = envPairs.filter(p => p.key.trim() && !p.value).map(p => p.key.trim())
+    if (emptyKeys.length > 0) {
+      const proceed = window.confirm(`The following keys have empty values and will be removed:\n\n${emptyKeys.join('\n')}\n\nContinue?`)
+      if (!proceed) return
+    }
     const vars: Record<string, string> = {}
     for (const pair of envPairs) {
       const key = pair.key.trim()
@@ -188,7 +193,9 @@ export function AccountsSection() {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  removeProfile(profile.id)
+                  if (window.confirm(`Delete profile "${profile.name}"? This will remove all encrypted environment variables and reset projects using this profile.`)) {
+                    removeProfile(profile.id)
+                  }
                 }}
                 className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                 title="Delete profile"
@@ -288,7 +295,7 @@ export function AccountsSection() {
                     className="flex-1 px-2 py-1 text-xs font-mono rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <input
-                    type="text"
+                    type="password"
                     value={pair.value}
                     onChange={(e) => handleEnvPairChange(index, 'value', e.target.value)}
                     placeholder="value"

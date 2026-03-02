@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X, User } from 'lucide-react'
+import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
@@ -102,12 +102,14 @@ export function Sidebar() {
     })
   }, [loadProjects])
 
-  // Check local config for all projects after they load
+  // Check local config for all projects (only re-run when projects added/removed)
+  const checkConfigProjectIds = projects.map(p => p.id).join(',')
   useEffect(() => {
     for (const project of projects) {
       checkLocalConfig(project.id)
     }
-  }, [projects, checkLocalConfig])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkConfigProjectIds])
 
   // Load worktrees for active project (deferred: other projects load on-demand when selected)
   useEffect(() => {

@@ -13,6 +13,7 @@ interface EncryptedStore {
 export class SecureEnvStore {
   private filePath: string
   private store: EncryptedStore
+  private hasWarnedFallback = false
 
   constructor() {
     const userDataPath = app.getPath('userData')
@@ -52,11 +53,15 @@ export class SecureEnvStore {
    */
   setEnvVars(profileId: string, vars: Record<string, string>): void {
     const encrypted: Record<string, string> = {}
+    const useEncryption = safeStorage.isEncryptionAvailable()
+    if (!useEncryption && !this.hasWarnedFallback) {
+      console.warn('[SecureEnvStore] WARNING: safeStorage encryption not available. Values stored as base64 encoding only (not encrypted).')
+      this.hasWarnedFallback = true
+    }
     for (const [key, value] of Object.entries(vars)) {
-      if (safeStorage.isEncryptionAvailable()) {
+      if (useEncryption) {
         encrypted[key] = safeStorage.encryptString(value).toString('base64')
       } else {
-        // Fallback: store as base64 (not truly secure, but functional)
         encrypted[key] = Buffer.from(value).toString('base64')
       }
     }
@@ -72,9 +77,10 @@ export class SecureEnvStore {
     if (!encrypted) return {}
 
     const decrypted: Record<string, string> = {}
+    const useEncryption = safeStorage.isEncryptionAvailable()
     for (const [key, encValue] of Object.entries(encrypted)) {
       try {
-        if (safeStorage.isEncryptionAvailable()) {
+        if (useEncryption) {
           decrypted[key] = safeStorage.decryptString(Buffer.from(encValue, 'base64'))
         } else {
           decrypted[key] = Buffer.from(encValue, 'base64').toString()

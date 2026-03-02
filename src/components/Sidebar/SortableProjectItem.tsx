@@ -59,13 +59,15 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     isOver,
   } = useSortable({ id: project.id })
 
-  const projectLocalConfigs = useProjectStore((s) => s.projectLocalConfigs)
-  const profilesList = useProjectStore((s) => s.profiles)
-  const hasLocalConfig = projectLocalConfigs[project.id] ?? false
-  const authMode = project.settings?.authMode ?? 'subscription'
-  const profileId = project.settings?.profileId
-  const selectedProfile = profileId ? profilesList.find(p => p.id === profileId) : null
-  const hasMismatch = authMode === 'profile' && (!profileId || !selectedProfile || selectedProfile.envVarCount === 0)
+  const hasLocalConfig = useProjectStore((s) => s.projectLocalConfigs[project.id] ?? false)
+  const hasMismatch = useProjectStore((s) => {
+    const authMode = project.settings?.authMode ?? 'subscription'
+    const profileId = project.settings?.profileId
+    if (authMode !== 'profile') return false
+    if (!profileId) return true
+    const profile = s.profiles.find(p => p.id === profileId)
+    return !profile || profile.envVarCount === 0
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -175,11 +177,9 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         )}
         {hasMismatch && (
           <span title={
-            !profileId
+            !project.settings?.profileId
               ? 'Auth mode is Profile but no profile selected'
-              : !selectedProfile
-              ? 'Selected profile no longer exists'
-              : 'Selected profile has no environment variables configured'
+              : 'Selected profile is missing or has no environment variables'
           }>
             <AlertTriangle className="w-3 h-3 shrink-0 text-yellow-500" />
           </span>

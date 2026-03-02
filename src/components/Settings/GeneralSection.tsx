@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { AlertTriangle, FileText } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import type { AuthMode } from '../../types'
@@ -10,15 +10,7 @@ export function GeneralSection() {
   const setTerminalPoolSize = useProjectStore((s) => s.setTerminalPoolSize)
   const profiles = useProjectStore((s) => s.profiles)
   const projectLocalConfigs = useProjectStore((s) => s.projectLocalConfigs)
-  const checkLocalConfig = useProjectStore((s) => s.checkLocalConfig)
   const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
-
-  // Check local config for all projects on mount
-  useEffect(() => {
-    for (const project of projects) {
-      checkLocalConfig(project.id)
-    }
-  }, [projects, checkLocalConfig])
 
   if (projects.length === 0) {
     return (

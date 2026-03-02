@@ -32,6 +32,19 @@ const isValidUUID = (id: string): boolean =>
 const clamp = (val: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, Math.floor(val)))
 
+const BLOCKED_ENV_KEYS = new Set([
+  'PATH', 'HOME', 'USER', 'SHELL', 'COMSPEC', 'SYSTEMROOT', 'WINDIR',
+  'NODE_OPTIONS', 'ELECTRON_RUN_AS_NODE',
+  'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES',
+])
+
+function resolveEnvOverrides(project: { settings?: { authMode?: string; profileId?: string } } | undefined): Record<string, string> | undefined {
+  if (project?.settings?.authMode === 'profile' && project.settings.profileId && secureEnvStore) {
+    return secureEnvStore.getEnvVars(project.settings.profileId)
+  }
+  return undefined
+}
+
 function validateProjectPath(projectPath: string): void {
   if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
     throw new Error('Invalid project path')
@@ -214,10 +227,7 @@ async function restoreSessions(): Promise<void> {
       }
 
       // Resolve env overrides for profile auth mode
-      let envOverrides: Record<string, string> | undefined
-      if (project?.settings?.authMode === 'profile' && project.settings.profileId && secureEnvStore) {
-        envOverrides = secureEnvStore.getEnvVars(project.settings.profileId)
-      }
+      const envOverrides = resolveEnvOverrides(project)
 
       // Create terminal with --resume flag (or fresh if session file missing)
       const terminalId = terminalManager.createTerminal({
@@ -374,10 +384,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   }
 
   // Resolve env overrides for profile auth mode
-  let envOverrides: Record<string, string> | undefined
-  if (project?.settings?.authMode === 'profile' && project.settings.profileId && secureEnvStore) {
-    envOverrides = secureEnvStore.getEnvVars(project.settings.profileId)
-  }
+  const envOverrides = resolveEnvOverrides(project)
 
   // For worktree terminals, default to plan mode initial input
   const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
@@ -516,7 +523,12 @@ ipcMain.handle('project:hasLocalConfig', async (_event, projectId: string) => {
 
 // IPC Handlers for Profile operations
 ipcMain.handle('profile:list', async () => {
-  return projectPersistence?.getProfiles() ?? []
+  const profiles = projectPersistence?.getProfiles() ?? []
+  // Derive envVarCount at read time from SecureEnvStore (not from persisted state)
+  return profiles.map(p => ({
+    ...p,
+    envVarCount: secureEnvStore?.getEnvVarKeys(p.id).length ?? 0,
+  }))
 })
 
 ipcMain.handle('profile:add', async (_event, name: string) => {
@@ -557,12 +569,12 @@ ipcMain.handle('profile:setEnvVars', async (_event, profileId: string, vars: Rec
   // Validate all keys and values are strings
   for (const [key, value] of Object.entries(vars)) {
     if (typeof key !== 'string' || key.length === 0 || key.length > 200) throw new Error('Invalid env var key')
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`Invalid env var key format: ${key}`)
+    if (BLOCKED_ENV_KEYS.has(key.toUpperCase())) throw new Error(`Cannot override system env var: ${key}`)
     if (typeof value !== 'string' || value.length > 10000) throw new Error('Invalid env var value')
   }
   secureEnvStore?.setEnvVars(profileId, vars)
-  // Update envVarCount on the profile
-  const count = secureEnvStore?.getEnvVarCount(profileId) ?? 0
-  projectPersistence?.updateProfile(profileId, { envVarCount: count })
+  // envVarCount is derived at read time in profile:list, no need to persist it
 })
 
 ipcMain.handle('profile:getEnvVarKeys', async (_event, profileId: string) => {
@@ -573,7 +585,7 @@ ipcMain.handle('profile:getEnvVarKeys', async (_event, profileId: string) => {
 ipcMain.handle('profile:clearEnvVars', async (_event, profileId: string) => {
   if (!isValidUUID(profileId)) throw new Error('Invalid profile ID')
   secureEnvStore?.deleteEnvVars(profileId)
-  projectPersistence?.updateProfile(profileId, { envVarCount: 0 })
+  // envVarCount is derived at read time in profile:list, no need to persist it
 })
 
 // IPC Handlers for File System operations

@@ -188,7 +188,7 @@ export class ProjectPersistence {
     // Migrate from version 4 to 5: add profiles and activeProfileId
     if (oldState.version === 4) {
       return {
-        version: STATE_VERSION,
+        version: 5,
         projects: oldState.projects,
         worktrees: oldState.worktrees ?? {},
         sessions: oldState.sessions ?? [],
