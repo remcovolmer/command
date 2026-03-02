@@ -2,11 +2,12 @@
  * Script to generate app icons from SVG source
  * Run with: node scripts/generate-icons.mjs
  *
- * Requires: npm install sharp --save-dev
+ * Requires: npm install sharp png-to-ico --save-dev
  */
 
 import sharp from 'sharp';
-import { readFileSync, writeFileSync } from 'fs';
+import pngToIco from 'png-to-ico';
+import { readFileSync, writeFileSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,7 +18,7 @@ const publicDir = join(__dirname, '..', 'public');
 const svgPath = join(buildDir, 'icon.svg');
 const svgBuffer = readFileSync(svgPath);
 
-const sizes = [16, 32, 48, 64, 128, 256, 512, 1024];
+const sizes = [16, 32, 48, 256];
 
 async function generatePNGs() {
   console.log('Generating PNG icons...');
@@ -32,19 +33,12 @@ async function generatePNGs() {
   }
 
   // Main icon.png (256x256 for electron-builder)
-  await sharp(svgBuffer)
-    .resize(256, 256)
-    .png()
-    .toFile(join(buildDir, 'icon.png'));
-  console.log('  Created: icon.png (256x256)');
+  copyFileSync(join(buildDir, 'icon-256.png'), join(buildDir, 'icon.png'));
+  console.log('  Created: icon.png (256x256, copied from icon-256.png)');
 }
 
 async function generateICO() {
   console.log('Generating ICO file...');
-
-  // For Windows ICO, we need multiple sizes in one file
-  // sharp doesn't support ICO directly, but we can use png-to-ico
-  // For now, create the PNGs and use an online converter or ico-convert package
 
   const icoSizes = [16, 32, 48, 256];
   const pngBuffers = await Promise.all(
@@ -56,28 +50,36 @@ async function generateICO() {
     )
   );
 
-  // Create a simple ICO file (just using 256x256 for now)
-  // For proper multi-resolution ICO, use png-to-ico package
-  console.log('  Note: For proper ICO with multiple resolutions, use png-to-ico package');
-  console.log('  Run: npx png-to-ico build/icon-16.png build/icon-32.png build/icon-48.png build/icon-256.png > build/icon.ico');
+  const icoBuffer = await pngToIco(pngBuffers);
+  writeFileSync(join(buildDir, 'icon.ico'), icoBuffer);
+  console.log('  Created: icon.ico (16, 32, 48, 256)');
+}
+
+async function copyToPublic() {
+  console.log('Copying to public/...');
+
+  // Favicon PNG (32x32)
+  await sharp(svgBuffer)
+    .resize(32, 32)
+    .png()
+    .toFile(join(publicDir, 'favicon.png'));
+  console.log('  Created: public/favicon.png');
+
+  // Favicon ICO
+  copyFileSync(join(buildDir, 'icon.ico'), join(publicDir, 'favicon.ico'));
+  console.log('  Copied: public/favicon.ico');
+
+  // Favicon SVG
+  copyFileSync(join(buildDir, 'icon.svg'), join(publicDir, 'favicon.svg'));
+  console.log('  Copied: public/favicon.svg');
 }
 
 async function main() {
   try {
     await generatePNGs();
     await generateICO();
-
-    // Copy favicon to public
-    await sharp(svgBuffer)
-      .resize(32, 32)
-      .png()
-      .toFile(join(publicDir, 'favicon.png'));
-    console.log('  Created: public/favicon.png');
-
-    console.log('\nDone! Next steps:');
-    console.log('1. For Windows ICO: npx png-to-ico build/icon-16.png build/icon-32.png build/icon-48.png build/icon-256.png > build/icon.ico');
-    console.log('2. For macOS ICNS: Use iconutil on macOS or online converter');
-    console.log('3. Copy icon.ico to public/favicon.ico');
+    await copyToPublic();
+    console.log('\nDone! All icons generated and copied.');
   } catch (error) {
     console.error('Error generating icons:', error);
     process.exit(1);

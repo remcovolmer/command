@@ -12,6 +12,7 @@ import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
 import { TerminalListItem } from './TerminalListItem'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
+import { LogoIcon } from '../LogoIcon'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 
 export function Sidebar() {
@@ -275,7 +276,9 @@ export function Sidebar() {
     <div className="flex flex-col h-full bg-sidebar" data-sidebar>
       {/* Logo Header */}
       <div className="flex items-center gap-2 px-4 py-5">
-        <img src="favicon.png" alt="Command" className="w-6 h-6" />
+        <LogoIcon className="w-6 h-6 text-primary" />
+          </g>
+        </svg>
         <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
       </div>
 
