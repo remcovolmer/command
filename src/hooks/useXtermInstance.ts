@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { SerializeAddon } from '@xterm/addon-serialize'
+import { WebglAddon } from '@xterm/addon-webgl'
 import { useProjectStore } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
 import { terminalEvents } from '../utils/terminalEvents'
@@ -127,7 +128,7 @@ export function useXtermInstance({
       cursorStyle: 'block',
       fontSize,
       fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace",
-      lineHeight: 1.2,
+      lineHeight: 1.0,
       scrollback,
       theme: buildTerminalTheme(theme),
       allowProposedApi: true,
@@ -151,6 +152,20 @@ export function useXtermInstance({
     serializeAddonRef.current = serializeAddon
 
     terminal.open(containerRef.current)
+
+    // WebGL renderer for sharper block character and glyph rendering
+    let webglAddon: WebglAddon | null = null
+    try {
+      webglAddon = new WebglAddon()
+      webglAddon.onContextLoss(() => {
+        webglAddon?.dispose()
+        webglAddon = null
+      })
+      terminal.loadAddon(webglAddon)
+    } catch {
+      // WebGL not available, fall back to default canvas renderer
+      webglAddon = null
+    }
 
     // Restore serialized buffer if this terminal was previously evicted
     const wasEvicted = terminalPool.isEvicted(id)
@@ -304,6 +319,9 @@ export function useXtermInstance({
       mutationObserver.disconnect()
       terminalEvents.unsubscribe(id)
       terminalPool.unregisterCallbacks(id)
+      // Dispose WebGL addon before terminal to avoid _isDisposed race
+      try { webglAddon?.dispose() } catch { /* already disposed */ }
+      webglAddon = null
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
