@@ -124,8 +124,10 @@ export class AutomationRunner {
 
       const chunks: Buffer[] = []
       let totalBytes = 0
+      let stderrBytes = 0
       let timedOut = false
       let killed = false
+      let settled = false
 
       // Timeout
       const timer = setTimeout(() => {
@@ -140,6 +142,12 @@ export class AutomationRunner {
       }
       controller.signal.addEventListener('abort', onAbort, { once: true })
 
+      const cleanup = () => {
+        clearTimeout(timer)
+        controller.signal.removeEventListener('abort', onAbort)
+        this.activeRuns.delete(runId)
+      }
+
       // Collect stdout
       child.stdout?.on('data', (chunk: Buffer) => {
         totalBytes += chunk.length
@@ -151,16 +159,19 @@ export class AutomationRunner {
         chunks.push(chunk)
       })
 
-      // Collect stderr
+      // Collect stderr (with size limit matching stdout)
       const stderrChunks: Buffer[] = []
       child.stderr?.on('data', (chunk: Buffer) => {
-        stderrChunks.push(chunk)
+        stderrBytes += chunk.length
+        if (stderrBytes <= MAX_OUTPUT_BYTES) {
+          stderrChunks.push(chunk)
+        }
       })
 
       child.on('close', async (exitCode) => {
-        clearTimeout(timer)
-        controller.signal.removeEventListener('abort', onAbort)
-        this.activeRuns.delete(runId)
+        if (settled) return
+        settled = true
+        cleanup()
 
         const rawOutput = Buffer.concat(chunks).toString('utf-8')
         const stderr = Buffer.concat(stderrChunks).toString('utf-8')
@@ -205,9 +216,9 @@ export class AutomationRunner {
       })
 
       child.on('error', async (err) => {
-        clearTimeout(timer)
-        controller.signal.removeEventListener('abort', onAbort)
-        this.activeRuns.delete(runId)
+        if (settled) return
+        settled = true
+        cleanup()
 
         await this.cleanupWorktree(projectPath, worktreePath, branchName)
 
@@ -233,18 +244,21 @@ export class AutomationRunner {
   }
 
   async destroy(): Promise<void> {
+    // Snapshot runs before killing — close handlers delete from activeRuns during the wait
+    const runsToClean = Array.from(this.activeRuns.values())
+
     // Kill all running processes
-    for (const run of this.activeRuns.values()) {
+    for (const run of runsToClean) {
       this.killProcess(run.process)
     }
 
     // Wait for Windows handle release
-    if (this.activeRuns.size > 0) {
+    if (runsToClean.length > 0) {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
 
-    // Cleanup worktrees
-    for (const run of this.activeRuns.values()) {
+    // Force-cleanup all worktrees (close handlers may have skipped those with uncommitted changes)
+    for (const run of runsToClean) {
       try {
         await this.cleanupWorktree(run.projectPath, run.worktreePath, run.worktreeBranch)
       } catch {
