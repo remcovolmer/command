@@ -29,9 +29,18 @@ const ALLOWED_LISTENER_CHANNELS = [
 
 // NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type ProjectType = 'workspace' | 'project' | 'code'
+type AuthMode = 'subscription' | 'profile'
+
+interface AccountProfile {
+  id: string
+  name: string
+  envVarCount: number
+}
 
 interface ProjectSettings {
   dangerouslySkipPermissions?: boolean
+  authMode?: AuthMode
+  profileId?: string
 }
 
 interface Project {
@@ -303,6 +312,39 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     setActiveWatcher: (projectId: string): Promise<void> =>
       ipcRenderer.invoke('project:setActiveWatcher', projectId),
+
+    hasLocalConfig: (projectId: string): Promise<boolean> =>
+      ipcRenderer.invoke('project:hasLocalConfig', projectId),
+  },
+
+  // Profile operations
+  profile: {
+    list: (): Promise<AccountProfile[]> =>
+      ipcRenderer.invoke('profile:list'),
+
+    add: (name: string): Promise<AccountProfile> =>
+      ipcRenderer.invoke('profile:add', name),
+
+    update: (id: string, updates: { name: string }): Promise<AccountProfile | null> =>
+      ipcRenderer.invoke('profile:update', id, updates),
+
+    remove: (id: string): Promise<void> =>
+      ipcRenderer.invoke('profile:remove', id),
+
+    setActive: (id: string | null): Promise<void> =>
+      ipcRenderer.invoke('profile:setActive', id),
+
+    getActive: (): Promise<string | null> =>
+      ipcRenderer.invoke('profile:getActive'),
+
+    setEnvVars: (profileId: string, vars: Record<string, string>): Promise<void> =>
+      ipcRenderer.invoke('profile:setEnvVars', profileId, vars),
+
+    getEnvVarKeys: (profileId: string): Promise<string[]> =>
+      ipcRenderer.invoke('profile:getEnvVarKeys', profileId),
+
+    clearEnvVars: (profileId: string): Promise<void> =>
+      ipcRenderer.invoke('profile:clearEnvVars', profileId),
   },
 
   // Worktree operations

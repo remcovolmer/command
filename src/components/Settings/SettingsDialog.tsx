@@ -1,18 +1,28 @@
-import { useState } from 'react'
-import { X, Keyboard, Settings } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Keyboard, Settings, User } from 'lucide-react'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import { HotkeySection } from './HotkeySection'
 import { GeneralSection } from './GeneralSection'
+import { AccountsSection } from './AccountsSection'
+import { useProjectStore } from '../../stores/projectStore'
 
 interface SettingsDialogProps {
   isOpen: boolean
   onClose: () => void
 }
 
-type SettingsTab = 'shortcuts' | 'general'
+type SettingsTab = 'shortcuts' | 'general' | 'accounts'
 
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
+  const settingsInitialTab = useProjectStore((s) => s.settingsInitialTab)
   const [activeTab, setActiveTab] = useState<SettingsTab>('shortcuts')
+
+  // Apply initial tab from store when dialog opens
+  useEffect(() => {
+    if (isOpen && settingsInitialTab) {
+      setActiveTab(settingsInitialTab as SettingsTab)
+    }
+  }, [isOpen, settingsInitialTab])
 
   // Close on Escape
   useDialogHotkeys(onClose, undefined, { enabled: isOpen })
@@ -67,12 +77,24 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             <Settings className="w-4 h-4" />
             General
           </button>
+          <button
+            onClick={() => setActiveTab('accounts')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === 'accounts'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            Accounts
+          </button>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {activeTab === 'shortcuts' && <HotkeySection />}
           {activeTab === 'general' && <GeneralSection />}
+          {activeTab === 'accounts' && <AccountsSection />}
         </div>
       </div>
     </div>

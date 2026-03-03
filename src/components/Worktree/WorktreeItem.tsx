@@ -1,6 +1,6 @@
 import { memo, useEffect, useCallback } from 'react'
-import { GitBranch, Trash2, ExternalLink, GitMerge, AlertTriangle, CheckCircle2, XCircle, Clock, RefreshCw } from 'lucide-react'
-import type { Worktree, TerminalSession, PRStatus } from '../../types'
+import { GitBranch, Trash2, ExternalLink, GitMerge, AlertTriangle, CheckCircle2, XCircle, Clock, RefreshCw, Loader2 } from 'lucide-react'
+import type { Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
@@ -45,6 +45,39 @@ function ReviewBadge({ decision }: { decision: PRStatus['reviewDecision'] }) {
     <span className={`text-[10px] px-1 py-0.5 rounded ${info.cls}`} title={`Review: ${decision}`}>
       {info.label}
     </span>
+  )
+}
+
+function MergeButton({ checks, onMerge }: { checks: PRCheckStatus[]; onMerge: () => void }) {
+  const failNames = checks.filter(c => c.bucket === 'fail').map(c => c.name)
+  const pendingNames = checks.filter(c => c.bucket === 'pending').map(c => c.name)
+  const anyFail = failNames.length > 0
+  const anyPending = pendingNames.length > 0
+
+  const btnColor = anyFail
+    ? 'bg-red-600 hover:bg-red-700'
+    : anyPending
+      ? 'bg-yellow-600 hover:bg-yellow-700'
+      : 'bg-green-600 hover:bg-green-700'
+
+  const title = anyFail
+    ? `Merge & Squash (checks failing: ${failNames.join(', ')})`
+    : anyPending
+      ? `Merge & Squash (checks running: ${pendingNames.join(', ')})`
+      : 'Merge & Squash this PR'
+
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onMerge() }}
+      className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-white transition-colors ml-auto ${btnColor}`}
+      title={title}
+    >
+      {anyPending && !anyFail
+        ? <Loader2 className="w-3 h-3 animate-spin" />
+        : <GitMerge className="w-3 h-3" />
+      }
+      Merge
+    </button>
   )
 }
 
@@ -112,9 +145,23 @@ export const WorktreeItem = memo(function WorktreeItem({
     try {
       // Check for uncommitted changes before merging
       const hasChanges = await api.worktree.hasChanges(worktree.id)
-      const message = hasChanges
-        ? `Merge & Squash PR #${prStatus.number}?\n\nWARNING: This worktree has uncommitted changes that will be lost.\n\nThis will also remove the worktree.`
-        : `Merge & Squash PR #${prStatus.number}?\n\nThis will also remove the worktree.`
+
+      // Build warning message parts
+      const warnings: string[] = []
+      const currentChecks = prStatus?.statusCheckRollup ?? []
+      const failingChecks = currentChecks.filter(c => c.bucket === 'fail')
+      const pendingChecks = currentChecks.filter(c => c.bucket === 'pending')
+      if (failingChecks.length > 0) {
+        warnings.push(`WARNING: Some checks are failing (${failingChecks.map(c => c.name).join(', ')}).`)
+      } else if (pendingChecks.length > 0) {
+        warnings.push(`WARNING: Some checks are still running.`)
+      }
+      if (hasChanges) {
+        warnings.push(`WARNING: This worktree has uncommitted changes that will be lost.`)
+      }
+
+      const warningBlock = warnings.length > 0 ? `\n\n${warnings.join('\n\n')}\n\n` : '\n\n'
+      const message = `Merge & Squash PR #${prStatus.number}?${warningBlock}This will also remove the worktree.`
       const confirmed = window.confirm(message)
       if (!confirmed) return
 
@@ -176,11 +223,10 @@ export const WorktreeItem = memo(function WorktreeItem({
   const visibleStates = ['busy', 'done', 'permission', 'question'] as const
   const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
-  // Merge button visibility
-  const canMerge = prStatus && !prStatus.noPR &&
+  // Merge button visibility (show for any open, conflict-free PR)
+  const showMergeButton = prStatus && !prStatus.noPR &&
     prStatus.state === 'OPEN' &&
-    prStatus.mergeable === 'MERGEABLE' &&
-    prStatus.mergeStateStatus === 'CLEAN'
+    prStatus.mergeable === 'MERGEABLE'
 
   const hasPR = prStatus && !prStatus.noPR && prStatus.state === 'OPEN'
   const hasConflicts = prStatus?.mergeable === 'CONFLICTING'
@@ -286,15 +332,8 @@ export const WorktreeItem = memo(function WorktreeItem({
           <ReviewBadge decision={prStatus.reviewDecision} />
 
           {/* Merge button */}
-          {canMerge && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleMerge() }}
-              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 transition-colors ml-auto"
-              title="Merge & Squash this PR"
-            >
-              <GitMerge className="w-3 h-3" />
-              Merge
-            </button>
+          {showMergeButton && (
+            <MergeButton checks={prStatus.statusCheckRollup ?? []} onMerge={handleMerge} />
           )}
         </div>
       )}

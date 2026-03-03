@@ -124,6 +124,7 @@ export class AutomationRunner {
 
       const chunks: Buffer[] = []
       let totalBytes = 0
+      let stderrBytes = 0
       let timedOut = false
       let killed = false
       let settled = false
@@ -152,10 +153,13 @@ export class AutomationRunner {
         chunks.push(chunk)
       })
 
-      // Collect stderr
+      // Collect stderr (with size limit matching stdout)
       const stderrChunks: Buffer[] = []
       child.stderr?.on('data', (chunk: Buffer) => {
-        stderrChunks.push(chunk)
+        stderrBytes += chunk.length
+        if (stderrBytes <= MAX_OUTPUT_BYTES) {
+          stderrChunks.push(chunk)
+        }
       })
 
       child.on('close', async (exitCode) => {
