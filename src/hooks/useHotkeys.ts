@@ -5,6 +5,16 @@ import { matchesBinding, DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys';
 
 type HotkeyHandlers = Partial<Record<HotkeyAction, () => void>>;
 
+// Module-level flag to suppress hotkey actions while recording a new binding.
+// Without this, pressing e.g. Ctrl+T in the recorder would both record the
+// binding AND create a new terminal, because both listeners sit on `window`
+// in the capture phase and stopPropagation doesn't block same-element listeners.
+let _hotkeyRecordingActive = false;
+
+export function setHotkeyRecordingActive(active: boolean): void {
+  _hotkeyRecordingActive = active;
+}
+
 interface UseHotkeysOptions {
   /** Whether hotkeys are enabled (default: true) */
   enabled?: boolean;
@@ -43,6 +53,9 @@ export function useHotkeys(
   configRef.current = hotkeyConfig;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Suppress all hotkey actions while the HotkeyRecorder overlay is active
+    if (_hotkeyRecordingActive) return;
+
     // Don't handle if typing in input, textarea, or contenteditable
     // Exception: xterm.js uses a hidden textarea for keyboard input - allow hotkeys there
     const target = e.target as HTMLElement;
