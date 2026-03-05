@@ -354,6 +354,34 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     expect(watcher.getTerminalSessions()).toHaveLength(0)
   })
 
+  test('duplicate timestamp for same session does not emit twice', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    const sendSpy = (mockWindow.webContents.send as ReturnType<typeof vi.fn>)
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    // Same session, same timestamp (re-read scenario)
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    // Should only have emitted once
+    const stateEmissions = sendSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'terminal:state'
+    )
+    expect(stateEmissions).toHaveLength(1)
+  })
+
   test('unregisterTerminal cleans up all mappings', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
 
