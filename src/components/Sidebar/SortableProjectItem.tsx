@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code, FileText, AlertTriangle } from 'lucide-react'
+import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code, Coins, AlertTriangle } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
@@ -59,7 +59,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     isOver,
   } = useSortable({ id: project.id })
 
-  const hasLocalConfig = useProjectStore((s) => s.projectLocalConfigs[project.id] ?? false)
+  const hasVertexConfig = useProjectStore((s) => s.projectVertexConfigs[project.id] ?? false)
   const hasMismatch = useProjectStore((s) => {
     const authMode = project.settings?.authMode ?? 'subscription'
     const profileId = project.settings?.profileId
@@ -170,9 +170,9 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         </span>
 
         {/* Indicators */}
-        {hasLocalConfig && (
-          <span title="Has local Claude config (.claude/settings.local.json)">
-            <FileText className="w-3 h-3 shrink-0 text-blue-400" />
+        {hasVertexConfig && (
+          <span title="Vertex AI configured via .claude/settings.local.json">
+            <Coins className="w-3 h-3 shrink-0 text-blue-400" />
           </span>
         )}
         {hasMismatch && (
