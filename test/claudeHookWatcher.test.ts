@@ -354,6 +354,88 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     expect(watcher.getTerminalSessions()).toHaveLength(0)
   })
 
+  test('duplicate state re-reads are suppressed (same timestamp+event+state)', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    // Re-process the exact same state (simulates file re-read when another session changed)
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    // Should have emitted only once
+    const send = (mockWindow.webContents.send as ReturnType<typeof vi.fn>)
+    const stateEmissions = send.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'terminal:state' && call[1] === 't1'
+    )
+    expect(stateEmissions).toHaveLength(1)
+  })
+
+  test('different event at same timestamp is NOT suppressed', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    // Different event at same timestamp
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'PreToolUse',
+    })
+
+    const send = (mockWindow.webContents.send as ReturnType<typeof vi.fn>)
+    const stateEmissions = send.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'terminal:state' && call[1] === 't1'
+    )
+    expect(stateEmissions).toHaveLength(2)
+  })
+
+  test('different state at same timestamp is NOT suppressed', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'PreToolUse',
+    })
+
+    // Same timestamp, same event, different state
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'permission',
+      timestamp: 1000,
+      hook_event: 'PermissionRequest',
+    })
+
+    const send = (mockWindow.webContents.send as ReturnType<typeof vi.fn>)
+    const stateEmissions = send.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'terminal:state' && call[1] === 't1'
+    )
+    expect(stateEmissions).toHaveLength(2)
+  })
+
   test('unregisterTerminal cleans up all mappings', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
 
