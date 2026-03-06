@@ -313,8 +313,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setActiveWatcher: (projectId: string): Promise<void> =>
       ipcRenderer.invoke('project:setActiveWatcher', projectId),
 
-    hasLocalConfig: (projectId: string): Promise<boolean> =>
-      ipcRenderer.invoke('project:hasLocalConfig', projectId),
+    hasVertexConfig: (projectId: string): Promise<boolean> =>
+      ipcRenderer.invoke('project:hasVertexConfig', projectId),
   },
 
   // Profile operations

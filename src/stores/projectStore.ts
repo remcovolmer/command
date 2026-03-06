@@ -70,7 +70,7 @@ interface ProjectStore {
   // Profile state
   profiles: AccountProfile[]
   activeProfileId: string | null
-  projectLocalConfigs: Record<string, boolean>  // projectId -> has local config
+  projectVertexConfigs: Record<string, boolean>  // projectId -> has Vertex AI configured
 
   // Profile actions
   loadProfiles: () => Promise<void>
@@ -81,7 +81,7 @@ interface ProjectStore {
   setProfileEnvVars: (profileId: string, vars: Record<string, string>) => Promise<void>
   clearProfileEnvVars: (profileId: string) => Promise<void>
   getProfileEnvKeys: (profileId: string) => Promise<string[]>
-  checkLocalConfig: (projectId: string) => Promise<void>
+  checkVertexConfig: (projectId: string) => Promise<void>
 
   // Editor tab actions
   openEditorTab: (filePath: string, fileName: string, projectId: string) => void
@@ -277,7 +277,7 @@ export const useProjectStore = create<ProjectStore>()(
       // Profile state
       profiles: [],
       activeProfileId: null,
-      projectLocalConfigs: {},
+      projectVertexConfigs: {},
 
       // Profile actions
       loadProfiles: async () => {
@@ -373,15 +373,15 @@ export const useProjectStore = create<ProjectStore>()(
         }
       },
 
-      checkLocalConfig: async (projectId) => {
+      checkVertexConfig: async (projectId) => {
         const api = getElectronAPI()
         try {
-          const hasConfig = await api.project.hasLocalConfig(projectId)
+          const hasConfig = await api.project.hasVertexConfig(projectId)
           set((state) => ({
-            projectLocalConfigs: { ...state.projectLocalConfigs, [projectId]: hasConfig },
+            projectVertexConfigs: { ...state.projectVertexConfigs, [projectId]: hasConfig },
           }))
         } catch (error) {
-          console.error('Failed to check local config:', error)
+          console.error('Failed to check Vertex config:', error)
         }
       },
 

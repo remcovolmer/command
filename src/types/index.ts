@@ -380,7 +380,7 @@ export interface ElectronAPI {
     selectFolder: () => Promise<string | null>;
     reorder: (projectIds: string[]) => Promise<Project[]>;
     setActiveWatcher: (projectId: string) => Promise<void>;
-    hasLocalConfig: (projectId: string) => Promise<boolean>;
+    hasVertexConfig: (projectId: string) => Promise<boolean>;
   };
   profile: {
     list: () => Promise<AccountProfile[]>;

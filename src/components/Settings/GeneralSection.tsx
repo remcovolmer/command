@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, FileText } from 'lucide-react'
+import { AlertTriangle, Coins } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import type { AuthMode } from '../../types'
 
@@ -9,7 +9,7 @@ export function GeneralSection() {
   const terminalPoolSize = useProjectStore((s) => s.terminalPoolSize)
   const setTerminalPoolSize = useProjectStore((s) => s.setTerminalPoolSize)
   const profiles = useProjectStore((s) => s.profiles)
-  const projectLocalConfigs = useProjectStore((s) => s.projectLocalConfigs)
+  const projectVertexConfigs = useProjectStore((s) => s.projectVertexConfigs)
   const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
 
   if (projects.length === 0) {
@@ -100,7 +100,7 @@ export function GeneralSection() {
           const skipPermissions = project.settings?.dangerouslySkipPermissions ?? false
           const authMode = project.settings?.authMode ?? 'subscription'
           const profileId = project.settings?.profileId
-          const hasLocalConfig = projectLocalConfigs[project.id] ?? false
+          const hasVertexConfig = projectVertexConfigs[project.id] ?? false
 
           return (
             <div
@@ -112,14 +112,14 @@ export function GeneralSection() {
                   <h4 className="text-sm font-medium text-foreground truncate">{project.name}</h4>
                   <p className="text-xs text-muted-foreground truncate">{project.path}</p>
                 </div>
-                {/* Local config indicator */}
-                {hasLocalConfig && (
+                {/* Vertex AI indicator */}
+                {hasVertexConfig && (
                   <span
                     className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-500/10 text-blue-500 shrink-0"
-                    title="This project has a local Claude config file (.claude/settings.local.json)"
+                    title="Vertex AI configured via .claude/settings.local.json"
                   >
-                    <FileText className="w-3 h-3" />
-                    Local Config
+                    <Coins className="w-3 h-3" />
+                    Vertex AI
                   </span>
                 )}
               </div>

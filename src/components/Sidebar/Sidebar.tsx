@@ -44,7 +44,7 @@ export function Sidebar() {
     loadProjects,
     loadWorktrees,
     reorderProjects,
-    checkLocalConfig,
+    checkVertexConfig,
   } = useProjectStore(
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
@@ -58,7 +58,7 @@ export function Sidebar() {
       loadProjects: s.loadProjects,
       loadWorktrees: s.loadWorktrees,
       reorderProjects: s.reorderProjects,
-      checkLocalConfig: s.checkLocalConfig,
+      checkVertexConfig: s.checkVertexConfig,
     }))
   )
 
@@ -102,11 +102,11 @@ export function Sidebar() {
     })
   }, [loadProjects])
 
-  // Check local config for all projects (only re-run when projects added/removed)
+  // Check Vertex config for all projects (only re-run when projects added/removed)
   const checkConfigProjectIds = projects.map(p => p.id).join(',')
   useEffect(() => {
     for (const project of projects) {
-      checkLocalConfig(project.id)
+      checkVertexConfig(project.id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkConfigProjectIds])

@@ -508,14 +508,16 @@ ipcMain.handle('project:setActiveWatcher', async (_event, projectId: string) => 
   await fileWatcherService?.switchTo(project.id, project.path)
 })
 
-ipcMain.handle('project:hasLocalConfig', async (_event, projectId: string) => {
+ipcMain.handle('project:hasVertexConfig', async (_event, projectId: string) => {
   if (!isValidUUID(projectId)) throw new Error('Invalid project ID')
   const projects = projectPersistence?.getProjects() ?? []
   const project = projects.find(p => p.id === projectId)
   if (!project) return false
   try {
-    await fs.access(path.join(project.path, '.claude', 'settings.local.json'))
-    return true
+    const filePath = path.join(project.path, '.claude', 'settings.local.json')
+    const content = await fs.readFile(filePath, 'utf-8')
+    const parsed = JSON.parse(content) as { env?: { CLAUDE_CODE_USE_VERTEX?: string } } | null
+    return parsed?.env?.CLAUDE_CODE_USE_VERTEX === '1'
   } catch {
     return false
   }
