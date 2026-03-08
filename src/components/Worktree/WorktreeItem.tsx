@@ -207,22 +207,6 @@ export const WorktreeItem = memo(function WorktreeItem({
     }
   }, [terminal, onSelectTerminal, onCreateTerminal])
 
-  // Claude Code state indicator dots
-  const stateDots: Record<string, string> = {
-    busy: 'bg-blue-500',
-    permission: 'bg-orange-500',
-    question: 'bg-orange-500',
-    done: 'bg-green-500',
-    stopped: 'bg-red-500',
-  }
-
-  const inputStates = ['done', 'permission', 'question'] as const
-  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
-
-  // Only show dot for visible states (not idle/stopped)
-  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
-  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
-
   // Merge button visibility (show for any open, conflict-free PR)
   const showMergeButton = prStatus && !prStatus.noPR &&
     prStatus.state === 'OPEN' &&

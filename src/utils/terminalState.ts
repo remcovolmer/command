@@ -2,7 +2,7 @@ import type { TerminalState } from '../types'
 
 // State dot colors for terminal indicators
 export const STATE_DOT_COLORS: Record<TerminalState, string> = {
-  busy: 'bg-gray-400',
+  busy: 'bg-blue-500',
   permission: 'bg-orange-500',
   question: 'bg-orange-500',
   done: 'bg-green-500',
@@ -11,7 +11,7 @@ export const STATE_DOT_COLORS: Record<TerminalState, string> = {
 
 // State text colors for terminal icons
 export const STATE_TEXT_COLORS: Record<TerminalState, string> = {
-  busy: 'text-gray-400',
+  busy: 'text-blue-500',
   permission: 'text-orange-500',
   question: 'text-orange-500',
   done: 'text-green-500',
