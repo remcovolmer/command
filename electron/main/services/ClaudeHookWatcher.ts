@@ -82,8 +82,10 @@ export class ClaudeHookWatcher {
   // Multiple terminals can share same cwd (e.g., split terminals)
   private cwdToTerminals: Map<string, Set<string>> = new Map()
 
-  // Per-session timestamp tracking for deduplication
-  private lastProcessedTimestamps: Map<string, number> = new Map()
+  // Per-session composite state tracking for deduplication
+  // Tracks timestamp + hookEvent + state to distinguish genuine state changes
+  // from unchanged sessions being re-read during polling
+  private lastProcessedState: Map<string, { timestamp: number; hookEvent: string; state: string }> = new Map()
 
   // Guard to prevent concurrent async reads
   private isReading: boolean = false
@@ -116,14 +118,14 @@ export class ClaudeHookWatcher {
       this.terminalToSession.delete(terminalId)
     }
     this.sessionToTerminal.delete(sessionId)
-    this.lastProcessedTimestamps.delete(sessionId)
+    this.lastProcessedState.delete(sessionId)
   }
 
   private clearSessionMappingByTerminal(terminalId: string): void {
     const sessionId = this.terminalToSession.get(terminalId)
     if (sessionId) {
       this.sessionToTerminal.delete(sessionId)
-      this.lastProcessedTimestamps.delete(sessionId)
+      this.lastProcessedState.delete(sessionId)
     }
     this.terminalToSession.delete(terminalId)
   }
@@ -238,13 +240,28 @@ export class ClaudeHookWatcher {
     const sessionId = hookState.session_id
     if (!sessionId) return
 
-    // Skip if we've already processed this timestamp for this session
-    // Use strict less-than to allow same-millisecond events (sub-millisecond timing edge case)
-    const lastTimestamp = this.lastProcessedTimestamps.get(sessionId) || 0
-    if (hookState.timestamp < lastTimestamp) {
-      return  // Only skip if timestamp is older (not equal)
+    // Composite deduplication: skip if timestamp is stale, or if timestamp+event+state
+    // are identical (unchanged session re-read during polling). This prevents duplicate
+    // IPC emissions when one session updates the shared state file and other sessions
+    // get re-read with unchanged data.
+    const last = this.lastProcessedState.get(sessionId)
+    if (last) {
+      if (hookState.timestamp < last.timestamp) {
+        return  // Stale event
+      }
+      if (
+        hookState.timestamp === last.timestamp &&
+        hookState.hook_event === last.hookEvent &&
+        hookState.state === last.state
+      ) {
+        return  // Duplicate re-read of unchanged session
+      }
     }
-    this.lastProcessedTimestamps.set(sessionId, hookState.timestamp)
+    this.lastProcessedState.set(sessionId, {
+      timestamp: hookState.timestamp,
+      hookEvent: hookState.hook_event,
+      state: hookState.state,
+    })
 
     const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
 
@@ -428,7 +445,7 @@ export class ClaudeHookWatcher {
     this.sessionToTerminal.clear()
     this.terminalToSession.clear()
     this.cwdToTerminals.clear()
-    this.lastProcessedTimestamps.clear()
+    this.lastProcessedState.clear()
     this.pendingStates.clear()
     this.stateChangeCallbacks.length = 0
   }

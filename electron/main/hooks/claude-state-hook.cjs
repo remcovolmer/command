@@ -7,6 +7,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // Configuration constants
 const STALE_SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
@@ -25,7 +26,7 @@ process.stdin.on('end', async () => {
     }
 
     const stateFile = path.join(
-      process.env.HOME || process.env.USERPROFILE,
+      process.env.HOME || process.env.USERPROFILE || os.homedir(),
       '.claude',
       'command-center-state.json'
     );
