@@ -238,11 +238,12 @@ export class ClaudeHookWatcher {
     const sessionId = hookState.session_id
     if (!sessionId) return
 
-    // Skip if we've already processed this timestamp for this session
-    // Use strict less-than to allow same-millisecond events (sub-millisecond timing edge case)
+    // Skip if we've already processed this exact timestamp for this session.
+    // The state file has one entry per session_id, so equal timestamps mean
+    // the same event was re-read (e.g. during pendingRead re-read loop).
     const lastTimestamp = this.lastProcessedTimestamps.get(sessionId) || 0
-    if (hookState.timestamp < lastTimestamp) {
-      return  // Only skip if timestamp is older (not equal)
+    if (hookState.timestamp <= lastTimestamp) {
+      return
     }
     this.lastProcessedTimestamps.set(sessionId, hookState.timestamp)
 

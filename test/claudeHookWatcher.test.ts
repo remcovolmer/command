@@ -354,6 +354,62 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     expect(watcher.getTerminalSessions()).toHaveLength(0)
   })
 
+  test('same timestamp is deduplicated (no duplicate emissions on re-read)', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    const sendSpy = (mockWindow.webContents.send as ReturnType<typeof vi.fn>)
+    const callCountAfterFirst = sendSpy.mock.calls.length
+
+    // Re-process the exact same state (simulates pendingRead re-read)
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    // Should NOT have emitted again — same timestamp means same event re-read
+    expect(sendSpy.mock.calls.length).toBe(callCountAfterFirst)
+  })
+
+  test('newer timestamp for same session is processed', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    const sendSpy = (mockWindow.webContents.send as ReturnType<typeof vi.fn>)
+    const callCountAfterFirst = sendSpy.mock.calls.length
+
+    // Process a newer state update
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'done',
+      timestamp: 2000,
+      hook_event: 'Stop',
+    })
+
+    // Should have emitted the new state
+    expect(sendSpy.mock.calls.length).toBe(callCountAfterFirst + 1)
+    const lastCall = sendSpy.mock.calls[sendSpy.mock.calls.length - 1]
+    expect(lastCall).toEqual(['terminal:state', 't1', 'done'])
+  })
+
   test('unregisterTerminal cleans up all mappings', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
 
