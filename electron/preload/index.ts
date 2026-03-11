@@ -349,8 +349,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Worktree operations
   worktree: {
-    create: (projectId: string, branchName: string, worktreeName?: string): Promise<Worktree> =>
-      ipcRenderer.invoke('worktree:create', projectId, branchName, worktreeName),
+    create: (projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string): Promise<Worktree> =>
+      ipcRenderer.invoke('worktree:create', projectId, branchName, worktreeName, sourceBranch),
 
     list: (projectId: string): Promise<Worktree[]> =>
       ipcRenderer.invoke('worktree:list', projectId),

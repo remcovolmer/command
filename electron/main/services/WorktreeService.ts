@@ -218,7 +218,8 @@ export class WorktreeService {
   async createWorktree(
     projectPath: string,
     branchName: string,
-    worktreeName?: string
+    worktreeName?: string,
+    sourceBranch?: string
   ): Promise<{ path: string; branch: string }> {
     // Ensure .worktrees directory exists
     await this.ensureWorktreesDir(projectPath)
@@ -267,8 +268,18 @@ export class WorktreeService {
           worktreePath,
           `origin/${branchName}`,
         ])
+      } else if (sourceBranch) {
+        // Create new branch based on explicit source branch
+        await this.execGit(projectPath, [
+          'worktree',
+          'add',
+          '-b',
+          branchName,
+          worktreePath,
+          sourceBranch,
+        ])
       } else {
-        // Create new branch based on current HEAD
+        // Create new branch based on current HEAD (default behavior)
         await this.execGit(projectPath, [
           'worktree',
           'add',
