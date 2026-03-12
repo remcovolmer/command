@@ -29,6 +29,7 @@ export function CreateWorktreeDialog({
   const [newBranchName, setNewBranchName] = useState('')
   const [customName, setCustomName] = useState('')
   const [isNewBranch, setIsNewBranch] = useState(false)
+  const [sourceBranch, setSourceBranch] = useState('main')
 
   // Determine if form is valid for submission
   const canSubmit = !loading && !creating && (
@@ -53,6 +54,19 @@ export function CreateWorktreeDialog({
         if (available.length > 0) {
           setSelectedBranch(available[0])
         }
+        // Default source branch: prefer main (local first, then remote), else current
+        const remoteOnly = remote.filter(b => !local.includes(b))
+        if (local.includes('main')) {
+          setSourceBranch('main')
+        } else if (remoteOnly.includes('main')) {
+          setSourceBranch('origin/main')
+        } else if (current && local.includes(current)) {
+          setSourceBranch(current)
+        } else if (local.length > 0) {
+          setSourceBranch(local[0])
+        } else if (remoteOnly.length > 0) {
+          setSourceBranch(`origin/${remoteOnly[0]}`)
+        }
       })
       .catch((err) => {
         setError(err.message || 'Failed to load branches')
@@ -69,6 +83,7 @@ export function CreateWorktreeDialog({
       setNewBranchName('')
       setCustomName('')
       setIsNewBranch(false)
+      setSourceBranch('main')
       setError(null)
     }
   }, [isOpen])
@@ -87,7 +102,8 @@ export function CreateWorktreeDialog({
       const worktree = await api.worktree.create(
         projectId,
         branchName,
-        customName.trim() || undefined
+        customName.trim() || undefined,
+        isNewBranch ? sourceBranch || undefined : undefined
       )
       onCreated(worktree)
       onClose()
@@ -97,7 +113,7 @@ export function CreateWorktreeDialog({
     } finally {
       setCreating(false)
     }
-  }, [api, projectId, isNewBranch, newBranchName, selectedBranch, customName, onCreated, onClose])
+  }, [api, projectId, isNewBranch, newBranchName, selectedBranch, customName, sourceBranch, onCreated, onClose])
 
   // Keyboard shortcuts: Escape to close, Enter to confirm
   useDialogHotkeys(
@@ -106,15 +122,18 @@ export function CreateWorktreeDialog({
     { enabled: isOpen, canConfirm: !!canSubmit }
   )
 
+  // Remote branches not already in local
+  const remoteOnlyBranches = useMemo(() =>
+    remoteBranches.filter(b => !localBranches.includes(b)),
+    [localBranches, remoteBranches]
+  )
+
   // Filter out current branch and already used branches
   const availableBranches = useMemo(() => {
     const local = localBranches.filter(b => b !== currentBranch)
-    // Add remote branches that aren't in local
-    const remoteOnly = remoteBranches.filter(b =>
-      !localBranches.includes(b) && b !== currentBranch
-    )
-    return { local, remote: remoteOnly }
-  }, [localBranches, remoteBranches, currentBranch])
+    const remote = remoteOnlyBranches.filter(b => b !== currentBranch)
+    return { local, remote }
+  }, [localBranches, remoteOnlyBranches, currentBranch])
 
   if (!isOpen) return null
 
@@ -216,19 +235,48 @@ export function CreateWorktreeDialog({
 
               {/* New Branch Input */}
               {isNewBranch && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Branch Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newBranchName}
-                    onChange={(e) => setNewBranchName(e.target.value)}
-                    placeholder="feature/my-feature"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    autoFocus
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Branch Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newBranchName}
+                      onChange={(e) => setNewBranchName(e.target.value)}
+                      placeholder="feature/my-feature"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Source Branch Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Based on
+                    </label>
+                    <select
+                      value={sourceBranch}
+                      onChange={(e) => setSourceBranch(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {localBranches.map((branch) => (
+                        <option key={branch} value={branch}>
+                          {branch}
+                        </option>
+                      ))}
+                      {remoteOnlyBranches.length > 0 && (
+                        <optgroup label="Remote">
+                          {remoteOnlyBranches.map((branch) => (
+                            <option key={branch} value={`origin/${branch}`}>
+                              origin/{branch}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+                </>
               )}
 
               {/* Custom Name (Optional) */}
