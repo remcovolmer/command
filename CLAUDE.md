@@ -97,7 +97,7 @@ This is the core mechanism that powers the attention indicator:
 2. When Claude Code fires an event, it executes the hook script which reads JSON from stdin
 3. The hook maps events to states and writes atomically to `~/.claude/command-center-state.json`
 4. `ClaudeHookWatcher` polls this file, matches sessions to terminals via a BiMap (session ID ↔ terminal ID), and emits `terminal:state` events
-5. States: `busy` (blue), `permission` (orange), `question` (orange), `done` (green), `stopped` (red)
+5. States: `busy` (gray), `permission` (orange), `question` (orange), `done` (green), `stopped` (red)
 
 ### Terminal Pool & LRU Eviction
 

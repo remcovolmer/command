@@ -394,7 +394,7 @@ export interface ElectronAPI {
     clearEnvVars: (profileId: string) => Promise<void>;
   };
   worktree: {
-    create: (projectId: string, branchName: string, worktreeName?: string) => Promise<Worktree>;
+    create: (projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string) => Promise<Worktree>;
     list: (projectId: string) => Promise<Worktree[]>;
     listBranches: (projectId: string) => Promise<{ local: string[]; remote: string[]; current: string | null }>;
     remove: (worktreeId: string, force?: boolean) => Promise<void>;

@@ -897,7 +897,7 @@ ipcMain.handle('github:stop-polling', async (_event, key: string) => {
 })
 
 // IPC Handlers for Worktree operations
-ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: string, worktreeName?: string) => {
+ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string) => {
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
   }
@@ -915,6 +915,14 @@ ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: 
       throw new Error('Worktree name must not contain path separators or ".."')
     }
   }
+  if (sourceBranch !== undefined) {
+    if (typeof sourceBranch !== 'string' || sourceBranch.length === 0 || sourceBranch.length > 200) {
+      throw new Error('Invalid source branch name')
+    }
+    if (sourceBranch.startsWith('-')) {
+      throw new Error('Source branch name must not start with "-"')
+    }
+  }
 
   const projects = projectPersistence?.getProjects() ?? []
   const project = projects.find(p => p.id === projectId)
@@ -923,7 +931,7 @@ ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: 
   }
 
   // Create the worktree using git
-  const result = await worktreeService!.createWorktree(project.path, branchName, worktreeName)
+  const result = await worktreeService!.createWorktree(project.path, branchName, worktreeName, sourceBranch)
 
   // Save worktree to persistence
   const name = worktreeName || branchName.replace(/\//g, '-')
