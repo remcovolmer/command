@@ -183,6 +183,11 @@ export class AutomationPersistence {
     }
   }
 
+  clearAllRuns(): void {
+    this.runState.runs = this.runState.runs.filter(r => r.status === 'running')
+    this.saveRuns()
+  }
+
   markRunningAsFailed(): number {
     let count = 0
     for (const run of this.runState.runs) {

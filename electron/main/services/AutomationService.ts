@@ -335,6 +335,10 @@ export class AutomationService {
     this.persistence.removeRun(runId)
   }
 
+  clearAllRuns(): void {
+    this.persistence.clearAllRuns()
+  }
+
   async checkPRForRun(runId: string): Promise<AutomationRun | null> {
     const run = this.persistence.getRun(runId)
     if (!run || !run.worktreeBranch || !this.githubService || !this.projectPersistence) return null

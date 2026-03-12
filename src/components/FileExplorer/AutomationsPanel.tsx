@@ -215,6 +215,13 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
     if (expandedRunId === runId) setExpandedRunId(null)
   }
 
+  const handleClearAllRuns = async () => {
+    if (!window.confirm('Clear all completed run history?')) return
+    await api.automation.clearAllRuns()
+    setRuns(prev => prev.filter(r => r.status === 'running'))
+    setExpandedRunId(null)
+  }
+
   const filteredRuns = filter === 'unread'
     ? runs.filter(r => !r.read && r.status !== 'running')
     : runs
@@ -312,6 +319,15 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
         <div className="flex items-center justify-between px-3 py-2 shrink-0">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Run History</span>
           <div className="flex items-center gap-1">
+            {runs.some(r => r.status !== 'running') && (
+              <button
+                onClick={handleClearAllRuns}
+                className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                title="Clear all run history"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
               onClick={() => setFilter('all')}
               className={`px-1.5 py-0.5 rounded text-xs ${filter === 'all' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
@@ -335,13 +351,13 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
           ) : (
             filteredRuns.map(run => (
               <div key={run.id}>
-                <button
+                <div
                   onClick={() => {
                     const newId = expandedRunId === run.id ? null : run.id
                     setExpandedRunId(newId)
                     if (newId && !run.read) handleMarkRead(run.id)
                   }}
-                  className={`w-full text-left px-3 py-1.5 hover:bg-muted/30 flex items-center gap-2 ${!run.read && run.status !== 'running' ? 'bg-primary/5' : ''}`}
+                  className={`w-full text-left px-3 py-1.5 hover:bg-muted/30 flex items-center gap-2 cursor-pointer group/run ${!run.read && run.status !== 'running' ? 'bg-primary/5' : ''}`}
                 >
                   {expandedRunId === run.id
                     ? <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
@@ -357,7 +373,16 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                   <span className="text-xs text-muted-foreground shrink-0">
                     {formatRelativeTime(run.startedAt)}
                   </span>
-                </button>
+                  {run.status !== 'running' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteRun(run.id) }}
+                      className="p-0.5 rounded hover:bg-muted/50 shrink-0 opacity-0 group-hover/run:opacity-100 transition-opacity"
+                      title="Delete run"
+                    >
+                      <Trash2 className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
+                </div>
 
                 {/* Expanded run detail */}
                 {expandedRunId === run.id && (
@@ -396,22 +421,16 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                         </div>
                       )}
 
-                      <div className="flex items-center gap-2 pt-1">
-                        {run.status === 'running' && (
+                      {run.status === 'running' && (
+                        <div className="flex items-center gap-2 pt-1">
                           <button
                             onClick={() => handleStopRun(run.id)}
                             className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
                           >
                             <Square className="w-3 h-3" /> Stop
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleDeleteRun(run.id)}
-                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-                        >
-                          <Trash2 className="w-3 h-3" /> Delete
-                        </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
