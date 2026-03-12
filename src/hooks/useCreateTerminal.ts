@@ -17,10 +17,11 @@ interface CreateTerminalOptions {
  * - Terminal count limit per project
  * - IPC call to create the PTY
  * - Adding the TerminalSession to the store
+ *
+ * All terminal reads use getState() to avoid stale closures across awaits.
  */
 export function useCreateTerminal() {
   const api = useMemo(() => getElectronAPI(), [])
-  const terminals = useProjectStore((s) => s.terminals)
   const addTerminal = useProjectStore((s) => s.addTerminal)
   const setActiveTerminal = useProjectStore((s) => s.setActiveTerminal)
 
@@ -28,18 +29,20 @@ export function useCreateTerminal() {
     async (projectId: string, options?: CreateTerminalOptions) => {
       const { worktreeId, onCreated } = options ?? {}
 
+      // Always read fresh state to avoid stale closures
+      const currentTerminals = () => useProjectStore.getState().terminals
+
       // Enforce 1:1 worktree-terminal coupling
       if (worktreeId) {
-        const existing = Object.values(terminals).find((t) => t.worktreeId === worktreeId)
+        const existing = Object.values(currentTerminals()).find((t) => t.worktreeId === worktreeId)
         if (existing) {
-          // Already has a terminal - just select it
           setActiveTerminal(existing.id)
           return existing.id
         }
       }
 
       // Check terminal limit (max per project)
-      const projectTerminals = Object.values(terminals).filter(
+      const projectTerminals = Object.values(currentTerminals()).filter(
         (t) => t.projectId === projectId
       )
       if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
@@ -50,17 +53,25 @@ export function useCreateTerminal() {
         return null
       }
 
-      const terminalId = await api.terminal.create(projectId, worktreeId)
+      let terminalId: string
+      try {
+        terminalId = await api.terminal.create(projectId, worktreeId)
+      } catch {
+        api.notification.show('Error', 'Failed to create terminal')
+        return null
+      }
+
+      // Re-read state after await — terminals may have changed
+      const freshTerminals = currentTerminals()
 
       // For worktree terminals, use the worktree name as the tab title
-      // Use getState() to read fresh worktrees (closure may be stale after addWorktree)
       const worktree = worktreeId
         ? Object.values(useProjectStore.getState().worktrees).find((w) => w.id === worktreeId)
         : null
 
       const title = worktree
         ? worktree.name
-        : `Chat ${Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
+        : `Chat ${Object.values(freshTerminals).filter((t) => t.projectId === projectId && t.worktreeId === null).length + 1}`
 
       const terminal: TerminalSession = {
         id: terminalId,
@@ -77,7 +88,7 @@ export function useCreateTerminal() {
 
       return terminalId
     },
-    [api, terminals, addTerminal, setActiveTerminal]
+    [api, addTerminal, setActiveTerminal]
   )
 
   return { createTerminal }
