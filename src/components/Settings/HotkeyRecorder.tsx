@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { X, Check, Delete } from 'lucide-react'
 import type { HotkeyBinding, ModifierKey } from '../../types/hotkeys'
 import { formatBinding, parseKeyEvent } from '../../utils/hotkeys'
+import { setHotkeyRecordingActive } from '../../hooks/useHotkeys'
 
 interface HotkeyRecorderProps {
   currentBinding: HotkeyBinding
@@ -40,6 +41,12 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
     if (e.shiftKey) modifiers.push('shift')
     if (e.metaKey) modifiers.push('meta')
     setActiveModifiers(modifiers)
+  }, [])
+
+  // Suppress global hotkey actions while recording
+  useEffect(() => {
+    setHotkeyRecordingActive(true)
+    return () => setHotkeyRecordingActive(false)
   }, [])
 
   useEffect(() => {

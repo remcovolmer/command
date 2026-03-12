@@ -17,6 +17,7 @@ import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
 import type { AutomationTrigger } from './services/AutomationPersistence'
+import { SecureEnvStore } from './services/SecureEnvStore'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -30,6 +31,19 @@ const isValidUUID = (id: string): boolean =>
 
 const clamp = (val: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, Math.floor(val)))
+
+const BLOCKED_ENV_KEYS = new Set([
+  'PATH', 'HOME', 'USER', 'SHELL', 'COMSPEC', 'SYSTEMROOT', 'WINDIR',
+  'NODE_OPTIONS', 'ELECTRON_RUN_AS_NODE',
+  'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES',
+])
+
+function resolveEnvOverrides(project: { settings?: { authMode?: string; profileId?: string } } | undefined): Record<string, string> | undefined {
+  if (project?.settings?.authMode === 'profile' && project.settings.profileId && secureEnvStore) {
+    return secureEnvStore.getEnvVars(project.settings.profileId)
+  }
+  return undefined
+}
 
 function validateProjectPath(projectPath: string): void {
   if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
@@ -107,6 +121,7 @@ let githubService: GitHubService | null = null
 let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
 let automationService: AutomationService | null = null
+let secureEnvStore: SecureEnvStore | null = null
 
 
 /**
@@ -211,6 +226,9 @@ async function restoreSessions(): Promise<void> {
         console.log(`[Session] Session file not found for ${session.claudeSessionId}, starting fresh`)
       }
 
+      // Resolve env overrides for profile auth mode
+      const envOverrides = resolveEnvOverrides(project)
+
       // Create terminal with --resume flag (or fresh if session file missing)
       const terminalId = terminalManager.createTerminal({
         cwd: session.cwd,
@@ -220,6 +238,7 @@ async function restoreSessions(): Promise<void> {
         worktreeId: session.worktreeId ?? undefined,
         resumeSessionId: sessionFileExists ? session.claudeSessionId : undefined,  // only resume if session file exists
         dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
+        envOverrides,
       })
 
       console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
@@ -278,6 +297,7 @@ async function createWindow() {
   terminalManager = new TerminalManager(win, hookWatcher)
   projectPersistence = new ProjectPersistence()
   await projectPersistence.initialize()
+  secureEnvStore = new SecureEnvStore()
   gitService = new GitService()
   worktreeService = new WorktreeService()
   updateService = new UpdateService()
@@ -363,6 +383,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     cwd = project?.path ?? process.cwd()
   }
 
+  // Resolve env overrides for profile auth mode
+  const envOverrides = resolveEnvOverrides(project)
+
   // For worktree terminals, default to plan mode initial input
   const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
   return terminalManager?.createTerminal({
@@ -373,6 +396,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     projectId,
     worktreeId: worktreeId ?? undefined,
     dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
+    envOverrides,
   })
 })
 
@@ -437,9 +461,19 @@ ipcMain.handle('project:update', async (_event, id: string, updates: Record<stri
   const allowedUpdates: Record<string, unknown> = {}
   if (updates.settings && typeof updates.settings === 'object' && !Array.isArray(updates.settings)) {
     const s = updates.settings as Record<string, unknown>
-    allowedUpdates.settings = {
+    const settings: Record<string, unknown> = {
       dangerouslySkipPermissions: s.dangerouslySkipPermissions === true,
     }
+    // Auth mode settings
+    if (s.authMode === 'subscription' || s.authMode === 'profile') {
+      settings.authMode = s.authMode
+    }
+    if (typeof s.profileId === 'string' && isValidUUID(s.profileId)) {
+      settings.profileId = s.profileId
+    } else if (s.profileId === undefined || s.profileId === null) {
+      settings.profileId = undefined
+    }
+    allowedUpdates.settings = settings
   }
   if (typeof updates.name === 'string') {
     allowedUpdates.name = updates.name
@@ -472,6 +506,88 @@ ipcMain.handle('project:setActiveWatcher', async (_event, projectId: string) => 
   if (!project) return
 
   await fileWatcherService?.switchTo(project.id, project.path)
+})
+
+ipcMain.handle('project:hasVertexConfig', async (_event, projectId: string) => {
+  if (!isValidUUID(projectId)) throw new Error('Invalid project ID')
+  const projects = projectPersistence?.getProjects() ?? []
+  const project = projects.find(p => p.id === projectId)
+  if (!project) return false
+  try {
+    const filePath = path.join(project.path, '.claude', 'settings.local.json')
+    const content = await fs.readFile(filePath, 'utf-8')
+    const parsed = JSON.parse(content) as { env?: { CLAUDE_CODE_USE_VERTEX?: string } } | null
+    return parsed?.env?.CLAUDE_CODE_USE_VERTEX === '1'
+  } catch {
+    return false
+  }
+})
+
+// IPC Handlers for Profile operations
+ipcMain.handle('profile:list', async () => {
+  const profiles = projectPersistence?.getProfiles() ?? []
+  // Derive envVarCount at read time from SecureEnvStore (not from persisted state)
+  return profiles.map(p => ({
+    ...p,
+    envVarCount: secureEnvStore?.getEnvVarKeys(p.id).length ?? 0,
+  }))
+})
+
+ipcMain.handle('profile:add', async (_event, name: string) => {
+  if (typeof name !== 'string' || name.length === 0 || name.length > 100) {
+    throw new Error('Invalid profile name')
+  }
+  const profile = projectPersistence?.addProfile(name)
+  if (!profile) throw new Error('Failed to add profile')
+  return profile
+})
+
+ipcMain.handle('profile:update', async (_event, id: string, updates: { name: string }) => {
+  if (!isValidUUID(id)) throw new Error('Invalid profile ID')
+  if (typeof updates?.name !== 'string' || updates.name.length === 0 || updates.name.length > 100) {
+    throw new Error('Invalid profile name')
+  }
+  return projectPersistence?.updateProfile(id, { name: updates.name }) ?? null
+})
+
+ipcMain.handle('profile:remove', async (_event, id: string) => {
+  if (!isValidUUID(id)) throw new Error('Invalid profile ID')
+  secureEnvStore?.deleteEnvVars(id)
+  projectPersistence?.removeProfile(id)
+})
+
+ipcMain.handle('profile:setActive', async (_event, id: string | null) => {
+  if (id !== null && !isValidUUID(id)) throw new Error('Invalid profile ID')
+  projectPersistence?.setActiveProfileId(id)
+})
+
+ipcMain.handle('profile:getActive', async () => {
+  return projectPersistence?.getActiveProfileId() ?? null
+})
+
+ipcMain.handle('profile:setEnvVars', async (_event, profileId: string, vars: Record<string, string>) => {
+  if (!isValidUUID(profileId)) throw new Error('Invalid profile ID')
+  if (!vars || typeof vars !== 'object' || Array.isArray(vars)) throw new Error('Invalid env vars')
+  // Validate all keys and values are strings
+  for (const [key, value] of Object.entries(vars)) {
+    if (typeof key !== 'string' || key.length === 0 || key.length > 200) throw new Error('Invalid env var key')
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`Invalid env var key format: ${key}`)
+    if (BLOCKED_ENV_KEYS.has(key.toUpperCase())) throw new Error(`Cannot override system env var: ${key}`)
+    if (typeof value !== 'string' || value.length > 10000) throw new Error('Invalid env var value')
+  }
+  secureEnvStore?.setEnvVars(profileId, vars)
+  // envVarCount is derived at read time in profile:list, no need to persist it
+})
+
+ipcMain.handle('profile:getEnvVarKeys', async (_event, profileId: string) => {
+  if (!isValidUUID(profileId)) throw new Error('Invalid profile ID')
+  return secureEnvStore?.getEnvVarKeys(profileId) ?? []
+})
+
+ipcMain.handle('profile:clearEnvVars', async (_event, profileId: string) => {
+  if (!isValidUUID(profileId)) throw new Error('Invalid profile ID')
+  secureEnvStore?.deleteEnvVars(profileId)
+  // envVarCount is derived at read time in profile:list, no need to persist it
 })
 
 // IPC Handlers for File System operations
@@ -781,7 +897,7 @@ ipcMain.handle('github:stop-polling', async (_event, key: string) => {
 })
 
 // IPC Handlers for Worktree operations
-ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: string, worktreeName?: string) => {
+ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string) => {
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
   }
@@ -799,6 +915,14 @@ ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: 
       throw new Error('Worktree name must not contain path separators or ".."')
     }
   }
+  if (sourceBranch !== undefined) {
+    if (typeof sourceBranch !== 'string' || sourceBranch.length === 0 || sourceBranch.length > 200) {
+      throw new Error('Invalid source branch name')
+    }
+    if (sourceBranch.startsWith('-')) {
+      throw new Error('Source branch name must not start with "-"')
+    }
+  }
 
   const projects = projectPersistence?.getProjects() ?? []
   const project = projects.find(p => p.id === projectId)
@@ -807,7 +931,7 @@ ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: 
   }
 
   // Create the worktree using git
-  const result = await worktreeService!.createWorktree(project.path, branchName, worktreeName)
+  const result = await worktreeService!.createWorktree(project.path, branchName, worktreeName, sourceBranch)
 
   // Save worktree to persistence
   const name = worktreeName || branchName.replace(/\//g, '-')

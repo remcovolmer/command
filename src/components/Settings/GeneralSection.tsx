@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Coins } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
+import type { AuthMode } from '../../types'
 
 interface GeneralSectionProps {
   onNestedDialogChange?: (open: boolean) => void
@@ -12,6 +13,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   const updateProject = useProjectStore((s) => s.updateProject)
   const terminalPoolSize = useProjectStore((s) => s.terminalPoolSize)
   const setTerminalPoolSize = useProjectStore((s) => s.setTerminalPoolSize)
+  const profiles = useProjectStore((s) => s.profiles)
+  const projectVertexConfigs = useProjectStore((s) => s.projectVertexConfigs)
   const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
   const hasConfirmDialog = confirmingProjectId !== null
 
@@ -42,10 +45,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
   const handleToggle = (projectId: string, currentlyEnabled: boolean) => {
     if (currentlyEnabled) {
-      // Disabling is always safe — no confirmation needed
       updateProject(projectId, { settings: { dangerouslySkipPermissions: false } })
     } else {
-      // Enabling requires confirmation
       setConfirmingProjectId(projectId)
     }
   }
@@ -55,6 +56,27 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
       updateProject(confirmingProjectId, { settings: { dangerouslySkipPermissions: true } })
       setConfirmingProjectId(null)
     }
+  }
+
+  const handleAuthModeChange = (projectId: string, project: typeof projects[0], authMode: AuthMode) => {
+    updateProject(projectId, {
+      settings: {
+        ...project.settings,
+        authMode,
+        // Clear profileId when switching to subscription
+        profileId: authMode === 'subscription' ? undefined : project.settings?.profileId,
+      },
+    })
+  }
+
+  const handleProfileSelect = (projectId: string, project: typeof projects[0], profileId: string) => {
+    updateProject(projectId, {
+      settings: {
+        ...project.settings,
+        authMode: 'profile',
+        profileId,
+      },
+    })
   }
 
   return (
@@ -99,17 +121,33 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
       <div className="space-y-3">
         {projects.map((project) => {
           const skipPermissions = project.settings?.dangerouslySkipPermissions ?? false
+          const authMode = project.settings?.authMode ?? 'subscription'
+          const profileId = project.settings?.profileId
+          const hasVertexConfig = projectVertexConfigs[project.id] ?? false
 
           return (
             <div
               key={project.id}
               className="rounded-lg border border-border p-4"
             >
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-foreground truncate">{project.name}</h4>
-                <p className="text-xs text-muted-foreground truncate">{project.path}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-medium text-foreground truncate">{project.name}</h4>
+                  <p className="text-xs text-muted-foreground truncate">{project.path}</p>
+                </div>
+                {/* Vertex AI indicator */}
+                {hasVertexConfig && (
+                  <span
+                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-500/10 text-blue-500 shrink-0"
+                    title="Vertex AI configured via .claude/settings.local.json"
+                  >
+                    <Coins className="w-3 h-3" />
+                    Vertex AI
+                  </span>
+                )}
               </div>
 
+              {/* Skip Permissions toggle */}
               <div className="mt-3 flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <label className="text-sm font-medium text-foreground cursor-pointer" htmlFor={`skip-permissions-${project.id}`}>
@@ -137,6 +175,37 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                     }`}
                   />
                 </button>
+              </div>
+
+              {/* Auth Mode */}
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <label className="text-sm font-medium text-foreground">Auth Mode</label>
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  Choose how Claude Code authenticates for this project.
+                </p>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={authMode}
+                    onChange={(e) => handleAuthModeChange(project.id, project, e.target.value as AuthMode)}
+                    className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="subscription">Subscription (default)</option>
+                    <option value="profile">Profile (env injection)</option>
+                  </select>
+
+                  {authMode === 'profile' && (
+                    <select
+                      value={profileId ?? ''}
+                      onChange={(e) => handleProfileSelect(project.id, project, e.target.value)}
+                      className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="">Select profile...</option>
+                      {profiles.filter(p => p.envVarCount > 0).map(profile => (
+                        <option key={profile.id} value={profile.id}>{profile.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
             </div>
           )

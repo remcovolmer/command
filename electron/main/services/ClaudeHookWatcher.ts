@@ -238,11 +238,12 @@ export class ClaudeHookWatcher {
     const sessionId = hookState.session_id
     if (!sessionId) return
 
-    // Skip if we've already processed this timestamp for this session
-    // Use strict less-than to allow same-millisecond events (sub-millisecond timing edge case)
+    // Skip if we've already processed this timestamp for this session.
+    // The state file holds one entry per session, so equal timestamps mean
+    // the same event was re-read (e.g. by the pendingRead do-while loop).
     const lastTimestamp = this.lastProcessedTimestamps.get(sessionId) || 0
-    if (hookState.timestamp < lastTimestamp) {
-      return  // Only skip if timestamp is older (not equal)
+    if (hookState.timestamp <= lastTimestamp) {
+      return
     }
     this.lastProcessedTimestamps.set(sessionId, hookState.timestamp)
 
@@ -261,12 +262,10 @@ export class ClaudeHookWatcher {
       terminalId = this.associateSessionWithTerminal(sessionId, normalizedCwd)
     }
 
-    // Fallback: find any terminal in this cwd that doesn't have a session yet
+    // Fallback: find an unassigned terminal in this cwd (don't steal from active sessions)
     if (!terminalId && normalizedCwd) {
       terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
       if (terminalId) {
-        // Associate this session with the found terminal using BiMap
-        this.clearSessionMappingByTerminal(terminalId)
         this.setSessionMapping(sessionId, terminalId)
         if (isDev) {
           console.log(`[HookWatcher] Late association: session ${sessionId} with terminal ${terminalId}`)
@@ -290,10 +289,26 @@ export class ClaudeHookWatcher {
   }
 
   /**
-   * Associate a new session with an unassigned terminal in the same cwd
+   * Associate a new session with a terminal in the same cwd.
+   * Prefers unassigned terminals. On SessionStart only, falls back to
+   * stealing the first assigned terminal (the old session likely crashed
+   * without sending SessionEnd).
    */
   private associateSessionWithTerminal(sessionId: string, normalizedCwd: string): string | undefined {
-    const terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
+    let terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
+
+    // SessionStart fallback: steal from first terminal if none unassigned
+    // (old session likely crashed without SessionEnd)
+    if (!terminalId) {
+      const terminals = this.cwdToTerminals.get(normalizedCwd)
+      if (terminals && terminals.size > 0) {
+        const first = terminals.values().next()
+        terminalId = first.done ? undefined : first.value
+        if (isDev && terminalId) {
+          console.warn(`[HookWatcher] SessionStart: stealing terminal ${terminalId} (old session likely dead)`)
+        }
+      }
+    }
 
     if (terminalId) {
       // Remove any old session mapping for this terminal using BiMap
@@ -310,7 +325,9 @@ export class ClaudeHookWatcher {
   }
 
   /**
-   * Find a terminal in the given cwd that doesn't have a session assigned yet
+   * Find a terminal in the given cwd that doesn't have a session assigned yet.
+   * Returns undefined if all terminals already have sessions — callers must
+   * decide whether to steal or queue.
    */
   private findUnassignedTerminalInCwd(normalizedCwd: string): string | undefined {
     const terminals = this.cwdToTerminals.get(normalizedCwd)
@@ -328,12 +345,7 @@ export class ClaudeHookWatcher {
       }
     }
 
-    // All terminals have sessions - log warning and return first one
-    if (isDev) {
-      console.warn(`[HookWatcher] All terminals in cwd "${normalizedCwd}" already have sessions. Using first terminal.`)
-    }
-    const first = terminals.values().next()
-    return first.done ? undefined : first.value
+    return undefined
   }
 
   /**

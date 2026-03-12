@@ -1,6 +1,6 @@
 {
   "name": "command",
-  "version": "0.14.4",
+  "version": "0.15.2",
   "main": "dist-electron/main/index.js",
   "description": "Command center for managing multiple Claude Code terminal instances",
   "author": "Remco Volmer",
@@ -21,7 +21,8 @@
     "rebuild": "electron-rebuild -w node-pty",
     "release:patch": "npm version patch && git push && git push --tags",
     "release:minor": "npm version minor && git push && git push --tags",
-    "release:major": "npm version major && git push && git push --tags"
+    "release:major": "npm version major && git push && git push --tags",
+    "generate-icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -41,6 +42,7 @@
     "@xterm/addon-serialize": "^0.14.0",
     "@xterm/addon-unicode11": "^0.9.0",
     "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^5.5.0",
     "chokidar": "^4.0.3",
     "clsx": "^2.1.1",
@@ -66,6 +68,7 @@
     "autoprefixer": "^10.4.20",
     "electron": "^40.1.0",
     "electron-builder": "^26.7.0",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
     "postcss-import": "^16.1.0",
     "sharp": "^0.34.5",

@@ -2,8 +2,9 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code } from 'lucide-react'
+import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code, Coins, AlertTriangle } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
+import { useProjectStore } from '../../stores/projectStore'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { ContextMenu } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
@@ -57,6 +58,16 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     transition,
     isOver,
   } = useSortable({ id: project.id })
+
+  const hasVertexConfig = useProjectStore((s) => s.projectVertexConfigs[project.id] ?? false)
+  const hasMismatch = useProjectStore((s) => {
+    const authMode = project.settings?.authMode ?? 'subscription'
+    const profileId = project.settings?.profileId
+    if (authMode !== 'profile') return false
+    if (!profileId) return true
+    const profile = s.profiles.find(p => p.id === profileId)
+    return !profile || profile.envVarCount === 0
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -157,6 +168,22 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <span className="flex-1 text-sm truncate" title={project.path}>
           {project.name}
         </span>
+
+        {/* Indicators */}
+        {hasVertexConfig && (
+          <span title="Vertex AI configured via .claude/settings.local.json">
+            <Coins className="w-3 h-3 shrink-0 text-blue-400" />
+          </span>
+        )}
+        {hasMismatch && (
+          <span title={
+            !project.settings?.profileId
+              ? 'Auth mode is Profile but no profile selected'
+              : 'Selected profile is missing or has no environment variables'
+          }>
+            <AlertTriangle className="w-3 h-3 shrink-0 text-yellow-500" />
+          </span>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

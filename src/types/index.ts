@@ -1,8 +1,18 @@
 // Project types
 export type ProjectType = 'workspace' | 'project' | 'code';
 
+export type AuthMode = 'subscription' | 'profile';
+
+export interface AccountProfile {
+  id: string;
+  name: string;
+  envVarCount: number;  // renderer sees count only, never the values
+}
+
 export interface ProjectSettings {
   dangerouslySkipPermissions?: boolean;
+  authMode?: AuthMode;
+  profileId?: string;
 }
 
 export interface Project {
@@ -186,6 +196,7 @@ export interface PRStatus {
   number?: number;
   title?: string;
   url?: string;
+  headRefName?: string;
   state?: 'OPEN' | 'CLOSED' | 'MERGED';
   mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
   mergeStateStatus?: 'CLEAN' | 'DIRTY' | 'BLOCKED' | 'UNSTABLE' | 'UNKNOWN';
@@ -369,9 +380,21 @@ export interface ElectronAPI {
     selectFolder: () => Promise<string | null>;
     reorder: (projectIds: string[]) => Promise<Project[]>;
     setActiveWatcher: (projectId: string) => Promise<void>;
+    hasVertexConfig: (projectId: string) => Promise<boolean>;
+  };
+  profile: {
+    list: () => Promise<AccountProfile[]>;
+    add: (name: string) => Promise<AccountProfile>;
+    update: (id: string, updates: { name: string }) => Promise<AccountProfile | null>;
+    remove: (id: string) => Promise<void>;
+    setActive: (id: string | null) => Promise<void>;
+    getActive: () => Promise<string | null>;
+    setEnvVars: (profileId: string, vars: Record<string, string>) => Promise<void>;
+    getEnvVarKeys: (profileId: string) => Promise<string[]>;
+    clearEnvVars: (profileId: string) => Promise<void>;
   };
   worktree: {
-    create: (projectId: string, branchName: string, worktreeName?: string) => Promise<Worktree>;
+    create: (projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string) => Promise<Worktree>;
     list: (projectId: string) => Promise<Worktree[]>;
     listBranches: (projectId: string) => Promise<{ local: string[]; remote: string[]; current: string | null }>;
     remove: (worktreeId: string, force?: boolean) => Promise<void>;

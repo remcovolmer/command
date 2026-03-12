@@ -20,6 +20,7 @@ export interface CreateTerminalOptions {
   worktreeId?: string
   resumeSessionId?: string
   dangerouslySkipPermissions?: boolean
+  envOverrides?: Record<string, string>
 }
 
 interface TerminalInstance {
@@ -88,7 +89,10 @@ export class TerminalManager {
       cols: 80,
       rows: 24,
       cwd,
-      env: process.env as Record<string, string>,
+      env: {
+        ...process.env,
+        ...options.envOverrides,
+      } as Record<string, string>,
     })
 
     const terminal: TerminalInstance = {

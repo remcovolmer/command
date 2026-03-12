@@ -12,6 +12,7 @@ import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
 import { TerminalListItem } from './TerminalListItem'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
+import { LogoIcon } from '../LogoIcon'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 
 export function Sidebar() {
@@ -27,6 +28,8 @@ export function Sidebar() {
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
   const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
+  const profiles = useProjectStore((s) => s.profiles)
+  const activeProfileId = useProjectStore((s) => s.activeProfileId)
 
   // Group actions together with useShallow for stable reference
   const {
@@ -41,6 +44,7 @@ export function Sidebar() {
     loadProjects,
     loadWorktrees,
     reorderProjects,
+    checkVertexConfig,
   } = useProjectStore(
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
@@ -54,6 +58,7 @@ export function Sidebar() {
       loadProjects: s.loadProjects,
       loadWorktrees: s.loadWorktrees,
       reorderProjects: s.reorderProjects,
+      checkVertexConfig: s.checkVertexConfig,
     }))
   )
 
@@ -96,6 +101,15 @@ export function Sidebar() {
       console.error('Failed to load projects:', error)
     })
   }, [loadProjects])
+
+  // Check Vertex config for all projects (only re-run when projects added/removed)
+  const checkConfigProjectIds = projects.map(p => p.id).join(',')
+  useEffect(() => {
+    for (const project of projects) {
+      checkVertexConfig(project.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkConfigProjectIds])
 
   // Load worktrees for active project (deferred: other projects load on-demand when selected)
   useEffect(() => {
@@ -275,7 +289,7 @@ export function Sidebar() {
     <div className="flex flex-col h-full bg-sidebar" data-sidebar>
       {/* Logo Header */}
       <div className="flex items-center gap-2 px-4 py-5">
-        <img src="favicon.png" alt="Command" className="w-6 h-6" />
+        <LogoIcon className="w-6 h-6 text-primary" />
         <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
       </div>
 
@@ -419,9 +433,25 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-3 py-2 border-t border-border">
         <div className="flex items-center">
-          <span className="text-xs text-muted-foreground flex-1">
-            {appVersion ? `v${appVersion}` : ''}
-          </span>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-xs text-muted-foreground shrink-0">
+              {appVersion ? `v${appVersion}` : ''}
+            </span>
+            {/* Active profile badge */}
+            <button
+              onClick={() => setSettingsDialogOpen(true, 'accounts')}
+              className={`truncate px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
+                activeProfileId
+                  ? 'text-primary bg-primary/10 hover:bg-primary/20'
+                  : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted'
+              }`}
+              title={activeProfileId ? `Active: ${profiles.find(p => p.id === activeProfileId)?.name}` : 'No active profile'}
+            >
+              {activeProfileId
+                ? profiles.find(p => p.id === activeProfileId)?.name ?? 'Unknown'
+                : 'No account'}
+            </button>
+          </div>
           <div className="flex items-center gap-0.5">
             <button
               onClick={handleCheckForUpdate}

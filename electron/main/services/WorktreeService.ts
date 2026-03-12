@@ -199,16 +199,33 @@ export class WorktreeService {
     return worktrees.some(wt => wt.branch === branchName)
   }
 
+  /** Ensures worktrees are created from up-to-date refs. */
+  private async fetchAndFastForward(projectPath: string): Promise<void> {
+    try {
+      await this.execGit(projectPath, ['fetch', 'origin'])
+    } catch {
+      return
+    }
+
+    try {
+      await this.execGit(projectPath, ['pull', '--ff-only'])
+    } catch {}
+  }
+
   /**
    * Create a new worktree
    */
   async createWorktree(
     projectPath: string,
     branchName: string,
-    worktreeName?: string
+    worktreeName?: string,
+    sourceBranch?: string
   ): Promise<{ path: string; branch: string }> {
     // Ensure .worktrees directory exists
     await this.ensureWorktreesDir(projectPath)
+
+    // Fetch + fast-forward to ensure local is up to date
+    await this.fetchAndFastForward(projectPath)
 
     // Use branch name as worktree name if not provided
     // Replace / with - for branch names like feature/auth
@@ -251,8 +268,18 @@ export class WorktreeService {
           worktreePath,
           `origin/${branchName}`,
         ])
+      } else if (sourceBranch) {
+        // Create new branch based on explicit source branch
+        await this.execGit(projectPath, [
+          'worktree',
+          'add',
+          '-b',
+          branchName,
+          worktreePath,
+          sourceBranch,
+        ])
       } else {
-        // Create new branch based on current HEAD
+        // Create new branch based on current HEAD (default behavior)
         await this.execGit(projectPath, [
           'worktree',
           'add',
