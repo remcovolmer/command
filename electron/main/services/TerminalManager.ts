@@ -205,6 +205,8 @@ export class TerminalManager {
       const title = this.extractTaskTitle(buffer)
 
       if (title) {
+        const terminal = this.terminals.get(terminalId)
+        if (terminal) terminal.title = title
         this.terminalTitled.set(terminalId, true)
         this.sendToRenderer('terminal:title', terminalId, title)
       }
