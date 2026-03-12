@@ -16,6 +16,7 @@ type SettingsTab = 'shortcuts' | 'general' | 'accounts'
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const settingsInitialTab = useProjectStore((s) => s.settingsInitialTab)
   const [activeTab, setActiveTab] = useState<SettingsTab>('shortcuts')
+  const [hasNestedDialog, setHasNestedDialog] = useState(false)
 
   // Apply initial tab from store when dialog opens
   useEffect(() => {
@@ -24,8 +25,8 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     }
   }, [isOpen, settingsInitialTab])
 
-  // Close on Escape
-  useDialogHotkeys(onClose, undefined, { enabled: isOpen })
+  // Close on Escape — disabled when a nested dialog (e.g. confirmation) is open
+  useDialogHotkeys(onClose, undefined, { enabled: isOpen && !hasNestedDialog })
 
   if (!isOpen) return null
 
@@ -93,7 +94,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {activeTab === 'shortcuts' && <HotkeySection />}
-          {activeTab === 'general' && <GeneralSection />}
+          {activeTab === 'general' && <GeneralSection onNestedDialogChange={setHasNestedDialog} />}
           {activeTab === 'accounts' && <AccountsSection />}
         </div>
       </div>

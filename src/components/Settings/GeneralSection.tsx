@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AlertTriangle, Coins } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
+import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import type { AuthMode } from '../../types'
 
-export function GeneralSection() {
+interface GeneralSectionProps {
+  onNestedDialogChange?: (open: boolean) => void
+}
+
+export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   const projects = useProjectStore((s) => s.projects)
   const updateProject = useProjectStore((s) => s.updateProject)
   const terminalPoolSize = useProjectStore((s) => s.terminalPoolSize)
@@ -11,6 +16,24 @@ export function GeneralSection() {
   const profiles = useProjectStore((s) => s.profiles)
   const projectVertexConfigs = useProjectStore((s) => s.projectVertexConfigs)
   const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
+  const hasConfirmDialog = confirmingProjectId !== null
+
+  // Notify parent when nested dialog opens/closes so it can disable its own Escape handler
+  useEffect(() => {
+    onNestedDialogChange?.(hasConfirmDialog)
+  }, [hasConfirmDialog, onNestedDialogChange])
+
+  // Keyboard support for the confirmation dialog (Escape to close, Enter to confirm)
+  useDialogHotkeys(
+    () => setConfirmingProjectId(null),
+    () => {
+      if (confirmingProjectId) {
+        updateProject(confirmingProjectId, { settings: { dangerouslySkipPermissions: true } })
+        setConfirmingProjectId(null)
+      }
+    },
+    { enabled: hasConfirmDialog }
+  )
 
   if (projects.length === 0) {
     return (

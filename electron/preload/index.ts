@@ -579,6 +579,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteRun: (runId: string): Promise<void> =>
       ipcRenderer.invoke('automation:delete-run', runId),
 
+    clearAllRuns: (): Promise<void> =>
+      ipcRenderer.invoke('automation:clear-all-runs'),
+
     getNextRun: (automationId: string): Promise<string | null> =>
       ipcRenderer.invoke('automation:get-next-run', automationId),
 

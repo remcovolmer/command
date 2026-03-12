@@ -354,9 +354,9 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     expect(watcher.getTerminalSessions()).toHaveLength(0)
   })
 
-  test('duplicate timestamp for same session does not emit twice', () => {
+  test('duplicate state (same timestamp+event+state) is deduplicated', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
-    const sendSpy = (mockWindow.webContents.send as ReturnType<typeof vi.fn>)
+    const send = (mockWindow as any).webContents.send
 
     processState({
       session_id: 's1',
@@ -365,8 +365,9 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
       timestamp: 1000,
       hook_event: 'SessionStart',
     })
+    expect(send).toHaveBeenCalledTimes(1)
 
-    // Same session, same timestamp (re-read scenario)
+    // Same session, same timestamp+event+state = should be deduplicated
     processState({
       session_id: 's1',
       cwd: 'C:\\projects\\foo',
@@ -374,12 +375,125 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
       timestamp: 1000,
       hook_event: 'SessionStart',
     })
+    expect(send).toHaveBeenCalledTimes(1) // NOT called again
+  })
 
-    // Should only have emitted once
-    const stateEmissions = sendSpy.mock.calls.filter(
-      (call: unknown[]) => call[0] === 'terminal:state'
-    )
-    expect(stateEmissions).toHaveLength(1)
+  test('same timestamp but different state is NOT deduplicated', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    const send = (mockWindow as any).webContents.send
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    expect(send).toHaveBeenCalledTimes(1)
+
+    // Same timestamp but different state = genuine state change, should emit
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'permission',
+      timestamp: 1000,
+      hook_event: 'PermissionRequest',
+    })
+    expect(send).toHaveBeenCalledTimes(2)
+  })
+
+  test('stale event (older timestamp) is skipped', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    const send = (mockWindow as any).webContents.send
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 2000,
+      hook_event: 'SessionStart',
+    })
+    expect(send).toHaveBeenCalledTimes(1)
+
+    // Older timestamp = stale, should be skipped
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'done',
+      timestamp: 1000,
+      hook_event: 'Stop',
+    })
+    expect(send).toHaveBeenCalledTimes(1) // NOT called again
+  })
+
+  test('different sessions with same timestamp are processed independently', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    watcher.registerTerminal('t2', 'c:/projects/foo')
+    const send = (mockWindow as any).webContents.send
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    expect(send).toHaveBeenCalledTimes(2) // Both processed
+
+    // Re-read same state for both = both deduplicated
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    expect(send).toHaveBeenCalledTimes(2) // No new calls
+  })
+
+  test('pending states from multiple sessions route to correct terminals', () => {
+    // States arrive before terminals are registered
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'done',
+      timestamp: 1001,
+      hook_event: 'Stop',
+    })
+
+    // Now register two terminals — pending states should route through session mapping
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    watcher.registerTerminal('t2', 'c:/projects/foo')
+
+    // Both sessions should be mapped (s1 to t1 on replay, s2 to t2)
+    const sessions = watcher.getTerminalSessions()
+    expect(sessions).toHaveLength(2)
+    expect(sessions.find(s => s.sessionId === 's1')).toBeDefined()
+    expect(sessions.find(s => s.sessionId === 's2')).toBeDefined()
+    // They should be on different terminals
+    const terminals = sessions.map(s => s.terminalId)
+    expect(new Set(terminals).size).toBe(2)
   })
 
   test('unregisterTerminal cleans up all mappings', () => {

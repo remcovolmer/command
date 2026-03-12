@@ -1273,6 +1273,10 @@ ipcMain.handle('automation:delete-run', async (_event, runId: string) => {
   automationService?.deleteRun(runId)
 })
 
+ipcMain.handle('automation:clear-all-runs', async () => {
+  automationService?.clearAllRuns()
+})
+
 ipcMain.handle('automation:get-next-run', async (_event, automationId: string) => {
   if (!isValidUUID(automationId)) throw new Error('Invalid automation ID')
   return automationService?.getNextRunTime(automationId) ?? null
