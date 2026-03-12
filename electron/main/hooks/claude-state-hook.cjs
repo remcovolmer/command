@@ -41,12 +41,12 @@ process.stdin.on('end', async () => {
           // Question asked = question (orange)
           state = 'question';
         } else {
-          // Working with tools = busy (blue)
+          // Working with tools = busy (gray)
           state = 'busy';
         }
         break;
       case 'SessionStart':
-        // Starting = busy (blue)
+        // Starting = busy (gray)
         state = 'busy';
         break;
       case 'Stop':
@@ -68,7 +68,7 @@ process.stdin.on('end', async () => {
         }
         break;
       case 'UserPromptSubmit':
-        // User submitted a prompt = busy (blue)
+        // User submitted a prompt = busy (gray)
         state = 'busy';
         break;
       case 'PermissionRequest':
