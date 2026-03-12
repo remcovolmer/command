@@ -164,16 +164,17 @@ export class ClaudeHookWatcher {
       console.log(`[HookWatcher]   Terminals in this cwd: ${Array.from(terminals).join(', ')}`)
     }
 
-    // Process any pending states for this cwd
+    // Process any pending states for this cwd through normal session mapping
+    // (not directly to this terminal — pending states may belong to different sessions)
     const pending = this.pendingStates.get(normalizedCwd)
     if (pending && pending.length > 0) {
       if (isDev) {
         console.log(`[HookWatcher] Processing ${pending.length} pending states for cwd: ${normalizedCwd}`)
       }
-      for (const state of pending) {
-        this.processStateForTerminal(state, terminalId)
-      }
       this.pendingStates.delete(normalizedCwd)
+      for (const state of pending) {
+        this.processSessionState(state)
+      }
     }
   }
 
@@ -257,12 +258,6 @@ export class ClaudeHookWatcher {
         return  // Duplicate re-read of unchanged session
       }
     }
-    this.lastProcessedState.set(sessionId, {
-      timestamp: hookState.timestamp,
-      hookEvent: hookState.hook_event,
-      state: hookState.state,
-    })
-
     const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
 
     if (isDev) {
@@ -290,9 +285,15 @@ export class ClaudeHookWatcher {
     }
 
     if (terminalId) {
+      // Only mark as processed when actually emitted (not when queued)
+      this.lastProcessedState.set(sessionId, {
+        timestamp: hookState.timestamp,
+        hookEvent: hookState.hook_event,
+        state: hookState.state,
+      })
       this.processStateForTerminal(hookState, terminalId)
     } else if (normalizedCwd) {
-      // Queue state for when terminal registers
+      // Queue state for when terminal registers (don't mark as processed — replay must succeed)
       this.queuePendingState(normalizedCwd, hookState)
     } else if (isDev) {
       console.log(`[HookWatcher] No matching terminal found for session ${sessionId}`)
