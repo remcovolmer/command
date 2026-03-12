@@ -1,4 +1,4 @@
-import { memo, useEffect, useCallback } from 'react'
+import { memo, useState, useEffect, useCallback } from 'react'
 import { GitBranch, Trash2, ExternalLink, GitMerge, AlertTriangle, CheckCircle2, XCircle, Clock, RefreshCw, Loader2 } from 'lucide-react'
 import type { Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
@@ -48,7 +48,20 @@ function ReviewBadge({ decision }: { decision: PRStatus['reviewDecision'] }) {
   )
 }
 
-function MergeButton({ checks, onMerge }: { checks: PRCheckStatus[]; onMerge: () => void }) {
+function MergeButton({ checks, onMerge, isMerging }: { checks: PRCheckStatus[]; onMerge: () => void; isMerging: boolean }) {
+  if (isMerging) {
+    return (
+      <button
+        disabled
+        className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-white transition-colors ml-auto bg-gray-500 opacity-75 cursor-not-allowed"
+        title="Merging in progress..."
+      >
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Merging...
+      </button>
+    )
+  }
+
   const failNames = checks.filter(c => c.bucket === 'fail').map(c => c.name)
   const pendingNames = checks.filter(c => c.bucket === 'pending').map(c => c.name)
   const anyFail = failNames.length > 0
@@ -96,6 +109,8 @@ export const WorktreeItem = memo(function WorktreeItem({
   const setGhAvailable = useProjectStore((s) => s.setGhAvailable)
   const removeTerminal = useProjectStore((s) => s.removeTerminal)
   const removeWorktree = useProjectStore((s) => s.removeWorktree)
+
+  const [isMerging, setIsMerging] = useState(false)
 
   // The single terminal for this worktree (1:1 model)
   const terminal = terminals[0] ?? null
@@ -165,27 +180,32 @@ export const WorktreeItem = memo(function WorktreeItem({
       const confirmed = window.confirm(message)
       if (!confirmed) return
 
-      // Merge from main project path (not worktree) to avoid branch-in-use error
-      await api.github.mergePR(projectPath, prStatus.number)
-
-      // Close active terminals before removal (prevents EBUSY on Windows)
-      await closeWorktreeTerminals(terminals, removeTerminal)
-
-      // Remove the worktree (also deletes local branch)
+      setIsMerging(true)
       try {
-        await api.worktree.remove(worktree.id, hasChanges)
-      } catch (err) {
-        console.error('[WorktreeItem] Worktree removal failed after merge:', err)
+        // Merge from main project path (not worktree) to avoid branch-in-use error
+        await api.github.mergePR(projectPath, prStatus.number)
+
+        // Close active terminals before removal (prevents EBUSY on Windows)
+        await closeWorktreeTerminals(terminals, removeTerminal)
+
+        // Remove the worktree (also deletes local branch)
+        try {
+          await api.worktree.remove(worktree.id, hasChanges)
+        } catch (err) {
+          console.error('[WorktreeItem] Worktree removal failed after merge:', err)
+          api.github.stopPolling(worktree.id)
+          api.notification.show('PR Merged', `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`)
+          return
+        }
+
+        // Clean up store and stop polling
+        removeWorktree(worktree.id)
         api.github.stopPolling(worktree.id)
-        api.notification.show('PR Merged', `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`)
-        return
+
+        api.notification.show('PR Merged', `PR #${prStatus.number} merged and worktree removed`)
+      } finally {
+        setIsMerging(false)
       }
-
-      // Clean up store and stop polling
-      removeWorktree(worktree.id)
-      api.github.stopPolling(worktree.id)
-
-      api.notification.show('PR Merged', `PR #${prStatus.number} merged and worktree removed`)
     } catch (err) {
       api.notification.show('Merge Failed', err instanceof Error ? err.message : 'Unknown error')
     }
@@ -206,22 +226,6 @@ export const WorktreeItem = memo(function WorktreeItem({
       onCreateTerminal()
     }
   }, [terminal, onSelectTerminal, onCreateTerminal])
-
-  // Claude Code state indicator dots
-  const stateDots: Record<string, string> = {
-    busy: 'bg-blue-500',
-    permission: 'bg-orange-500',
-    question: 'bg-orange-500',
-    done: 'bg-green-500',
-    stopped: 'bg-red-500',
-  }
-
-  const inputStates = ['done', 'permission', 'question'] as const
-  const isInputState = (state: string) => inputStates.includes(state as typeof inputStates[number])
-
-  // Only show dot for visible states (not idle/stopped)
-  const visibleStates = ['busy', 'done', 'permission', 'question'] as const
-  const isVisibleState = (state: string) => visibleStates.includes(state as typeof visibleStates[number])
 
   // Merge button visibility (show for any open, conflict-free PR)
   const showMergeButton = prStatus && !prStatus.noPR &&
@@ -333,7 +337,7 @@ export const WorktreeItem = memo(function WorktreeItem({
 
           {/* Merge button */}
           {showMergeButton && (
-            <MergeButton checks={prStatus.statusCheckRollup ?? []} onMerge={handleMerge} />
+            <MergeButton checks={prStatus.statusCheckRollup ?? []} onMerge={handleMerge} isMerging={isMerging} />
           )}
         </div>
       )}
