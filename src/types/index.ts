@@ -38,7 +38,7 @@ export interface Worktree {
 
 // Terminal types - Claude Code states (5 states)
 export type TerminalState =
-  | 'busy'        // Blue - Claude is working (includes starting)
+  | 'busy'        // Gray - Claude is working (includes starting)
   | 'permission'  // Orange - Claude needs permission for tool/command
   | 'question'    // Orange - Claude asked a question via AskUserQuestion
   | 'done'        // Green - Claude finished, waiting for new prompt
