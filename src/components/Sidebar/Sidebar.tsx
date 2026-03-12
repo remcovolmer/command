@@ -291,16 +291,12 @@ export function Sidebar() {
       <div className="flex items-center gap-2 px-4 py-5">
         <LogoIcon className="w-6 h-6 text-primary" />
         <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
-      </div>
-
-      {/* Add Project Button */}
-      <div className="px-3 mb-2">
         <button
           onClick={handleAddProject}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary text-sm font-medium transition-colors"
+          title="Add project"
+          className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Add project
         </button>
       </div>
 
