@@ -27,6 +27,7 @@ export interface ActiveRun {
   worktreePath: string
   worktreeBranch: string
   projectPath: string
+  ownsBranch: boolean
 }
 
 export class AutomationRunner {
@@ -61,22 +62,24 @@ export class AutomationRunner {
       sourceBranch?: string
     } = {}
   ): Promise<RunResult> {
-    const { timeoutMinutes = 30, sourceBranch } = options
+    const { timeoutMinutes = 30, baseBranch, sourceBranch } = options
     const timeoutMs = timeoutMinutes * 60 * 1000
     const startTime = Date.now()
 
     // Create worktree (serialized to prevent concurrent git operations)
+    // Always create a NEW branch named after the automation run. Use sourceBranch
+    // (from PR context) or baseBranch (from automation config) as the starting point.
     const worktreeDirName = this.makeBranchName(automationId)
-    let branchName = worktreeDirName
+    const branchName = worktreeDirName
+    const startPoint = sourceBranch || baseBranch
     let worktreePath: string
 
     try {
-      if (sourceBranch) {
+      if (startPoint) {
         try {
-          worktreePath = await this.serializedWorktreeCreate(projectPath, sourceBranch, worktreeDirName)
-          branchName = sourceBranch
+          worktreePath = await this.serializedWorktreeCreate(projectPath, worktreeDirName, undefined, startPoint)
         } catch (error) {
-          console.warn(`[AutomationRunner] Failed to checkout source branch "${sourceBranch}", falling back to HEAD: ${error instanceof Error ? error.message : String(error)}`)
+          console.warn(`[AutomationRunner] Failed to branch from "${startPoint}", falling back to HEAD: ${error instanceof Error ? error.message : String(error)}`)
           worktreePath = await this.serializedWorktreeCreate(projectPath, worktreeDirName)
         }
       } else {
@@ -119,6 +122,7 @@ export class AutomationRunner {
         worktreePath,
         worktreeBranch: branchName,
         projectPath,
+        ownsBranch: true,
       }
       this.activeRuns.set(runId, activeRun)
 
@@ -246,7 +250,7 @@ export class AutomationRunner {
           timedOut: false,
           durationMs: Date.now() - startTime,
           error: err.message,
-          worktreeBranch: '',
+          worktreeBranch: branchName,
           worktreePath: '',
         })
       })
@@ -279,7 +283,7 @@ export class AutomationRunner {
     // Force cleanup all worktrees (close handlers skipped cleanup since map was cleared)
     for (const run of runs) {
       try {
-        await this.cleanupWorktree(run.projectPath, run.worktreePath, run.worktreeBranch)
+        await this.cleanupWorktree(run.projectPath, run.worktreePath, run.ownsBranch ? run.worktreeBranch : null)
       } catch {
         // Best-effort cleanup
       }
@@ -292,8 +296,14 @@ export class AutomationRunner {
       const worktrees = await this.worktreeService.listWorktrees(projectPath)
       const maxAgeMs = 24 * 60 * 60 * 1000 // 24 hours
 
+      // Collect paths of active runs to avoid deleting in-use worktrees
+      const activeWorktreePaths = new Set(
+        [...this.activeRuns.values()].map(r => r.worktreePath)
+      )
+
       for (const wt of worktrees) {
         if (wt.isMain || !wt.branch.startsWith('auto-')) continue
+        if (activeWorktreePaths.has(wt.path)) continue
 
         // Parse timestamp from branch name (auto-{name}-{timestamp})
         const timestampMatch = wt.branch.match(/-(\d{13,})$/)
@@ -322,9 +332,9 @@ export class AutomationRunner {
     return `auto-${shortId}-${Date.now()}`
   }
 
-  private async serializedWorktreeCreate(projectPath: string, branchName: string, worktreeName?: string): Promise<string> {
+  private async serializedWorktreeCreate(projectPath: string, branchName: string, worktreeName?: string, sourceBranch?: string): Promise<string> {
     const op = this.worktreeLock.then(async () => {
-      const result = await this.worktreeService.createWorktree(projectPath, branchName, worktreeName)
+      const result = await this.worktreeService.createWorktree(projectPath, branchName, worktreeName, sourceBranch)
       return result.path
     })
     // Keep the lock chain alive regardless of success/failure so subsequent
@@ -345,21 +355,23 @@ export class AutomationRunner {
     }
   }
 
-  private async cleanupWorktree(projectPath: string, worktreePath: string, branchName: string): Promise<void> {
+  private async cleanupWorktree(projectPath: string, worktreePath: string, branchName: string | null): Promise<void> {
     try {
       await this.worktreeService.removeWorktree(projectPath, worktreePath, true)
     } catch (error) {
       console.error(`[AutomationRunner] Failed to remove worktree: ${error}`)
     }
 
-    try {
-      await execFileAsync('git', ['branch', '-D', branchName], {
-        cwd: projectPath,
-        windowsHide: true,
-        timeout: 10_000,
-      })
-    } catch {
-      // Branch may already be deleted
+    if (branchName) {
+      try {
+        await execFileAsync('git', ['branch', '-D', branchName], {
+          cwd: projectPath,
+          windowsHide: true,
+          timeout: 10_000,
+        })
+      } catch {
+        // Branch may already be deleted
+      }
     }
   }
 
