@@ -477,6 +477,7 @@ export interface ElectronAPI {
     listRuns: (automationId?: string, limit?: number) => Promise<AutomationRun[]>;
     markRead: (runId: string) => Promise<void>;
     deleteRun: (runId: string) => Promise<void>;
+    clearAllRuns: () => Promise<void>;
     getNextRun: (automationId: string) => Promise<string | null>;
     checkPR: (runId: string) => Promise<AutomationRun | null>;
     onRunStarted: (callback: (run: AutomationRun) => void) => Unsubscribe;
