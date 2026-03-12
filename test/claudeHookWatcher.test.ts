@@ -465,6 +465,37 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     expect(send).toHaveBeenCalledTimes(2) // No new calls
   })
 
+  test('pending states from multiple sessions route to correct terminals', () => {
+    // States arrive before terminals are registered
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    processState({
+      session_id: 's2',
+      cwd: 'C:\\projects\\foo',
+      state: 'done',
+      timestamp: 1001,
+      hook_event: 'Stop',
+    })
+
+    // Now register two terminals — pending states should route through session mapping
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    watcher.registerTerminal('t2', 'c:/projects/foo')
+
+    // Both sessions should be mapped (s1 to t1 on replay, s2 to t2)
+    const sessions = watcher.getTerminalSessions()
+    expect(sessions).toHaveLength(2)
+    expect(sessions.find(s => s.sessionId === 's1')).toBeDefined()
+    expect(sessions.find(s => s.sessionId === 's2')).toBeDefined()
+    // They should be on different terminals
+    const terminals = sessions.map(s => s.terminalId)
+    expect(new Set(terminals).size).toBe(2)
+  })
+
   test('unregisterTerminal cleans up all mappings', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
 
