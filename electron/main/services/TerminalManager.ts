@@ -6,7 +6,6 @@ import { ClaudeHookWatcher } from './ClaudeHookWatcher'
 import type { TerminalState, TerminalType } from '../../../src/types'
 
 const SHELL_READY_DELAY_MS = 100
-const CLAUDE_STARTUP_DELAY_MS = 3000
 
 // Session ID validation regex (alphanumeric, hyphens, underscores only)
 const SESSION_ID_REGEX = /^[a-zA-Z0-9_-]+$/
@@ -14,7 +13,6 @@ const SESSION_ID_REGEX = /^[a-zA-Z0-9_-]+$/
 export interface CreateTerminalOptions {
   cwd: string
   type?: TerminalType
-  initialInput?: string
   initialTitle?: string
   projectId?: string
   worktreeId?: string
@@ -68,7 +66,6 @@ export class TerminalManager {
     const {
       cwd,
       type = 'claude',
-      initialInput,
       initialTitle,
       projectId,
       worktreeId,
@@ -156,14 +153,6 @@ export class TerminalManager {
         if (this.terminals.has(id)) ptyProcess.write(claudeCommand)
       }, SHELL_READY_DELAY_MS)
       terminal.timeouts.push(claudeTimeout)
-
-      // If initialInput is provided, send it after Claude has started
-      if (initialInput) {
-        const inputTimeout = setTimeout(() => {
-          if (this.terminals.has(id)) ptyProcess.write(initialInput)
-        }, CLAUDE_STARTUP_DELAY_MS)
-        terminal.timeouts.push(inputTimeout)
-      }
     } else {
       this.sendToRenderer('terminal:state', id, 'done')
     }

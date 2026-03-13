@@ -386,12 +386,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   // Resolve env overrides for profile auth mode
   const envOverrides = resolveEnvOverrides(project)
 
-  // For worktree terminals, default to plan mode initial input
-  const effectiveInitialInput = worktreeId ? '/workflows:plan ' : undefined
   return terminalManager?.createTerminal({
     cwd,
     type,
-    initialInput: effectiveInitialInput,
     initialTitle,
     projectId,
     worktreeId: worktreeId ?? undefined,
