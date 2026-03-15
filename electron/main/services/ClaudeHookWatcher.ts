@@ -1,4 +1,4 @@
-import { watchFile, unwatchFile, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { watchFile, unwatchFile, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
@@ -143,6 +143,19 @@ export class ClaudeHookWatcher {
     this.watching = true
 
     console.log('[HookWatcher] Started watching:', this.stateFilePath)
+  }
+
+  /**
+   * Pre-associate a known session ID with a terminal ID.
+   * Called during session restore when the mapping is already known from the previous app session.
+   * This avoids unreliable cwd-based re-discovery which can misroute states
+   * when multiple terminals share the same working directory.
+   */
+  preAssociateSession(sessionId: string, terminalId: string): void {
+    this.setSessionMapping(sessionId, terminalId)
+    if (isDev) {
+      console.log(`[HookWatcher] Pre-associated session ${sessionId} with terminal ${terminalId}`)
+    }
   }
 
   /**
@@ -299,9 +312,11 @@ export class ClaudeHookWatcher {
       console.log(`[HookWatcher] No matching terminal found for session ${sessionId}`)
     }
 
-    // On SessionEnd: cleanup session mapping
+    // On SessionEnd: cleanup session mapping and remove stale entry from state file
+    // to prevent ghost re-emissions on the next poll cycle
     if (hookState.hook_event === 'SessionEnd') {
       this.clearSessionMappingBySession(sessionId)
+      this.removeSessionFromStateFile(sessionId)
     }
   }
 
@@ -383,6 +398,23 @@ export class ClaudeHookWatcher {
 
     if (isDev) {
       console.log(`[HookWatcher] Queued pending state for cwd: ${normalizedCwd} (queue size: ${pending.length})`)
+    }
+  }
+
+  /**
+   * Remove a session entry from the shared state file to prevent
+   * stale data from being re-read on the next poll cycle.
+   */
+  private removeSessionFromStateFile(sessionId: string): void {
+    try {
+      const content = readFileSync(this.stateFilePath, 'utf-8')
+      const parsed = JSON.parse(content)
+      if (parsed && typeof parsed === 'object' && sessionId in parsed) {
+        delete parsed[sessionId]
+        writeFileSync(this.stateFilePath, JSON.stringify(parsed))
+      }
+    } catch {
+      // Ignore errors — file may be mid-write or already cleaned
     }
   }
 
