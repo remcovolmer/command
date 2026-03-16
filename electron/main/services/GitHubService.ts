@@ -109,7 +109,17 @@ export class GitHubService {
         mergeable: data.mergeable,
         mergeStateStatus: data.mergeStateStatus,
         reviewDecision: data.reviewDecision,
-        statusCheckRollup: data.statusCheckRollup ?? [],
+        statusCheckRollup: (data.statusCheckRollup ?? []).map((c: Record<string, string>) => ({
+          name: c.name ?? c.context ?? 'unknown',
+          state: c.status ?? c.state ?? '',
+          bucket: c.bucket ?? (
+            c.status === 'COMPLETED'
+              ? (c.conclusion === 'SUCCESS' || c.conclusion === 'SKIPPED' || c.conclusion === 'NEUTRAL' ? 'pass' : 'fail')
+              : c.state === 'SUCCESS' ? 'pass'
+              : c.state === 'FAILURE' || c.state === 'ERROR' ? 'fail'
+              : 'pending'
+          ),
+        })),
         additions: data.additions,
         deletions: data.deletions,
         changedFiles: data.changedFiles,
