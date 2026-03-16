@@ -116,6 +116,7 @@ export class TerminalPool {
       if (splitSet.has(id)) return false
       const terminal = terminals[id]
       if (!terminal) return false
+      if (terminal.type === 'normal') return false // Sidecar terminals are lightweight — never evict
       if (PROTECTED_STATES.has(terminal.state)) return false
       return true
     })
