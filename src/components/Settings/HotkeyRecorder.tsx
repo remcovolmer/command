@@ -18,6 +18,12 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
     e.preventDefault()
     e.stopPropagation()
 
+    // Escape without modifiers cancels the recorder (consistent with all other dialogs)
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+      onCancel()
+      return
+    }
+
     // Update active modifiers for visual feedback
     const modifiers: ModifierKey[] = []
     if (e.ctrlKey) modifiers.push('ctrl')
@@ -31,7 +37,7 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
     if (parsed) {
       setRecordedBinding(parsed)
     }
-  }, [])
+  }, [onCancel])
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     // Update active modifiers
