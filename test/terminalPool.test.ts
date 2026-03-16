@@ -221,6 +221,36 @@ describe('TerminalPool', () => {
       expect(candidate).toBe('b') // a is evicted, skipped
     })
 
+    test('excludes sidecar (normal) terminals from eviction', () => {
+      pool.touch('a')
+      pool.touch('b')
+      pool.touch('c')
+
+      const terminals: Record<string, TerminalSession> = {
+        a: makeTerminal({ type: 'normal' }),  // sidecar
+        b: makeTerminal({ type: 'claude' }),
+        c: makeTerminal({ type: 'claude' }),
+      }
+
+      const candidate = pool.getEvictionCandidate(terminals, 'c', [])
+      expect(candidate).toBe('b') // a is sidecar (protected), b is the only claude candidate
+    })
+
+    test('returns null when only sidecar terminals are candidates', () => {
+      pool.touch('a')
+      pool.touch('b')
+      pool.touch('c')
+
+      const terminals: Record<string, TerminalSession> = {
+        a: makeTerminal({ type: 'normal' }),
+        b: makeTerminal({ type: 'normal' }),
+        c: makeTerminal({ type: 'claude' }),
+      }
+
+      const candidate = pool.getEvictionCandidate(terminals, 'c', [])
+      expect(candidate).toBeNull() // only sidecar terminals available, all protected
+    })
+
     test('returns null when no candidates available', () => {
       pool.touch('a')
       const terminals: Record<string, TerminalSession> = {
