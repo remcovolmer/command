@@ -18,7 +18,6 @@ export function FileTree({ project }: FileTreeProps) {
   const api = useMemo(() => getElectronAPI(), [])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const loadedRef = useRef<string | null>(null)
 
   const [contextMenu, setContextMenu] = useState<{
     entry: FileSystemEntry | null
@@ -78,29 +77,24 @@ export function FileTree({ project }: FileTreeProps) {
     return () => fileWatcherEvents.unsubscribe(project.id, 'file-tree')
   }, [project.id, invalidateDirectories, refreshDirectory])
 
-  // Load root directory on mount or when project changes
+  // Load root directory on mount or when project/cache changes
   useEffect(() => {
-    const loadRoot = async () => {
-      // Skip if already loaded for this project
-      if (loadedRef.current === project.path || rootEntries) return
+    if (rootEntries) return
 
-      loadedRef.current = project.path
-      setIsLoading(true)
-      setError(null)
+    let aborted = false
+    setIsLoading(true)
+    setError(null)
 
-      try {
-        const entries = await api.fs.readDirectory(project.path)
-        setDirectoryContents(project.path, entries)
-      } catch (err) {
-        console.error('Failed to load project directory:', err)
-        setError('Failed to load directory')
-        loadedRef.current = null // Allow retry
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    api.fs.readDirectory(project.path).then((entries) => {
+      if (!aborted) setDirectoryContents(project.path, entries)
+    }).catch((err) => {
+      console.error('Failed to load project directory:', err)
+      if (!aborted) setError('Failed to load directory')
+    }).finally(() => {
+      if (!aborted) setIsLoading(false)
+    })
 
-    loadRoot()
+    return () => { aborted = true }
   }, [api, project.path, rootEntries, setDirectoryContents])
 
   const handleContextMenu = useCallback((entry: FileSystemEntry, x: number, y: number) => {
@@ -224,6 +218,7 @@ function RootCreateEntry({ type, projectPath, projectId }: { type: 'file' | 'dir
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const submittedRef = useRef(false)
   const cancelCreate = useProjectStore((s) => s.cancelCreate)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
   const openEditorTab = useProjectStore((s) => s.openEditorTab)
@@ -233,11 +228,13 @@ function RootCreateEntry({ type, projectPath, projectId }: { type: 'file' | 'dir
   }, [])
 
   const handleSubmit = async () => {
+    if (submittedRef.current) return
     const trimmed = value.trim()
     if (!trimmed) {
       cancelCreate()
       return
     }
+    submittedRef.current = true
 
     const sep = projectPath.includes('\\') ? '\\' : '/'
     const newPath = projectPath + sep + trimmed
