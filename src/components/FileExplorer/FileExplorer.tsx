@@ -84,6 +84,10 @@ export function FileExplorer() {
     () => projects.find((p) => p.id === activeProjectId),
     [projects, activeProjectId]
   )
+
+  // File explorer root: worktree path when active, otherwise project path
+  const fileTreeRootPath = activeWorktree?.path ?? activeProject?.path
+  const fileTreeContextKey = activeWorktree?.id ?? activeProjectId
   // Both 'workspace' and 'project' types have limited functionality (no git, no sidecar)
   const isLimitedProject = useMemo(
     () => activeProject?.type === 'workspace' || activeProject?.type === 'project',
@@ -117,7 +121,7 @@ export function FileExplorer() {
 
   const handleFilesRefresh = () => {
     if (activeProjectId) {
-      clearDirectoryCache(activeProjectId)
+      clearDirectoryCache(activeProjectId, fileTreeRootPath)
     }
   }
 
@@ -260,6 +264,7 @@ export function FileExplorer() {
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
         showGitTab={!isLimitedProject}
+        worktreeBranch={activeWorktree?.branch}
       />
 
       {/* Files/Git/Tasks/Automations Content - takes remaining space */}
@@ -273,7 +278,7 @@ export function FileExplorer() {
           activeTab === 'tasks' ? (
             <TasksPanel project={activeProject} />
           ) : (isLimitedProject || activeTab === 'files') ? (
-            <FileTree project={activeProject} />
+            <FileTree project={activeProject} rootPath={fileTreeRootPath} contextKey={fileTreeContextKey} />
           ) : (
             <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
           )
@@ -310,6 +315,7 @@ export function FileExplorer() {
         <DeleteConfirmDialog
           entry={fileExplorerDeletingEntry}
           projectId={activeProjectId}
+          contextKey={fileTreeContextKey ?? activeProjectId}
         />
       )}
 

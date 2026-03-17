@@ -10,13 +10,14 @@ import { getParentPath } from '../../utils/paths'
 interface FileTreeNodeProps {
   entry: FileSystemEntry
   projectId: string
+  contextKey: string
   depth: number
   isRenaming: boolean
   isCreating: { type: 'file' | 'directory' } | null
   onContextMenu: (entry: FileSystemEntry, x: number, y: number) => void
 }
 
-export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, onContextMenu }: FileTreeNodeProps) {
+export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, isCreating, onContextMenu }: FileTreeNodeProps) {
   const api = getElectronAPI()
   const [isLoading, setIsLoading] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -28,7 +29,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
 
   // Use specific selectors to avoid unnecessary re-renders
   const isExpanded = useProjectStore(
-    (s) => s.expandedPaths[projectId]?.includes(entry.path) ?? false
+    (s) => s.expandedPaths[contextKey]?.includes(entry.path) ?? false
   )
   const children = useProjectStore(
     (s) => s.directoryCache[entry.path]
@@ -97,7 +98,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
       }
     }
     if (!isExpanded) {
-      toggleExpandedPath(projectId, entry.path)
+      toggleExpandedPath(contextKey, entry.path)
     }
   }
 
@@ -115,7 +116,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
     }
 
     if (isExpanded) {
-      toggleExpandedPath(projectId, entry.path)
+      toggleExpandedPath(contextKey, entry.path)
     } else {
       await handleExpand()
     }
@@ -145,7 +146,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
 
       // Update expandedPaths if renamed directory was expanded
       if (isDirectory) {
-        updateExpandedPathsAfterRename(projectId, entry.path, newPath)
+        updateExpandedPathsAfterRename(contextKey, entry.path, newPath)
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Rename failed'
@@ -299,6 +300,7 @@ export function FileTreeNode({ entry, projectId, depth, isRenaming, isCreating, 
               key={child.path}
               entry={child}
               projectId={projectId}
+              contextKey={contextKey}
               depth={depth + 1}
               isRenaming={fileExplorerRenamingPath === child.path}
               isCreating={

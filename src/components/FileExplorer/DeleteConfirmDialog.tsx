@@ -7,9 +7,10 @@ import { getParentPath } from '../../utils/paths'
 interface DeleteConfirmDialogProps {
   entry: FileSystemEntry
   projectId: string
+  contextKey?: string
 }
 
-export function DeleteConfirmDialog({ entry, projectId }: DeleteConfirmDialogProps) {
+export function DeleteConfirmDialog({ entry, projectId, contextKey }: DeleteConfirmDialogProps) {
   const api = getElectronAPI()
   const cancelRef = useRef<HTMLButtonElement>(null)
   const clearDeletingEntry = useProjectStore((s) => s.clearDeletingEntry)
@@ -47,7 +48,7 @@ export function DeleteConfirmDialog({ entry, projectId }: DeleteConfirmDialogPro
       }
 
       // Clean up expandedPaths and directoryCache
-      cleanupAfterDelete(projectId, entry.path)
+      cleanupAfterDelete(contextKey ?? projectId, entry.path)
 
       clearDeletingEntry()
       await refreshDirectory(getParentPath(entry.path))

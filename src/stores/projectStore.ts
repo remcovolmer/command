@@ -40,6 +40,7 @@ interface ProjectStore {
   fileExplorerActiveTab: 'files' | 'git' | 'tasks' | 'automations'
   expandedPaths: Record<string, string[]>
   directoryCache: Record<string, FileSystemEntry[]>
+  directoryCacheVersion: number
 
   // Theme state
   theme: 'light' | 'dark'
@@ -138,7 +139,7 @@ interface ProjectStore {
   setFileExplorerActiveTab: (tab: 'files' | 'git' | 'tasks' | 'automations') => void
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
-  clearDirectoryCache: (projectId?: string) => void
+  clearDirectoryCache: (projectId?: string, rootPath?: string) => void
   invalidateDirectories: (dirPaths: string[]) => void
 
   // Theme actions
@@ -232,6 +233,7 @@ export const useProjectStore = create<ProjectStore>()(
       fileExplorerActiveTab: 'files',
       expandedPaths: {},
       directoryCache: {},
+      directoryCacheVersion: 0,
 
       // File explorer interaction state (ephemeral)
       fileExplorerSelectedPath: null,
@@ -723,20 +725,20 @@ export const useProjectStore = create<ProjectStore>()(
           },
         })),
 
-      clearDirectoryCache: (projectId) =>
+      clearDirectoryCache: (projectId, rootPath) =>
         set((state) => {
           if (!projectId) {
-            return { directoryCache: {} }
+            return { directoryCache: {}, directoryCacheVersion: state.directoryCacheVersion + 1 }
           }
-          const project = state.projects.find((p) => p.id === projectId)
-          if (!project) return state
+          const basePath = rootPath ?? state.projects.find((p) => p.id === projectId)?.path
+          if (!basePath) return state
           const newCache = { ...state.directoryCache }
           Object.keys(newCache).forEach((path) => {
-            if (path.startsWith(project.path)) {
+            if (path.startsWith(basePath)) {
               delete newCache[path]
             }
           })
-          return { directoryCache: newCache }
+          return { directoryCache: newCache, directoryCacheVersion: state.directoryCacheVersion + 1 }
         }),
 
       invalidateDirectories: (dirPaths) =>
@@ -1211,6 +1213,10 @@ export const useProjectStore = create<ProjectStore>()(
           delete newExpandedCommitHash[id]
           delete newGitHeadHash[id]
 
+          // Clean expandedPaths for this worktree context
+          const newExpandedPaths = { ...state.expandedPaths }
+          delete newExpandedPaths[id]
+
           // Clean directoryCache entries under worktree path
           const newDirectoryCache = { ...state.directoryCache }
           if (removedWorktree) {
@@ -1269,6 +1275,7 @@ export const useProjectStore = create<ProjectStore>()(
             gitCommitLogLoading: newGitCommitLogLoading,
             expandedCommitHash: newExpandedCommitHash,
             gitHeadHash: newGitHeadHash,
+            expandedPaths: newExpandedPaths,
             directoryCache: newDirectoryCache,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveCenterTabId,
