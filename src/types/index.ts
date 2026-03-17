@@ -92,8 +92,18 @@ export interface DiffTab {
   projectId: string;
 }
 
+// Working tree diff tab (for viewing uncommitted changes)
+export interface WorkingTreeDiffTab {
+  id: string;
+  type: 'working-tree-diff';
+  filePath: string;
+  fileName: string;
+  diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted';
+  projectId: string;
+}
+
 // Union of all center tab types
-export type CenterTab = EditorTab | DiffTab;
+export type CenterTab = EditorTab | DiffTab | WorkingTreeDiffTab;
 
 // File watcher types
 export const FILE_WATCH_EVENT_TYPES = [
@@ -182,6 +192,12 @@ export interface GitCommitDetail {
 export interface GitCommitLog {
   commits: GitCommit[];
   hasMore: boolean;
+}
+
+export interface GitBranchListItem {
+  name: string;
+  current: boolean;
+  upstream: string | null;
 }
 
 // GitHub PR types
@@ -437,6 +453,18 @@ export interface ElectronAPI {
     getCommitDetail: (projectPath: string, commitHash: string) => Promise<GitCommitDetail | null>;
     getFileAtCommit: (projectPath: string, commitHash: string, filePath: string) => Promise<string | null>;
     getHeadHash: (projectPath: string) => Promise<string | null>;
+    stageFiles: (projectPath: string, files: string[]) => Promise<void>;
+    unstageFiles: (projectPath: string, files: string[]) => Promise<void>;
+    commit: (projectPath: string, message: string) => Promise<string>;
+    discardFiles: (projectPath: string, files: string[]) => Promise<void>;
+    discardAll: (projectPath: string) => Promise<void>;
+    deleteUntrackedFiles: (projectPath: string, files: string[]) => Promise<void>;
+    getIndexFileContent: (projectPath: string, filePath: string) => Promise<string | null>;
+    listBranches: (projectPath: string) => Promise<GitBranchListItem[]>;
+    createBranch: (projectPath: string, name: string) => Promise<void>;
+    switchBranch: (projectPath: string, name: string) => Promise<void>;
+    deleteBranch: (projectPath: string, name: string, force: boolean) => Promise<void>;
+    validateBranchName: (projectPath: string, name: string) => Promise<boolean>;
   };
   github: {
     checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;

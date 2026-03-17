@@ -60,7 +60,28 @@ export interface GitCommitLog {
   hasMore: boolean
 }
 
+export interface GitBranchListItem {
+  name: string
+  current: boolean
+  upstream: string | null
+}
+
 export class GitService {
+  // Per-repo operation serialization to prevent index.lock conflicts
+  private operationQueue = new Map<string, Promise<void>>()
+
+  private async serialized<T>(projectPath: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.operationQueue.get(projectPath) ?? Promise.resolve()
+    let result!: T
+    const next = prev.then(
+      async () => { result = await fn() },
+      async () => { result = await fn() },
+    )
+    this.operationQueue.set(projectPath, next.then(() => {}, () => {}))
+    await next
+    return result
+  }
+
   private async execGit(cwd: string, args: string[]): Promise<string> {
     const { stdout } = await execFileAsync('git', args, {
       cwd,
@@ -463,6 +484,129 @@ export class GitService {
     }
     // HTTPS format: https://github.com/owner/repo.git
     return url.replace(/\.git$/, '')
+  }
+
+  // --- Staging operations ---
+
+  async stageFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      // Chunk to stay within Windows CreateProcessW 32K argument limit
+      const CHUNK_SIZE = 100
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE)
+        await this.execGit(projectPath, ['add', '--', ...chunk])
+      }
+    })
+  }
+
+  async unstageFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      const CHUNK_SIZE = 100
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE)
+        await this.execGit(projectPath, ['reset', 'HEAD', '--', ...chunk])
+      }
+    })
+  }
+
+  // --- Commit ---
+
+  async commit(projectPath: string, message: string): Promise<string> {
+    return this.serialized(projectPath, async () => {
+      const cleanMessage = message.replace(/\0/g, '')
+      const output = await this.execGit(projectPath, ['commit', '-m', cleanMessage])
+      return output
+    })
+  }
+
+  // --- Discard operations ---
+
+  async discardFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      const CHUNK_SIZE = 100
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE)
+        await this.execGit(projectPath, ['checkout', '--', ...chunk])
+      }
+    })
+  }
+
+  async discardAll(projectPath: string): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      await this.execGit(projectPath, ['checkout', '--', '.'])
+    })
+  }
+
+  async deleteUntrackedFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      const CHUNK_SIZE = 100
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE)
+        await this.execGit(projectPath, ['clean', '-f', '--', ...chunk])
+      }
+    })
+  }
+
+  // --- Working directory content (for diff viewer) ---
+
+  async getIndexFileContent(projectPath: string, filePath: string): Promise<string | null> {
+    try {
+      return await this.execGit(projectPath, ['show', `:${filePath}`])
+    } catch {
+      return null
+    }
+  }
+
+  // --- Branch management ---
+
+  async listBranches(projectPath: string): Promise<GitBranchListItem[]> {
+    try {
+      const output = await this.execGit(projectPath, [
+        'branch',
+        '--format=%(refname:short)%00%(HEAD)%00%(upstream:short)',
+      ])
+
+      if (!output) return []
+
+      return output.split('\n').filter(Boolean).map((line) => {
+        const [name, head, upstream] = line.split('\0')
+        return {
+          name: name || '',
+          current: head === '*',
+          upstream: upstream || null,
+        }
+      })
+    } catch {
+      return []
+    }
+  }
+
+  async createBranch(projectPath: string, name: string): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      await this.execGit(projectPath, ['switch', '-c', '--', name])
+    })
+  }
+
+  async switchBranch(projectPath: string, name: string): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      await this.execGit(projectPath, ['switch', '--', name])
+    })
+  }
+
+  async deleteBranch(projectPath: string, name: string, force: boolean): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      const flag = force ? '-D' : '-d'
+      await this.execGit(projectPath, ['branch', flag, '--', name])
+    })
+  }
+
+  async validateBranchName(projectPath: string, name: string): Promise<boolean> {
+    try {
+      await this.execGit(projectPath, ['check-ref-format', '--branch', name])
+      return true
+    } catch {
+      return false
+    }
   }
 
   private mapStatus(code: string): GitFileChange['status'] {

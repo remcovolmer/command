@@ -133,6 +133,12 @@ interface GitCommitLog {
   hasMore: boolean
 }
 
+interface GitBranchListItem {
+  name: string
+  current: boolean
+  upstream: string | null
+}
+
 // Task types
 interface TaskItem {
   id: string
@@ -453,6 +459,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:file-at-commit', projectPath, commitHash, filePath),
     getHeadHash: (projectPath: string): Promise<string | null> =>
       ipcRenderer.invoke('git:head-hash', projectPath),
+    stageFiles: (projectPath: string, files: string[]): Promise<void> =>
+      ipcRenderer.invoke('git:stage-files', projectPath, files),
+    unstageFiles: (projectPath: string, files: string[]): Promise<void> =>
+      ipcRenderer.invoke('git:unstage-files', projectPath, files),
+    commit: (projectPath: string, message: string): Promise<string> =>
+      ipcRenderer.invoke('git:commit', projectPath, message),
+    discardFiles: (projectPath: string, files: string[]): Promise<void> =>
+      ipcRenderer.invoke('git:discard-files', projectPath, files),
+    discardAll: (projectPath: string): Promise<void> =>
+      ipcRenderer.invoke('git:discard-all', projectPath),
+    deleteUntrackedFiles: (projectPath: string, files: string[]): Promise<void> =>
+      ipcRenderer.invoke('git:delete-untracked-files', projectPath, files),
+    getIndexFileContent: (projectPath: string, filePath: string): Promise<string | null> =>
+      ipcRenderer.invoke('git:get-index-file-content', projectPath, filePath),
+    listBranches: (projectPath: string): Promise<GitBranchListItem[]> =>
+      ipcRenderer.invoke('git:list-branches', projectPath),
+    createBranch: (projectPath: string, name: string): Promise<void> =>
+      ipcRenderer.invoke('git:create-branch', projectPath, name),
+    switchBranch: (projectPath: string, name: string): Promise<void> =>
+      ipcRenderer.invoke('git:switch-branch', projectPath, name),
+    deleteBranch: (projectPath: string, name: string, force: boolean): Promise<void> =>
+      ipcRenderer.invoke('git:delete-branch', projectPath, name, force),
+    validateBranchName: (projectPath: string, name: string): Promise<boolean> =>
+      ipcRenderer.invoke('git:validate-branch-name', projectPath, name),
   },
 
   // Task operations

@@ -51,6 +51,29 @@ function validateProjectPath(projectPath: string): void {
   }
 }
 
+function validateRelativeFilePaths(files: unknown): asserts files is string[] {
+  if (!Array.isArray(files) || files.length === 0 || files.length > 500) {
+    throw new Error('Invalid files array')
+  }
+  for (const f of files) {
+    if (typeof f !== 'string' || f.length === 0 || f.length > 1000) {
+      throw new Error('Invalid file path')
+    }
+    if (f.includes('..') || path.isAbsolute(f)) {
+      throw new Error('File path must be relative and within project')
+    }
+  }
+}
+
+function validateBranchName(name: unknown): asserts name is string {
+  if (typeof name !== 'string' || name.length === 0 || name.length > 255) {
+    throw new Error('Invalid branch name')
+  }
+  if (name.startsWith('-')) {
+    throw new Error('Branch name cannot start with -')
+  }
+}
+
 function validateTrigger(raw: unknown): AutomationTrigger {
   if (!raw || typeof raw !== 'object') throw new Error('Invalid trigger')
   const obj = raw as Record<string, unknown>
@@ -797,6 +820,88 @@ ipcMain.handle('git:file-at-commit', async (_event, projectPath: string, commitH
 ipcMain.handle('git:head-hash', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)
   return gitService?.getHeadHash(projectPath) ?? null
+})
+
+// IPC Handlers for Git staging, commit, discard, and branch operations
+
+ipcMain.handle('git:stage-files', async (_event, projectPath: string, files: unknown) => {
+  validateProjectPath(projectPath)
+  validateRelativeFilePaths(files)
+  return gitService?.stageFiles(projectPath, files)
+})
+
+ipcMain.handle('git:unstage-files', async (_event, projectPath: string, files: unknown) => {
+  validateProjectPath(projectPath)
+  validateRelativeFilePaths(files)
+  return gitService?.unstageFiles(projectPath, files)
+})
+
+ipcMain.handle('git:commit', async (_event, projectPath: string, message: string) => {
+  validateProjectPath(projectPath)
+  if (typeof message !== 'string' || message.length === 0 || message.length > 10000) {
+    throw new Error('Invalid commit message')
+  }
+  return gitService?.commit(projectPath, message)
+})
+
+ipcMain.handle('git:discard-files', async (_event, projectPath: string, files: unknown) => {
+  validateProjectPath(projectPath)
+  validateRelativeFilePaths(files)
+  return gitService?.discardFiles(projectPath, files)
+})
+
+ipcMain.handle('git:discard-all', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return gitService?.discardAll(projectPath)
+})
+
+ipcMain.handle('git:delete-untracked-files', async (_event, projectPath: string, files: unknown) => {
+  validateProjectPath(projectPath)
+  validateRelativeFilePaths(files)
+  return gitService?.deleteUntrackedFiles(projectPath, files)
+})
+
+ipcMain.handle('git:get-index-file-content', async (_event, projectPath: string, filePath: string) => {
+  validateProjectPath(projectPath)
+  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+    throw new Error('Invalid file path')
+  }
+  if (filePath.includes('..') || filePath.startsWith(':')) {
+    throw new Error('Invalid file path')
+  }
+  return gitService?.getIndexFileContent(projectPath, filePath) ?? null
+})
+
+ipcMain.handle('git:list-branches', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return gitService?.listBranches(projectPath) ?? []
+})
+
+ipcMain.handle('git:create-branch', async (_event, projectPath: string, name: string) => {
+  validateProjectPath(projectPath)
+  validateBranchName(name)
+  return gitService?.createBranch(projectPath, name)
+})
+
+ipcMain.handle('git:switch-branch', async (_event, projectPath: string, name: string) => {
+  validateProjectPath(projectPath)
+  validateBranchName(name)
+  return gitService?.switchBranch(projectPath, name)
+})
+
+ipcMain.handle('git:delete-branch', async (_event, projectPath: string, name: string, force: unknown) => {
+  validateProjectPath(projectPath)
+  validateBranchName(name)
+  const forceDelete = typeof force === 'boolean' ? force : false
+  return gitService?.deleteBranch(projectPath, name, forceDelete)
+})
+
+ipcMain.handle('git:validate-branch-name', async (_event, projectPath: string, name: string) => {
+  validateProjectPath(projectPath)
+  if (typeof name !== 'string' || name.length === 0 || name.length > 255) {
+    return false
+  }
+  return gitService?.validateBranchName(projectPath, name) ?? false
 })
 
 // IPC Handlers for Tasks operations

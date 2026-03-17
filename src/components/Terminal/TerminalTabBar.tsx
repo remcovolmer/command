@@ -135,13 +135,15 @@ export function TerminalTabBar({
               }
             `}
           >
-            {tab.type === 'diff' ? (
+            {(tab.type === 'diff' || tab.type === 'working-tree-diff') ? (
               <GitCompare className="w-3.5 h-3.5 flex-shrink-0 text-blue-400" />
             ) : (
               <FileText className="w-3.5 h-3.5 flex-shrink-0" />
             )}
             <span className="text-xs font-medium whitespace-nowrap">
-              {tab.type === 'diff' ? `${tab.fileName} (diff)` : tab.fileName}
+              {tab.type === 'diff' ? `${tab.fileName} (diff)` : tab.type === 'working-tree-diff' ? `${tab.fileName} (${
+                tab.diffKind === 'staged' ? 'Staged' : tab.diffKind === 'untracked' ? 'New File' : tab.diffKind === 'deleted' ? 'Deleted' : 'Working Tree'
+              })` : tab.fileName}
             </span>
             {tab.type === 'editor' && tab.isDirty && (
               <Circle className="w-2 h-2 flex-shrink-0 fill-current text-orange-400" />
