@@ -621,8 +621,9 @@ function domReady(condition: DocumentReadyState[] = ['complete', 'interactive'])
     if (condition.includes(document.readyState)) {
       resolve(true)
     } else {
-      document.addEventListener('readystatechange', () => {
+      document.addEventListener('readystatechange', function handler() {
         if (condition.includes(document.readyState)) {
+          document.removeEventListener('readystatechange', handler)
           resolve(true)
         }
       })
@@ -693,7 +694,8 @@ const { appendLoading, removeLoading } = useLoading()
 domReady().then(appendLoading)
 
 window.onmessage = (ev) => {
-  ev.data.payload === 'removeLoading' && removeLoading()
+  if (ev.origin !== 'file://' && ev.origin !== location.origin) return
+  if (ev.data?.payload === 'removeLoading') removeLoading()
 }
 
 setTimeout(removeLoading, 4999)
