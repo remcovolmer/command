@@ -11,6 +11,7 @@ interface FileExplorerTabBarProps {
   isGitLoading: boolean
   onRefresh: () => void
   showGitTab?: boolean
+  worktreeBranch?: string | null
 }
 
 export function FileExplorerTabBar({
@@ -22,9 +23,11 @@ export function FileExplorerTabBar({
   isGitLoading,
   onRefresh,
   showGitTab = true,
+  worktreeBranch,
 }: FileExplorerTabBarProps) {
+  const filesLabel = worktreeBranch ? `Files · ${worktreeBranch}` : 'Files'
   const allTabs = [
-    { id: 'files' as const, label: 'Files', icon: FolderTree },
+    { id: 'files' as const, label: filesLabel, icon: FolderTree },
     { id: 'git' as const, label: 'Git', icon: GitBranch, badge: gitChangeCount },
     { id: 'tasks' as const, label: 'Tasks', icon: ListTodo, badge: taskNowCount },
     { id: 'automations' as const, label: 'Auto', icon: Zap, badge: automationUnreadCount },

@@ -12,9 +12,14 @@ import { getParentPath } from '../../utils/paths'
 
 interface FileTreeProps {
   project: Project
+  rootPath?: string
+  contextKey?: string | null
 }
 
-export function FileTree({ project }: FileTreeProps) {
+export function FileTree({ project, rootPath: rootPathProp, contextKey: contextKeyProp }: FileTreeProps) {
+  // Use worktree-aware root path, falling back to project path
+  const rootPath = rootPathProp ?? project.path
+  const contextKey = contextKeyProp ?? project.id
   const api = useMemo(() => getElectronAPI(), [])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +31,7 @@ export function FileTree({ project }: FileTreeProps) {
     y: number
   } | null>(null)
 
-  const rootEntries = useProjectStore((s) => s.directoryCache[project.path])
+  const rootEntries = useProjectStore((s) => s.directoryCache[rootPath])
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
   const fileExplorerRenamingPath = useProjectStore((s) => s.fileExplorerRenamingPath)
   const fileExplorerCreating = useProjectStore((s) => s.fileExplorerCreating)
@@ -36,6 +41,8 @@ export function FileTree({ project }: FileTreeProps) {
   const setFileExplorerSelectedPath = useProjectStore((s) => s.setFileExplorerSelectedPath)
   const invalidateDirectories = useProjectStore((s) => s.invalidateDirectories)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
+  const directoryCacheVersion = useProjectStore((s) => s.directoryCacheVersion)
+  const expandedPathsMap = useProjectStore((s) => s.expandedPaths[contextKey] ?? {})
 
   // Subscribe to file watcher events for cache invalidation
   useEffect(() => {
@@ -78,19 +85,19 @@ export function FileTree({ project }: FileTreeProps) {
     return () => fileWatcherEvents.unsubscribe(project.id, 'file-tree')
   }, [project.id, invalidateDirectories, refreshDirectory])
 
-  // Load root directory on mount or when project changes
+  // Load root directory on mount or when root path changes (project or worktree switch)
   useEffect(() => {
     const loadRoot = async () => {
-      // Skip if already loaded for this project
-      if (loadedRef.current === project.path || rootEntries) return
+      // Skip if already loaded for this root
+      if (loadedRef.current === rootPath || rootEntries) return
 
-      loadedRef.current = project.path
+      loadedRef.current = rootPath
       setIsLoading(true)
       setError(null)
 
       try {
-        const entries = await api.fs.readDirectory(project.path)
-        setDirectoryContents(project.path, entries)
+        const entries = await api.fs.readDirectory(rootPath)
+        setDirectoryContents(rootPath, entries)
       } catch (err) {
         console.error('Failed to load project directory:', err)
         setError('Failed to load directory')
@@ -101,7 +108,35 @@ export function FileTree({ project }: FileTreeProps) {
     }
 
     loadRoot()
-  }, [api, project.path, rootEntries, setDirectoryContents])
+  }, [api, rootPath, rootEntries, setDirectoryContents])
+
+  // Re-fetch root and all expanded directories after manual refresh (cacheVersion bump)
+  const prevCacheVersionRef = useRef(directoryCacheVersion)
+  useEffect(() => {
+    if (directoryCacheVersion === prevCacheVersionRef.current) return
+    prevCacheVersionRef.current = directoryCacheVersion
+
+    // Reset loadedRef so root re-fetches
+    loadedRef.current = null
+
+    const refetchAll = async () => {
+      try {
+        // Re-fetch root
+        const entries = await api.fs.readDirectory(rootPath)
+        setDirectoryContents(rootPath, entries)
+        // Re-fetch all expanded directories in parallel
+        await Promise.all(Object.keys(expandedPathsMap).map(async (dir) => {
+          try {
+            const dirEntries = await api.fs.readDirectory(dir)
+            setDirectoryContents(dir, dirEntries)
+          } catch { /* directory may no longer exist */ }
+        }))
+      } catch (err) {
+        console.error('Failed to refresh directories:', err)
+      }
+    }
+    refetchAll()
+  }, [directoryCacheVersion, api, rootPath, expandedPathsMap, setDirectoryContents])
 
   const handleContextMenu = useCallback((entry: FileSystemEntry, x: number, y: number) => {
     setFileExplorerSelectedPath(entry.path)
@@ -120,7 +155,7 @@ export function FileTree({ project }: FileTreeProps) {
   const buildMenuItems = useCallback((entry: FileSystemEntry | null): ContextMenuEntry[] => {
     // Determine where new files/folders should be created
     const createPath = !entry
-      ? project.path
+      ? rootPath
       : entry.type === 'directory'
         ? entry.path
         : getParentPath(entry.path)
@@ -153,7 +188,7 @@ export function FileTree({ project }: FileTreeProps) {
         variant: 'destructive',
       },
     ]
-  }, [api, project.path, startCreate, startRename, setDeletingEntry])
+  }, [api, rootPath, startCreate, startRename, setDeletingEntry])
 
   if (isLoading) {
     return (
@@ -185,8 +220,8 @@ export function FileTree({ project }: FileTreeProps) {
   return (
     <div className="py-1 min-h-full" onContextMenu={handleRootContextMenu}>
       {/* Root-level create ghost entry */}
-      {fileExplorerCreating && fileExplorerCreating.parentPath === project.path && (
-        <RootCreateEntry type={fileExplorerCreating.type} projectPath={project.path} projectId={project.id} />
+      {fileExplorerCreating && fileExplorerCreating.parentPath === rootPath && (
+        <RootCreateEntry type={fileExplorerCreating.type} projectPath={rootPath} projectId={project.id} />
       )}
 
       {rootEntries.map((entry) => (
@@ -194,6 +229,7 @@ export function FileTree({ project }: FileTreeProps) {
           key={entry.path}
           entry={entry}
           projectId={project.id}
+          contextKey={contextKey}
           depth={0}
           isRenaming={fileExplorerRenamingPath === entry.path}
           isCreating={

@@ -38,8 +38,9 @@ interface ProjectStore {
   // File explorer state
   fileExplorerVisible: boolean
   fileExplorerActiveTab: 'files' | 'git' | 'tasks' | 'automations'
-  expandedPaths: Record<string, string[]>
+  expandedPaths: Record<string, Record<string, true>>
   directoryCache: Record<string, FileSystemEntry[]>
+  directoryCacheVersion: number
 
   // Theme state
   theme: 'light' | 'dark'
@@ -138,7 +139,7 @@ interface ProjectStore {
   setFileExplorerActiveTab: (tab: 'files' | 'git' | 'tasks' | 'automations') => void
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
-  clearDirectoryCache: (projectId?: string) => void
+  clearDirectoryCache: (projectId?: string, rootPath?: string) => void
   invalidateDirectories: (dirPaths: string[]) => void
 
   // Theme actions
@@ -232,6 +233,7 @@ export const useProjectStore = create<ProjectStore>()(
       fileExplorerActiveTab: 'files',
       expandedPaths: {},
       directoryCache: {},
+      directoryCacheVersion: 0,
 
       // File explorer interaction state (ephemeral)
       fileExplorerSelectedPath: null,
@@ -653,25 +655,38 @@ export const useProjectStore = create<ProjectStore>()(
 
       updateExpandedPathsAfterRename: (projectId, oldPath, newPath) => {
         set((state) => {
-          const currentPaths = state.expandedPaths[projectId] ?? []
+          const current = state.expandedPaths[projectId] ?? {}
           const sep = oldPath.includes('\\') ? '\\' : '/'
-          const updatedPaths = currentPaths.map((p) =>
-            p === oldPath ? newPath : p.startsWith(oldPath + sep) ? newPath + p.slice(oldPath.length) : p
-          )
-          if (JSON.stringify(updatedPaths) !== JSON.stringify(currentPaths)) {
-            return { expandedPaths: { ...state.expandedPaths, [projectId]: updatedPaths } }
+          let changed = false
+          const updated: Record<string, true> = {}
+          for (const p of Object.keys(current)) {
+            if (p === oldPath) {
+              updated[newPath] = true
+              changed = true
+            } else if (p.startsWith(oldPath + sep)) {
+              updated[newPath + p.slice(oldPath.length)] = true
+              changed = true
+            } else {
+              updated[p] = true
+            }
           }
-          return {}
+          return changed ? { expandedPaths: { ...state.expandedPaths, [projectId]: updated } } : {}
         })
       },
 
       cleanupAfterDelete: (projectId, deletedPath) => {
         set((state) => {
           // Remove expandedPaths starting with deleted path
-          const currentPaths = state.expandedPaths[projectId] ?? []
-          const filteredPaths = currentPaths.filter(
-            (p) => p !== deletedPath && !p.startsWith(deletedPath + '\\') && !p.startsWith(deletedPath + '/')
-          )
+          const current = state.expandedPaths[projectId] ?? {}
+          let changed = false
+          const filtered: Record<string, true> = {}
+          for (const p of Object.keys(current)) {
+            if (p === deletedPath || p.startsWith(deletedPath + '\\') || p.startsWith(deletedPath + '/')) {
+              changed = true
+            } else {
+              filtered[p] = true
+            }
+          }
 
           // Remove deleted path and children from directory cache
           const newCache = { ...state.directoryCache }
@@ -683,8 +698,8 @@ export const useProjectStore = create<ProjectStore>()(
           }
 
           return {
-            expandedPaths: filteredPaths.length !== currentPaths.length
-              ? { ...state.expandedPaths, [projectId]: filteredPaths }
+            expandedPaths: changed
+              ? { ...state.expandedPaths, [projectId]: filtered }
               : state.expandedPaths,
             directoryCache: newCache,
           }
@@ -703,15 +718,14 @@ export const useProjectStore = create<ProjectStore>()(
 
       toggleExpandedPath: (projectId, path) =>
         set((state) => {
-          const currentPaths = state.expandedPaths[projectId] ?? []
-          const isExpanded = currentPaths.includes(path)
+          const current = { ...(state.expandedPaths[projectId] ?? {}) }
+          if (current[path]) {
+            delete current[path]
+          } else {
+            current[path] = true
+          }
           return {
-            expandedPaths: {
-              ...state.expandedPaths,
-              [projectId]: isExpanded
-                ? currentPaths.filter((p) => p !== path)
-                : [...currentPaths, path],
-            },
+            expandedPaths: { ...state.expandedPaths, [projectId]: current },
           }
         }),
 
@@ -723,20 +737,20 @@ export const useProjectStore = create<ProjectStore>()(
           },
         })),
 
-      clearDirectoryCache: (projectId) =>
+      clearDirectoryCache: (projectId, rootPath) =>
         set((state) => {
           if (!projectId) {
-            return { directoryCache: {} }
+            return { directoryCache: {}, directoryCacheVersion: state.directoryCacheVersion + 1 }
           }
-          const project = state.projects.find((p) => p.id === projectId)
-          if (!project) return state
+          const basePath = rootPath ?? state.projects.find((p) => p.id === projectId)?.path
+          if (!basePath) return state
           const newCache = { ...state.directoryCache }
           Object.keys(newCache).forEach((path) => {
-            if (path.startsWith(project.path)) {
+            if (path.startsWith(basePath)) {
               delete newCache[path]
             }
           })
-          return { directoryCache: newCache }
+          return { directoryCache: newCache, directoryCacheVersion: state.directoryCacheVersion + 1 }
         }),
 
       invalidateDirectories: (dirPaths) =>
@@ -1211,6 +1225,10 @@ export const useProjectStore = create<ProjectStore>()(
           delete newExpandedCommitHash[id]
           delete newGitHeadHash[id]
 
+          // Clean expandedPaths for this worktree context
+          const newExpandedPaths = { ...state.expandedPaths }
+          delete newExpandedPaths[id]
+
           // Clean directoryCache entries under worktree path
           const newDirectoryCache = { ...state.directoryCache }
           if (removedWorktree) {
@@ -1269,6 +1287,7 @@ export const useProjectStore = create<ProjectStore>()(
             gitCommitLogLoading: newGitCommitLogLoading,
             expandedCommitHash: newExpandedCommitHash,
             gitHeadHash: newGitHeadHash,
+            expandedPaths: newExpandedPaths,
             directoryCache: newDirectoryCache,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveCenterTabId,
@@ -1433,9 +1452,19 @@ export const useProjectStore = create<ProjectStore>()(
         // Profile state
         activeProfileId: state.activeProfileId,
       }),
-      onRehydrateStorage: () => (_state, error) => {
+      onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error('Zustand hydration failed:', error)
+        }
+        // Migrate expandedPaths from old string[] format to Record<string, true>
+        if (state?.expandedPaths) {
+          for (const [key, val] of Object.entries(state.expandedPaths)) {
+            if (Array.isArray(val)) {
+              const migrated: Record<string, true> = {}
+              for (const p of val) migrated[p] = true
+              ;(state.expandedPaths as Record<string, Record<string, true>>)[key] = migrated
+            }
+          }
         }
         // Signal main process that store is hydrated (triggers session restoration)
         try {
