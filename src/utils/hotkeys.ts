@@ -220,6 +220,36 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     enabled: true,
   },
 
+  // Git operations
+  'git.stageAll': {
+    key: 'a',
+    modifiers: ['ctrl', 'shift', 'alt'],
+    description: 'Stage all changes',
+    category: 'git',
+    enabled: true,
+  },
+  'git.unstageAll': {
+    key: 'u',
+    modifiers: ['ctrl', 'shift', 'alt'],
+    description: 'Unstage all changes',
+    category: 'git',
+    enabled: true,
+  },
+  'git.commit': {
+    key: 'Enter',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Commit staged changes',
+    category: 'git',
+    enabled: true,
+  },
+  'git.discardAll': {
+    key: 'z',
+    modifiers: ['ctrl', 'shift', 'alt'],
+    description: 'Discard all changes',
+    category: 'git',
+    enabled: true,
+  },
+
   // Editor
   'editor.closeTab': {
     key: 'w',

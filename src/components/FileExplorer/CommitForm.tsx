@@ -57,6 +57,7 @@ export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFor
     <div className="border-t border-border/50 px-3 py-2">
       <textarea
         ref={textareaRef}
+        data-git-commit-input
         value={message}
         onChange={(e) => { setMessage(e.target.value); handleInput() }}
         onKeyDown={handleKeyDown}

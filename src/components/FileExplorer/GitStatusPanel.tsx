@@ -335,6 +335,7 @@ function FileChangeSection({
 }) {
   const api = getElectronAPI()
   const setDiscardingFiles = useProjectStore((s) => s.setDiscardingFiles)
+  const closeWorkingTreeDiffTabs = useProjectStore((s) => s.closeWorkingTreeDiffTabs)
 
   const colorClass = {
     success: 'text-green-600 dark:text-green-400',
@@ -347,13 +348,15 @@ function FileChangeSection({
     e.stopPropagation()
     const filePaths = files.map((f) => f.path)
     await withOperation(() => api.git.stageFiles(gitPath, filePaths))
-  }, [api, gitPath, files, withOperation])
+    closeWorkingTreeDiffTabs(filePaths)
+  }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
 
   const handleUnstageAll = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     const filePaths = files.map((f) => f.path)
     await withOperation(() => api.git.unstageFiles(gitPath, filePaths))
-  }, [api, gitPath, files, withOperation])
+    closeWorkingTreeDiffTabs(filePaths)
+  }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
 
   const handleDiscardAll = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -442,6 +445,7 @@ function FileChangeItem({
 }) {
   const api = getElectronAPI()
   const openWorkingTreeDiffTab = useProjectStore((s) => s.openWorkingTreeDiffTab)
+  const closeWorkingTreeDiffTabs = useProjectStore((s) => s.closeWorkingTreeDiffTabs)
   const setDiscardingFiles = useProjectStore((s) => s.setDiscardingFiles)
 
   const Icon = {
@@ -465,12 +469,14 @@ function FileChangeItem({
   const handleStage = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     await withOperation(() => api.git.stageFiles(gitPath, [file.path]))
-  }, [api, gitPath, file.path, withOperation])
+    closeWorkingTreeDiffTabs([file.path])
+  }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
 
   const handleUnstage = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     await withOperation(() => api.git.unstageFiles(gitPath, [file.path]))
-  }, [api, gitPath, file.path, withOperation])
+    closeWorkingTreeDiffTabs([file.path])
+  }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
 
   const handleDiscard = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()

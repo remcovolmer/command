@@ -808,10 +808,13 @@ ipcMain.handle('git:commit-detail', async (_event, projectPath: string, commitHa
 
 ipcMain.handle('git:file-at-commit', async (_event, projectPath: string, commitHash: string, filePath: string) => {
   validateProjectPath(projectPath)
-  if (typeof commitHash !== 'string' || !/^[0-9a-f]{7,40}$/i.test(commitHash)) {
+  if (typeof commitHash !== 'string' || !/^([0-9a-f]{7,40}|HEAD(~\d+)?|HEAD\^?)$/i.test(commitHash)) {
     throw new Error('Invalid commit hash')
   }
   if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+    throw new Error('Invalid file path')
+  }
+  if (filePath.includes('..') || path.isAbsolute(filePath)) {
     throw new Error('Invalid file path')
   }
   return gitService?.getFileAtCommit(projectPath, commitHash, filePath) ?? null
@@ -848,11 +851,6 @@ ipcMain.handle('git:discard-files', async (_event, projectPath: string, files: u
   validateProjectPath(projectPath)
   validateRelativeFilePaths(files)
   return gitService?.discardFiles(projectPath, files)
-})
-
-ipcMain.handle('git:discard-all', async (_event, projectPath: string) => {
-  validateProjectPath(projectPath)
-  return gitService?.discardAll(projectPath)
 })
 
 ipcMain.handle('git:delete-untracked-files', async (_event, projectPath: string, files: unknown) => {
@@ -894,14 +892,6 @@ ipcMain.handle('git:delete-branch', async (_event, projectPath: string, name: st
   validateBranchName(name)
   const forceDelete = typeof force === 'boolean' ? force : false
   return gitService?.deleteBranch(projectPath, name, forceDelete)
-})
-
-ipcMain.handle('git:validate-branch-name', async (_event, projectPath: string, name: string) => {
-  validateProjectPath(projectPath)
-  if (typeof name !== 'string' || name.length === 0 || name.length > 255) {
-    return false
-  }
-  return gitService?.validateBranchName(projectPath, name) ?? false
 })
 
 // IPC Handlers for Tasks operations

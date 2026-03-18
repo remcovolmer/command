@@ -24,6 +24,7 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
   const [newBranchName, setNewBranchName] = useState('')
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -110,12 +111,6 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
     setCreating(true)
     setError(null)
     try {
-      const valid = await api.git.validateBranchName(gitPath, newBranchName.trim())
-      if (!valid) {
-        setError('Invalid branch name')
-        setCreating(false)
-        return
-      }
       await api.git.createBranch(gitPath, newBranchName.trim())
       onClose()
     } catch (err) {
@@ -126,21 +121,33 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
   }, [api, gitPath, newBranchName, creating, onClose])
 
   const handleDeleteBranch = useCallback(async (name: string, force = false) => {
+    if (!force) {
+      setDeleting(name)
+      setError(null)
+      try {
+        await api.git.deleteBranch(gitPath, name, false)
+        setBranches((prev) => prev.filter((b) => b.name !== name))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Delete failed'
+        if (msg.includes('not fully merged')) {
+          setConfirmDelete(name)
+        } else {
+          setError(msg)
+        }
+      } finally {
+        setDeleting(null)
+      }
+      return
+    }
+    // Force delete
     setDeleting(name)
     setError(null)
     try {
-      await api.git.deleteBranch(gitPath, name, force)
+      await api.git.deleteBranch(gitPath, name, true)
       setBranches((prev) => prev.filter((b) => b.name !== name))
+      setConfirmDelete(null)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Delete failed'
-      if (!force && msg.includes('not fully merged')) {
-        if (confirm(`Branch "${name}" is not fully merged. Force delete?`)) {
-          await handleDeleteBranch(name, true)
-          return
-        }
-      } else {
-        setError(msg)
-      }
+      setError(err instanceof Error ? err.message : 'Delete failed')
     } finally {
       setDeleting(null)
     }
@@ -272,6 +279,29 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
       {/* Error display */}
       {error && !showNewBranch && (
         <div className="px-3 py-1.5 text-xs text-red-500 border-t border-border/50">{error}</div>
+      )}
+
+      {/* Force delete confirmation */}
+      {confirmDelete && (
+        <div className="px-3 py-2 border-t border-border/50 bg-destructive/10">
+          <p className="text-xs text-foreground mb-1.5">
+            Branch "{confirmDelete}" is not fully merged. Force delete?
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setConfirmDelete(null)}
+              className="px-2 py-0.5 text-xs rounded border border-border hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleDeleteBranch(confirmDelete, true)}
+              className="px-2 py-0.5 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+            >
+              Force Delete
+            </button>
+          </div>
+        </div>
       )}
     </div>,
     document.body

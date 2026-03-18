@@ -457,14 +457,12 @@ export interface ElectronAPI {
     unstageFiles: (projectPath: string, files: string[]) => Promise<void>;
     commit: (projectPath: string, message: string) => Promise<string>;
     discardFiles: (projectPath: string, files: string[]) => Promise<void>;
-    discardAll: (projectPath: string) => Promise<void>;
     deleteUntrackedFiles: (projectPath: string, files: string[]) => Promise<void>;
     getIndexFileContent: (projectPath: string, filePath: string) => Promise<string | null>;
     listBranches: (projectPath: string) => Promise<GitBranchListItem[]>;
     createBranch: (projectPath: string, name: string) => Promise<void>;
     switchBranch: (projectPath: string, name: string) => Promise<void>;
     deleteBranch: (projectPath: string, name: string, force: boolean) => Promise<void>;
-    validateBranchName: (projectPath: string, name: string) => Promise<boolean>;
   };
   github: {
     checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;

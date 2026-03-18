@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, GitCommitDetail, CenterTab, TasksData, AccountProfile } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, CenterTab, TasksData, AccountProfile } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'

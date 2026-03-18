@@ -167,7 +167,6 @@ export function FileExplorer() {
 
   // Operation lock: generation counter prevents stale watcher refreshes during git operations
   const operationGeneration = useRef(0)
-  const refreshGeneration = useRef(0)
 
   const handleOperationStart = useCallback(() => {
     ++operationGeneration.current
@@ -262,9 +261,6 @@ export function FileExplorer() {
       setTasksLoading(activeProject.id, false)
     }
   }, [api, activeProject])
-
-  const hasTerminals = sidecarTerminals.length > 0
-  const isExpanded = hasTerminals && !sidecarTerminalCollapsed
 
   return (
     <div className="h-full flex flex-col bg-sidebar" data-file-explorer>

@@ -285,6 +285,55 @@ function App() {
       }
     },
 
+    // Git operations
+    'git.stageAll': () => {
+      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } = useProjectStore.getState()
+      if (fileExplorerActiveTab !== 'git') return
+      const project = projects.find(p => p.id === activeProjectId)
+      if (!project) return
+      const status = gitStatus[activeProjectId!]
+      if (!status) return
+      const files = [...status.modified.map(f => f.path), ...status.untracked.map(f => f.path)]
+      if (files.length > 0) {
+        api.git.stageFiles(project.path, files).then(() => {
+          // Trigger refresh via the git tab's existing refresh mechanism
+        })
+      }
+    },
+    'git.unstageAll': () => {
+      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } = useProjectStore.getState()
+      if (fileExplorerActiveTab !== 'git') return
+      const project = projects.find(p => p.id === activeProjectId)
+      if (!project) return
+      const status = gitStatus[activeProjectId!]
+      if (!status) return
+      const files = status.staged.map(f => f.path)
+      if (files.length > 0) {
+        api.git.unstageFiles(project.path, files).then(() => {
+          // Refresh handled by file watcher
+        })
+      }
+    },
+    'git.commit': () => {
+      // Focus the commit textarea when git tab is active
+      const { fileExplorerActiveTab } = useProjectStore.getState()
+      if (fileExplorerActiveTab !== 'git') return
+      const textarea = document.querySelector('[data-git-commit-input]') as HTMLTextAreaElement
+      textarea?.focus()
+    },
+    'git.discardAll': () => {
+      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab, setDiscardingFiles } = useProjectStore.getState()
+      if (fileExplorerActiveTab !== 'git') return
+      const project = projects.find(p => p.id === activeProjectId)
+      if (!project) return
+      const status = gitStatus[activeProjectId!]
+      if (!status) return
+      const files = status.modified.map(f => f.path)
+      if (files.length > 0) {
+        setDiscardingFiles({ files, isUntracked: false })
+      }
+    },
+
     // Editor
     'editor.closeTab': () => {
       const { activeCenterTabId, editorTabs } = useProjectStore.getState()

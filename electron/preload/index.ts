@@ -467,8 +467,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:commit', projectPath, message),
     discardFiles: (projectPath: string, files: string[]): Promise<void> =>
       ipcRenderer.invoke('git:discard-files', projectPath, files),
-    discardAll: (projectPath: string): Promise<void> =>
-      ipcRenderer.invoke('git:discard-all', projectPath),
     deleteUntrackedFiles: (projectPath: string, files: string[]): Promise<void> =>
       ipcRenderer.invoke('git:delete-untracked-files', projectPath, files),
     getIndexFileContent: (projectPath: string, filePath: string): Promise<string | null> =>
@@ -481,8 +479,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:switch-branch', projectPath, name),
     deleteBranch: (projectPath: string, name: string, force: boolean): Promise<void> =>
       ipcRenderer.invoke('git:delete-branch', projectPath, name, force),
-    validateBranchName: (projectPath: string, name: string): Promise<boolean> =>
-      ipcRenderer.invoke('git:validate-branch-name', projectPath, name),
   },
 
   // Task operations

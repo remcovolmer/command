@@ -6,6 +6,7 @@ export type HotkeyCategory =
   | 'navigation'
   | 'terminal'
   | 'file-explorer'
+  | 'git'
   | 'editor'
   | 'worktree'
   | 'sidebar'
@@ -56,6 +57,11 @@ export type HotkeyAction =
   | 'fileExplorer.rename'
   | 'fileExplorer.delete'
   | 'fileExplorer.copyPath'
+  // Git
+  | 'git.stageAll'
+  | 'git.unstageAll'
+  | 'git.commit'
+  | 'git.discardAll'
   // Editor
   | 'editor.closeTab'
   | 'editor.nextTab'
@@ -81,6 +87,7 @@ export const HOTKEY_CATEGORY_NAMES: Record<HotkeyCategory, string> = {
   navigation: 'Navigation',
   terminal: 'Terminal',
   'file-explorer': 'File Explorer',
+  git: 'Git',
   editor: 'Editor',
   worktree: 'Worktree',
   sidebar: 'Sidebar',
@@ -93,6 +100,7 @@ export const HOTKEY_CATEGORY_ORDER: HotkeyCategory[] = [
   'navigation',
   'terminal',
   'file-explorer',
+  'git',
   'editor',
   'worktree',
   'sidebar',
