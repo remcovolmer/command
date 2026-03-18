@@ -42,7 +42,7 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
   const invalidateDirectories = useProjectStore((s) => s.invalidateDirectories)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
   const directoryCacheVersion = useProjectStore((s) => s.directoryCacheVersion)
-  const expandedPaths = useProjectStore((s) => s.expandedPaths[contextKey] ?? [])
+  const expandedPathsMap = useProjectStore((s) => s.expandedPaths[contextKey] ?? {})
 
   // Subscribe to file watcher events for cache invalidation
   useEffect(() => {
@@ -124,19 +124,19 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
         // Re-fetch root
         const entries = await api.fs.readDirectory(rootPath)
         setDirectoryContents(rootPath, entries)
-        // Re-fetch all expanded directories
-        for (const dir of expandedPaths) {
+        // Re-fetch all expanded directories in parallel
+        await Promise.all(Object.keys(expandedPathsMap).map(async (dir) => {
           try {
             const dirEntries = await api.fs.readDirectory(dir)
             setDirectoryContents(dir, dirEntries)
           } catch { /* directory may no longer exist */ }
-        }
+        }))
       } catch (err) {
         console.error('Failed to refresh directories:', err)
       }
     }
     refetchAll()
-  }, [directoryCacheVersion, api, rootPath, expandedPaths, setDirectoryContents])
+  }, [directoryCacheVersion, api, rootPath, expandedPathsMap, setDirectoryContents])
 
   const handleContextMenu = useCallback((entry: FileSystemEntry, x: number, y: number) => {
     setFileExplorerSelectedPath(entry.path)

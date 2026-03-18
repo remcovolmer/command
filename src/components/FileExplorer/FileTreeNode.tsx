@@ -29,7 +29,7 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
 
   // Use specific selectors to avoid unnecessary re-renders
   const isExpanded = useProjectStore(
-    (s) => s.expandedPaths[contextKey]?.includes(entry.path) ?? false
+    (s) => !!(s.expandedPaths[contextKey]?.[entry.path])
   )
   const children = useProjectStore(
     (s) => s.directoryCache[entry.path]
