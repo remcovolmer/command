@@ -3,13 +3,16 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Terminal } from './Terminal'
 import { EditorSkeleton } from '../Editor/EditorSkeleton'
 import { useTerminalPool } from '../../hooks/useTerminalPool'
-import type { TerminalSession, CenterTab, DiffTab } from '../../types'
+import type { TerminalSession, CenterTab, DiffTab, WorkingTreeDiffTab } from '../../types'
 
 const EditorContainer = lazy(() =>
   import('../Editor/EditorContainer').then(m => ({ default: m.EditorContainer }))
 )
 const DiffEditorView = lazy(() =>
   import('../Editor/DiffEditorView').then(m => ({ default: m.DiffEditorView }))
+)
+const WorkingTreeDiffView = lazy(() =>
+  import('../Editor/WorkingTreeDiffView').then(m => ({ default: m.WorkingTreeDiffView }))
 )
 
 interface TerminalViewportProps {
@@ -171,6 +174,12 @@ export function TerminalViewport({
                 <DiffEditorView
                   key={tab.id}
                   tab={tab as DiffTab}
+                  isActive={isEditorActive && tab.id === activeCenterTabId}
+                />
+              ) : tab.type === 'working-tree-diff' ? (
+                <WorkingTreeDiffView
+                  key={tab.id}
+                  tab={tab as WorkingTreeDiffTab}
                   isActive={isEditorActive && tab.id === activeCenterTabId}
                 />
               ) : (

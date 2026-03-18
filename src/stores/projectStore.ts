@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, GitCommit, GitCommitLog, GitCommitDetail, CenterTab, TasksData, AccountProfile } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, CenterTab, TasksData, AccountProfile } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
@@ -165,6 +165,13 @@ interface ProjectStore {
 
   // Diff tab actions
   openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string) => void
+  openWorkingTreeDiffTab: (filePath: string, fileName: string, diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted', projectId: string) => void
+  closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
+
+  // Discard confirmation state
+  discardingFiles: { files: string[]; isUntracked: boolean } | null
+  setDiscardingFiles: (value: { files: string[]; isUntracked: boolean } | null) => void
+  clearDiscardingFiles: () => void
 
   // Tasks state (not persisted - reload from disk)
   tasksData: Record<string, TasksData>        // keyed by project.id
@@ -261,6 +268,9 @@ export const useProjectStore = create<ProjectStore>()(
       // Tasks state
       tasksData: {},
       tasksLoading: {},
+
+      // Discard confirmation state
+      discardingFiles: null,
 
       // Editor tab state
       editorTabs: {},
@@ -772,9 +782,30 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Git status actions
       setGitStatus: (projectId, status) =>
-        set((state) => ({
-          gitStatus: { ...state.gitStatus, [projectId]: status },
-        })),
+        set((state) => {
+          // Shallow equality check to avoid no-op re-renders from file watcher
+          const existing = state.gitStatus[projectId]
+          if (existing &&
+              existing.isClean === status.isClean &&
+              existing.branch?.name === status.branch?.name &&
+              existing.branch?.ahead === status.branch?.ahead &&
+              existing.branch?.behind === status.branch?.behind &&
+              existing.staged.length === status.staged.length &&
+              existing.modified.length === status.modified.length &&
+              existing.untracked.length === status.untracked.length &&
+              existing.conflicted.length === status.conflicted.length) {
+            // Check if actual file paths changed
+            const sameFiles = (a: { path: string }[], b: { path: string }[]) =>
+              a.length === b.length && a.every((f, i) => f.path === b[i].path)
+            if (sameFiles(existing.staged, status.staged) &&
+                sameFiles(existing.modified, status.modified) &&
+                sameFiles(existing.untracked, status.untracked) &&
+                sameFiles(existing.conflicted, status.conflicted)) {
+              return state // no change, skip re-render
+            }
+          }
+          return { gitStatus: { ...state.gitStatus, [projectId]: status } }
+        }),
 
       setGitStatusLoading: (projectId, loading) =>
         set((state) => ({
@@ -834,6 +865,55 @@ export const useProjectStore = create<ProjectStore>()(
             activeCenterTabId: id,
           }
         }),
+
+      openWorkingTreeDiffTab: (filePath, fileName, diffKind, projectId) =>
+        set((state) => {
+          // Check if already open with same file+diffKind
+          const existing = Object.values(state.editorTabs).find(
+            (t) => t.type === 'working-tree-diff' && (t as WorkingTreeDiffTab).diffKind === diffKind && t.filePath === filePath
+          )
+          if (existing) {
+            return { activeCenterTabId: existing.id }
+          }
+          // Enforce MAX_EDITOR_TABS
+          const MAX_EDITOR_TABS = 15
+          const projectTabs = Object.values(state.editorTabs).filter((t) => t.projectId === projectId)
+          const newTabs = { ...state.editorTabs }
+          if (projectTabs.length >= MAX_EDITOR_TABS) {
+            // Remove oldest non-active tab
+            const toRemove = projectTabs.find((t) => t.id !== state.activeCenterTabId)
+            if (toRemove) delete newTabs[toRemove.id]
+          }
+          const id = `wt-diff-${crypto.randomUUID()}`
+          const tab: WorkingTreeDiffTab = { id, type: 'working-tree-diff', filePath, fileName, diffKind, projectId }
+          return {
+            editorTabs: { ...newTabs, [id]: tab },
+            activeCenterTabId: id,
+          }
+        }),
+
+      closeWorkingTreeDiffTabs: (affectedFiles) =>
+        set((state) => {
+          const newTabs = { ...state.editorTabs }
+          let changed = false
+          for (const [id, tab] of Object.entries(newTabs)) {
+            if (tab.type === 'working-tree-diff') {
+              if (!affectedFiles || affectedFiles.includes(tab.filePath)) {
+                delete newTabs[id]
+                changed = true
+              }
+            }
+          }
+          if (!changed) return state
+          const newActiveId = state.activeCenterTabId && newTabs[state.activeCenterTabId]
+            ? state.activeCenterTabId
+            : null
+          return { editorTabs: newTabs, activeCenterTabId: newActiveId }
+        }),
+
+      // Discard confirmation actions
+      setDiscardingFiles: (value) => set({ discardingFiles: value }),
+      clearDiscardingFiles: () => set({ discardingFiles: null }),
 
       // GitHub PR status actions
       // Tasks setters

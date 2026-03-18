@@ -169,6 +169,19 @@ export function FileExplorer() {
     }
   }, [gitContextId])
 
+  // Operation lock: generation counter prevents stale watcher refreshes during git operations
+  const operationGeneration = useRef(0)
+
+  const handleOperationStart = useCallback(() => {
+    ++operationGeneration.current
+    // Cancel any pending watcher-triggered refresh
+    if (gitDebounceRef.current) clearTimeout(gitDebounceRef.current)
+  }, [])
+
+  const handleOperationEnd = useCallback(() => {
+    // The refresh is handled by withOperation in GitStatusPanel via onRefresh
+  }, [])
+
   // Event-driven git refresh via file watcher (replaces 10s polling)
   const gitDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [watcherFailed, setWatcherFailed] = useState(false)
@@ -179,9 +192,13 @@ export function FileExplorer() {
     const handleWatchEvents = () => {
       // Watcher is working again — stop fallback polling
       if (watcherFailed) setWatcherFailed(false)
+      // Skip watcher-triggered refresh if a git operation is in progress
+      const genAtSchedule = operationGeneration.current
       // Debounce: wait 500ms after last event batch before refreshing
       if (gitDebounceRef.current) clearTimeout(gitDebounceRef.current)
       gitDebounceRef.current = setTimeout(() => {
+        // If an operation started since we scheduled, skip (it will do its own refresh)
+        if (operationGeneration.current !== genAtSchedule) return
         handleGitRefreshRef.current()
       }, GIT_DEBOUNCE_MS)
     }
@@ -249,9 +266,6 @@ export function FileExplorer() {
     }
   }, [api, activeProject])
 
-  const hasTerminals = sidecarTerminals.length > 0
-  const isExpanded = hasTerminals && !sidecarTerminalCollapsed
-
   return (
     <div className="h-full flex flex-col bg-sidebar" data-file-explorer>
       {/* Tab Bar - at top */}
@@ -280,7 +294,7 @@ export function FileExplorer() {
           ) : (isLimitedProject || activeTab === 'files') ? (
             <FileTree project={activeProject} rootPath={fileTreeRootPath} contextKey={fileTreeContextKey} />
           ) : (
-            <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} />
+            <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} onOperationStart={handleOperationStart} onOperationEnd={handleOperationEnd} />
           )
         ) : (
           <div className="px-3 py-4 text-sm text-muted-foreground">

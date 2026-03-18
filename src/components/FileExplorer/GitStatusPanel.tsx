@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import {
   GitBranch,
   ChevronDown,
@@ -13,20 +13,29 @@ import {
   Loader2,
   Download,
   History,
+  Plus,
+  Minus,
+  X,
+  CheckCircle,
 } from 'lucide-react'
 import type { Project, GitFileChange, GitBranchInfo } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { CommitHistory } from './CommitHistory'
+import { CommitForm } from './CommitForm'
+import { BranchDropdown } from './BranchDropdown'
+import { DiscardConfirmDialog } from './DiscardConfirmDialog'
 
 interface GitStatusPanelProps {
   project: Project
   gitContextId?: string | null
   gitPath?: string
   onRefresh?: () => void
+  onOperationStart?: () => void
+  onOperationEnd?: () => void
 }
 
-export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: GitStatusPanelProps) {
+export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh, onOperationStart, onOperationEnd }: GitStatusPanelProps) {
   const contextKey = gitContextId ?? project.id
   const gitStatus = useProjectStore((s) => s.gitStatus[contextKey])
   const effectiveGitPath = gitPath ?? project.path
@@ -40,6 +49,16 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: Gi
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
   }
+
+  const withOperation = useCallback(async (fn: () => Promise<void>) => {
+    onOperationStart?.()
+    try {
+      await fn()
+      onRefresh?.()
+    } finally {
+      onOperationEnd?.()
+    }
+  }, [onRefresh, onOperationStart, onOperationEnd])
 
   return (
     <div className="h-full flex flex-col">
@@ -80,6 +99,10 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: Gi
                     expanded={expandedSections.staged}
                     onToggle={() => toggleSection('staged')}
                     variant="success"
+                    sectionType="staged"
+                    gitPath={effectiveGitPath}
+                    projectId={project.id}
+                    withOperation={withOperation}
                   />
                 )}
 
@@ -91,6 +114,10 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: Gi
                     expanded={expandedSections.modified}
                     onToggle={() => toggleSection('modified')}
                     variant="warning"
+                    sectionType="modified"
+                    gitPath={effectiveGitPath}
+                    projectId={project.id}
+                    withOperation={withOperation}
                   />
                 )}
 
@@ -102,6 +129,10 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: Gi
                     expanded={expandedSections.untracked}
                     onToggle={() => toggleSection('untracked')}
                     variant="muted"
+                    sectionType="untracked"
+                    gitPath={effectiveGitPath}
+                    projectId={project.id}
+                    withOperation={withOperation}
                   />
                 )}
 
@@ -113,8 +144,19 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: Gi
                     expanded={true}
                     onToggle={() => {}}
                     variant="error"
+                    sectionType="conflicted"
+                    gitPath={effectiveGitPath}
+                    projectId={project.id}
+                    withOperation={withOperation}
                   />
                 )}
+
+                {/* Commit Form */}
+                <CommitForm
+                  gitPath={effectiveGitPath}
+                  hasStagedFiles={gitStatus.staged.length > 0}
+                  withOperation={withOperation}
+                />
               </>
             )}
 
@@ -143,6 +185,9 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh }: Gi
           </div>
         </>
       )}
+
+      {/* Discard confirmation dialog (rendered via store state) */}
+      <DiscardConfirmDialog gitPath={effectiveGitPath} onComplete={onRefresh} />
     </div>
   )
 }
@@ -157,7 +202,9 @@ function BranchSection({
   onRefresh?: () => void
 }) {
   const api = getElectronAPI()
-  const [loading, setLoading] = useState<'fetch' | 'pull' | 'push' | null>(null)
+  const [loading, setLoading] = useState<'fetch' | 'pull' | 'push' | 'switch' | null>(null)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const branchNameRef = useRef<HTMLButtonElement>(null)
 
   const handleGitAction = useCallback(async (action: 'fetch' | 'pull' | 'push') => {
     setLoading(action)
@@ -174,13 +221,42 @@ function BranchSection({
     }
   }, [api, gitPath, onRefresh])
 
+  const handleBranchSwitch = useCallback(async (name: string) => {
+    setLoading('switch')
+    setShowDropdown(false)
+    try {
+      await api.git.switchBranch(gitPath, name)
+      onRefresh?.()
+    } catch (err) {
+      api.notification.show(
+        'Branch Switch Failed',
+        err instanceof Error ? err.message : 'Failed to switch branch'
+      )
+    } finally {
+      setLoading(null)
+    }
+  }, [api, gitPath, onRefresh])
+
   return (
     <div className="px-3 py-2">
       <div className="flex items-center gap-2">
         <GitBranch className="w-4 h-4 text-primary" />
-        <span className="text-sm text-sidebar-foreground font-medium truncate flex-1">
-          {branch.name}
-        </span>
+        <button
+          ref={branchNameRef}
+          onClick={() => setShowDropdown(!showDropdown)}
+          disabled={loading !== null}
+          className="text-sm text-sidebar-foreground font-medium truncate flex-1 text-left hover:text-primary transition-colors cursor-pointer"
+          title="Click to switch branches"
+        >
+          {loading === 'switch' ? (
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Switching...
+            </span>
+          ) : (
+            branch.name
+          )}
+        </button>
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => handleGitAction('fetch')}
@@ -220,9 +296,21 @@ function BranchSection({
           </button>
         </div>
       </div>
+
+      {showDropdown && (
+        <BranchDropdown
+          gitPath={gitPath}
+          currentBranch={branch.name}
+          triggerRef={branchNameRef}
+          onClose={() => setShowDropdown(false)}
+          onSwitch={handleBranchSwitch}
+        />
+      )}
     </div>
   )
 }
+
+type SectionType = 'staged' | 'modified' | 'untracked' | 'conflicted'
 
 function FileChangeSection({
   title,
@@ -230,13 +318,25 @@ function FileChangeSection({
   expanded,
   onToggle,
   variant,
+  sectionType,
+  gitPath,
+  projectId,
+  withOperation,
 }: {
   title: string
   files: GitFileChange[]
   expanded: boolean
   onToggle: () => void
   variant: 'success' | 'warning' | 'error' | 'muted'
+  sectionType: SectionType
+  gitPath: string
+  projectId: string
+  withOperation: (fn: () => Promise<void>) => Promise<void>
 }) {
+  const api = getElectronAPI()
+  const setDiscardingFiles = useProjectStore((s) => s.setDiscardingFiles)
+  const closeWorkingTreeDiffTabs = useProjectStore((s) => s.closeWorkingTreeDiffTabs)
+
   const colorClass = {
     success: 'text-green-600 dark:text-green-400',
     warning: 'text-yellow-600 dark:text-yellow-400',
@@ -244,11 +344,33 @@ function FileChangeSection({
     muted: 'text-muted-foreground',
   }[variant]
 
+  const handleStageAll = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const filePaths = files.map((f) => f.path)
+    await withOperation(() => api.git.stageFiles(gitPath, filePaths))
+    closeWorkingTreeDiffTabs(filePaths)
+  }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
+
+  const handleUnstageAll = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const filePaths = files.map((f) => f.path)
+    await withOperation(() => api.git.unstageFiles(gitPath, filePaths))
+    closeWorkingTreeDiffTabs(filePaths)
+  }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
+
+  const handleDiscardAll = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDiscardingFiles({
+      files: files.map((f) => f.path),
+      isUntracked: sectionType === 'untracked',
+    })
+  }, [files, sectionType, setDiscardingFiles])
+
   return (
     <div className="border-t border-border/50">
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-sidebar-accent transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-sidebar-accent transition-colors group"
       >
         {expanded ? (
           <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -256,12 +378,49 @@ function FileChangeSection({
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         )}
         <span className={`text-sm font-medium ${colorClass}`}>{title}</span>
-        <span className="text-xs text-muted-foreground ml-auto">{files.length}</span>
+        <span className="text-xs text-muted-foreground">{files.length}</span>
+        <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {sectionType === 'staged' && (
+            <button
+              onClick={handleUnstageAll}
+              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              title="Unstage All"
+            >
+              <Minus className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
+          {(sectionType === 'modified' || sectionType === 'untracked') && (
+            <button
+              onClick={handleStageAll}
+              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              title="Stage All"
+            >
+              <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
+          {sectionType === 'modified' && (
+            <button
+              onClick={handleDiscardAll}
+              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              title="Discard All Changes"
+            >
+              <X className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
+        </div>
       </button>
       {expanded && (
         <div className="pb-1">
           {files.map((file) => (
-            <FileChangeItem key={file.path} file={file} variant={variant} />
+            <FileChangeItem
+              key={file.path}
+              file={file}
+              variant={variant}
+              sectionType={sectionType}
+              gitPath={gitPath}
+              projectId={projectId}
+              withOperation={withOperation}
+            />
           ))}
         </div>
       )}
@@ -272,10 +431,23 @@ function FileChangeSection({
 function FileChangeItem({
   file,
   variant,
+  sectionType,
+  gitPath,
+  projectId,
+  withOperation,
 }: {
   file: GitFileChange
   variant: 'success' | 'warning' | 'error' | 'muted'
+  sectionType: SectionType
+  gitPath: string
+  projectId: string
+  withOperation: (fn: () => Promise<void>) => Promise<void>
 }) {
+  const api = getElectronAPI()
+  const openWorkingTreeDiffTab = useProjectStore((s) => s.openWorkingTreeDiffTab)
+  const closeWorkingTreeDiffTabs = useProjectStore((s) => s.closeWorkingTreeDiffTabs)
+  const setDiscardingFiles = useProjectStore((s) => s.setDiscardingFiles)
+
   const Icon = {
     modified: FileEdit,
     added: FilePlus,
@@ -292,16 +464,106 @@ function FileChangeItem({
     muted: 'text-muted-foreground',
   }[variant]
 
-  // Get just the filename
   const fileName = file.path.split(/[/\\]/).pop() || file.path
+
+  const handleStage = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    await withOperation(() => api.git.stageFiles(gitPath, [file.path]))
+    closeWorkingTreeDiffTabs([file.path])
+  }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
+
+  const handleUnstage = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    await withOperation(() => api.git.unstageFiles(gitPath, [file.path]))
+    closeWorkingTreeDiffTabs([file.path])
+  }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
+
+  const handleDiscard = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDiscardingFiles({
+      files: [file.path],
+      isUntracked: sectionType === 'untracked',
+    })
+  }, [file.path, sectionType, setDiscardingFiles])
+
+  const handleClick = useCallback(() => {
+    let diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted'
+    if (sectionType === 'staged') {
+      diffKind = 'staged'
+    } else if (sectionType === 'untracked') {
+      diffKind = 'untracked'
+    } else if (file.status === 'deleted') {
+      diffKind = 'deleted'
+    } else {
+      diffKind = 'unstaged'
+    }
+    openWorkingTreeDiffTab(file.path, fileName, diffKind, projectId)
+  }, [sectionType, file.status, file.path, fileName, projectId, openWorkingTreeDiffTab])
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-1 ml-4 text-sm hover:bg-sidebar-accent rounded transition-colors min-w-0"
+      className="flex items-center gap-2 px-3 py-1 ml-4 text-sm hover:bg-sidebar-accent rounded transition-colors min-w-0 group cursor-pointer"
       title={file.path}
+      onClick={handleClick}
     >
       <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} />
-      <span className="text-sidebar-foreground truncate min-w-0">{fileName}</span>
+      <span className="text-sidebar-foreground truncate min-w-0 flex-1">{fileName}</span>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {sectionType === 'staged' && (
+          <button
+            onClick={handleUnstage}
+            className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+            title="Unstage"
+          >
+            <Minus className="w-3 h-3 text-muted-foreground" />
+          </button>
+        )}
+        {sectionType === 'modified' && (
+          <>
+            <button
+              onClick={handleStage}
+              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              title="Stage"
+            >
+              <Plus className="w-3 h-3 text-muted-foreground" />
+            </button>
+            <button
+              onClick={handleDiscard}
+              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              title="Discard Changes"
+            >
+              <X className="w-3 h-3 text-muted-foreground" />
+            </button>
+          </>
+        )}
+        {sectionType === 'untracked' && (
+          <>
+            <button
+              onClick={handleStage}
+              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              title="Stage"
+            >
+              <Plus className="w-3 h-3 text-muted-foreground" />
+            </button>
+            <button
+              onClick={handleDiscard}
+              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              title="Delete File"
+            >
+              <X className="w-3 h-3 text-muted-foreground" />
+            </button>
+          </>
+        )}
+        {sectionType === 'conflicted' && (
+          <button
+            onClick={handleStage}
+            className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+            title="Mark as Resolved"
+          >
+            <CheckCircle className="w-3 h-3 text-muted-foreground" />
+          </button>
+        )}
+      </div>
     </div>
   )
 }

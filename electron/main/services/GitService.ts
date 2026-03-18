@@ -60,7 +60,33 @@ export interface GitCommitLog {
   hasMore: boolean
 }
 
+export interface GitBranchListItem {
+  name: string
+  current: boolean
+  upstream: string | null
+}
+
 export class GitService {
+  // Per-repo operation serialization to prevent index.lock conflicts
+  private operationQueue = new Map<string, Promise<void>>()
+
+  private async serialized<T>(projectPath: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.operationQueue.get(projectPath) ?? Promise.resolve()
+    let result!: T
+    const next = prev.then(
+      async () => { result = await fn() },
+      async () => { result = await fn() },
+    )
+    const settled = next.then(() => {}, () => {})
+    this.operationQueue.set(projectPath, settled)
+    await next
+    // Clean up if no further operations were queued
+    if (this.operationQueue.get(projectPath) === settled) {
+      this.operationQueue.delete(projectPath)
+    }
+    return result
+  }
+
   private async execGit(cwd: string, args: string[]): Promise<string> {
     const { stdout } = await execFileAsync('git', args, {
       cwd,
@@ -69,6 +95,22 @@ export class GitService {
       timeout: 30000, // 30 seconds timeout to prevent hung network operations
     })
     return stdout.trim()
+  }
+
+  private async execGitWithStdin(cwd: string, args: string[], stdin: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const proc = execFile('git', args, {
+        cwd,
+        maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true,
+        timeout: 30000,
+      }, (error, stdout) => {
+        if (error) reject(error)
+        else resolve(stdout.trim())
+      })
+      proc.stdin?.write(stdin)
+      proc.stdin?.end()
+    })
   }
 
   async getStatus(projectPath: string): Promise<GitStatus> {
@@ -88,18 +130,16 @@ export class GitService {
     }
 
     try {
-      // Get branch info
-      const branch = await this.getBranchInfo(projectPath)
-
-      // Get file changes using porcelain format
-      const statusOutput = await this.execGit(projectPath, [
+      // Single command for branch info + file changes
+      const output = await this.execGit(projectPath, [
         'status',
-        '--porcelain=v1',
+        '--porcelain=v2',
+        '--branch',
         '-z',
       ])
 
-      const { staged, modified, untracked, conflicted } =
-        this.parseStatusOutput(statusOutput)
+      const { branch, staged, modified, untracked, conflicted } =
+        this.parseStatusV2Output(output)
 
       return {
         isGitRepo: true,
@@ -128,48 +168,8 @@ export class GitService {
     }
   }
 
-  private async getBranchInfo(cwd: string): Promise<GitBranchInfo | null> {
-    try {
-      // Get current branch name
-      const name = await this.execGit(cwd, [
-        'rev-parse',
-        '--abbrev-ref',
-        'HEAD',
-      ])
-
-      // Try to get upstream tracking info
-      let upstream: string | null = null
-      let ahead = 0
-      let behind = 0
-
-      try {
-        upstream = await this.execGit(cwd, [
-          'rev-parse',
-          '--abbrev-ref',
-          '@{upstream}',
-        ])
-
-        // Get ahead/behind counts
-        const counts = await this.execGit(cwd, [
-          'rev-list',
-          '--left-right',
-          '--count',
-          `${name}...@{upstream}`,
-        ])
-        const [aheadStr, behindStr] = counts.split('\t')
-        ahead = parseInt(aheadStr, 10) || 0
-        behind = parseInt(behindStr, 10) || 0
-      } catch {
-        // No upstream set, that's fine
-      }
-
-      return { name, upstream, ahead, behind }
-    } catch {
-      return null
-    }
-  }
-
-  private parseStatusOutput(output: string): {
+  private parseStatusV2Output(output: string): {
+    branch: GitBranchInfo | null
     staged: GitFileChange[]
     modified: GitFileChange[]
     untracked: GitFileChange[]
@@ -179,55 +179,102 @@ export class GitService {
     const modified: GitFileChange[] = []
     const untracked: GitFileChange[] = []
     const conflicted: GitFileChange[] = []
+    let branchName: string | null = null
+    let upstream: string | null = null
+    let ahead = 0
+    let behind = 0
 
     if (!output) {
-      return { staged, modified, untracked, conflicted }
+      return { branch: null, staged, modified, untracked, conflicted }
     }
 
-    // Split by null character (porcelain v1 with -z)
-    const entries = output.split('\0').filter(Boolean)
+    const parts = output.split('\0')
 
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i]
-      if (entry.length < 3) continue
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      if (!part) continue
 
-      const indexStatus = entry[0]
-      const workTreeStatus = entry[1]
-      const filePath = entry.slice(3)
-
-      // Handle renames (R100 old -> new)
-      if (indexStatus === 'R' || workTreeStatus === 'R') {
-        i++ // Skip the next entry (original filename)
+      // Branch header lines
+      if (part.startsWith('# branch.head ')) {
+        const name = part.slice('# branch.head '.length)
+        branchName = name === '(detached)' ? 'HEAD (detached)' : name
+        continue
       }
+      if (part.startsWith('# branch.upstream ')) {
+        upstream = part.slice('# branch.upstream '.length)
+        continue
+      }
+      if (part.startsWith('# branch.ab ')) {
+        const match = part.match(/\+(\d+) -(\d+)/)
+        if (match) {
+          ahead = parseInt(match[1], 10)
+          behind = parseInt(match[2], 10)
+        }
+        continue
+      }
+      if (part.startsWith('# ')) continue // skip other headers like branch.oid
 
-      // Check for merge conflicts using the exact unmerged status pairs
-      // from git porcelain v1: DD, AU, UD, UA, DU, AA, UU
-      const statusPair = indexStatus + workTreeStatus
-      if (
-        statusPair === 'DD' || statusPair === 'AU' || statusPair === 'UD' ||
-        statusPair === 'UA' || statusPair === 'DU' || statusPair === 'AA' ||
-        statusPair === 'UU'
-      ) {
-        conflicted.push({ path: filePath, status: 'conflicted', staged: false })
+      // Untracked file
+      if (part.startsWith('? ')) {
+        const filePath = part.slice(2)
+        untracked.push({ path: filePath, status: 'added', staged: false })
         continue
       }
 
-      // Staged changes (index status)
-      if (indexStatus !== ' ' && indexStatus !== '?') {
-        const status = this.mapStatus(indexStatus)
-        staged.push({ path: filePath, status, staged: true })
+      // Ordinary changed entry: "1 XY ..."
+      if (part.startsWith('1 ')) {
+        const xy = part.slice(2, 4)
+        // path is next NUL-separated part
+        const filePath = parts[++i]
+        if (!filePath) continue
+
+        const indexStatus = xy[0]
+        const workTreeStatus = xy[1]
+
+        // Index changes (staged)
+        if (indexStatus !== '.') {
+          staged.push({ path: filePath, status: this.mapStatus(indexStatus), staged: true })
+        }
+        // Work tree changes (unstaged)
+        if (workTreeStatus !== '.') {
+          modified.push({ path: filePath, status: this.mapStatus(workTreeStatus), staged: false })
+        }
+        continue
       }
 
-      // Unstaged changes (worktree status)
-      if (workTreeStatus === '?') {
-        untracked.push({ path: filePath, status: 'untracked', staged: false })
-      } else if (workTreeStatus !== ' ' && workTreeStatus !== '?') {
-        const status = this.mapStatus(workTreeStatus)
-        modified.push({ path: filePath, status, staged: false })
+      // Renamed/copied entry: "2 XY ..."
+      if (part.startsWith('2 ')) {
+        const xy = part.slice(2, 4)
+        const filePath = parts[++i]
+        ++i // skip original path
+        if (!filePath) continue
+
+        const indexStatus = xy[0]
+        const workTreeStatus = xy[1]
+
+        if (indexStatus !== '.') {
+          staged.push({ path: filePath, status: indexStatus === 'R' ? 'renamed' : this.mapStatus(indexStatus), staged: true })
+        }
+        if (workTreeStatus !== '.') {
+          modified.push({ path: filePath, status: this.mapStatus(workTreeStatus), staged: false })
+        }
+        continue
+      }
+
+      // Unmerged entry: "u XY ..."
+      if (part.startsWith('u ')) {
+        const filePath = parts[++i]
+        if (!filePath) continue
+        conflicted.push({ path: filePath, status: 'modified', staged: false })
+        continue
       }
     }
 
-    return { staged, modified, untracked, conflicted }
+    const branch: GitBranchInfo | null = branchName
+      ? { name: branchName, upstream, ahead, behind }
+      : null
+
+    return { branch, staged, modified, untracked, conflicted }
   }
 
   async fetch(projectPath: string): Promise<string> {
@@ -463,6 +510,105 @@ export class GitService {
     }
     // HTTPS format: https://github.com/owner/repo.git
     return url.replace(/\.git$/, '')
+  }
+
+  // --- Staging operations ---
+
+  async stageFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      await this.execGitWithStdin(projectPath, ['add', '--pathspec-from-file=-'], files.join('\n'))
+    })
+  }
+
+  async unstageFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      await this.execGitWithStdin(projectPath, ['reset', 'HEAD', '--pathspec-from-file=-'], files.join('\n'))
+    })
+  }
+
+  // --- Commit ---
+
+  async commit(projectPath: string, message: string): Promise<string> {
+    return this.serialized(projectPath, async () => {
+      const cleanMessage = message.replace(/\0/g, '')
+      const output = await this.execGit(projectPath, ['commit', '-m', cleanMessage])
+      return output
+    })
+  }
+
+  // --- Discard operations ---
+
+  async discardFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      const CHUNK_SIZE = 100
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE)
+        await this.execGit(projectPath, ['checkout', '--', ...chunk])
+      }
+    })
+  }
+
+  async deleteUntrackedFiles(projectPath: string, files: string[]): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      const CHUNK_SIZE = 100
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE)
+        await this.execGit(projectPath, ['clean', '-f', '--', ...chunk])
+      }
+    })
+  }
+
+  // --- Working directory content (for diff viewer) ---
+
+  async getIndexFileContent(projectPath: string, filePath: string): Promise<string | null> {
+    try {
+      return await this.execGit(projectPath, ['show', `:${filePath}`])
+    } catch {
+      return null
+    }
+  }
+
+  // --- Branch management ---
+
+  async listBranches(projectPath: string): Promise<GitBranchListItem[]> {
+    try {
+      const output = await this.execGit(projectPath, [
+        'branch',
+        '--format=%(refname:short)%00%(HEAD)%00%(upstream:short)',
+      ])
+
+      if (!output) return []
+
+      return output.split('\n').filter(Boolean).map((line) => {
+        const [name, head, upstream] = line.split('\0')
+        return {
+          name: name || '',
+          current: head === '*',
+          upstream: upstream || null,
+        }
+      })
+    } catch {
+      return []
+    }
+  }
+
+  async createBranch(projectPath: string, name: string): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      await this.execGit(projectPath, ['switch', '-c', '--', name])
+    })
+  }
+
+  async switchBranch(projectPath: string, name: string): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      await this.execGit(projectPath, ['switch', '--', name])
+    })
+  }
+
+  async deleteBranch(projectPath: string, name: string, force: boolean): Promise<void> {
+    return this.serialized(projectPath, async () => {
+      const flag = force ? '-D' : '-d'
+      await this.execGit(projectPath, ['branch', flag, '--', name])
+    })
   }
 
   private mapStatus(code: string): GitFileChange['status'] {
