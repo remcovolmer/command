@@ -10,6 +10,8 @@ import { isEditableFile } from '../../utils/editorLanguages'
 import { getFileIcon, getFolderIcon } from './fileIcons'
 import { getParentPath } from '../../utils/paths'
 
+const EMPTY_EXPANDED: Record<string, true> = {}
+
 interface FileTreeProps {
   project: Project
   rootPath?: string
@@ -42,7 +44,7 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
   const invalidateDirectories = useProjectStore((s) => s.invalidateDirectories)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
   const directoryCacheVersion = useProjectStore((s) => s.directoryCacheVersion)
-  const expandedPathsMap = useProjectStore((s) => s.expandedPaths[contextKey] ?? {})
+  const expandedPathsMap = useProjectStore((s) => s.expandedPaths[contextKey] ?? EMPTY_EXPANDED)
 
   // Subscribe to file watcher events for cache invalidation
   useEffect(() => {
