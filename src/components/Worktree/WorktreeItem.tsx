@@ -17,6 +17,7 @@ interface WorktreeItemProps {
 }
 
 function CIStatusIcon({ status }: { status: PRStatus }) {
+  const [hovered, setHovered] = useState(false)
   const checks = status.statusCheckRollup ?? []
   if (checks.length === 0) return null
 
@@ -24,12 +25,33 @@ function CIStatusIcon({ status }: { status: PRStatus }) {
   const anyFail = checks.some(c => c.bucket === 'fail')
   const anyPending = checks.some(c => c.bucket === 'pending')
 
-  const tooltip = checks.map(c => `${c.bucket === 'pass' ? '\u2713' : c.bucket === 'fail' ? '\u2717' : '\u25cb'} ${c.name}`).join('\n')
+  let Icon = CheckCircle2
+  let iconClass = 'text-green-500'
+  if (anyFail) { Icon = XCircle; iconClass = 'text-red-500' }
+  else if (anyPending) { Icon = Clock; iconClass = 'text-yellow-500' }
+  else if (!allPass) return null
 
-  if (allPass) return <span title={tooltip}><CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" /></span>
-  if (anyFail) return <span title={tooltip}><XCircle className="w-3 h-3 text-red-500 flex-shrink-0" /></span>
-  if (anyPending) return <span title={tooltip}><Clock className="w-3 h-3 text-yellow-500 flex-shrink-0" /></span>
-  return null
+  return (
+    <span
+      className="relative flex-shrink-0"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <Icon className={`w-3 h-3 ${iconClass}`} />
+      {hovered && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg py-1.5 px-2 text-xs whitespace-nowrap">
+          {checks.map((c, i) => (
+            <div key={i} className="flex items-center gap-1.5 py-0.5">
+              <span className={c.bucket === 'pass' ? 'text-green-500' : c.bucket === 'fail' ? 'text-red-500' : 'text-yellow-500'}>
+                {c.bucket === 'pass' ? '\u2713' : c.bucket === 'fail' ? '\u2717' : '\u25cb'}
+              </span>
+              <span className="text-popover-foreground">{c.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </span>
+  )
 }
 
 function ReviewBadge({ decision }: { decision: PRStatus['reviewDecision'] }) {
