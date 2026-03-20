@@ -12,7 +12,7 @@ interface DiffEditorViewProps {
 
 export function DiffEditorView({ tab, isActive }: DiffEditorViewProps) {
   const api = useMemo(() => getElectronAPI(), [])
-  const theme = useProjectStore((s) => s.theme)
+  const resolvedTheme = useProjectStore((s) => s.resolvedTheme)
   const [original, setOriginal] = useState<string | null>(null)
   const [modified, setModified] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -99,7 +99,7 @@ export function DiffEditorView({ tab, isActive }: DiffEditorViewProps) {
         original={original ?? ''}
         modified={modified ?? ''}
         language={getLanguageFromPath(tab.filePath)}
-        theme={theme === 'dark' ? 'vs-dark' : 'light'}
+        theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
         options={{
           readOnly: true,
           renderSideBySide: true,

@@ -16,6 +16,7 @@ function App() {
   const setFileExplorerVisible = useProjectStore((s) => s.setFileExplorerVisible)
   const setFileExplorerActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
   const theme = useProjectStore((s) => s.theme)
+  const setResolvedTheme = useProjectStore((s) => s.setResolvedTheme)
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
   const settingsDialogOpen = useProjectStore((s) => s.settingsDialogOpen)
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
@@ -384,14 +385,28 @@ function App() {
     { enabled: showCloseDialog, canConfirm: false }
   )
 
-  // Sync theme class with html element (only add 'dark' class when dark mode)
+  // Sync theme class with html element and resolve system preference
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
+    const applyTheme = (resolved: 'light' | 'dark') => {
+      if (resolved === 'dark') {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+      setResolvedTheme(resolved)
+      api.app.syncClaudeTheme(resolved).catch(() => {})
     }
-  }, [theme])
+
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      applyTheme(mq.matches ? 'dark' : 'light')
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches ? 'dark' : 'light')
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    } else {
+      applyTheme(theme)
+    }
+  }, [theme, setResolvedTheme])
 
   // Restore terminal focus when window regains focus
   useEffect(() => {

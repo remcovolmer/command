@@ -43,7 +43,8 @@ interface ProjectStore {
   directoryCacheVersion: number
 
   // Theme state
-  theme: 'light' | 'dark'
+  theme: 'light' | 'dark' | 'system'
+  resolvedTheme: 'light' | 'dark'
 
   // Git status state (not persisted)
   gitStatus: Record<string, GitStatus>
@@ -144,7 +145,8 @@ interface ProjectStore {
 
   // Theme actions
   toggleTheme: () => void
-  setTheme: (theme: 'light' | 'dark') => void
+  setTheme: (theme: 'light' | 'dark' | 'system') => void
+  setResolvedTheme: (theme: 'light' | 'dark') => void
 
   // Git status actions
   setGitStatus: (projectId: string, status: GitStatus) => void
@@ -248,8 +250,9 @@ export const useProjectStore = create<ProjectStore>()(
       fileExplorerCreating: null,
       fileExplorerDeletingEntry: null,
 
-      // Theme state (light is default)
-      theme: 'light',
+      // Theme state (system follows OS preference)
+      theme: 'system',
+      resolvedTheme: 'light',
 
       // Git status state (not persisted)
       gitStatus: {},
@@ -776,9 +779,13 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Theme actions
       toggleTheme: () =>
-        set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+        set((state) => ({
+          theme: state.theme === 'light' ? 'dark' : state.theme === 'dark' ? 'system' : 'light'
+        })),
 
       setTheme: (theme) => set({ theme }),
+
+      setResolvedTheme: (resolvedTheme) => set({ resolvedTheme }),
 
       // Git status actions
       setGitStatus: (projectId, status) =>

@@ -58,7 +58,7 @@ export function useXtermInstance({
 
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
   const updateTerminalTitle = useProjectStore((s) => s.updateTerminalTitle)
-  const theme = useProjectStore((s) => s.theme)
+  const resolvedTheme = useProjectStore((s) => s.resolvedTheme)
   const terminalState = useProjectStore((s) => s.terminals[id]?.state)
   const api = useMemo(() => getElectronAPI(), [])
 
@@ -132,7 +132,7 @@ export function useXtermInstance({
       fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace",
       lineHeight: 1.0,
       scrollback,
-      theme: buildTerminalTheme(theme),
+      theme: buildTerminalTheme(resolvedTheme),
       allowProposedApi: true,
       letterSpacing: 0,
       customGlyphs: true,
@@ -353,9 +353,9 @@ export function useXtermInstance({
   useEffect(() => {
     if (terminalRef.current && !isDisposedRef.current) {
       invalidateTerminalThemeCache()
-      terminalRef.current.options.theme = buildTerminalTheme(theme)
+      terminalRef.current.options.theme = buildTerminalTheme(resolvedTheme)
     }
-  }, [theme])
+  }, [resolvedTheme])
 
   // Focus terminal when active and refit
   useEffect(() => {

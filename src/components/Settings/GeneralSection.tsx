@@ -15,6 +15,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   const setTerminalPoolSize = useProjectStore((s) => s.setTerminalPoolSize)
   const profiles = useProjectStore((s) => s.profiles)
   const projectVertexConfigs = useProjectStore((s) => s.projectVertexConfigs)
+  const theme = useProjectStore((s) => s.theme)
+  const setTheme = useProjectStore((s) => s.setTheme)
   const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
   const hasConfirmDialog = confirmingProjectId !== null
 
@@ -81,6 +83,29 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
   return (
     <div className="space-y-6">
+      {/* Appearance section */}
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-1">Appearance</h3>
+        <p className="text-xs text-muted-foreground mb-3">Choose your preferred theme.</p>
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-center gap-2">
+            {(['light', 'dark', 'system'] as const).map((option) => (
+              <button
+                key={option}
+                onClick={() => setTheme(option)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
+                  theme === option
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-accent'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Performance section */}
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-1">Performance</h3>

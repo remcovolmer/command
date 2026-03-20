@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
+import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, Monitor, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
@@ -486,12 +486,14 @@ export function Sidebar() {
             <button
               onClick={toggleTheme}
               className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
-              title={`${theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
+              title={`Theme: ${theme} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
             >
-              {theme === 'dark' ? (
+              {theme === 'light' ? (
                 <Sun className="w-4 h-4" />
-              ) : (
+              ) : theme === 'dark' ? (
                 <Moon className="w-4 h-4" />
+              ) : (
+                <Monitor className="w-4 h-4" />
               )}
             </button>
             <button

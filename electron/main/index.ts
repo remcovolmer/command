@@ -1244,6 +1244,26 @@ ipcMain.on('app:cancel-close', () => {
   // User cancelled, do nothing
 })
 
+// Sync theme to Claude Code's config (~/.claude.json)
+ipcMain.handle('app:sync-claude-theme', async (_event, theme: 'light' | 'dark') => {
+  const claudeConfigPath = path.join(os.homedir(), '.claude.json')
+  try {
+    let config: Record<string, unknown> = {}
+    try {
+      const content = await fs.readFile(claudeConfigPath, 'utf-8')
+      config = JSON.parse(content)
+    } catch {
+      // File doesn't exist or is invalid — start fresh
+    }
+    config.theme = theme
+    const tempPath = `${claudeConfigPath}.tmp`
+    await fs.writeFile(tempPath, JSON.stringify(config, null, 2), 'utf-8')
+    await fs.rename(tempPath, claudeConfigPath)
+  } catch (e) {
+    console.warn('[App] Failed to sync Claude theme:', e)
+  }
+})
+
 // IPC Handlers for Update operations
 ipcMain.handle('update:check', async () => {
   return updateService?.checkForUpdates()

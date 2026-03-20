@@ -17,7 +17,7 @@ interface CodeEditorProps {
 
 export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   const api = getElectronAPI()
-  const theme = useProjectStore((s) => s.theme)
+  const resolvedTheme = useProjectStore((s) => s.resolvedTheme)
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
   const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
   const isDeletedExternally = useProjectStore((s) => {
@@ -209,7 +209,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
       <Editor
         defaultValue={content}
         language={getMonacoLanguage(filePath)}
-        theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+        theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
         onMount={handleMount}
         onChange={handleChange}
         options={{
