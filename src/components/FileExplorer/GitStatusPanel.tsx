@@ -347,15 +347,19 @@ function FileChangeSection({
   const handleStageAll = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     const filePaths = files.map((f) => f.path)
-    await withOperation(() => api.git.stageFiles(gitPath, filePaths))
-    closeWorkingTreeDiffTabs(filePaths)
+    await withOperation(async () => {
+      await api.git.stageFiles(gitPath, filePaths)
+      closeWorkingTreeDiffTabs(filePaths)
+    })
   }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
 
   const handleUnstageAll = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     const filePaths = files.map((f) => f.path)
-    await withOperation(() => api.git.unstageFiles(gitPath, filePaths))
-    closeWorkingTreeDiffTabs(filePaths)
+    await withOperation(async () => {
+      await api.git.unstageFiles(gitPath, filePaths)
+      closeWorkingTreeDiffTabs(filePaths)
+    })
   }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
 
   const handleDiscardAll = useCallback((e: React.MouseEvent) => {
@@ -468,14 +472,18 @@ function FileChangeItem({
 
   const handleStage = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
-    await withOperation(() => api.git.stageFiles(gitPath, [file.path]))
-    closeWorkingTreeDiffTabs([file.path])
+    await withOperation(async () => {
+      await api.git.stageFiles(gitPath, [file.path])
+      closeWorkingTreeDiffTabs([file.path])
+    })
   }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
 
   const handleUnstage = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
-    await withOperation(() => api.git.unstageFiles(gitPath, [file.path]))
-    closeWorkingTreeDiffTabs([file.path])
+    await withOperation(async () => {
+      await api.git.unstageFiles(gitPath, [file.path])
+      closeWorkingTreeDiffTabs([file.path])
+    })
   }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
 
   const handleDiscard = useCallback((e: React.MouseEvent) => {
