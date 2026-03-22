@@ -252,7 +252,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Theme state (system follows OS preference)
       theme: 'system',
-      resolvedTheme: 'light',
+      resolvedTheme: typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
 
       // Git status state (not persisted)
       gitStatus: {},

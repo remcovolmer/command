@@ -1246,6 +1246,7 @@ ipcMain.on('app:cancel-close', () => {
 
 // Sync theme to Claude Code's config (~/.claude.json)
 ipcMain.handle('app:sync-claude-theme', async (_event, theme: 'light' | 'dark') => {
+  if (theme !== 'light' && theme !== 'dark') return
   const claudeConfigPath = path.join(os.homedir(), '.claude.json')
   try {
     let config: Record<string, unknown> = {}
