@@ -1252,7 +1252,10 @@ ipcMain.handle('app:sync-claude-theme', async (_event, theme: 'light' | 'dark') 
     let config: Record<string, unknown> = {}
     try {
       const content = await fs.readFile(claudeConfigPath, 'utf-8')
-      config = JSON.parse(content)
+      const parsed = JSON.parse(content)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        config = parsed
+      }
     } catch {
       // File doesn't exist or is invalid — start fresh
     }
