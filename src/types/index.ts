@@ -430,6 +430,7 @@ export interface ElectronAPI {
     confirmClose: () => void;
     cancelClose: () => void;
     storeHydrated: () => void;
+    syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>;
   };
   fs: {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;

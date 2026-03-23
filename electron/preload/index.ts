@@ -407,6 +407,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     storeHydrated: (): void =>
       ipcRenderer.send('store:hydrated'),
+
+    syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
+      ipcRenderer.invoke('app:sync-claude-theme', theme),
   },
 
   // File system operations

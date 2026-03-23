@@ -7,6 +7,7 @@ import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
 import { fileWatcherEvents } from './utils/fileWatcherEvents'
+import { useThemeResolver } from './hooks/useThemeResolver'
 
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
@@ -15,7 +16,6 @@ function App() {
   const toggleFileExplorer = useProjectStore((s) => s.toggleFileExplorer)
   const setFileExplorerVisible = useProjectStore((s) => s.setFileExplorerVisible)
   const setFileExplorerActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
-  const theme = useProjectStore((s) => s.theme)
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
   const settingsDialogOpen = useProjectStore((s) => s.settingsDialogOpen)
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
@@ -384,14 +384,8 @@ function App() {
     { enabled: showCloseDialog, canConfirm: false }
   )
 
-  // Sync theme class with html element (only add 'dark' class when dark mode)
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [theme])
+  // Resolve theme preference (system/light/dark) → apply to DOM + sync to Claude Code
+  useThemeResolver()
 
   // Restore terminal focus when window regains focus
   useEffect(() => {
