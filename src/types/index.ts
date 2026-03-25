@@ -89,6 +89,7 @@ export interface DiffTab {
   fileName: string;
   commitHash: string;
   parentHash: string;  // empty string for initial commits
+  oldPath?: string;    // original path for renamed files (used to fetch parent commit content)
   projectId: string;
 }
 
