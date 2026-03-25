@@ -43,7 +43,7 @@ export function CommitDetail({ commit, gitPath, detailCache }: CommitDetailProps
     if (!activeProjectId) return
     const parentHash = commit.parentHashes[0] ?? ''
     const fileName = file.path.split('/').pop() ?? file.path
-    openDiffTab(file.oldPath ?? file.path, fileName, commit.hash, parentHash, activeProjectId)
+    openDiffTab(file.path, fileName, commit.hash, parentHash, activeProjectId, file.oldPath)
   }
 
   if (loading) {

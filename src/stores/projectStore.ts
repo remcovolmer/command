@@ -166,7 +166,7 @@ interface ProjectStore {
   setGitHeadHash: (contextId: string, hash: string | null) => void
 
   // Diff tab actions
-  openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string) => void
+  openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string, oldPath?: string) => void
   openWorkingTreeDiffTab: (filePath: string, fileName: string, diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted', projectId: string) => void
   closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
 
@@ -856,7 +856,7 @@ export const useProjectStore = create<ProjectStore>()(
         })),
 
       // Diff tab actions
-      openDiffTab: (filePath, fileName, commitHash, parentHash, projectId) =>
+      openDiffTab: (filePath, fileName, commitHash, parentHash, projectId, oldPath) =>
         set((state) => {
           // Check if already open with same commit+file
           const existing = Object.values(state.editorTabs).find(
@@ -866,7 +866,7 @@ export const useProjectStore = create<ProjectStore>()(
             return { activeCenterTabId: existing.id }
           }
           const id = `diff-${crypto.randomUUID()}`
-          const tab: DiffTab = { id, type: 'diff', filePath, fileName, commitHash, parentHash, projectId }
+          const tab: DiffTab = { id, type: 'diff', filePath, fileName, commitHash, parentHash, projectId, ...(oldPath ? { oldPath } : {}) }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
             activeCenterTabId: id,
