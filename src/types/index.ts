@@ -3,6 +3,8 @@ export type ProjectType = 'workspace' | 'project' | 'code';
 
 export type AuthMode = 'subscription' | 'profile';
 
+export type ClaudeMode = 'chat' | 'auto' | 'full-auto';
+
 export interface AccountProfile {
   id: string;
   name: string;
@@ -10,7 +12,7 @@ export interface AccountProfile {
 }
 
 export interface ProjectSettings {
-  dangerouslySkipPermissions?: boolean;
+  claudeMode?: ClaudeMode;
   authMode?: AuthMode;
   profileId?: string;
 }

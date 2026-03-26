@@ -260,7 +260,7 @@ async function restoreSessions(): Promise<void> {
         projectId: session.projectId,
         worktreeId: session.worktreeId ?? undefined,
         resumeSessionId: sessionFileExists ? session.claudeSessionId : undefined,  // only resume if session file exists
-        dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
+        claudeMode: project?.settings?.claudeMode,
         envOverrides,
       })
 
@@ -415,7 +415,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     initialTitle,
     projectId,
     worktreeId: worktreeId ?? undefined,
-    dangerouslySkipPermissions: project?.settings?.dangerouslySkipPermissions ?? false,
+    claudeMode: project?.settings?.claudeMode,
     envOverrides,
   })
 })
@@ -481,8 +481,9 @@ ipcMain.handle('project:update', async (_event, id: string, updates: Record<stri
   const allowedUpdates: Record<string, unknown> = {}
   if (updates.settings && typeof updates.settings === 'object' && !Array.isArray(updates.settings)) {
     const s = updates.settings as Record<string, unknown>
+    const VALID_CLAUDE_MODES = ['chat', 'auto', 'full-auto']
     const settings: Record<string, unknown> = {
-      dangerouslySkipPermissions: s.dangerouslySkipPermissions === true,
+      claudeMode: VALID_CLAUDE_MODES.includes(s.claudeMode as string) ? s.claudeMode : 'chat',
     }
     // Auth mode settings
     if (s.authMode === 'subscription' || s.authMode === 'profile') {
