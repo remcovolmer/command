@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, Coins } from 'lucide-react'
+import { AlertTriangle, Coins, Info } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
-import type { AuthMode } from '../../types'
+import type { AuthMode, ClaudeMode } from '../../types'
+
+type ConfirmDialog = { projectId: string; mode: 'auto' | 'full-auto' } | null
 
 interface GeneralSectionProps {
   onNestedDialogChange?: (open: boolean) => void
@@ -17,23 +19,28 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   const projectVertexConfigs = useProjectStore((s) => s.projectVertexConfigs)
   const theme = useProjectStore((s) => s.theme)
   const setTheme = useProjectStore((s) => s.setTheme)
-  const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
-  const hasConfirmDialog = confirmingProjectId !== null
+  const confirmedModeKeys = useProjectStore((s) => s.confirmedModeKeys)
+  const addConfirmedModeKey = useProjectStore((s) => s.addConfirmedModeKey)
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
+  const hasConfirmDialog = confirmDialog !== null
 
   // Notify parent when nested dialog opens/closes so it can disable its own Escape handler
   useEffect(() => {
     onNestedDialogChange?.(hasConfirmDialog)
   }, [hasConfirmDialog, onNestedDialogChange])
 
+  const confirmMode = () => {
+    if (confirmDialog) {
+      addConfirmedModeKey(`${confirmDialog.projectId}:${confirmDialog.mode}`)
+      updateProject(confirmDialog.projectId, { settings: { claudeMode: confirmDialog.mode } })
+      setConfirmDialog(null)
+    }
+  }
+
   // Keyboard support for the confirmation dialog (Escape to close, Enter to confirm)
   useDialogHotkeys(
-    () => setConfirmingProjectId(null),
-    () => {
-      if (confirmingProjectId) {
-        updateProject(confirmingProjectId, { settings: { dangerouslySkipPermissions: true } })
-        setConfirmingProjectId(null)
-      }
-    },
+    () => setConfirmDialog(null),
+    () => confirmMode(),
     { enabled: hasConfirmDialog }
   )
 
@@ -45,18 +52,16 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
     )
   }
 
-  const handleToggle = (projectId: string, currentlyEnabled: boolean) => {
-    if (currentlyEnabled) {
-      updateProject(projectId, { settings: { dangerouslySkipPermissions: false } })
+  const handleModeChange = (projectId: string, newMode: ClaudeMode) => {
+    if (newMode === 'chat') {
+      updateProject(projectId, { settings: { claudeMode: 'chat' } })
     } else {
-      setConfirmingProjectId(projectId)
-    }
-  }
-
-  const confirmEnable = () => {
-    if (confirmingProjectId) {
-      updateProject(confirmingProjectId, { settings: { dangerouslySkipPermissions: true } })
-      setConfirmingProjectId(null)
+      const key = `${projectId}:${newMode}`
+      if (confirmedModeKeys.includes(key)) {
+        updateProject(projectId, { settings: { claudeMode: newMode } })
+      } else {
+        setConfirmDialog({ projectId, mode: newMode })
+      }
     }
   }
 
@@ -79,6 +84,21 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
         profileId,
       },
     })
+  }
+
+  const modeOptions: { value: ClaudeMode; label: string }[] = [
+    { value: 'chat', label: 'Chat' },
+    { value: 'auto', label: 'Auto' },
+    { value: 'full-auto', label: 'Full Auto' },
+  ]
+
+  const getModeColor = (mode: ClaudeMode, isActive: boolean) => {
+    if (!isActive) return 'bg-muted text-muted-foreground hover:bg-accent'
+    switch (mode) {
+      case 'chat': return 'bg-primary text-primary-foreground'
+      case 'auto': return 'bg-blue-500 text-white'
+      case 'full-auto': return 'bg-yellow-500 text-black'
+    }
   }
 
   return (
@@ -145,7 +165,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
       <div className="space-y-3">
         {projects.map((project) => {
-          const skipPermissions = project.settings?.dangerouslySkipPermissions ?? false
+          const currentMode: ClaudeMode = project.settings?.claudeMode ?? 'chat'
           const authMode = project.settings?.authMode ?? 'subscription'
           const profileId = project.settings?.profileId
           const hasVertexConfig = projectVertexConfigs[project.id] ?? false
@@ -172,34 +192,27 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 )}
               </div>
 
-              {/* Skip Permissions toggle */}
-              <div className="mt-3 flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <label className="text-sm font-medium text-foreground cursor-pointer" htmlFor={`skip-permissions-${project.id}`}>
-                    Skip Permissions
-                  </label>
-                  <div className="flex items-start gap-1.5 mt-1">
-                    <AlertTriangle className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${skipPermissions ? 'text-yellow-500' : 'text-muted-foreground/40'}`} />
-                    <p className={`text-xs ${skipPermissions ? 'text-yellow-600 dark:text-yellow-400' : 'text-muted-foreground'}`}>
-                      Runs <code className="text-[11px] px-1 py-0.5 bg-muted rounded">claude --dangerously-skip-permissions</code>. Only use in isolated environments.
-                    </p>
-                  </div>
+              {/* Claude Mode selector */}
+              <div className="mt-3">
+                <label className="text-sm font-medium text-foreground">Claude Mode</label>
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  {currentMode === 'chat' && 'Normal mode — Claude asks for permission before every action.'}
+                  {currentMode === 'auto' && 'Auto mode — Claude auto-accepts safe actions, asks for risky ones.'}
+                  {currentMode === 'full-auto' && 'Full auto — Claude executes all actions without permission prompts.'}
+                </p>
+                <div className="flex items-center gap-1">
+                  {modeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleModeChange(project.id, option.value)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        getModeColor(option.value, currentMode === option.value)
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-                <button
-                  id={`skip-permissions-${project.id}`}
-                  role="switch"
-                  aria-checked={skipPermissions}
-                  onClick={() => handleToggle(project.id, skipPermissions)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    skipPermissions ? 'bg-yellow-500' : 'bg-muted-foreground/30'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${
-                      skipPermissions ? 'translate-x-[18px]' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
               </div>
 
               {/* Auth Mode */}
@@ -237,34 +250,54 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
         })}
       </div>
 
-      {/* Confirmation dialog */}
-      {confirmingProjectId && (
+      {/* Confirmation dialog for Auto and Full Auto modes */}
+      {confirmDialog && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmingProjectId(null)} />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDialog(null)} />
           <div className="relative bg-background rounded-lg border border-border p-6 max-w-md shadow-xl">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
+              {confirmDialog.mode === 'full-auto' ? (
+                <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
+              ) : (
+                <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+              )}
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Enable Skip Permissions?</h3>
-                <p className="text-xs text-muted-foreground mt-2">
-                  This will run Claude Code with <code className="text-[11px] px-1 py-0.5 bg-muted rounded">--dangerously-skip-permissions</code>,
-                  allowing it to execute any command without approval prompts.
-                </p>
-                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                  Only enable this in isolated or sandboxed environments.
-                </p>
+                {confirmDialog.mode === 'full-auto' ? (
+                  <>
+                    <h3 className="text-sm font-semibold text-foreground">Enable Full Auto Mode?</h3>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This will run Claude Code with <code className="text-[11px] px-1 py-0.5 bg-muted rounded">--dangerously-skip-permissions</code>,
+                      allowing it to execute any command without approval prompts.
+                    </p>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                      Only enable this in isolated or sandboxed environments.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-sm font-semibold text-foreground">Enable Auto Mode?</h3>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This will run Claude Code with <code className="text-[11px] px-1 py-0.5 bg-muted rounded">--enable-auto-mode</code>.
+                      Claude will auto-accept safe actions (file edits, reads) but still ask permission for risky operations.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => setConfirmingProjectId(null)}
+                onClick={() => setConfirmDialog(null)}
                 className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={confirmEnable}
-                className="px-3 py-1.5 text-xs font-medium rounded-md bg-yellow-500 text-black hover:bg-yellow-400 transition-colors"
+                onClick={confirmMode}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  confirmDialog.mode === 'full-auto'
+                    ? 'bg-yellow-500 text-black hover:bg-yellow-400'
+                    : 'bg-blue-500 text-white hover:bg-blue-400'
+                }`}
               >
                 Enable
               </button>
