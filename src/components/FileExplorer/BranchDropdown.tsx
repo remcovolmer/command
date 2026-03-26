@@ -126,7 +126,14 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
       setError(null)
       try {
         await api.git.deleteBranch(gitPath, name, false)
-        setBranches((prev) => prev.filter((b) => b.name !== name))
+        setBranches((prev) => {
+          const next = prev.filter((b) => b.name !== name)
+          const nextDisplayedLen = next.filter(
+            (b) => !b.current && b.name.toLowerCase().includes(filter.toLowerCase())
+          ).slice(0, MAX_RENDERED).length
+          setActiveIndex((i) => Math.min(i, Math.max(nextDisplayedLen - 1, 0)))
+          return next
+        })
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Delete failed'
         if (msg.includes('not fully merged')) {
@@ -144,14 +151,21 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
     setError(null)
     try {
       await api.git.deleteBranch(gitPath, name, true)
-      setBranches((prev) => prev.filter((b) => b.name !== name))
+      setBranches((prev) => {
+        const next = prev.filter((b) => b.name !== name)
+        const nextDisplayedLen = next.filter(
+          (b) => !b.current && b.name.toLowerCase().includes(filter.toLowerCase())
+        ).slice(0, MAX_RENDERED).length
+        setActiveIndex((i) => Math.min(i, Math.max(nextDisplayedLen - 1, 0)))
+        return next
+      })
       setConfirmDelete(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed')
     } finally {
       setDeleting(null)
     }
-  }, [api, gitPath])
+  }, [api, gitPath, filter])
 
   // Adjust position if near bottom of viewport
   const adjustedTop = Math.min(position.top, window.innerHeight - 300)
@@ -210,7 +224,7 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
           </div>
         ) : (
           <button
-            onClick={() => setShowNewBranch(true)}
+            onClick={() => { setShowNewBranch(true); setError(null) }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
