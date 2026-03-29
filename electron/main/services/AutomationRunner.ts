@@ -345,11 +345,21 @@ export class AutomationRunner {
 
   private async worktreeHasChanges(worktreePath: string): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('git', ['status', '--porcelain'], {
+      // Check for uncommitted changes
+      const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], {
         cwd: worktreePath,
         windowsHide: true,
       })
-      return stdout.trim().length > 0
+      if (status.trim().length > 0) return true
+
+      // Check for local-only commits (not pushed to any remote).
+      // Without this, committed work from the automation gets silently
+      // deleted when the working tree is clean.
+      const { stdout: unpushed } = await execFileAsync(
+        'git', ['log', '--oneline', 'HEAD', '--not', '--remotes'],
+        { cwd: worktreePath, windowsHide: true }
+      )
+      return unpushed.trim().length > 0
     } catch {
       return false
     }
