@@ -360,7 +360,14 @@ async function createWindow() {
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https:')) shell.openExternal(url)
+    try {
+      const parsed = new URL(url)
+      if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && !parsed.username && !parsed.password) {
+        shell.openExternal(url)
+      }
+    } catch {
+      // Invalid URL, ignore
+    }
     return { action: 'deny' }
   })
 
@@ -1228,8 +1235,20 @@ ipcMain.handle('shell:open-in-editor', async (_event, targetPath: string) => {
 })
 
 ipcMain.handle('shell:open-external', async (_event, url: string) => {
-  if (typeof url !== 'string' || !url.match(/^https?:\/\//)) {
+  if (typeof url !== 'string') {
+    throw new Error('URL must be a string')
+  }
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error('Invalid URL')
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     throw new Error('Only HTTP/HTTPS URLs allowed')
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('URLs with embedded credentials are not allowed')
   }
   return shell.openExternal(url)
 })
