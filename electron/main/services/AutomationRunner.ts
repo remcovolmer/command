@@ -98,6 +98,18 @@ export class AutomationRunner {
       }
     }
 
+    // Capture starting commit so we can detect new commits later
+    let initialCommit: string | undefined
+    try {
+      const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+        cwd: worktreePath,
+        windowsHide: true,
+      })
+      initialCommit = stdout.trim()
+    } catch {
+      // Non-fatal: worktreeHasChanges will fall back to conservative behavior
+    }
+
     const controller = new AbortController()
 
     return new Promise<RunResult>((resolve) => {
@@ -192,10 +204,10 @@ export class AutomationRunner {
           }
 
           // Only do worktree cleanup if destroy() hasn't taken ownership
-          let hasUncommitted = false
+          let hasChanges = false
           if (ownsCleanup) {
-            hasUncommitted = await this.worktreeHasChanges(worktreePath)
-            if (!hasUncommitted) {
+            hasChanges = await this.worktreeHasChanges(worktreePath, initialCommit)
+            if (!hasChanges) {
               await this.cleanupWorktree(projectPath, worktreePath, branchName)
             }
           }
@@ -215,7 +227,7 @@ export class AutomationRunner {
                   ? stderr || `Process exited with code ${exitCode}`
                   : undefined,
             worktreeBranch: branchName,
-            worktreePath: ownsCleanup && hasUncommitted ? worktreePath : '',
+            worktreePath: ownsCleanup && hasChanges ? worktreePath : '',
           })
         } catch (err) {
           resolve({
@@ -343,15 +355,28 @@ export class AutomationRunner {
     return op
   }
 
-  private async worktreeHasChanges(worktreePath: string): Promise<boolean> {
+  private async worktreeHasChanges(worktreePath: string, initialCommit?: string): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('git', ['status', '--porcelain'], {
+      // Check for uncommitted changes (staged or unstaged)
+      const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], {
         cwd: worktreePath,
         windowsHide: true,
       })
-      return stdout.trim().length > 0
-    } catch {
+      if (status.trim().length > 0) return true
+
+      // Check for new commits since the worktree branch was created
+      if (initialCommit) {
+        const { stdout: currentHead } = await execFileAsync(
+          'git', ['rev-parse', 'HEAD'],
+          { cwd: worktreePath, windowsHide: true }
+        )
+        if (currentHead.trim() !== initialCommit) return true
+      }
+
       return false
+    } catch {
+      // Conservative: assume changes exist to prevent data loss
+      return true
     }
   }
 
