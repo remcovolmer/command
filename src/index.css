@@ -334,18 +334,32 @@ button {
   list-style-type: none;
   margin-left: -1.5em;
   padding-left: 1.5em;
+  position: relative;
 }
 
 .milkdown-wrapper .ProseMirror li[data-item-type="task"]::before {
-  content: '';
-}
-
-.milkdown-wrapper .ProseMirror input[type="checkbox"] {
-  margin-right: 0.5em;
+  position: absolute;
+  left: 0;
   cursor: pointer;
+  font-size: 1.1em;
+  line-height: 1;
+  top: 0.15em;
+  width: 1.2em;
+  text-align: center;
 }
 
-.milkdown-wrapper .ProseMirror li[data-checked="true"] {
+.milkdown-wrapper .ProseMirror li[data-item-type="task"][data-checked="false"]::before {
+  content: '☐';
+  color: var(--muted-foreground);
+}
+
+.milkdown-wrapper .ProseMirror li[data-item-type="task"][data-checked="true"]::before {
+  content: '☑';
+  color: var(--primary);
+}
+
+.milkdown-wrapper .ProseMirror li[data-checked="true"] > p,
+.milkdown-wrapper .ProseMirror li[data-checked="true"] > span {
   text-decoration: line-through;
   opacity: 0.7;
 }
