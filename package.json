@@ -68,6 +68,7 @@
     "autoprefixer": "^10.4.20",
     "electron": "^40.1.0",
     "electron-builder": "^26.7.0",
+    "jsdom": "^29.0.1",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
     "postcss-import": "^16.1.0",
