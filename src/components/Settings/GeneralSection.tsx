@@ -31,8 +31,9 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
   const confirmMode = () => {
     if (confirmDialog) {
+      const project = projects.find((p) => p.id === confirmDialog.projectId)
       addConfirmedModeKey(`${confirmDialog.projectId}:${confirmDialog.mode}`)
-      updateProject(confirmDialog.projectId, { settings: { claudeMode: confirmDialog.mode } })
+      updateProject(confirmDialog.projectId, { settings: { ...project?.settings, claudeMode: confirmDialog.mode } })
       setConfirmDialog(null)
     }
   }
@@ -53,12 +54,13 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   }
 
   const handleModeChange = (projectId: string, newMode: ClaudeMode) => {
+    const project = projects.find((p) => p.id === projectId)
     if (newMode === 'chat') {
-      updateProject(projectId, { settings: { claudeMode: 'chat' } })
+      updateProject(projectId, { settings: { ...project?.settings, claudeMode: 'chat' } })
     } else {
       const key = `${projectId}:${newMode}`
       if (confirmedModeKeys.includes(key)) {
-        updateProject(projectId, { settings: { claudeMode: newMode } })
+        updateProject(projectId, { settings: { ...project?.settings, claudeMode: newMode } })
       } else {
         setConfirmDialog({ projectId, mode: newMode })
       }

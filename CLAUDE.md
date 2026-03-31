@@ -211,6 +211,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + ,` | Open settings |
 | `Ctrl + Shift + T` | Toggle theme |
 | `Ctrl + /` | Show shortcuts |
+| `Ctrl + Shift + M` | Cycle Claude mode |
 
 ### Dialogs
 | Shortcut | Action |

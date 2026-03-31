@@ -201,28 +201,23 @@ export class ProjectPersistence {
     // Migrate from version 5 to 6: replace dangerouslySkipPermissions boolean with claudeMode enum
     if (oldState.version === 5) {
       const migratedProjects = oldState.projects.map(p => {
-        if (p.settings && (p.settings as Record<string, unknown>).dangerouslySkipPermissions) {
-          const { dangerouslySkipPermissions: _, ...restSettings } = p.settings as Record<string, unknown>
-          return {
-            ...p,
-            settings: { ...restSettings, claudeMode: 'full-auto' as ClaudeMode },
-          }
+        if (!p.settings) return p
+        const { dangerouslySkipPermissions, ...restSettings } = p.settings as Record<string, unknown>
+        return {
+          ...p,
+          settings: dangerouslySkipPermissions
+            ? { ...restSettings, claudeMode: 'full-auto' as ClaudeMode }
+            : restSettings,
         }
-        // Remove dangerouslySkipPermissions if it was false/undefined
-        if (p.settings && 'dangerouslySkipPermissions' in (p.settings as Record<string, unknown>)) {
-          const { dangerouslySkipPermissions: _, ...restSettings } = p.settings as Record<string, unknown>
-          return { ...p, settings: restSettings }
-        }
-        return p
       })
-      return {
+      return this.migrateState({
         version: 6,
         projects: migratedProjects,
         worktrees: oldState.worktrees ?? {},
         sessions: oldState.sessions ?? [],
         profiles: oldState.profiles ?? [],
         activeProfileId: oldState.activeProfileId ?? null,
-      }
+      })
     }
 
     // Default migration: ensure all fields exist

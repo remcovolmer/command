@@ -75,6 +75,7 @@ export type HotkeyAction =
   | 'ui.openSettings'
   | 'ui.toggleTheme'
   | 'ui.showShortcuts'
+  | 'ui.cycleClaudeMode'
   // Dialogs
   | 'dialog.close'
   | 'dialog.confirm';

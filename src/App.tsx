@@ -375,6 +375,16 @@ function App() {
     'ui.openSettings': () => setSettingsDialogOpen(true),
     'ui.toggleTheme': toggleTheme,
     'ui.showShortcuts': () => setShowShortcuts(true),
+    'ui.cycleClaudeMode': () => {
+      const { activeProjectId, projects, updateProject } = useProjectStore.getState()
+      if (!activeProjectId) return
+      const project = projects.find(p => p.id === activeProjectId)
+      if (!project) return
+      const currentMode = project.settings?.claudeMode ?? 'chat'
+      const modeOrder = ['chat', 'auto', 'full-auto'] as const
+      const nextMode = modeOrder[(modeOrder.indexOf(currentMode) + 1) % modeOrder.length]
+      updateProject(activeProjectId, { settings: { ...project.settings, claudeMode: nextMode } })
+    },
   })
 
   // Close dialog with Escape
