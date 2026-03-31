@@ -316,6 +316,14 @@ export class AutomationRunner {
         const age = Date.now() - createdAt
 
         if (age > maxAgeMs) {
+          // Don't delete worktrees that still have uncommitted changes —
+          // they may contain work from a crashed or killed automation run
+          const hasChanges = await this.worktreeHasChanges(wt.path, null)
+          if (hasChanges) {
+            console.log(`[AutomationRunner] GC: skipping worktree ${wt.branch} — has uncommitted changes`)
+            continue
+          }
+
           console.log(`[AutomationRunner] GC: removing orphaned worktree ${wt.branch} (age: ${Math.round(age / 3600000)}h)`)
           await this.cleanupWorktree(projectPath, wt.path, wt.branch)
           cleaned++
