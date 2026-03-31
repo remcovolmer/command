@@ -221,11 +221,12 @@ export class GitService {
         continue
       }
 
-      // Ordinary changed entry: "1 XY ..."
+      // Ordinary changed entry: "1 XY sub mH mI mW hH hI <path>"
+      // With -z, the entire entry is one NUL-terminated part; path is field 8+
       if (part.startsWith('1 ')) {
-        const xy = part.slice(2, 4)
-        // path is next NUL-separated part
-        const filePath = parts[++i]
+        const fields = part.split(' ')
+        const xy = fields[1]
+        const filePath = fields.slice(8).join(' ')
         if (!filePath) continue
 
         const indexStatus = xy[0]
@@ -242,11 +243,13 @@ export class GitService {
         continue
       }
 
-      // Renamed/copied entry: "2 XY ..."
+      // Renamed/copied entry: "2 XY sub mH mI mW hH hI Xscore <path>"
+      // With -z, the new path is field 9+ of this part; origPath is the next NUL part
       if (part.startsWith('2 ')) {
-        const xy = part.slice(2, 4)
-        const filePath = parts[++i]
-        ++i // skip original path
+        const fields = part.split(' ')
+        const xy = fields[1]
+        const filePath = fields.slice(9).join(' ')
+        ++i // skip origPath (next NUL-separated part)
         if (!filePath) continue
 
         const indexStatus = xy[0]
@@ -261,9 +264,11 @@ export class GitService {
         continue
       }
 
-      // Unmerged entry: "u XY ..."
+      // Unmerged entry: "u XY sub m1 m2 m3 mW h1 h2 h3 <path>"
+      // With -z, the entire entry is one NUL-terminated part; path is field 10+
       if (part.startsWith('u ')) {
-        const filePath = parts[++i]
+        const fields = part.split(' ')
+        const filePath = fields.slice(10).join(' ')
         if (!filePath) continue
         conflicted.push({ path: filePath, status: 'modified', staged: false })
         continue
