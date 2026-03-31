@@ -320,6 +320,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'ui',
     enabled: true,
   },
+  'ui.cycleClaudeMode': {
+    key: 'm',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Cycle Claude mode',
+    category: 'ui',
+    enabled: true,
+  },
 
   // Dialogs
   'dialog.close': {

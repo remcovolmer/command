@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { accessSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { ClaudeHookWatcher } from './ClaudeHookWatcher'
-import type { TerminalState, TerminalType } from '../../../src/types'
+import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
 
 const SHELL_READY_DELAY_MS = 100
 
@@ -17,7 +17,7 @@ export interface CreateTerminalOptions {
   projectId?: string
   worktreeId?: string
   resumeSessionId?: string
-  dangerouslySkipPermissions?: boolean
+  claudeMode?: ClaudeMode
   envOverrides?: Record<string, string>
 }
 
@@ -147,7 +147,8 @@ export class TerminalManager {
       this.sendToRenderer('terminal:state', id, 'busy')
       const flags: string[] = []
       if (resumeSessionId) flags.push(`--resume "${resumeSessionId}"`)
-      if (options.dangerouslySkipPermissions) flags.push('--dangerously-skip-permissions')
+      if (options.claudeMode === 'auto') flags.push('--enable-auto-mode')
+      else if (options.claudeMode === 'full-auto') flags.push('--dangerously-skip-permissions')
       const claudeCommand = `claude${flags.length ? ' ' + flags.join(' ') : ''}\r`
       const claudeTimeout = setTimeout(() => {
         if (this.terminals.has(id)) ptyProcess.write(claudeCommand)

@@ -65,6 +65,10 @@ interface ProjectStore {
   terminalPoolSize: number
   setTerminalPoolSize: (size: number) => void
 
+  // Track which mode confirmations have been dismissed (persisted)
+  confirmedModeKeys: string[]
+  addConfirmedModeKey: (key: string) => void
+
   // Settings dialog state
   settingsDialogOpen: boolean
   settingsInitialTab: string | null
@@ -285,6 +289,9 @@ export const useProjectStore = create<ProjectStore>()(
       // Terminal pool settings
       terminalPoolSize: 5,
 
+      // Confirmed mode keys
+      confirmedModeKeys: [],
+
       // Settings dialog state
       settingsDialogOpen: false,
       settingsInitialTab: null,
@@ -499,6 +506,14 @@ export const useProjectStore = create<ProjectStore>()(
 
       resetAllHotkeys: () =>
         set({ hotkeyConfig: DEFAULT_HOTKEY_CONFIG }),
+
+      // Confirmed mode keys
+      addConfirmedModeKey: (key) => {
+        const current = get().confirmedModeKeys
+        if (!current.includes(key)) {
+          set({ confirmedModeKeys: [...current, key] })
+        }
+      },
 
       // Terminal pool settings
       setTerminalPoolSize: (size) => {
@@ -1536,6 +1551,8 @@ export const useProjectStore = create<ProjectStore>()(
         hotkeyConfig: state.hotkeyConfig,
         // Terminal pool settings
         terminalPoolSize: state.terminalPoolSize,
+        // Confirmed mode dialog keys
+        confirmedModeKeys: state.confirmedModeKeys,
         // Profile state
         activeProfileId: state.activeProfileId,
       }),

@@ -7,6 +7,7 @@ import path from 'node:path'
 // NOTE: Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type ProjectType = 'workspace' | 'project' | 'code'
 type AuthMode = 'subscription' | 'profile'
+type ClaudeMode = 'chat' | 'auto' | 'full-auto'
 
 interface AccountProfile {
   id: string
@@ -15,7 +16,7 @@ interface AccountProfile {
 }
 
 interface ProjectSettings {
-  dangerouslySkipPermissions?: boolean
+  claudeMode?: ClaudeMode
   authMode?: AuthMode
   profileId?: string
 }
@@ -88,7 +89,7 @@ interface PersistedState {
   activeProfileId: string | null
 }
 
-const STATE_VERSION = 5
+const STATE_VERSION = 6
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -187,14 +188,36 @@ export class ProjectPersistence {
 
     // Migrate from version 4 to 5: add profiles and activeProfileId
     if (oldState.version === 4) {
-      return {
+      return this.migrateState({
         version: 5,
         projects: oldState.projects,
         worktrees: oldState.worktrees ?? {},
         sessions: oldState.sessions ?? [],
         profiles: [],
         activeProfileId: null,
-      }
+      })
+    }
+
+    // Migrate from version 5 to 6: replace dangerouslySkipPermissions boolean with claudeMode enum
+    if (oldState.version === 5) {
+      const migratedProjects = oldState.projects.map(p => {
+        if (!p.settings) return p
+        const { dangerouslySkipPermissions, ...restSettings } = p.settings as Record<string, unknown>
+        return {
+          ...p,
+          settings: dangerouslySkipPermissions
+            ? { ...restSettings, claudeMode: 'full-auto' as ClaudeMode }
+            : restSettings,
+        }
+      })
+      return this.migrateState({
+        version: 6,
+        projects: migratedProjects,
+        worktrees: oldState.worktrees ?? {},
+        sessions: oldState.sessions ?? [],
+        profiles: oldState.profiles ?? [],
+        activeProfileId: oldState.activeProfileId ?? null,
+      })
     }
 
     // Default migration: ensure all fields exist
