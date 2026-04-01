@@ -351,7 +351,8 @@ export class AutomationRunner {
       })
       return stdout.trim().length > 0
     } catch {
-      return false
+      // Assume dirty on error to avoid deleting worktrees with uncommitted changes
+      return true
     }
   }
 
