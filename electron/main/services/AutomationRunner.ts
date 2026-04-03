@@ -151,6 +151,7 @@ export class AutomationRunner {
         totalBytes += chunk.length
         if (totalBytes > MAX_OUTPUT_BYTES) {
           killed = true
+          chunks.length = 0
           this.killProcess(child)
           return
         }
@@ -351,7 +352,9 @@ export class AutomationRunner {
       })
       return stdout.trim().length > 0
     } catch {
-      return false
+      // If git status fails (locked repo, EBUSY, etc.), assume changes exist
+      // to prevent accidental worktree/branch deletion and data loss
+      return true
     }
   }
 
