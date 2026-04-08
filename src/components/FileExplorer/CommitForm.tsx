@@ -5,7 +5,7 @@ import { getElectronAPI } from '../../utils/electron'
 interface CommitFormProps {
   gitPath: string
   hasStagedFiles: boolean
-  withOperation: (fn: () => Promise<void>) => Promise<void>
+  withOperation: (fn: () => Promise<void>) => Promise<boolean>
 }
 
 export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFormProps) {
