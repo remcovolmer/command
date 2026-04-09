@@ -295,6 +295,21 @@ describe('TerminalPool', () => {
       const result = pool.evict('a')
       expect(result).toBe(false)
     })
+
+    test('evicts terminal with empty string buffer', () => {
+      pool.touch('a')
+      const cleanup = vi.fn()
+      pool.registerCallbacks('a', () => '', cleanup)
+
+      const result = pool.evict('a')
+
+      expect(result).toBe(true)
+      expect(pool.isEvicted('a')).toBe(true)
+      expect(pool.getBuffer('a')).toBe('')
+      expect(cleanup).toHaveBeenCalledOnce()
+      // Verify the terminal is not counted as active
+      expect(pool.getActiveCount()).toBe(0)
+    })
   })
 
   // --- storeBuffer / getBuffer / clearBuffer ---
