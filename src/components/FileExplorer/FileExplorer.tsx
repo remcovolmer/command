@@ -88,9 +88,9 @@ export function FileExplorer() {
   // File explorer root: worktree path when active, otherwise project path
   const fileTreeRootPath = activeWorktree?.path ?? activeProject?.path
   const fileTreeContextKey = activeWorktree?.id ?? activeProjectId
-  // Both 'workspace' and 'project' types have limited functionality (no git, no sidecar)
+  // 'project' type has limited functionality (no git, no sidecar)
   const isLimitedProject = useMemo(
-    () => activeProject?.type === 'workspace' || activeProject?.type === 'project',
+    () => activeProject?.type === 'project',
     [activeProject?.type]
   )
 
