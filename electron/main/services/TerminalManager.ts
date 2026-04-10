@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { accessSync } from 'node:fs'
+import * as path from 'node:path'
 import * as pty from 'node-pty'
 import { ClaudeHookWatcher } from './ClaudeHookWatcher'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
@@ -33,10 +34,17 @@ interface TerminalInstance {
   timeouts: ReturnType<typeof setTimeout>[]
 }
 
+export interface CommandServerAccessor {
+  getPort(): number | null
+  getToken(): string
+}
+
 export class TerminalManager {
   private terminals: Map<string, TerminalInstance> = new Map()
   private window: BrowserWindow
   private hookWatcher: ClaudeHookWatcher | null = null
+  private commandServer: CommandServerAccessor | null = null
+  private cliDir: string
 
   // Auto-naming: track input buffer and whether terminal has been titled
   private terminalInputBuffers: Map<string, string> = new Map()
@@ -50,9 +58,12 @@ export class TerminalManager {
   private sidecarBuffers: Map<string, string> = new Map()
   private readonly MAX_SIDECAR_BUFFER_SIZE = 1_048_576 // 1MB per terminal
 
-  constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher) {
+  constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher, options?: { commandServer?: CommandServerAccessor; cliDir?: string }) {
     this.window = window
     this.hookWatcher = hookWatcher || null
+    this.commandServer = options?.commandServer || null
+    // Default CLI dir: relative to compiled output in dev, resourcesPath in production
+    this.cliDir = options?.cliDir || path.join(__dirname, '..', 'cli')
   }
 
   /**
@@ -85,15 +96,36 @@ export class TerminalManager {
     const id = randomUUID()
     const shell = this.getShell()
 
+    // Build env with Command Center vars injected
+    const env: Record<string, string> = {
+      ...process.env,
+    } as Record<string, string>
+
+    // Inject CommandServer connection vars into every terminal
+    if (this.commandServer) {
+      const port = this.commandServer.getPort()
+      if (port !== null) {
+        env.COMMAND_CENTER_PORT = String(port)
+      }
+      env.COMMAND_CENTER_TOKEN = this.commandServer.getToken()
+    }
+    env.COMMAND_CENTER_TERMINAL_ID = id
+
+    // Prepend CLI directory to PATH so `ccli` is available
+    const existingPath = env.PATH || env.Path || ''
+    env.PATH = this.cliDir + path.delimiter + existingPath
+
+    // Apply caller-provided overrides last
+    if (options.envOverrides) {
+      Object.assign(env, options.envOverrides)
+    }
+
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd,
-      env: {
-        ...process.env,
-        ...options.envOverrides,
-      } as Record<string, string>,
+      env,
     })
 
     const terminal: TerminalInstance = {

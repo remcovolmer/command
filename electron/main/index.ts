@@ -332,7 +332,15 @@ async function createWindow() {
   worktreeService = new WorktreeService()
   githubService = new GitHubService()
   githubService.setWindow(win)
-  terminalManager = new TerminalManager(win, hookWatcher)
+  // Resolve CLI directory: packaged apps use resourcesPath, dev uses compiled output
+  const cliDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'cli')
+    : path.join(__dirname, '..', 'cli')
+
+  terminalManager = new TerminalManager(win, hookWatcher, {
+    commandServer: commandServer!,
+    cliDir,
+  })
 
   // Wire CommandServer deps now that all services are initialized
   commandServer.setDeps({
