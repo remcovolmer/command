@@ -16,6 +16,8 @@ import { GitHubService, type GitEvent, VALID_GIT_EVENTS } from './services/GitHu
 import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
+import { SessionIndexService } from './services/SessionIndexService'
+import { normalizePath } from './utils/paths'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { randomUUID } from 'node:crypto'
@@ -144,6 +146,8 @@ let githubService: GitHubService | null = null
 let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
 let automationService: AutomationService | null = null
+let sessionIndexService: SessionIndexService | null = null
+let unsubSessionIndex: (() => void) | null = null
 let secureEnvStore: SecureEnvStore | null = null
 
 
@@ -273,12 +277,13 @@ async function restoreSessions(): Promise<void> {
 
       console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
 
-      // Notify renderer about restored session
+      // Notify renderer about restored session (include summary if persisted)
       win.webContents.send('session:restored', {
         terminalId,
         projectId: session.projectId,
         worktreeId: session.worktreeId,
         title: session.title,
+        summary: session.summary,
       })
     } catch (error) {
       console.error(`[Session] Failed to restore session:`, error)
@@ -322,6 +327,29 @@ async function createWindow() {
   // Initialize hook watcher
   hookWatcher = new ClaudeHookWatcher(win)
   hookWatcher.start()
+
+  // Initialize session index service
+  sessionIndexService = new SessionIndexService(win)
+
+  // Wire session index to state changes — refresh summaries when terminals finish
+  unsubSessionIndex = hookWatcher.addStateChangeListener((terminalId, state) => {
+    if (state !== 'done' && state !== 'stopped') return
+    if (!sessionIndexService || !hookWatcher || !terminalManager) return
+
+    const info = terminalManager.getTerminalInfo(terminalId)
+    if (!info || info.type !== 'claude') return
+
+    const normalizedCwd = normalizePath(info.cwd)
+    const terminalSessions = hookWatcher.getTerminalSessions()
+      .filter(ts => {
+        const tsInfo = terminalManager!.getTerminalInfo(ts.terminalId)
+        return tsInfo && normalizePath(tsInfo.cwd) === normalizedCwd
+      })
+
+    sessionIndexService.refreshAndPush(info.cwd, terminalSessions).catch(err => {
+      console.error('[SessionIndex] Refresh failed:', err)
+    })
+  })
 
   // Initialize services
   terminalManager = new TerminalManager(win, hookWatcher)
@@ -388,7 +416,7 @@ async function createWindow() {
 }
 
 // IPC Handlers for Terminal operations
-ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude') => {
+ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude', resumeSessionId?: string) => {
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
   }
@@ -397,6 +425,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   }
   if (type !== undefined && type !== 'claude' && type !== 'normal') {
     throw new Error('Invalid terminal type')
+  }
+  if (resumeSessionId !== undefined && (typeof resumeSessionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(resumeSessionId))) {
+    throw new Error('Invalid session ID format')
   }
 
   // Look up project for settings and path
@@ -429,6 +460,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     initialTitle,
     projectId,
     worktreeId: worktreeId ?? undefined,
+    resumeSessionId: resumeSessionId ?? undefined,
     claudeMode: project?.settings?.claudeMode,
     envOverrides,
   })
@@ -907,6 +939,12 @@ ipcMain.handle('git:delete-branch', async (_event, projectPath: string, name: st
   validateBranchName(name)
   const forceDelete = typeof force === 'boolean' ? force : false
   return gitService?.deleteBranch(projectPath, name, forceDelete)
+})
+
+// IPC Handlers for Session Index operations
+ipcMain.handle('session-index:getForProject', async (_event, projectPath: string) => {
+  validateProjectPath(projectPath)
+  return sessionIndexService?.getSessionsForProject(projectPath) ?? []
 })
 
 // IPC Handlers for Tasks operations
@@ -1477,6 +1515,7 @@ app.on('before-quit', () => {
     for (const { terminalId, sessionId } of terminalSessions) {
       const info = terminalManager.getTerminalInfo(terminalId)
       if (info && info.type === 'claude') {
+        const summaryData = sessionIndexService?.getSessionSummary(sessionId)
         sessionsToSave.push({
           terminalId,
           projectId: info.projectId,
@@ -1485,6 +1524,7 @@ app.on('before-quit', () => {
           cwd: info.cwd,
           title: info.title ?? '',
           closedAt: Date.now(),
+          summary: summaryData?.summary || summaryData?.firstPrompt,
         })
       }
     }
@@ -1504,6 +1544,8 @@ app.on('before-quit', () => {
   fileWatcherService?.stopAll().catch(err => {
     console.error('[FileWatcher] Cleanup error:', err)
   })
+  unsubSessionIndex?.()
+  sessionIndexService?.destroy()
   hookWatcher?.destroy()
   githubService?.destroy()
   terminalManager?.destroy()

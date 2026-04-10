@@ -162,6 +162,14 @@ function App() {
       }, 50)
     },
 
+    'nav.projectOverview': () => {
+      const { activeProjectId, setActiveTerminal, setActiveCenterTab } = useProjectStore.getState()
+      if (!activeProjectId) return
+      // Deselect terminal to trigger project overview panel
+      setActiveTerminal(null)
+      setActiveCenterTab(null)
+    },
+
     // Terminal operations
     'terminal.new': () => {
       const { activeProjectId, getProjectTerminals, addTerminal } = useProjectStore.getState()

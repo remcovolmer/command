@@ -54,6 +54,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'navigation',
     enabled: true,
   },
+  'nav.projectOverview': {
+    key: 'o',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Show project overview',
+    category: 'navigation',
+    enabled: true,
+  },
 
   // Terminal operations
   'terminal.new': {

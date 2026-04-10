@@ -94,7 +94,7 @@ interface ProjectStore {
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
-  setActiveCenterTab: (id: string) => void
+  setActiveCenterTab: (id: string | null) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -204,6 +204,7 @@ interface ProjectStore {
   removeTerminal: (id: string) => void
   updateTerminalState: (id: string, state: TerminalState) => void
   updateTerminalTitle: (id: string, title: string) => void
+  updateTerminalSummary: (id: string, summary: string) => void
   setActiveTerminal: (id: string | null) => void
   getProjectTerminals: (projectId: string) => TerminalSession[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
@@ -481,7 +482,7 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           activeCenterTabId: id,
           // If it's a terminal, also update activeTerminalId
-          ...(state.terminals[id] ? { activeTerminalId: id } : {}),
+          ...(id && state.terminals[id] ? { activeTerminalId: id } : {}),
         })),
 
       // Hotkey actions
@@ -1245,6 +1246,19 @@ export const useProjectStore = create<ProjectStore>()(
             terminals: {
               ...state.terminals,
               [id]: { ...terminal, title },
+            },
+          }
+        }),
+
+      updateTerminalSummary: (id, summary) =>
+        set((state) => {
+          const terminal = state.terminals[id]
+          if (!terminal) return state
+
+          return {
+            terminals: {
+              ...state.terminals,
+              [id]: { ...terminal, summary },
             },
           }
         }),
