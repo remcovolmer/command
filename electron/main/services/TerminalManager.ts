@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { accessSync } from 'node:fs'
+import * as path from 'node:path'
 import * as pty from 'node-pty'
 import { ClaudeHookWatcher } from './ClaudeHookWatcher'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
@@ -33,10 +34,17 @@ interface TerminalInstance {
   timeouts: ReturnType<typeof setTimeout>[]
 }
 
+export interface CommandServerAccessor {
+  getPort(): number | null
+  getToken(): string
+}
+
 export class TerminalManager {
   private terminals: Map<string, TerminalInstance> = new Map()
   private window: BrowserWindow
   private hookWatcher: ClaudeHookWatcher | null = null
+  private commandServer: CommandServerAccessor | null = null
+  private cliDir: string
 
   // Auto-naming: track input buffer and whether terminal has been titled
   private terminalInputBuffers: Map<string, string> = new Map()
@@ -46,9 +54,16 @@ export class TerminalManager {
   private evictedBuffers: Map<string, string> = new Map()
   private readonly MAX_BUFFER_SIZE = 1_048_576 // 1MB per terminal
 
-  constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher) {
+  // Sidecar output buffer: rolling buffer for type='normal' terminals
+  private sidecarBuffers: Map<string, string> = new Map()
+  private readonly MAX_SIDECAR_BUFFER_SIZE = 1_048_576 // 1MB per terminal
+
+  constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher, options?: { commandServer?: CommandServerAccessor; cliDir?: string }) {
     this.window = window
     this.hookWatcher = hookWatcher || null
+    this.commandServer = options?.commandServer || null
+    // Default CLI dir: relative to compiled output in dev, resourcesPath in production
+    this.cliDir = options?.cliDir || path.join(__dirname, '..', 'cli')
   }
 
   /**
@@ -81,15 +96,37 @@ export class TerminalManager {
     const id = randomUUID()
     const shell = this.getShell()
 
+    // Build env with Command Center vars injected
+    const env: Record<string, string> = {}
+    for (const [k, v] of Object.entries(process.env)) {
+      if (v !== undefined) env[k] = v
+    }
+
+    // Inject CommandServer connection vars into every terminal
+    if (this.commandServer) {
+      const port = this.commandServer.getPort()
+      if (port !== null) {
+        env.COMMAND_CENTER_PORT = String(port)
+      }
+      env.COMMAND_CENTER_TOKEN = this.commandServer.getToken()
+    }
+    env.COMMAND_CENTER_TERMINAL_ID = id
+
+    // Prepend CLI directory to PATH so `ccli` is available
+    const existingPath = env.PATH || env.Path || ''
+    env.PATH = this.cliDir + path.delimiter + existingPath
+
+    // Apply caller-provided overrides last
+    if (options.envOverrides) {
+      Object.assign(env, options.envOverrides)
+    }
+
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd,
-      env: {
-        ...process.env,
-        ...options.envOverrides,
-      } as Record<string, string>,
+      env,
     })
 
     const terminal: TerminalInstance = {
@@ -110,6 +147,11 @@ export class TerminalManager {
     }
 
     ptyProcess.onData((data) => {
+      // Buffer output for sidecar (normal) terminals
+      if (terminal.type === 'normal') {
+        this.bufferSidecarData(id, data)
+      }
+
       if (this.evictedBuffers.has(id)) {
         // Buffer data for evicted terminal
         this.bufferEvictedData(id, data)
@@ -132,6 +174,7 @@ export class TerminalManager {
       this.terminalInputBuffers.delete(id)
       this.terminalTitled.delete(id)
       this.evictedBuffers.delete(id)
+      this.sidecarBuffers.delete(id)
     })
 
     this.terminals.set(id, terminal)
@@ -282,6 +325,9 @@ export class TerminalManager {
       // Clean up eviction state
       this.evictedBuffers.delete(terminalId)
 
+      // Clean up sidecar buffer
+      this.sidecarBuffers.delete(terminalId)
+
       if (terminal.pty) {
         // On Windows, kill the entire process tree to ensure child processes (like claude) are cleaned up
         if (process.platform === 'win32') {
@@ -322,7 +368,7 @@ export class TerminalManager {
   /**
    * Get terminal info for persistence (only Claude terminals)
    */
-  getTerminalInfo(terminalId: string): { projectId: string; worktreeId?: string; cwd: string; title?: string; type: TerminalType } | null {
+  getTerminalInfo(terminalId: string): { projectId: string; worktreeId?: string; cwd: string; title?: string; type: TerminalType; state: TerminalState } | null {
     const terminal = this.terminals.get(terminalId)
     if (!terminal) return null
     return {
@@ -331,7 +377,33 @@ export class TerminalManager {
       cwd: terminal.cwd,
       title: terminal.title,
       type: terminal.type,
+      state: terminal.state,
     }
+  }
+
+  /**
+   * Get all terminals as a flat array (for query routes).
+   */
+  getAllTerminals(): Array<{ id: string; projectId: string; worktreeId?: string; title?: string; state: TerminalState; type: TerminalType }> {
+    return Array.from(this.terminals.values()).map(t => ({
+      id: t.id,
+      projectId: t.projectId,
+      worktreeId: t.worktreeId,
+      title: t.title,
+      state: t.state,
+      type: t.type,
+    }))
+  }
+
+  /**
+   * Set a terminal's title explicitly and notify the renderer.
+   */
+  setTerminalTitle(terminalId: string, title: string): void {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal) return
+    terminal.title = title
+    this.terminalTitled.set(terminalId, true)
+    this.sendToRenderer('terminal:title', terminalId, title)
   }
 
   /**
@@ -341,6 +413,28 @@ export class TerminalManager {
     return Array.from(this.terminals.values())
       .filter(t => t.type === 'claude')
       .map(t => t.id)
+  }
+
+  /**
+   * Update a terminal's worktree assignment (chat-to-worktree upgrade).
+   * Enforces 1:1 constraint: no two terminals may share the same worktreeId.
+   */
+  updateTerminalWorktree(terminalId: string, worktreeId: string, newCwd: string): { success: boolean; error?: string } {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal) {
+      return { success: false, error: 'Terminal not found' }
+    }
+
+    // Enforce 1:1 worktree-terminal constraint
+    for (const [id, instance] of this.terminals) {
+      if (id !== terminalId && instance.worktreeId === worktreeId) {
+        return { success: false, error: `Worktree ${worktreeId} is already assigned to terminal ${id}` }
+      }
+    }
+
+    terminal.worktreeId = worktreeId
+    terminal.cwd = newCwd
+    return { success: true }
   }
 
   /**
@@ -386,6 +480,61 @@ export class TerminalManager {
     }
 
     this.evictedBuffers.set(terminalId, buffer)
+  }
+
+  /**
+   * Buffer PTY data for a sidecar terminal with size cap.
+   */
+  private bufferSidecarData(terminalId: string, data: string): void {
+    let buffer = this.sidecarBuffers.get(terminalId) ?? ''
+    buffer += data
+    if (buffer.length > this.MAX_SIDECAR_BUFFER_SIZE) {
+      const excess = buffer.length - this.MAX_SIDECAR_BUFFER_SIZE
+      const lineBreak = buffer.indexOf('\n', excess)
+      buffer = lineBreak !== -1 ? buffer.slice(lineBreak + 1) : buffer.slice(excess)
+    }
+    this.sidecarBuffers.set(terminalId, buffer)
+  }
+
+  /**
+   * Get the output buffer for a sidecar terminal.
+   */
+  getSidecarBuffer(terminalId: string): string | null {
+    return this.sidecarBuffers.get(terminalId) ?? null
+  }
+
+  /**
+   * Write data to a terminal's PTY stdin.
+   * Returns true if the write succeeded, false if the terminal was not found.
+   */
+  writeToPty(terminalId: string, data: string): boolean {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal?.pty) return false
+    terminal.pty.write(data)
+    return true
+  }
+
+  /**
+   * Get all terminals matching a given project and optional worktree, filtered by type.
+   */
+  getTerminalsByContext(projectId: string, worktreeId: string | undefined, type: TerminalType): Array<{ id: string; title: string | undefined; lastActivity: number }> {
+    const results: Array<{ id: string; title: string | undefined; lastActivity: number }> = []
+    for (const terminal of this.terminals.values()) {
+      if (terminal.projectId !== projectId) continue
+      if (terminal.type !== type) continue
+      // Match worktree context: both undefined or both equal
+      if (worktreeId) {
+        if (terminal.worktreeId !== worktreeId) continue
+      } else {
+        if (terminal.worktreeId) continue
+      }
+      results.push({
+        id: terminal.id,
+        title: terminal.title,
+        lastActivity: Date.now(), // no per-terminal timestamp tracked; use current time
+      })
+    }
+    return results
   }
 
   /**

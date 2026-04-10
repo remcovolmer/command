@@ -17,6 +17,16 @@
       "filter": ["*.cjs"]
     },
     {
+      "from": "electron/main/cli",
+      "to": "cli",
+      "filter": ["*.cjs", "*.cmd"]
+    },
+    {
+      "from": "electron/main/templates",
+      "to": "templates",
+      "filter": ["*.md"]
+    },
+    {
       "from": "build",
       "to": "build",
       "filter": ["icon.ico"]

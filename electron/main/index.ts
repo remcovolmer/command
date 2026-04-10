@@ -20,6 +20,8 @@ import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
+import { CommandServer } from './services/CommandServer'
+import { SkillInstaller } from './services/SkillInstaller'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -149,6 +151,8 @@ let automationService: AutomationService | null = null
 let sessionIndexService: SessionIndexService | null = null
 let unsubSessionIndex: (() => void) | null = null
 let secureEnvStore: SecureEnvStore | null = null
+let commandServer: CommandServer | null = null
+let skillInstaller: SkillInstaller | null = null
 
 
 /**
@@ -352,16 +356,47 @@ async function createWindow() {
   })
 
   // Initialize services
-  terminalManager = new TerminalManager(win, hookWatcher)
+  // Start CommandServer early so port/token are available for env injection into terminals
+  commandServer = new CommandServer()
+  await commandServer.start()
+
   projectPersistence = new ProjectPersistence()
   await projectPersistence.initialize()
   secureEnvStore = new SecureEnvStore()
   gitService = new GitService()
   worktreeService = new WorktreeService()
-  updateService = new UpdateService()
-  updateService.initialize(win)
   githubService = new GitHubService()
   githubService.setWindow(win)
+  // Resolve CLI directory: packaged apps use resourcesPath, dev uses compiled output
+  const cliDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'cli')
+    : path.join(__dirname, '..', 'cli')
+
+  terminalManager = new TerminalManager(win, hookWatcher, {
+    commandServer: commandServer!,
+    cliDir,
+  })
+
+  // Wire CommandServer deps now that all services are initialized
+  commandServer.setDeps({
+    terminalManager,
+    projectPersistence,
+    worktreeService,
+    githubService,
+    mainWindow: win,
+  })
+
+  // Initialize skill installer and install skills for all registered projects
+  skillInstaller = new SkillInstaller()
+  const allProjectsForSkills = projectPersistence.getProjects()
+  for (const project of allProjectsForSkills) {
+    skillInstaller.installOrUpdate(project.path).catch(err =>
+      console.error(`[SkillInstaller] Startup install failed for ${project.path}:`, err)
+    )
+  }
+
+  updateService = new UpdateService()
+  updateService.initialize(win)
   taskService = new TaskService()
   fileWatcherService = new FileWatcherService(win)
   automationService = new AutomationService(worktreeService)
@@ -486,6 +521,32 @@ ipcMain.on('terminal:close', (_event, terminalId: string) => {
   terminalManager?.closeTerminal(terminalId)
 })
 
+ipcMain.handle('terminal:update-worktree', async (_event, terminalId: string, worktreeId: string, newCwd: string) => {
+  if (!isValidUUID(terminalId)) throw new Error('Invalid terminal ID')
+  if (!isValidUUID(worktreeId)) throw new Error('Invalid worktree ID')
+  if (typeof newCwd !== 'string' || newCwd.length === 0 || newCwd.length > 1024) {
+    throw new Error('Invalid cwd')
+  }
+
+  const result = terminalManager?.updateTerminalWorktree(terminalId, worktreeId, newCwd)
+  if (!result || !result.success) {
+    throw new Error(result?.error ?? 'Failed to update terminal worktree')
+  }
+
+  // Notify renderer of the worktree update
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('terminal:worktree-updated', terminalId, worktreeId)
+
+    // Also update the terminal title to the worktree name
+    const worktree = projectPersistence?.getWorktreeById(worktreeId)
+    if (worktree) {
+      win.webContents.send('terminal:title', terminalId, worktree.name)
+    }
+  }
+
+  return { success: true }
+})
+
 ipcMain.on('terminal:evict', (_event, terminalId: string) => {
   if (!isValidUUID(terminalId)) return
   terminalManager?.evictTerminal(terminalId)
@@ -506,7 +567,12 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
   if (type !== undefined && !validTypes.includes(type)) {
     throw new Error('Invalid project type')
   }
-  return projectPersistence?.addProject(projectPath, name, type)
+  const result = projectPersistence?.addProject(projectPath, name, type)
+  // Auto-install ccli skill file in the new project
+  skillInstaller?.installOrUpdate(projectPath).catch(err =>
+    console.error(`[SkillInstaller] Failed to install skill on project add:`, err)
+  )
+  return result
 })
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
@@ -1350,6 +1416,7 @@ ipcMain.handle('update:install', async () => {
 
   // Kill all child processes BEFORE triggering the NSIS installer.
   // Without this, node-pty processes block the installer from starting.
+  await commandServer?.stop().catch(() => {})
   terminalManager?.destroy()
   hookWatcher?.destroy()
   githubService?.destroy()
@@ -1543,6 +1610,10 @@ app.on('before-quit', () => {
   // Stop file watchers before terminal cleanup to avoid EBUSY
   fileWatcherService?.stopAll().catch(err => {
     console.error('[FileWatcher] Cleanup error:', err)
+  })
+  // Stop CommandServer
+  commandServer?.stop().catch(err => {
+    console.error('[CommandServer] Cleanup error:', err)
   })
   unsubSessionIndex?.()
   sessionIndexService?.destroy()

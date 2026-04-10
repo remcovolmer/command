@@ -403,9 +403,17 @@ export interface ElectronAPI {
     onData: (callback: (id: string, data: string) => void) => Unsubscribe;
     onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe;
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
+    updateWorktree: (terminalId: string, worktreeId: string, newCwd: string) => Promise<{ success: boolean }>;
     onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
+    onStatusMessage: (callback: (id: string, message: string) => void) => Unsubscribe;
+    onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void) => Unsubscribe;
     onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
+    onSidecarCreated: (callback: (contextKey: string, terminal: TerminalSession) => void) => Unsubscribe;
     onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe;
+  };
+  editor: {
+    onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void) => Unsubscribe;
+    onOpenDiff: (callback: (data: { filePath: string; fileName: string; projectId: string }) => void) => Unsubscribe;
   };
   sessionIndex: {
     getForProject: (projectPath: string) => Promise<SessionIndexEntry[]>;
@@ -437,6 +445,7 @@ export interface ElectronAPI {
     listBranches: (projectId: string) => Promise<{ local: string[]; remote: string[]; current: string | null }>;
     remove: (worktreeId: string, force?: boolean) => Promise<void>;
     hasChanges: (worktreeId: string) => Promise<boolean>;
+    onWorktreeAdded: (callback: (projectId: string, worktree: Worktree) => void) => Unsubscribe;
   };
   shell: {
     openPath: (path: string) => Promise<string>;
