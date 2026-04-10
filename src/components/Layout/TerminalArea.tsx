@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
+import { ProjectOverview } from '../ProjectOverview'
 import { TerminalIcon, Plus, Sparkles } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
@@ -188,29 +189,34 @@ export function TerminalArea() {
     )
   }
 
-  // No terminals and no editor tabs in project
+  const handleResumeSession = useCallback(async (sessionId: string) => {
+    if (!activeProjectId) return
+    const terminalId = await api.terminal.create(activeProjectId, undefined, 'claude', sessionId)
+    if (terminalId) {
+      const { addTerminal, setActiveCenterTab } = useProjectStore.getState()
+      addTerminal({
+        id: terminalId,
+        projectId: activeProjectId,
+        worktreeId: null,
+        state: 'busy',
+        lastActivity: Date.now(),
+        title: 'Resuming...',
+        type: 'claude',
+      })
+      setActiveCenterTab(terminalId)
+    }
+  }, [activeProjectId, api])
+
+  // No terminals and no editor tabs in project — show project overview
   if (projectTerminals.length === 0 && projectEditorTabs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-sidebar">
-        <div className="text-center max-w-md mx-auto px-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-sm flex items-center justify-center mx-auto mb-8">
-            <TerminalIcon className="w-8 h-8 text-primary" />
-          </div>
-          <h2 className="text-xl font-semibold text-sidebar-foreground mb-2">
-            {activeProject.name}
-          </h2>
-          <p className="text-muted-foreground mb-8">
-            No chats running. Start a new chat to begin.
-          </p>
-          <button
-            onClick={handleCreateTerminal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-opacity shadow-md shadow-primary/20"
-          >
-            <Plus className="w-4 h-4" />
-            New Chat
-          </button>
-        </div>
-      </div>
+      <ProjectOverview
+        projectId={activeProjectId}
+        projectName={activeProject.name}
+        projectPath={activeProject.path}
+        onCreateTerminal={handleCreateTerminal}
+        onResumeSession={handleResumeSession}
+      />
     )
   }
 

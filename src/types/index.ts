@@ -394,7 +394,7 @@ export interface RestoredSession {
 
 export interface ElectronAPI {
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: TerminalType) => Promise<string>;
+    create: (projectId: string, worktreeId?: string, type?: TerminalType, resumeSessionId?: string) => Promise<string>;
     write: (terminalId: string, data: string) => void;
     resize: (terminalId: string, cols: number, rows: number) => void;
     close: (terminalId: string) => void;

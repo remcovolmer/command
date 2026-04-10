@@ -413,7 +413,7 @@ async function createWindow() {
 }
 
 // IPC Handlers for Terminal operations
-ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude') => {
+ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude', resumeSessionId?: string) => {
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
   }
@@ -454,6 +454,7 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
     initialTitle,
     projectId,
     worktreeId: worktreeId ?? undefined,
+    resumeSessionId: resumeSessionId ?? undefined,
     claudeMode: project?.settings?.claudeMode,
     envOverrides,
   })
