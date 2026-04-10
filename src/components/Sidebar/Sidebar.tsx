@@ -247,8 +247,11 @@ export function Sidebar() {
 
   const handleWorktreeCreated = (worktree: Worktree) => {
     addWorktree(worktree)
-    // Automatically create a terminal in the new worktree
-    createTerminal(worktree.projectId, { worktreeId: worktree.id })
+    // Automatically create a terminal in the new worktree and switch to it
+    createTerminal(worktree.projectId, {
+      worktreeId: worktree.id,
+      onCreated: (terminalId) => setActiveTerminal(terminalId),
+    })
   }
 
   const handleRemoveWorktree = async (worktreeId: string) => {

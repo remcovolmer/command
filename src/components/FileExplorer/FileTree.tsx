@@ -25,7 +25,6 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
   const api = useMemo(() => getElectronAPI(), [])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const loadedRef = useRef<string | null>(null)
 
   const [contextMenu, setContextMenu] = useState<{
     entry: FileSystemEntry | null
@@ -262,6 +261,7 @@ function RootCreateEntry({ type, projectPath, projectId }: { type: 'file' | 'dir
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const submittedRef = useRef(false)
   const cancelCreate = useProjectStore((s) => s.cancelCreate)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
   const openEditorTab = useProjectStore((s) => s.openEditorTab)
@@ -271,11 +271,13 @@ function RootCreateEntry({ type, projectPath, projectId }: { type: 'file' | 'dir
   }, [])
 
   const handleSubmit = async () => {
+    if (submittedRef.current) return
     const trimmed = value.trim()
     if (!trimmed) {
       cancelCreate()
       return
     }
+    submittedRef.current = true
 
     const sep = projectPath.includes('\\') ? '\\' : '/'
     const newPath = projectPath + sep + trimmed
