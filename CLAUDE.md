@@ -86,6 +86,7 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | `AutomationRunner.ts` | Executes automation runs in isolated worktrees |
 | `AutomationPersistence.ts` | Stores automations and run history in `userData/automations.json` |
 | `FileWatcherService.ts` | Chokidar-based file watching for file explorer and automation triggers |
+| `SessionIndexService.ts` | Reads Claude Code's `sessions-index.json` per project, caches summaries, pushes to renderer |
 | `TaskService.ts` | Scans project files for TODO/FIXME markers |
 | `UpdateService.ts` | Auto-updates via electron-updater |
 
@@ -119,7 +120,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 
 ### Key Patterns
 
-- **IPC Communication**: All main↔renderer communication uses typed IPC via `window.electronAPI` (defined in `src/types/index.ts`). IPC channels are namespaced: `terminal:*`, `project:*`, `worktree:*`, `fs:*`, `git:*`, `github:*`, `automation:*`, `update:*`
+- **IPC Communication**: All main↔renderer communication uses typed IPC via `window.electronAPI` (defined in `src/types/index.ts`). IPC channels are namespaced: `terminal:*`, `project:*`, `worktree:*`, `fs:*`, `git:*`, `github:*`, `automation:*`, `update:*`, `session-index:*`
 - **State Management**: Single Zustand store (`projectStore.ts`) with persist middleware. Key limits: `MAX_TERMINALS_PER_PROJECT = 10`, `MAX_EDITOR_TABS = 15`
 - **Center Tab System**: `activeCenterTabId` can point to either a terminal or an editor/diff tab. `removeTerminal` has a fallback chain (next terminal → last editor tab → null)
 - **Event Dispatchers**: `terminalEvents.ts` and `fileWatcherEvents.ts` register IPC listeners ONCE globally, then dispatch to per-terminal/per-project callback maps. This prevents listener memory leaks.

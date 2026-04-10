@@ -182,7 +182,10 @@ export class SessionIndexService {
         .filter(isValidEntry)
         .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime())
         .slice(0, limit)
-    } catch {
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT' && isDev) {
+        console.warn('[SessionIndex] getSessionsForProject error:', err)
+      }
       return []
     }
   }

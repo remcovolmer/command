@@ -17,6 +17,7 @@ import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
 import { SessionIndexService } from './services/SessionIndexService'
+import { normalizePath } from './utils/paths'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { randomUUID } from 'node:crypto'
@@ -146,6 +147,7 @@ let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
 let automationService: AutomationService | null = null
 let sessionIndexService: SessionIndexService | null = null
+let unsubSessionIndex: (() => void) | null = null
 let secureEnvStore: SecureEnvStore | null = null
 
 
@@ -330,17 +332,18 @@ async function createWindow() {
   sessionIndexService = new SessionIndexService(win)
 
   // Wire session index to state changes — refresh summaries when terminals finish
-  hookWatcher.addStateChangeListener((terminalId, state) => {
+  unsubSessionIndex = hookWatcher.addStateChangeListener((terminalId, state) => {
     if (state !== 'done' && state !== 'stopped') return
     if (!sessionIndexService || !hookWatcher || !terminalManager) return
 
     const info = terminalManager.getTerminalInfo(terminalId)
     if (!info || info.type !== 'claude') return
 
+    const normalizedCwd = normalizePath(info.cwd)
     const terminalSessions = hookWatcher.getTerminalSessions()
       .filter(ts => {
         const tsInfo = terminalManager!.getTerminalInfo(ts.terminalId)
-        return tsInfo && tsInfo.cwd === info.cwd
+        return tsInfo && normalizePath(tsInfo.cwd) === normalizedCwd
       })
 
     sessionIndexService.refreshAndPush(info.cwd, terminalSessions).catch(err => {
@@ -422,6 +425,9 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   }
   if (type !== undefined && type !== 'claude' && type !== 'normal') {
     throw new Error('Invalid terminal type')
+  }
+  if (resumeSessionId !== undefined && (typeof resumeSessionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(resumeSessionId))) {
+    throw new Error('Invalid session ID format')
   }
 
   // Look up project for settings and path
@@ -1538,6 +1544,7 @@ app.on('before-quit', () => {
   fileWatcherService?.stopAll().catch(err => {
     console.error('[FileWatcher] Cleanup error:', err)
   })
+  unsubSessionIndex?.()
   sessionIndexService?.destroy()
   hookWatcher?.destroy()
   githubService?.destroy()

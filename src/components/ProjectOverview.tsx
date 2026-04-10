@@ -44,7 +44,7 @@ export function ProjectOverview({
 
     api.sessionIndex.getForProject(projectPath).then((entries) => {
       if (!cancelled) {
-        setSessions(entries as SessionIndexEntry[])
+        setSessions(entries)
         setLoading(false)
       }
     }).catch(() => {

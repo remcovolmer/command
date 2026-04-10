@@ -306,7 +306,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Session index operations (for project overview)
   sessionIndex: {
-    getForProject: (projectPath: string): Promise<unknown[]> =>
+    getForProject: (projectPath: string): Promise<Array<{ sessionId: string; summary: string; firstPrompt: string; messageCount: number; gitBranch: string; modified: string; created: string; projectPath: string; isSidechain: boolean }>> =>
       ipcRenderer.invoke('session-index:getForProject', projectPath),
   },
 
