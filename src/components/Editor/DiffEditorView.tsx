@@ -41,10 +41,11 @@ export function DiffEditorView({ tab, isActive }: DiffEditorViewProps) {
         // Fetch modified (the file at this commit)
         const modifiedContent = await api.git.getFileAtCommit(gitPath, tab.commitHash, tab.filePath)
 
-        // Fetch original (the file at parent commit)
+        // Fetch original (the file at parent commit, using oldPath for renamed files)
         let originalContent: string | null = ''
         if (tab.parentHash) {
-          originalContent = await api.git.getFileAtCommit(gitPath, tab.parentHash, tab.filePath)
+          const parentFilePath = tab.oldPath ?? tab.filePath
+          originalContent = await api.git.getFileAtCommit(gitPath, tab.parentHash, parentFilePath)
         }
 
         if (!cancelled) {
