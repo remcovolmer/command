@@ -19,6 +19,7 @@ import { AutomationService } from './services/AutomationService'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { CommandServer } from './services/CommandServer'
+import { SkillInstaller } from './services/SkillInstaller'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -147,6 +148,7 @@ let fileWatcherService: FileWatcherService | null = null
 let automationService: AutomationService | null = null
 let secureEnvStore: SecureEnvStore | null = null
 let commandServer: CommandServer | null = null
+let skillInstaller: SkillInstaller | null = null
 
 
 /**
@@ -341,6 +343,15 @@ async function createWindow() {
     mainWindow: win,
   })
 
+  // Initialize skill installer and install skills for all registered projects
+  skillInstaller = new SkillInstaller()
+  const allProjectsForSkills = projectPersistence.getProjects()
+  for (const project of allProjectsForSkills) {
+    skillInstaller.installOrUpdate(project.path).catch(err =>
+      console.error(`[SkillInstaller] Startup install failed for ${project.path}:`, err)
+    )
+  }
+
   updateService = new UpdateService()
   updateService.initialize(win)
   taskService = new TaskService()
@@ -502,7 +513,12 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
   if (type !== undefined && !validTypes.includes(type)) {
     throw new Error('Invalid project type')
   }
-  return projectPersistence?.addProject(projectPath, name, type)
+  const result = projectPersistence?.addProject(projectPath, name, type)
+  // Auto-install ccli skill file in the new project
+  skillInstaller?.installOrUpdate(projectPath).catch(err =>
+    console.error(`[SkillInstaller] Failed to install skill on project add:`, err)
+  )
+  return result
 })
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
