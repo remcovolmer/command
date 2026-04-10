@@ -214,9 +214,11 @@ export class AutomationRunner {
               ? `Timed out after ${timeoutMinutes} minutes`
               : killed && totalBytes > MAX_OUTPUT_BYTES
                 ? `Output exceeded ${MAX_OUTPUT_BYTES} bytes`
-                : exitCode !== 0
-                  ? stderr || `Process exited with code ${exitCode}`
-                  : undefined,
+                : killed
+                  ? 'Run was stopped'
+                  : exitCode !== 0
+                    ? stderr || `Process exited with code ${exitCode}`
+                    : undefined,
             worktreeBranch: branchName,
             worktreePath: ownsCleanup && hasChanges ? worktreePath : '',
           })
@@ -225,7 +227,7 @@ export class AutomationRunner {
             success: false,
             output: '',
             exitCode,
-            timedOut: false,
+            timedOut,
             durationMs: Date.now() - startTime,
             error: err instanceof Error ? err.message : String(err),
             worktreeBranch: branchName,
@@ -275,6 +277,7 @@ export class AutomationRunner {
     this.activeRuns.clear()
 
     for (const run of runs) {
+      run.controller.abort()
       this.killProcess(run.process)
     }
 
@@ -352,16 +355,17 @@ export class AutomationRunner {
       const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], {
         cwd: worktreePath,
         windowsHide: true,
+        timeout: 15_000,
       })
       if (status.trim().length > 0) return true
 
       // Check for new commits since the run started.
       // Claude typically commits its work, so git status alone would miss it
       // and the worktree + branch would be deleted, destroying the automation's output.
-      if (startCommit) {
-        const currentCommit = await this.getHeadCommit(worktreePath)
-        if (currentCommit && currentCommit !== startCommit) return true
-      }
+      // If startCommit is null (e.g. empty repo), assume changes exist to avoid data loss.
+      if (!startCommit) return true
+      const currentCommit = await this.getHeadCommit(worktreePath)
+      if (currentCommit && currentCommit !== startCommit) return true
 
       return false
     } catch {
@@ -375,6 +379,7 @@ export class AutomationRunner {
       const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
         cwd: worktreePath,
         windowsHide: true,
+        timeout: 10_000,
       })
       return stdout.trim() || null
     } catch {
