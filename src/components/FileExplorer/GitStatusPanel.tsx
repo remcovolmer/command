@@ -50,11 +50,19 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh, onOp
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
   }
 
-  const withOperation = useCallback(async (fn: () => Promise<void>) => {
+  const withOperation = useCallback(async (fn: () => Promise<void>): Promise<boolean> => {
+    const api = getElectronAPI()
     onOperationStart?.()
     try {
       await fn()
       onRefresh?.()
+      return true
+    } catch (err) {
+      api.notification.show(
+        'Git Operation Failed',
+        err instanceof Error ? err.message : 'Operation failed'
+      )
+      return false
     } finally {
       onOperationEnd?.()
     }
@@ -331,7 +339,7 @@ function FileChangeSection({
   sectionType: SectionType
   gitPath: string
   projectId: string
-  withOperation: (fn: () => Promise<void>) => Promise<void>
+  withOperation: (fn: () => Promise<void>) => Promise<boolean>
 }) {
   const api = getElectronAPI()
   const setDiscardingFiles = useProjectStore((s) => s.setDiscardingFiles)
@@ -347,15 +355,15 @@ function FileChangeSection({
   const handleStageAll = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     const filePaths = files.map((f) => f.path)
-    await withOperation(() => api.git.stageFiles(gitPath, filePaths))
-    closeWorkingTreeDiffTabs(filePaths)
+    const ok = await withOperation(() => api.git.stageFiles(gitPath, filePaths))
+    if (ok) closeWorkingTreeDiffTabs(filePaths)
   }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
 
   const handleUnstageAll = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     const filePaths = files.map((f) => f.path)
-    await withOperation(() => api.git.unstageFiles(gitPath, filePaths))
-    closeWorkingTreeDiffTabs(filePaths)
+    const ok = await withOperation(() => api.git.unstageFiles(gitPath, filePaths))
+    if (ok) closeWorkingTreeDiffTabs(filePaths)
   }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
 
   const handleDiscardAll = useCallback((e: React.MouseEvent) => {
@@ -398,11 +406,11 @@ function FileChangeSection({
               <Plus className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
           )}
-          {sectionType === 'modified' && (
+          {(sectionType === 'modified' || sectionType === 'untracked') && (
             <button
               onClick={handleDiscardAll}
               className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title="Discard All Changes"
+              title={sectionType === 'untracked' ? 'Delete All Untracked Files' : 'Discard All Changes'}
             >
               <X className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
@@ -441,7 +449,7 @@ function FileChangeItem({
   sectionType: SectionType
   gitPath: string
   projectId: string
-  withOperation: (fn: () => Promise<void>) => Promise<void>
+  withOperation: (fn: () => Promise<void>) => Promise<boolean>
 }) {
   const api = getElectronAPI()
   const openWorkingTreeDiffTab = useProjectStore((s) => s.openWorkingTreeDiffTab)
@@ -468,14 +476,14 @@ function FileChangeItem({
 
   const handleStage = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
-    await withOperation(() => api.git.stageFiles(gitPath, [file.path]))
-    closeWorkingTreeDiffTabs([file.path])
+    const ok = await withOperation(() => api.git.stageFiles(gitPath, [file.path]))
+    if (ok) closeWorkingTreeDiffTabs([file.path])
   }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
 
   const handleUnstage = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
-    await withOperation(() => api.git.unstageFiles(gitPath, [file.path]))
-    closeWorkingTreeDiffTabs([file.path])
+    const ok = await withOperation(() => api.git.unstageFiles(gitPath, [file.path]))
+    if (ok) closeWorkingTreeDiffTabs([file.path])
   }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
 
   const handleDiscard = useCallback((e: React.MouseEvent) => {
