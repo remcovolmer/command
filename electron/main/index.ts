@@ -18,6 +18,7 @@ import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
+import { CommandServer } from './services/CommandServer'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -145,6 +146,7 @@ let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
 let automationService: AutomationService | null = null
 let secureEnvStore: SecureEnvStore | null = null
+let commandServer: CommandServer | null = null
 
 
 /**
@@ -317,16 +319,30 @@ async function createWindow() {
   hookWatcher.start()
 
   // Initialize services
-  terminalManager = new TerminalManager(win, hookWatcher)
+  // Start CommandServer early so port/token are available for env injection into terminals
+  commandServer = new CommandServer()
+  await commandServer.start()
+
   projectPersistence = new ProjectPersistence()
   await projectPersistence.initialize()
   secureEnvStore = new SecureEnvStore()
   gitService = new GitService()
   worktreeService = new WorktreeService()
-  updateService = new UpdateService()
-  updateService.initialize(win)
   githubService = new GitHubService()
   githubService.setWindow(win)
+  terminalManager = new TerminalManager(win, hookWatcher)
+
+  // Wire CommandServer deps now that all services are initialized
+  commandServer.setDeps({
+    terminalManager,
+    projectPersistence,
+    worktreeService,
+    githubService,
+    mainWindow: win,
+  })
+
+  updateService = new UpdateService()
+  updateService.initialize(win)
   taskService = new TaskService()
   fileWatcherService = new FileWatcherService(win)
   automationService = new AutomationService(worktreeService)
@@ -438,6 +454,32 @@ ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: n
 ipcMain.on('terminal:close', (_event, terminalId: string) => {
   if (!isValidUUID(terminalId)) return
   terminalManager?.closeTerminal(terminalId)
+})
+
+ipcMain.handle('terminal:update-worktree', async (_event, terminalId: string, worktreeId: string, newCwd: string) => {
+  if (!isValidUUID(terminalId)) throw new Error('Invalid terminal ID')
+  if (!isValidUUID(worktreeId)) throw new Error('Invalid worktree ID')
+  if (typeof newCwd !== 'string' || newCwd.length === 0 || newCwd.length > 1024) {
+    throw new Error('Invalid cwd')
+  }
+
+  const result = terminalManager?.updateTerminalWorktree(terminalId, worktreeId, newCwd)
+  if (!result || !result.success) {
+    throw new Error(result?.error ?? 'Failed to update terminal worktree')
+  }
+
+  // Notify renderer of the worktree update
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('terminal:worktree-updated', terminalId, worktreeId)
+
+    // Also update the terminal title to the worktree name
+    const worktree = projectPersistence?.getWorktreeById(worktreeId)
+    if (worktree) {
+      win.webContents.send('terminal:title', terminalId, worktree.name)
+    }
+  }
+
+  return { success: true }
 })
 
 ipcMain.on('terminal:evict', (_event, terminalId: string) => {
@@ -1286,6 +1328,7 @@ ipcMain.handle('update:install', async () => {
 
   // Kill all child processes BEFORE triggering the NSIS installer.
   // Without this, node-pty processes block the installer from starting.
+  await commandServer?.stop().catch(() => {})
   terminalManager?.destroy()
   hookWatcher?.destroy()
   githubService?.destroy()
@@ -1477,6 +1520,10 @@ app.on('before-quit', () => {
   // Stop file watchers before terminal cleanup to avoid EBUSY
   fileWatcherService?.stopAll().catch(err => {
     console.error('[FileWatcher] Cleanup error:', err)
+  })
+  // Stop CommandServer
+  commandServer?.stop().catch(err => {
+    console.error('[CommandServer] Cleanup error:', err)
   })
   hookWatcher?.destroy()
   githubService?.destroy()
