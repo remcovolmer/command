@@ -56,6 +56,8 @@ interface PersistedSession {
    * - Debugging session restoration issues
    */
   closedAt: number
+  /** Session summary from Claude Code's sessions-index.json, persisted for quick restore */
+  summary?: string
 }
 
 // Validation patterns for session data integrity

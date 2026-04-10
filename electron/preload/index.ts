@@ -11,6 +11,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:state',
   'terminal:exit',
   'terminal:title',
+  'terminal:summary',
   'session:restored',
   'app:close-request',
   'update:checking',
@@ -295,6 +296,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('session:restored', handler)
       return () => ipcRenderer.removeListener('session:restored', handler)
     },
+
+    onSummaryChange: (callback: (id: string, summary: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, id: string, summary: string) => callback(id, summary)
+      ipcRenderer.on('terminal:summary', handler)
+      return () => ipcRenderer.removeListener('terminal:summary', handler)
+    },
+  },
+
+  // Session index operations (for project overview)
+  sessionIndex: {
+    getForProject: (projectPath: string): Promise<unknown[]> =>
+      ipcRenderer.invoke('session-index:getForProject', projectPath),
   },
 
   // Project operations

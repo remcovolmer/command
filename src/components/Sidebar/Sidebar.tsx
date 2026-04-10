@@ -45,6 +45,7 @@ export function Sidebar() {
     loadWorktrees,
     reorderProjects,
     checkVertexConfig,
+    updateTerminalSummary,
   } = useProjectStore(
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
@@ -59,6 +60,7 @@ export function Sidebar() {
       loadWorktrees: s.loadWorktrees,
       reorderProjects: s.reorderProjects,
       checkVertexConfig: s.checkVertexConfig,
+      updateTerminalSummary: s.updateTerminalSummary,
     }))
   )
 
@@ -165,12 +167,21 @@ export function Sidebar() {
         lastActivity: Date.now(),
         title: session.title || 'Restored',
         type: 'claude',
+        summary: session.summary,
       }
       addTerminal(terminal)
       console.log(`[Session] Added restored terminal ${session.terminalId} to store`)
     })
     return unsubscribe
   }, [addTerminal])
+
+  // Listen for summary updates from main process (SessionIndexService)
+  useEffect(() => {
+    const unsubscribe = terminalEvents.onSummaryUpdate((terminalId, summary) => {
+      updateTerminalSummary(terminalId, summary)
+    })
+    return unsubscribe
+  }, [updateTerminalSummary])
 
   const handleCheckForUpdate = async () => {
     setUpdateStatus('checking')

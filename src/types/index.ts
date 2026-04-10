@@ -70,6 +70,20 @@ export interface TerminalSession {
   lastActivity: number;
   title: string;
   type: TerminalType;  // 'claude' or 'normal' shell
+  summary?: string;  // Session summary from Claude Code's sessions-index.json
+}
+
+/** Entry from Claude Code's sessions-index.json (used by project overview) */
+export interface SessionIndexEntry {
+  sessionId: string;
+  summary: string;
+  firstPrompt: string;
+  messageCount: number;
+  gitBranch: string;
+  modified: string;
+  created: string;
+  projectPath: string;
+  isSidechain: boolean;
 }
 
 // Editor tab types
@@ -375,6 +389,7 @@ export interface RestoredSession {
   projectId: string;
   worktreeId: string | null;
   title: string;
+  summary?: string;
 }
 
 export interface ElectronAPI {
@@ -390,6 +405,10 @@ export interface ElectronAPI {
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
     onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
     onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
+    onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe;
+  };
+  sessionIndex: {
+    getForProject: (projectPath: string) => Promise<SessionIndexEntry[]>;
   };
   project: {
     list: () => Promise<Project[]>;
