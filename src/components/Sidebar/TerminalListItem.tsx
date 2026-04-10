@@ -24,10 +24,11 @@ export const TerminalListItem = memo(function TerminalListItem({
   className,
 }: TerminalListItemProps) {
   const defaultClassName = `
-    group flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm
+    group flex items-center gap-2 px-3 py-1.5 cursor-pointer
+    transition-colors duration-150
     ${isActive
-      ? 'bg-sidebar-accent text-sidebar-foreground'
-      : 'text-muted-foreground hover:bg-muted/50 hover:text-sidebar-foreground'}
+      ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-md'
+      : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
   `
   return (
     <li
@@ -49,7 +50,7 @@ export const TerminalListItem = memo(function TerminalListItem({
       <button
         onClick={onClose}
         className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-        title="Close Terminal"
+        title="Close Chat"
       >
         <X className="w-3 h-3" />
       </button>
