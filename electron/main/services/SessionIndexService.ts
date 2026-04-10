@@ -46,7 +46,13 @@ export function encodeProjectPath(cwd: string): string {
 function isValidEntry(value: unknown): value is SessionIndexEntry {
   if (!value || typeof value !== 'object') return false
   const obj = value as Record<string, unknown>
-  return typeof obj.sessionId === 'string' && typeof obj.sessionId === 'string'
+  return (
+    typeof obj.sessionId === 'string' &&
+    typeof obj.summary === 'string' &&
+    typeof obj.firstPrompt === 'string' &&
+    typeof obj.messageCount === 'number' &&
+    typeof obj.modified === 'string'
+  )
 }
 
 /**
@@ -55,7 +61,7 @@ function isValidEntry(value: unknown): value is SessionIndexEntry {
  */
 export class SessionIndexService {
   private cache: Map<string, SessionIndexEntry> = new Map()
-  private currentProjectPath: string | null = null
+  private pendingProjectPath: string | null = null
   private isReading = false
   private pendingRead = false
   private window: BrowserWindow
@@ -77,18 +83,23 @@ export class SessionIndexService {
    * Safe to call multiple times — uses isReading guard against concurrent reads.
    */
   async loadForProject(projectPath: string): Promise<void> {
-    this.currentProjectPath = projectPath
-
     if (this.isReading) {
+      this.pendingProjectPath = projectPath
       this.pendingRead = true
       return
     }
     this.isReading = true
 
     try {
+      let pathToRead = projectPath
       do {
         this.pendingRead = false
-        await this.readIndex(projectPath)
+        await this.readIndex(pathToRead)
+        // If a new project path was requested while reading, use it for the next iteration
+        if (this.pendingRead && this.pendingProjectPath) {
+          pathToRead = this.pendingProjectPath
+          this.pendingProjectPath = null
+        }
       } while (this.pendingRead)
     } finally {
       this.isReading = false
@@ -211,6 +222,6 @@ export class SessionIndexService {
 
   destroy(): void {
     this.cache.clear()
-    this.currentProjectPath = null
+    this.pendingProjectPath = null
   }
 }

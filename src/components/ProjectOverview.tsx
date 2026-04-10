@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Plus, GitBranch, MessageSquare, Clock, TerminalSquare } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Plus, GitBranch, MessageSquare, TerminalSquare } from 'lucide-react'
 import { getElectronAPI } from '../utils/electron'
 import type { SessionIndexEntry } from '../types'
 
@@ -57,10 +57,6 @@ export function ProjectOverview({
     return () => { cancelled = true }
   }, [api, projectPath])
 
-  const handleResume = useCallback((sessionId: string) => {
-    onResumeSession(sessionId)
-  }, [onResumeSession])
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full bg-sidebar">
@@ -104,7 +100,7 @@ export function ProjectOverview({
             {sessions.map((session) => (
               <button
                 key={session.sessionId}
-                onClick={() => handleResume(session.sessionId)}
+                onClick={() => onResumeSession(session.sessionId)}
                 className="w-full text-left p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
               >
                 <div className="flex items-start justify-between gap-2 mb-1">

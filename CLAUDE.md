@@ -163,6 +163,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + 1` | Focus sidebar |
 | `Ctrl + 2` | Focus terminal |
 | `Ctrl + 3` | Focus file explorer |
+| `Ctrl + Shift + O` | Show project overview |
 
 ### Terminal
 | Shortcut | Action |

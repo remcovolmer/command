@@ -25,6 +25,7 @@ export function TerminalArea() {
     setSplitSizes,
     setActiveCenterTab,
     closeEditorTab,
+    addTerminal,
   } = useProjectStore(useShallow((s) => ({
     activeProjectId: s.activeProjectId,
     activeTerminalId: s.activeTerminalId,
@@ -40,6 +41,7 @@ export function TerminalArea() {
     setSplitSizes: s.setSplitSizes,
     setActiveCenterTab: s.setActiveCenterTab,
     closeEditorTab: s.closeEditorTab,
+    addTerminal: s.addTerminal,
   })))
 
   const { createTerminal } = useCreateTerminal()
@@ -158,6 +160,23 @@ export function TerminalArea() {
     [activeProjectId, setSplitSizes]
   )
 
+  const handleResumeSession = useCallback(async (sessionId: string) => {
+    if (!activeProjectId) return
+    const terminalId = await api.terminal.create(activeProjectId, undefined, 'claude', sessionId)
+    if (terminalId) {
+      addTerminal({
+        id: terminalId,
+        projectId: activeProjectId,
+        worktreeId: null,
+        state: 'busy',
+        lastActivity: Date.now(),
+        title: 'Resuming...',
+        type: 'claude',
+      })
+      setActiveCenterTab(terminalId)
+    }
+  }, [activeProjectId, api, addTerminal, setActiveCenterTab])
+
   // No project selected - show welcome
   if (!activeProjectId || !activeProject) {
     return (
@@ -188,24 +207,6 @@ export function TerminalArea() {
       </div>
     )
   }
-
-  const handleResumeSession = useCallback(async (sessionId: string) => {
-    if (!activeProjectId) return
-    const terminalId = await api.terminal.create(activeProjectId, undefined, 'claude', sessionId)
-    if (terminalId) {
-      const { addTerminal, setActiveCenterTab } = useProjectStore.getState()
-      addTerminal({
-        id: terminalId,
-        projectId: activeProjectId,
-        worktreeId: null,
-        state: 'busy',
-        lastActivity: Date.now(),
-        title: 'Resuming...',
-        type: 'claude',
-      })
-      setActiveCenterTab(terminalId)
-    }
-  }, [activeProjectId, api])
 
   // Show project overview when: no terminals/editors, OR user explicitly deselected all tabs (hotkey)
   const showOverview = (projectTerminals.length === 0 && projectEditorTabs.length === 0)

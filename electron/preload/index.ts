@@ -291,8 +291,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('terminal:title', handler)
     },
 
-    onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => callback(session)
+    onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string; summary?: string }) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string; summary?: string }) => callback(session)
       ipcRenderer.on('session:restored', handler)
       return () => ipcRenderer.removeListener('session:restored', handler)
     },
