@@ -141,6 +141,14 @@ body {
   background: var(--muted-foreground);
 }
 
+/* Hidden scrollbar - scroll still works via mousewheel */
+.scroll-hidden {
+  scrollbar-width: none;
+}
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Panel resize handle styling */
 [data-panel-resize-handle-id] {
   background: transparent;
