@@ -97,9 +97,10 @@ export class TerminalManager {
     const shell = this.getShell()
 
     // Build env with Command Center vars injected
-    const env: Record<string, string> = {
-      ...process.env,
-    } as Record<string, string>
+    const env: Record<string, string> = {}
+    for (const [k, v] of Object.entries(process.env)) {
+      if (v !== undefined) env[k] = v
+    }
 
     // Inject CommandServer connection vars into every terminal
     if (this.commandServer) {
@@ -367,7 +368,7 @@ export class TerminalManager {
   /**
    * Get terminal info for persistence (only Claude terminals)
    */
-  getTerminalInfo(terminalId: string): { projectId: string; worktreeId?: string; cwd: string; title?: string; type: TerminalType } | null {
+  getTerminalInfo(terminalId: string): { projectId: string; worktreeId?: string; cwd: string; title?: string; type: TerminalType; state: TerminalState } | null {
     const terminal = this.terminals.get(terminalId)
     if (!terminal) return null
     return {
@@ -376,6 +377,7 @@ export class TerminalManager {
       cwd: terminal.cwd,
       title: terminal.title,
       type: terminal.type,
+      state: terminal.state,
     }
   }
 

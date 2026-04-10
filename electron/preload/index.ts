@@ -32,6 +32,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'editor:open-file',
   'editor:open-diff',
   'sidecar:created',
+  'worktree:added',
 ] as const
 
 // NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
@@ -410,6 +411,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     hasChanges: (worktreeId: string): Promise<boolean> =>
       ipcRenderer.invoke('worktree:has-changes', worktreeId),
+
+    onWorktreeAdded: (callback: (projectId: string, worktree: unknown) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, projectId: string, worktree: unknown) => callback(projectId, worktree)
+      ipcRenderer.on('worktree:added', handler)
+      return () => ipcRenderer.removeListener('worktree:added', handler)
+    },
   },
 
   // Shell operations

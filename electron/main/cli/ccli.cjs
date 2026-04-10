@@ -256,12 +256,12 @@ function buildRoute(positional, flags) {
         case 'read': {
           const id = positional[2]
           if (!id) return { error: 'Usage: ccli sidecar read <id> [--lines <n>]' }
-          const qp = flags.lines ? '?lines=' + encodeURIComponent(flags.lines) : ''
-          return { method: 'GET', path: '/sidecar/read/' + encodeURIComponent(id) + qp }
+          const qp = '?id=' + encodeURIComponent(id) + (flags.lines ? '&lines=' + encodeURIComponent(flags.lines) : '')
+          return { method: 'GET', path: '/sidecar/read' + qp }
         }
         case 'exec': {
           const id = positional[2]
-          const command = positional[3]
+          const command = positional.slice(3).join(' ')
           if (!id || !command) return { error: 'Usage: ccli sidecar exec <id> <command>' }
           return { method: 'POST', path: '/sidecar/exec', body: { id, command } }
         }

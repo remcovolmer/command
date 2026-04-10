@@ -13,6 +13,7 @@ export interface CommandResponse {
   ok: boolean
   data?: unknown
   error?: string
+  statusCode?: number
 }
 
 /** Context passed to every route handler */
@@ -140,7 +141,10 @@ export class CommandServer {
       })
 
       // Update terminal's worktree assignment
-      context.terminalManager.updateTerminalWorktree(terminalId, worktree.id, worktree.path)
+      const updateResult = context.terminalManager.updateTerminalWorktree(terminalId, worktree.id, worktree.path)
+      if (!updateResult.success) {
+        return { ok: false, error: updateResult.error ?? 'Failed to assign worktree to terminal' }
+      }
 
       // Notify renderer
       context.mainWindow.webContents.send('worktree:added', projectId, worktree)
@@ -194,10 +198,21 @@ export class CommandServer {
       }
 
       // Extract branch name by reading HEAD from the gitdir
+      // Security: validate gitdir resolves within the project's .git/worktrees/ to prevent
+      // arbitrary file reads via crafted .git files (e.g., UNC paths on Windows → SMB hash leak)
       let branchName = 'unknown'
       try {
         const gitdir = gitFileContent.replace('gitdir:', '').trim()
-        const headContent = readFileSync(`${gitdir}/HEAD`, 'utf-8').trim()
+        const resolvedGitdir = path.resolve(path.normalize(gitdir))
+        const projectGitDir = path.resolve(project.path, '.git')
+        const isWin = process.platform === 'win32'
+        const normalizedGitdir = isWin ? resolvedGitdir.toLowerCase() : resolvedGitdir
+        const normalizedProjectGit = isWin ? projectGitDir.toLowerCase() : projectGitDir
+        if (!normalizedGitdir.startsWith(normalizedProjectGit + path.sep) && normalizedGitdir !== normalizedProjectGit) {
+          return { ok: false, error: 'Worktree gitdir points outside the project — refusing to read' }
+        }
+
+        const headContent = readFileSync(path.join(resolvedGitdir, 'HEAD'), 'utf-8').trim()
         if (headContent.startsWith('ref: refs/heads/')) {
           branchName = headContent.replace('ref: refs/heads/', '')
         } else {
@@ -223,7 +238,10 @@ export class CommandServer {
       })
 
       // Update terminal's worktree assignment
-      context.terminalManager.updateTerminalWorktree(terminalId, worktree.id, worktree.path)
+      const updateResult = context.terminalManager.updateTerminalWorktree(terminalId, worktree.id, worktree.path)
+      if (!updateResult.success) {
+        return { ok: false, error: updateResult.error ?? 'Failed to assign worktree to terminal' }
+      }
 
       // Notify renderer
       context.mainWindow.webContents.send('worktree:added', projectId, worktree)
@@ -293,7 +311,7 @@ export class CommandServer {
    * Validate that a file path is within a project or worktree boundary.
    * Returns the resolved path or a CommandResponse error.
    */
-  private validateFilePath(filePath: string, context: RouteContext): { resolved: string; projectId: string } | CommandResponse {
+  private validateFilePath(filePath: unknown, context: RouteContext): { ok: true; resolved: string; projectId: string } | CommandResponse {
     if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
       return { ok: false, error: 'Missing or invalid "file" (absolute path string)' }
     }
@@ -308,7 +326,7 @@ export class CommandServer {
       const projectPath = path.resolve(p.path)
       const normalizedProject = isWin ? projectPath.toLowerCase() : projectPath
       if (normalizedResolved.startsWith(normalizedProject + path.sep) || normalizedResolved === normalizedProject) {
-        return { resolved, projectId: p.id }
+        return { ok: true as const, resolved, projectId: p.id }
       }
     }
     return { ok: false, error: 'File path is not within a registered project' }
@@ -321,8 +339,8 @@ export class CommandServer {
     // POST /open — open a file in the editor
     this.route('POST', '/open', async (body, context) => {
       const file = body.file
-      const validation = this.validateFilePath(file as string, context)
-      if ('ok' in validation) return validation
+      const validation = this.validateFilePath(file, context)
+      if (!validation.ok) return validation
 
       const line = body.line
       if (line !== undefined && (typeof line !== 'number' || !Number.isInteger(line) || line < 1)) {
@@ -349,8 +367,8 @@ export class CommandServer {
     // POST /diff — open a diff view for a file
     this.route('POST', '/diff', async (body, context) => {
       const file = body.file
-      const validation = this.validateFilePath(file as string, context)
-      if ('ok' in validation) return validation
+      const validation = this.validateFilePath(file, context)
+      if (!validation.ok) return validation
 
       // Verify file exists
       try {
@@ -406,7 +424,7 @@ export class CommandServer {
 
       const terminalInfo = context.terminalManager.getTerminalInfo(targetId)
       if (!terminalInfo) {
-        return { ok: false, error: 'Not found' }
+        return { ok: false, error: 'Not found', statusCode: 404 }
       }
 
       let worktreePath: string | null = null
@@ -422,7 +440,7 @@ export class CommandServer {
         data: {
           id: targetId,
           title: terminalInfo.title ?? null,
-          state: null, // state not exposed via getTerminalInfo; use getTerminalState
+          state: terminalInfo.state,
           worktreeId: terminalInfo.worktreeId ?? null,
           worktreePath,
           type: terminalInfo.type,
@@ -460,12 +478,20 @@ export class CommandServer {
 
       // Validate path exists and is a directory
       try {
-        const stat = statSync(projectPath as string)
+        const stat = statSync(projectPath)
         if (!stat.isDirectory()) {
           return { ok: false, error: 'Path is not a directory' }
         }
       } catch {
         return { ok: false, error: 'Path does not exist' }
+      }
+
+      // Security: require the path to be a git repository to prevent registering
+      // arbitrary directories (which would expand validateFilePath's readable surface)
+      try {
+        accessSync(path.join(projectPath, '.git'))
+      } catch {
+        return { ok: false, error: 'Path is not a git repository (no .git found)' }
       }
 
       const name = typeof body.name === 'string' && body.name.length > 0 && body.name.length <= 200
@@ -493,7 +519,7 @@ export class CommandServer {
       const projects = context.projectPersistence.getProjects()
       const project = projects.find(p => p.id === projectId)
       if (!project) {
-        return { ok: false, error: 'Not found' }
+        return { ok: false, error: 'Not found', statusCode: 404 }
       }
 
       const worktrees = context.projectPersistence.getWorktrees(projectId)
@@ -544,8 +570,8 @@ export class CommandServer {
       }
 
       const message = body.message
-      if (typeof message !== 'string' || message.length > 5000) {
-        return { ok: false, error: 'Missing or invalid "message" (string, max 5000 chars)' }
+      if (typeof message !== 'string' || message.length === 0 || message.length > 5000) {
+        return { ok: false, error: 'Missing or invalid "message" (non-empty string, max 5000 chars)' }
       }
 
       context.mainWindow.webContents.send('terminal:status', terminalId, message)
@@ -567,6 +593,28 @@ export class CommandServer {
       context.terminalManager.setTerminalTitle(terminalId, title)
       return { ok: true }
     })
+  }
+
+  /**
+   * Validate that a sidecar terminal exists and belongs to the caller's project/worktree context.
+   * Returns null if ownership is valid, or a CommandResponse error.
+   */
+  private validateSidecarOwnership(
+    sidecarId: string,
+    projectId: string,
+    worktreeId: string | undefined,
+    context: RouteContext,
+  ): CommandResponse | null {
+    const sidecarInfo = context.terminalManager.getTerminalInfo(sidecarId)
+    if (!sidecarInfo) return { ok: false, error: 'Sidecar terminal not found' }
+    if (sidecarInfo.type !== 'normal') return { ok: false, error: 'Terminal is not a sidecar' }
+    if (sidecarInfo.projectId !== projectId) return { ok: false, error: 'Sidecar does not belong to your project' }
+    if (worktreeId) {
+      if (sidecarInfo.worktreeId !== worktreeId) return { ok: false, error: 'Sidecar does not belong to your worktree context' }
+    } else {
+      if (sidecarInfo.worktreeId) return { ok: false, error: 'Sidecar does not belong to your project context' }
+    }
+    return null
   }
 
   /**
@@ -682,27 +730,8 @@ export class CommandServer {
       }
 
       // Validate that the sidecar belongs to the caller's context
-      const sidecarInfo = context.terminalManager.getTerminalInfo(sidecarId)
-      if (!sidecarInfo) {
-        return { ok: false, error: 'Sidecar terminal not found' }
-      }
-      if (sidecarInfo.type !== 'normal') {
-        return { ok: false, error: 'Terminal is not a sidecar' }
-      }
-      if (sidecarInfo.projectId !== projectId) {
-        return { ok: false, error: 'Sidecar does not belong to your project' }
-      }
-      // Verify worktree context matches
-      const sidecarWorktree = sidecarInfo.worktreeId
-      if (worktreeId) {
-        if (sidecarWorktree !== worktreeId) {
-          return { ok: false, error: 'Sidecar does not belong to your worktree context' }
-        }
-      } else {
-        if (sidecarWorktree) {
-          return { ok: false, error: 'Sidecar does not belong to your project context' }
-        }
-      }
+      const ownershipError = this.validateSidecarOwnership(sidecarId, projectId, worktreeId, context)
+      if (ownershipError) return ownershipError
 
       const linesParam = context.query.get('lines')
       const lines = linesParam ? Math.max(1, Math.min(10000, parseInt(linesParam, 10) || 100)) : 100
@@ -735,33 +764,15 @@ export class CommandServer {
       }
 
       // Validate that the sidecar belongs to the caller's context
-      const sidecarInfo = context.terminalManager.getTerminalInfo(sidecarId)
-      if (!sidecarInfo) {
-        return { ok: false, error: 'Sidecar terminal not found' }
-      }
-      if (sidecarInfo.type !== 'normal') {
-        return { ok: false, error: 'Terminal is not a sidecar' }
-      }
-      if (sidecarInfo.projectId !== projectId) {
-        return { ok: false, error: 'Sidecar does not belong to your project' }
-      }
-      const sidecarWorktree = sidecarInfo.worktreeId
-      if (worktreeId) {
-        if (sidecarWorktree !== worktreeId) {
-          return { ok: false, error: 'Sidecar does not belong to your worktree context' }
-        }
-      } else {
-        if (sidecarWorktree) {
-          return { ok: false, error: 'Sidecar does not belong to your project context' }
-        }
-      }
+      const ownershipError = this.validateSidecarOwnership(sidecarId, projectId, worktreeId, context)
+      if (ownershipError) return ownershipError
 
       const success = context.terminalManager.writeToPty(sidecarId, command + '\n')
       if (!success) {
         return { ok: false, error: 'Failed to write to sidecar PTY' }
       }
 
-      return { ok: true, data: { ok: true } }
+      return { ok: true }
     })
   }
 
@@ -795,6 +806,12 @@ export class CommandServer {
 
       // Listen on random port, localhost only
       this.server.listen(0, '127.0.0.1', () => {
+        // Replace startup error handler with runtime handler
+        this.server!.removeAllListeners('error')
+        this.server!.on('error', (err: Error) => {
+          console.error('[CommandServer] Runtime server error:', err.message)
+        })
+
         const address = this.server?.address()
         if (address && typeof address === 'object') {
           this.port = address.port
@@ -814,6 +831,7 @@ export class CommandServer {
         resolve()
         return
       }
+      this.server.closeAllConnections()
       this.server.close(() => {
         this.server = null
         this.port = null
@@ -906,7 +924,7 @@ export class CommandServer {
     // Execute handler
     try {
       const result = await handler(body, context)
-      const statusCode = result.ok ? 200 : (result.error === 'Not found' ? 404 : 400)
+      const statusCode = result.ok ? 200 : (result.statusCode ?? 400)
       this.sendJson(res, statusCode, result)
     } catch (err: unknown) {
       console.error('[CommandServer] Route handler error:', err)
@@ -918,10 +936,13 @@ export class CommandServer {
     return new Promise((resolve) => {
       const chunks: Buffer[] = []
       let size = 0
+      let resolved = false
 
       req.on('data', (chunk: Buffer) => {
+        if (resolved) return
         size += chunk.length
         if (size > MAX_BODY_SIZE) {
+          resolved = true
           req.destroy()
           resolve({ body: {}, error: 'Request body too large' })
           return
@@ -930,6 +951,8 @@ export class CommandServer {
       })
 
       req.on('end', () => {
+        if (resolved) return
+        resolved = true
         const raw = Buffer.concat(chunks).toString('utf-8')
         if (!raw || raw.trim().length === 0) {
           resolve({ body: {} })
@@ -949,6 +972,8 @@ export class CommandServer {
       })
 
       req.on('error', () => {
+        if (resolved) return
+        resolved = true
         resolve({ body: {}, error: 'Error reading request body' })
       })
     })

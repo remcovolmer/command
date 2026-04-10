@@ -177,7 +177,7 @@ describe('ccli', () => {
     test('sidecar read with lines flag', () => {
       const route = ccli.buildRoute(['sidecar', 'read', 'sid-1'], { lines: '50' })
       expect(route.method).toBe('GET')
-      expect(route.path).toBe('/sidecar/read/sid-1?lines=50')
+      expect(route.path).toBe('/sidecar/read?id=sid-1&lines=50')
     })
 
     test('sidecar exec maps correctly', () => {

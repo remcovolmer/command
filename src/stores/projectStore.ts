@@ -625,7 +625,7 @@ export const useProjectStore = create<ProjectStore>()(
             },
             activeSidecarTerminalId: {
               ...state.activeSidecarTerminalId,
-              [contextKey]: terminal.id,
+              [contextKey]: state.activeSidecarTerminalId[contextKey] ?? terminal.id,
             },
             sidecarTerminalCollapsed: false,
             fileExplorerVisible: true,

@@ -445,6 +445,7 @@ export interface ElectronAPI {
     listBranches: (projectId: string) => Promise<{ local: string[]; remote: string[]; current: string | null }>;
     remove: (worktreeId: string, force?: boolean) => Promise<void>;
     hasChanges: (worktreeId: string) => Promise<boolean>;
+    onWorktreeAdded: (callback: (projectId: string, worktree: Worktree) => void) => Unsubscribe;
   };
   shell: {
     openPath: (path: string) => Promise<string>;
