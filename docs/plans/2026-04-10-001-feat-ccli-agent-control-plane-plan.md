@@ -1,7 +1,7 @@
 ---
 title: "feat: Add ccli agent control plane"
 type: feat
-status: active
+status: completed
 date: 2026-04-10
 origin: docs/brainstorms/2026-04-10-chat-worktree-upgrade-requirements.md
 ---
