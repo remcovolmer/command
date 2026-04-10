@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 
 interface CommitFormProps {
   gitPath: string
   hasStagedFiles: boolean
-  withOperation: (fn: () => Promise<void>) => Promise<void>
+  withOperation: (fn: () => Promise<void>) => Promise<boolean>
 }
 
 export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFormProps) {
@@ -44,14 +44,14 @@ export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFor
     }
   }, [handleCommit])
 
-  // Auto-resize textarea
-  const handleInput = useCallback(() => {
+  // Auto-resize textarea whenever message changes (including clear after commit)
+  useEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) return
     textarea.style.height = 'auto'
     const maxHeight = 6 * 20 // ~6 lines
     textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
-  }, [])
+  }, [message])
 
   return (
     <div className="border-t border-border/50 px-3 py-2">
@@ -59,7 +59,7 @@ export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFor
         ref={textareaRef}
         data-git-commit-input
         value={message}
-        onChange={(e) => { setMessage(e.target.value); handleInput() }}
+        onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Commit message"
         disabled={isCommitting}

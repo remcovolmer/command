@@ -171,9 +171,11 @@ export function useXtermInstance({
 
     // Restore serialized buffer if this terminal was previously evicted
     const wasEvicted = terminalPool.isEvicted(id)
-    const savedBuffer = terminalPool.getBuffer(id)
-    if (savedBuffer) {
-      terminal.write(savedBuffer)
+    if (wasEvicted) {
+      const savedBuffer = terminalPool.getBuffer(id)
+      if (savedBuffer) {
+        terminal.write(savedBuffer)
+      }
       terminalPool.clearBuffer(id)
       terminalPool.markRestored(id)
     }

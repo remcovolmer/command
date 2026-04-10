@@ -2,13 +2,13 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, Terminal as TerminalIcon, X, GitBranch, Code, Coins, AlertTriangle } from 'lucide-react'
+import { Plus, FolderOpen, X, GitBranch, Code, Coins, AlertTriangle } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
+import { TerminalListItem } from './TerminalListItem'
 import { ContextMenu } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
-import { STATE_TEXT_COLORS, STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
 
 interface SortableProjectItemProps {
   project: Project
@@ -226,40 +226,13 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       {directTerminals.length > 0 && (
         <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30">
           {directTerminals.map((terminal) => (
-            <li
+            <TerminalListItem
               key={terminal.id}
-              onClick={() => onSelectTerminal(terminal.id)}
-              className={`
-                group flex items-center gap-2 px-3 py-1.5 cursor-pointer
-                transition-colors duration-150
-                ${terminal.id === activeTerminalId
-                  ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-md'
-                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
-              `}
-            >
-              <TerminalIcon
-                className={`w-3 h-3 flex-shrink-0 ${STATE_TEXT_COLORS[terminal.state]}`}
-              />
-              <span className="flex-1 text-xs truncate">{terminal.title}</span>
-
-              {/* State indicator - shows for busy (static) and input states (blinking) */}
-              {isVisibleState(terminal.state) && (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${STATE_DOT_COLORS[terminal.state]} ${
-                    isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
-                  }`}
-                />
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={(e) => onCloseTerminal(e, terminal.id)}
-                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                title="Close Chat"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </li>
+              terminal={terminal}
+              isActive={terminal.id === activeTerminalId}
+              onSelect={() => onSelectTerminal(terminal.id)}
+              onClose={(e) => onCloseTerminal(e, terminal.id)}
+            />
           ))}
         </ul>
       )}

@@ -98,6 +98,9 @@ export class AutomationRunner {
       }
     }
 
+    // Capture starting commit so we can detect new commits after the run
+    const startCommit = await this.getHeadCommit(worktreePath)
+
     const controller = new AbortController()
 
     return new Promise<RunResult>((resolve) => {
@@ -192,10 +195,10 @@ export class AutomationRunner {
           }
 
           // Only do worktree cleanup if destroy() hasn't taken ownership
-          let hasUncommitted = false
+          let hasChanges = false
           if (ownsCleanup) {
-            hasUncommitted = await this.worktreeHasChanges(worktreePath)
-            if (!hasUncommitted) {
+            hasChanges = await this.worktreeHasChanges(worktreePath, startCommit)
+            if (!hasChanges) {
               await this.cleanupWorktree(projectPath, worktreePath, branchName)
             }
           }
@@ -215,7 +218,7 @@ export class AutomationRunner {
                   ? stderr || `Process exited with code ${exitCode}`
                   : undefined,
             worktreeBranch: branchName,
-            worktreePath: ownsCleanup && hasUncommitted ? worktreePath : '',
+            worktreePath: ownsCleanup && hasChanges ? worktreePath : '',
           })
         } catch (err) {
           resolve({
@@ -313,6 +316,14 @@ export class AutomationRunner {
         const age = Date.now() - createdAt
 
         if (age > maxAgeMs) {
+          // Don't delete worktrees that still have uncommitted changes —
+          // they may contain work from a crashed or killed automation run
+          const hasChanges = await this.worktreeHasChanges(wt.path, null)
+          if (hasChanges) {
+            console.log(`[AutomationRunner] GC: skipping worktree ${wt.branch} — has uncommitted changes`)
+            continue
+          }
+
           console.log(`[AutomationRunner] GC: removing orphaned worktree ${wt.branch} (age: ${Math.round(age / 3600000)}h)`)
           await this.cleanupWorktree(projectPath, wt.path, wt.branch)
           cleaned++
@@ -343,15 +354,39 @@ export class AutomationRunner {
     return op
   }
 
-  private async worktreeHasChanges(worktreePath: string): Promise<boolean> {
+  private async worktreeHasChanges(worktreePath: string, startCommit: string | null): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync('git', ['status', '--porcelain'], {
+      // Check for uncommitted changes
+      const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], {
         cwd: worktreePath,
         windowsHide: true,
       })
-      return stdout.trim().length > 0
-    } catch {
+      if (status.trim().length > 0) return true
+
+      // Check for new commits since the run started.
+      // Claude typically commits its work, so git status alone would miss it
+      // and the worktree + branch would be deleted, destroying the automation's output.
+      if (startCommit) {
+        const currentCommit = await this.getHeadCommit(worktreePath)
+        if (currentCommit && currentCommit !== startCommit) return true
+      }
+
       return false
+    } catch {
+      // Assume changes exist on error to avoid destroying work
+      return true
+    }
+  }
+
+  private async getHeadCommit(worktreePath: string): Promise<string | null> {
+    try {
+      const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+        cwd: worktreePath,
+        windowsHide: true,
+      })
+      return stdout.trim() || null
+    } catch {
+      return null
     }
   }
 

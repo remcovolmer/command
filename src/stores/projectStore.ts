@@ -98,7 +98,7 @@ interface ProjectStore {
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
-  setActiveCenterTab: (id: string) => void
+  setActiveCenterTab: (id: string | null) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -175,7 +175,7 @@ interface ProjectStore {
   setGitHeadHash: (contextId: string, hash: string | null) => void
 
   // Diff tab actions
-  openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string) => void
+  openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string, oldPath?: string) => void
   openWorkingTreeDiffTab: (filePath: string, fileName: string, diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted', projectId: string) => void
   closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
 
@@ -210,6 +210,7 @@ interface ProjectStore {
   updateTerminalState: (id: string, state: TerminalState) => void
   updateTerminalWorktree: (id: string, worktreeId: string) => void
   updateTerminalTitle: (id: string, title: string) => void
+  updateTerminalSummary: (id: string, summary: string) => void
   setActiveTerminal: (id: string | null) => void
   getProjectTerminals: (projectId: string) => TerminalSession[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
@@ -490,7 +491,7 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           activeCenterTabId: id,
           // If it's a terminal, also update activeTerminalId
-          ...(state.terminals[id] ? { activeTerminalId: id } : {}),
+          ...(id && state.terminals[id] ? { activeTerminalId: id } : {}),
         })),
 
       // Hotkey actions
@@ -906,7 +907,7 @@ export const useProjectStore = create<ProjectStore>()(
         })),
 
       // Diff tab actions
-      openDiffTab: (filePath, fileName, commitHash, parentHash, projectId) =>
+      openDiffTab: (filePath, fileName, commitHash, parentHash, projectId, oldPath) =>
         set((state) => {
           // Check if already open with same commit+file
           const existing = Object.values(state.editorTabs).find(
@@ -916,7 +917,7 @@ export const useProjectStore = create<ProjectStore>()(
             return { activeCenterTabId: existing.id }
           }
           const id = `diff-${crypto.randomUUID()}`
-          const tab: DiffTab = { id, type: 'diff', filePath, fileName, commitHash, parentHash, projectId }
+          const tab: DiffTab = { id, type: 'diff', filePath, fileName, commitHash, parentHash, projectId, ...(oldPath ? { oldPath } : {}) }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
             activeCenterTabId: id,
@@ -1301,6 +1302,19 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           terminalStatus: { ...state.terminalStatus, [terminalId]: message },
         })),
+
+      updateTerminalSummary: (id, summary) =>
+        set((state) => {
+          const terminal = state.terminals[id]
+          if (!terminal) return state
+
+          return {
+            terminals: {
+              ...state.terminals,
+              [id]: { ...terminal, summary },
+            },
+          }
+        }),
 
       setActiveTerminal: (id) =>
         set((state) => {

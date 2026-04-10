@@ -70,6 +70,20 @@ export interface TerminalSession {
   lastActivity: number;
   title: string;
   type: TerminalType;  // 'claude' or 'normal' shell
+  summary?: string;  // Session summary from Claude Code's sessions-index.json
+}
+
+/** Entry from Claude Code's sessions-index.json (used by project overview) */
+export interface SessionIndexEntry {
+  sessionId: string;
+  summary: string;
+  firstPrompt: string;
+  messageCount: number;
+  gitBranch: string;
+  modified: string;
+  created: string;
+  projectPath: string;
+  isSidechain: boolean;
 }
 
 // Editor tab types
@@ -91,6 +105,7 @@ export interface DiffTab {
   fileName: string;
   commitHash: string;
   parentHash: string;  // empty string for initial commits
+  oldPath?: string;    // original path for renamed files (used to fetch parent commit content)
   projectId: string;
 }
 
@@ -374,11 +389,12 @@ export interface RestoredSession {
   projectId: string;
   worktreeId: string | null;
   title: string;
+  summary?: string;
 }
 
 export interface ElectronAPI {
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: TerminalType) => Promise<string>;
+    create: (projectId: string, worktreeId?: string, type?: TerminalType, resumeSessionId?: string) => Promise<string>;
     write: (terminalId: string, data: string) => void;
     resize: (terminalId: string, cols: number, rows: number) => void;
     close: (terminalId: string) => void;
@@ -393,10 +409,14 @@ export interface ElectronAPI {
     onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void) => Unsubscribe;
     onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
     onSidecarCreated: (callback: (contextKey: string, terminal: TerminalSession) => void) => Unsubscribe;
+    onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe;
   };
   editor: {
     onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void) => Unsubscribe;
     onOpenDiff: (callback: (data: { filePath: string; fileName: string; projectId: string }) => void) => Unsubscribe;
+  };
+  sessionIndex: {
+    getForProject: (projectPath: string) => Promise<SessionIndexEntry[]>;
   };
   project: {
     list: () => Promise<Project[]>;

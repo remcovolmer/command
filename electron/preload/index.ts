@@ -14,6 +14,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:title',
   'terminal:status',
   'terminal:worktree-updated',
+  'terminal:summary',
   'session:restored',
   'app:close-request',
   'update:checking',
@@ -253,8 +254,8 @@ type Unsubscribe = () => void
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal'): Promise<string> =>
-      ipcRenderer.invoke('terminal:create', projectId, worktreeId, type),
+    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal', resumeSessionId?: string): Promise<string> =>
+      ipcRenderer.invoke('terminal:create', projectId, worktreeId, type, resumeSessionId),
 
     write: (terminalId: string, data: string): void =>
       ipcRenderer.send('terminal:write', terminalId, data),
@@ -311,8 +312,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('terminal:status', handler)
     },
 
-    onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => callback(session)
+    onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string; summary?: string }) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string; summary?: string }) => callback(session)
       ipcRenderer.on('session:restored', handler)
       return () => ipcRenderer.removeListener('session:restored', handler)
     },
@@ -322,6 +323,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('sidecar:created', handler)
       return () => ipcRenderer.removeListener('sidecar:created', handler)
     },
+
+    onSummaryChange: (callback: (id: string, summary: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, id: string, summary: string) => callback(id, summary)
+      ipcRenderer.on('terminal:summary', handler)
+      return () => ipcRenderer.removeListener('terminal:summary', handler)
+    },
+  },
+
+  // Session index operations (for project overview)
+  sessionIndex: {
+    getForProject: (projectPath: string): Promise<Array<{ sessionId: string; summary: string; firstPrompt: string; messageCount: number; gitBranch: string; modified: string; created: string; projectPath: string; isSidechain: boolean }>> =>
+      ipcRenderer.invoke('session-index:getForProject', projectPath),
   },
 
   // Project operations
@@ -693,8 +706,9 @@ function domReady(condition: DocumentReadyState[] = ['complete', 'interactive'])
     if (condition.includes(document.readyState)) {
       resolve(true)
     } else {
-      document.addEventListener('readystatechange', () => {
+      document.addEventListener('readystatechange', function handler() {
         if (condition.includes(document.readyState)) {
+          document.removeEventListener('readystatechange', handler)
           resolve(true)
         }
       })
@@ -765,7 +779,8 @@ const { appendLoading, removeLoading } = useLoading()
 domReady().then(appendLoading)
 
 window.onmessage = (ev) => {
-  ev.data.payload === 'removeLoading' && removeLoading()
+  if (ev.origin !== 'file://' && ev.origin !== location.origin) return
+  if (ev.data?.payload === 'removeLoading') removeLoading()
 }
 
 setTimeout(removeLoading, 4999)

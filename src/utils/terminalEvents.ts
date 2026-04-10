@@ -6,6 +6,8 @@ type StateCallback = (state: TerminalState) => void
 type ExitCallback = (code: number) => void
 type TitleCallback = (title: string) => void
 type WorktreeUpdatedCallback = (worktreeId: string) => void
+type SummaryCallback = (summary: string) => void
+type SummaryUpdateCallback = (terminalId: string, summary: string) => void
 type SessionRestoredCallback = (session: RestoredSession) => void
 type SidecarCreatedCallback = (contextKey: string, terminal: TerminalSession) => void
 type StatusMessageCallback = (terminalId: string, message: string) => void
@@ -23,6 +25,8 @@ class TerminalEventManager {
   private exitCallbacks = new Map<string, ExitCallback>()
   private titleCallbacks = new Map<string, TitleCallback>()
   private worktreeUpdatedCallbacks = new Map<string, WorktreeUpdatedCallback>()
+  private summaryCallbacks = new Map<string, SummaryCallback>()
+  private summaryUpdateCallbacks: SummaryUpdateCallback[] = []
   private sessionRestoredCallbacks: SessionRestoredCallback[] = []
   private sidecarCreatedCallbacks: SidecarCreatedCallback[] = []
   private statusMessageCallbacks: StatusMessageCallback[] = []
@@ -77,6 +81,17 @@ class TerminalEventManager {
     )
 
     this.unsubscribers.push(
+      api.terminal.onSummaryChange((terminalId, summary) => {
+        const callback = this.summaryCallbacks.get(terminalId)
+        if (callback) callback(summary)
+        // Also notify global listeners (used by Sidebar to update store)
+        for (const cb of this.summaryUpdateCallbacks) {
+          cb(terminalId, summary)
+        }
+      })
+    )
+
+    this.unsubscribers.push(
       api.terminal.onSessionRestored((session) => {
         for (const callback of this.sessionRestoredCallbacks) {
           callback(session)
@@ -123,7 +138,8 @@ class TerminalEventManager {
     onState: StateCallback,
     onExit?: ExitCallback,
     onTitle?: TitleCallback,
-    onWorktreeUpdated?: WorktreeUpdatedCallback
+    onWorktreeUpdated?: WorktreeUpdatedCallback,
+    onSummary?: SummaryCallback
   ) {
     this.init()
     this.dataCallbacks.set(terminalId, onData)
@@ -131,6 +147,7 @@ class TerminalEventManager {
     if (onExit) this.exitCallbacks.set(terminalId, onExit)
     if (onTitle) this.titleCallbacks.set(terminalId, onTitle)
     if (onWorktreeUpdated) this.worktreeUpdatedCallbacks.set(terminalId, onWorktreeUpdated)
+    if (onSummary) this.summaryCallbacks.set(terminalId, onSummary)
   }
 
   unsubscribe(terminalId: string) {
@@ -139,6 +156,19 @@ class TerminalEventManager {
     this.exitCallbacks.delete(terminalId)
     this.titleCallbacks.delete(terminalId)
     this.worktreeUpdatedCallbacks.delete(terminalId)
+    this.summaryCallbacks.delete(terminalId)
+  }
+
+  /**
+   * Subscribe to summary update events (for updating store when summaries arrive)
+   */
+  onSummaryUpdate(callback: SummaryUpdateCallback): () => void {
+    this.init()
+    this.summaryUpdateCallbacks.push(callback)
+    return () => {
+      const index = this.summaryUpdateCallbacks.indexOf(callback)
+      if (index !== -1) this.summaryUpdateCallbacks.splice(index, 1)
+    }
   }
 
   /**
@@ -212,6 +242,8 @@ class TerminalEventManager {
     this.exitCallbacks.clear()
     this.titleCallbacks.clear()
     this.worktreeUpdatedCallbacks.clear()
+    this.summaryCallbacks.clear()
+    this.summaryUpdateCallbacks = []
     this.sessionRestoredCallbacks = []
     this.sidecarCreatedCallbacks = []
     this.statusMessageCallbacks = []
