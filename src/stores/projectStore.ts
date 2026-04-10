@@ -46,6 +46,10 @@ interface ProjectStore {
   theme: 'light' | 'dark' | 'system'
   resolvedTheme: 'light' | 'dark'
 
+  // Terminal status messages from CommandServer (not persisted)
+  terminalStatus: Record<string, string>
+  setTerminalStatus: (terminalId: string, message: string) => void
+
   // Git status state (not persisted)
   gitStatus: Record<string, GitStatus>
   gitStatusLoading: Record<string, boolean>
@@ -94,7 +98,7 @@ interface ProjectStore {
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
-  setActiveCenterTab: (id: string) => void
+  setActiveCenterTab: (id: string | null) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -115,6 +119,7 @@ interface ProjectStore {
 
   // Sidecar terminal actions
   createSidecarTerminal: (contextKey: string, projectId: string, worktreeId?: string) => Promise<void>
+  registerSidecarTerminal: (contextKey: string, terminal: TerminalSession) => void
   closeSidecarTerminal: (contextKey: string, terminalId: string) => void
   setSidecarTerminalCollapsed: (collapsed: boolean) => void
   setActiveSidecarTerminal: (contextKey: string, id: string | null) => void
@@ -203,7 +208,9 @@ interface ProjectStore {
   addTerminal: (terminal: TerminalSession) => void
   removeTerminal: (id: string) => void
   updateTerminalState: (id: string, state: TerminalState) => void
+  updateTerminalWorktree: (id: string, worktreeId: string) => void
   updateTerminalTitle: (id: string, title: string) => void
+  updateTerminalSummary: (id: string, summary: string) => void
   setActiveTerminal: (id: string | null) => void
   getProjectTerminals: (projectId: string) => TerminalSession[]
   getWorktreeTerminals: (worktreeId: string) => TerminalSession[]
@@ -257,6 +264,9 @@ export const useProjectStore = create<ProjectStore>()(
       // Theme state (system follows OS preference)
       theme: 'system',
       resolvedTheme: typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+
+      // Terminal status messages (not persisted)
+      terminalStatus: {},
 
       // Git status state (not persisted)
       gitStatus: {},
@@ -481,7 +491,7 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           activeCenterTabId: id,
           // If it's a terminal, also update activeTerminalId
-          ...(state.terminals[id] ? { activeTerminalId: id } : {}),
+          ...(id && state.terminals[id] ? { activeTerminalId: id } : {}),
         })),
 
       // Hotkey actions
@@ -590,6 +600,32 @@ export const useProjectStore = create<ProjectStore>()(
             activeSidecarTerminalId: {
               ...state.activeSidecarTerminalId,
               [contextKey]: terminalId,
+            },
+            sidecarTerminalCollapsed: false,
+            fileExplorerVisible: true,
+          }
+        })
+      },
+
+      registerSidecarTerminal: (contextKey, terminal) => {
+        set((state) => {
+          const existing = state.sidecarTerminals[contextKey] ?? []
+          // Enforce limit of 5 sidecar terminals per context
+          if (existing.length >= 5) return state
+          // Prevent duplicate registration
+          if (existing.includes(terminal.id)) return state
+          return {
+            terminals: {
+              ...state.terminals,
+              [terminal.id]: terminal,
+            },
+            sidecarTerminals: {
+              ...state.sidecarTerminals,
+              [contextKey]: [...existing, terminal.id],
+            },
+            activeSidecarTerminalId: {
+              ...state.activeSidecarTerminalId,
+              [contextKey]: state.activeSidecarTerminalId[contextKey] ?? terminal.id,
             },
             sidecarTerminalCollapsed: false,
             fileExplorerVisible: true,
@@ -1236,6 +1272,19 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
+      updateTerminalWorktree: (id, worktreeId) =>
+        set((state) => {
+          const terminal = state.terminals[id]
+          if (!terminal) return state
+
+          return {
+            terminals: {
+              ...state.terminals,
+              [id]: { ...terminal, worktreeId },
+            },
+          }
+        }),
+
       updateTerminalTitle: (id, title) =>
         set((state) => {
           const terminal = state.terminals[id]
@@ -1245,6 +1294,24 @@ export const useProjectStore = create<ProjectStore>()(
             terminals: {
               ...state.terminals,
               [id]: { ...terminal, title },
+            },
+          }
+        }),
+
+      setTerminalStatus: (terminalId, message) =>
+        set((state) => ({
+          terminalStatus: { ...state.terminalStatus, [terminalId]: message },
+        })),
+
+      updateTerminalSummary: (id, summary) =>
+        set((state) => {
+          const terminal = state.terminals[id]
+          if (!terminal) return state
+
+          return {
+            terminals: {
+              ...state.terminals,
+              [id]: { ...terminal, summary },
             },
           }
         }),

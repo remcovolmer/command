@@ -26,6 +26,8 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
   const [createError, setCreateError] = useState<string | null>(null)
   const renameInputRef = useRef<HTMLInputElement>(null)
   const createInputRef = useRef<HTMLInputElement>(null)
+  const renameSubmittedRef = useRef(false)
+  const createSubmittedRef = useRef(false)
 
   // Use specific selectors to avoid unnecessary re-renders
   const isExpanded = useProjectStore(
@@ -44,6 +46,14 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
   const updateExpandedPathsAfterRename = useProjectStore((s) => s.updateExpandedPathsAfterRename)
 
   const isDirectory = entry.type === 'directory'
+
+  // Reset submit guards when entering/exiting rename or create mode
+  useEffect(() => {
+    if (isRenaming) renameSubmittedRef.current = false
+  }, [isRenaming])
+  useEffect(() => {
+    if (isCreating) createSubmittedRef.current = false
+  }, [isCreating])
 
   // Initialize rename input when entering rename mode
   useEffect(() => {
@@ -129,11 +139,13 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
   }
 
   const handleRenameSubmit = async () => {
+    if (renameSubmittedRef.current) return
     const trimmed = renameValue.trim()
     if (!trimmed || trimmed === entry.name) {
       cancelRename()
       return
     }
+    renameSubmittedRef.current = true
 
     const parentPath = getParentPath(entry.path)
     const sep = entry.path.includes('\\') ? '\\' : '/'
@@ -155,6 +167,7 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
   }
 
   const handleCreateSubmit = async () => {
+    if (createSubmittedRef.current) return
     const trimmed = createValue.trim()
     if (!trimmed) {
       cancelCreate()
@@ -162,6 +175,7 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
     }
 
     if (!isCreating) return
+    createSubmittedRef.current = true
 
     const sep = entry.path.includes('\\') ? '\\' : '/'
     const newPath = entry.path + sep + trimmed

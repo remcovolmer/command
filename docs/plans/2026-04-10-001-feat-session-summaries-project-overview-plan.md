@@ -1,7 +1,7 @@
 ---
 title: "feat: Session summaries in sidebar + project overview for inactive projects"
 type: feat
-status: active
+status: completed
 date: 2026-04-10
 ---
 
@@ -110,7 +110,11 @@ Verified: all 15+ projects have this file with real summaries. 76/97 sessions fo
 
 ## Implementation Units
 
+<<<<<<< HEAD
 - [ ] **Unit 1: SessionIndexService — read and cache sessions-index.json**
+=======
+- [x] **Unit 1: SessionIndexService — read and cache sessions-index.json**
+>>>>>>> c000602de9f8c9aabfdf7a8edaccad450899074e
 
   **Goal:** Create a main-process service that reads, parses, and caches `sessions-index.json` for a given project path. Provides a lookup method: `getSessionSummary(sessionId)` → `{ summary, firstPrompt, messageCount, gitBranch, modified }`.
 
@@ -152,7 +156,11 @@ Verified: all 15+ projects have this file with real summaries. 76/97 sessions fo
 
 ---
 
+<<<<<<< HEAD
 - [ ] **Unit 2: IPC channel + store integration for terminal summaries**
+=======
+- [x] **Unit 2: IPC channel + store integration for terminal summaries**
+>>>>>>> c000602de9f8c9aabfdf7a8edaccad450899074e
 
   **Goal:** Wire `SessionIndexService` data through IPC to the renderer. Add `summary` field to `TerminalSession` and `PersistedSession`. Store receives and exposes summaries.
 
@@ -193,7 +201,11 @@ Verified: all 15+ projects have this file with real summaries. 76/97 sessions fo
 
 ---
 
+<<<<<<< HEAD
 - [ ] **Unit 3: Sidebar summary display in TerminalListItem**
+=======
+- [x] **Unit 3: Sidebar summary display in TerminalListItem**
+>>>>>>> c000602de9f8c9aabfdf7a8edaccad450899074e
 
   **Goal:** Show the session summary as a second line below the terminal title in the sidebar.
 
@@ -228,7 +240,11 @@ Verified: all 15+ projects have this file with real summaries. 76/97 sessions fo
 
 ---
 
+<<<<<<< HEAD
 - [ ] **Unit 4: Project overview panel for inactive projects**
+=======
+- [x] **Unit 4: Project overview panel for inactive projects**
+>>>>>>> c000602de9f8c9aabfdf7a8edaccad450899074e
 
   **Goal:** When selecting a project with no active terminals, show a panel in the center area listing recent sessions from that project's sessions-index.json.
 
@@ -271,7 +287,11 @@ Verified: all 15+ projects have this file with real summaries. 76/97 sessions fo
 
 ---
 
+<<<<<<< HEAD
 - [ ] **Unit 5: Hotkey for project overview + polish**
+=======
+- [x] **Unit 5: Hotkey for project overview + polish**
+>>>>>>> c000602de9f8c9aabfdf7a8edaccad450899074e
 
   **Goal:** Add keyboard shortcut to access project overview. Polish summary refresh timing.
 

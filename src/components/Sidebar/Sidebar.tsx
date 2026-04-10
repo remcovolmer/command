@@ -45,6 +45,7 @@ export function Sidebar() {
     loadWorktrees,
     reorderProjects,
     checkVertexConfig,
+    updateTerminalSummary,
   } = useProjectStore(
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
@@ -59,6 +60,7 @@ export function Sidebar() {
       loadWorktrees: s.loadWorktrees,
       reorderProjects: s.reorderProjects,
       checkVertexConfig: s.checkVertexConfig,
+      updateTerminalSummary: s.updateTerminalSummary,
     }))
   )
 
@@ -165,12 +167,50 @@ export function Sidebar() {
         lastActivity: Date.now(),
         title: session.title || 'Restored',
         type: 'claude',
+        summary: session.summary,
       }
       addTerminal(terminal)
       console.log(`[Session] Added restored terminal ${session.terminalId} to store`)
     })
     return unsubscribe
   }, [addTerminal])
+
+  // Listen for server-created sidecar terminals
+  useEffect(() => {
+    const { registerSidecarTerminal } = useProjectStore.getState()
+    const unsubscribe = terminalEvents.onSidecarCreated((contextKey, terminal) => {
+      registerSidecarTerminal(contextKey, terminal)
+      console.log(`[Sidecar] Registered server-created sidecar ${terminal.id} in context ${contextKey}`)
+    })
+    return unsubscribe
+  }, [])
+
+  // Listen for CommandServer events: status messages, editor open file/diff
+  useEffect(() => {
+    const unsubStatus = terminalEvents.onStatusMessage((terminalId, message) => {
+      useProjectStore.getState().setTerminalStatus(terminalId, message)
+    })
+    const unsubOpenFile = terminalEvents.onEditorOpenFile((data) => {
+      useProjectStore.getState().openEditorTab(data.filePath, data.fileName, data.projectId)
+    })
+    const unsubOpenDiff = terminalEvents.onEditorOpenDiff((data) => {
+      const { openWorkingTreeDiffTab } = useProjectStore.getState()
+      openWorkingTreeDiffTab(data.filePath, data.fileName, 'unstaged', data.projectId)
+    })
+    return () => {
+      unsubStatus()
+      unsubOpenFile()
+      unsubOpenDiff()
+    }
+  }, [])
+
+  // Listen for summary updates from main process (SessionIndexService)
+  useEffect(() => {
+    const unsubscribe = terminalEvents.onSummaryUpdate((terminalId, summary) => {
+      updateTerminalSummary(terminalId, summary)
+    })
+    return unsubscribe
+  }, [updateTerminalSummary])
 
   const handleCheckForUpdate = async () => {
     setUpdateStatus('checking')
@@ -236,8 +276,11 @@ export function Sidebar() {
 
   const handleWorktreeCreated = (worktree: Worktree) => {
     addWorktree(worktree)
-    // Automatically create a terminal in the new worktree
-    createTerminal(worktree.projectId, { worktreeId: worktree.id })
+    // Automatically create a terminal in the new worktree and switch to it
+    createTerminal(worktree.projectId, {
+      worktreeId: worktree.id,
+      onCreated: (terminalId) => setActiveTerminal(terminalId),
+    })
   }
 
   const handleRemoveWorktree = async (worktreeId: string) => {

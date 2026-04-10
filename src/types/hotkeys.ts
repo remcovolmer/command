@@ -32,6 +32,7 @@ export type HotkeyAction =
   | 'nav.focusSidebar'
   | 'nav.focusTerminal'
   | 'nav.focusFileExplorer'
+  | 'nav.projectOverview'
   // Terminal operations
   | 'terminal.new'
   | 'terminal.close'
