@@ -94,7 +94,7 @@ interface ProjectStore {
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
-  setActiveCenterTab: (id: string) => void
+  setActiveCenterTab: (id: string | null) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -482,7 +482,7 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           activeCenterTabId: id,
           // If it's a terminal, also update activeTerminalId
-          ...(state.terminals[id] ? { activeTerminalId: id } : {}),
+          ...(id && state.terminals[id] ? { activeTerminalId: id } : {}),
         })),
 
       // Hotkey actions

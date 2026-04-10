@@ -207,8 +207,10 @@ export function TerminalArea() {
     }
   }, [activeProjectId, api])
 
-  // No terminals and no editor tabs in project — show project overview
-  if (projectTerminals.length === 0 && projectEditorTabs.length === 0) {
+  // Show project overview when: no terminals/editors, OR user explicitly deselected all tabs (hotkey)
+  const showOverview = (projectTerminals.length === 0 && projectEditorTabs.length === 0)
+    || (!activeCenterTabId && projectTerminals.length > 0)
+  if (showOverview) {
     return (
       <ProjectOverview
         projectId={activeProjectId}
