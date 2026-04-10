@@ -268,6 +268,50 @@ describe('projectStore activeCenterTabId', () => {
     })
   })
 
+  describe('updateTerminalWorktree', () => {
+    test('updates worktreeId from null to a valid worktreeId', () => {
+      const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1', worktreeId: null })
+
+      useProjectStore.setState({
+        terminals: { 'term-1': t1 },
+        activeProjectId: 'proj-1',
+      })
+
+      useProjectStore.getState().updateTerminalWorktree('term-1', 'wt-1')
+
+      const state = useProjectStore.getState()
+      expect(state.terminals['term-1'].worktreeId).toBe('wt-1')
+    })
+
+    test('does nothing for non-existent terminal', () => {
+      const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1' })
+
+      useProjectStore.setState({
+        terminals: { 'term-1': t1 },
+      })
+
+      useProjectStore.getState().updateTerminalWorktree('non-existent', 'wt-1')
+
+      const state = useProjectStore.getState()
+      // Original terminal unchanged
+      expect(state.terminals['term-1'].worktreeId).toBeNull()
+      expect(state.terminals['non-existent']).toBeUndefined()
+    })
+
+    test('overwrites existing worktreeId', () => {
+      const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1', worktreeId: 'wt-old' })
+
+      useProjectStore.setState({
+        terminals: { 'term-1': t1 },
+      })
+
+      useProjectStore.getState().updateTerminalWorktree('term-1', 'wt-new')
+
+      const state = useProjectStore.getState()
+      expect(state.terminals['term-1'].worktreeId).toBe('wt-new')
+    })
+  })
+
   describe('removeWorktree', () => {
     test('updates activeCenterTabId when worktree with active terminal is removed', () => {
       const t1 = makeTerminal({ id: 'term-1', projectId: 'proj-1', worktreeId: 'wt-1' })

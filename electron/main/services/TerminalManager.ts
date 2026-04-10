@@ -344,6 +344,28 @@ export class TerminalManager {
   }
 
   /**
+   * Update a terminal's worktree assignment (chat-to-worktree upgrade).
+   * Enforces 1:1 constraint: no two terminals may share the same worktreeId.
+   */
+  updateTerminalWorktree(terminalId: string, worktreeId: string, newCwd: string): { success: boolean; error?: string } {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal) {
+      return { success: false, error: 'Terminal not found' }
+    }
+
+    // Enforce 1:1 worktree-terminal constraint
+    for (const [id, instance] of this.terminals) {
+      if (id !== terminalId && instance.worktreeId === worktreeId) {
+        return { success: false, error: `Worktree ${worktreeId} is already assigned to terminal ${id}` }
+      }
+    }
+
+    terminal.worktreeId = worktreeId
+    terminal.cwd = newCwd
+    return { success: true }
+  }
+
+  /**
    * Mark a terminal as evicted — start buffering its PTY data
    */
   evictTerminal(terminalId: string): void {

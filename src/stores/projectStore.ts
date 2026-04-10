@@ -203,6 +203,7 @@ interface ProjectStore {
   addTerminal: (terminal: TerminalSession) => void
   removeTerminal: (id: string) => void
   updateTerminalState: (id: string, state: TerminalState) => void
+  updateTerminalWorktree: (id: string, worktreeId: string) => void
   updateTerminalTitle: (id: string, title: string) => void
   setActiveTerminal: (id: string | null) => void
   getProjectTerminals: (projectId: string) => TerminalSession[]
@@ -1232,6 +1233,19 @@ export const useProjectStore = create<ProjectStore>()(
                 state: terminalState,
                 lastActivity: Date.now(),
               },
+            },
+          }
+        }),
+
+      updateTerminalWorktree: (id, worktreeId) =>
+        set((state) => {
+          const terminal = state.terminals[id]
+          if (!terminal) return state
+
+          return {
+            terminals: {
+              ...state.terminals,
+              [id]: { ...terminal, worktreeId },
             },
           }
         }),

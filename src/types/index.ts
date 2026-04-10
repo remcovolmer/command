@@ -387,7 +387,9 @@ export interface ElectronAPI {
     onData: (callback: (id: string, data: string) => void) => Unsubscribe;
     onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe;
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
+    updateWorktree: (terminalId: string, worktreeId: string, newCwd: string) => Promise<{ success: boolean }>;
     onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
+    onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void) => Unsubscribe;
     onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
   };
   project: {

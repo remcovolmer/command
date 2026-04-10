@@ -11,6 +11,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:state',
   'terminal:exit',
   'terminal:title',
+  'terminal:worktree-updated',
   'session:restored',
   'app:close-request',
   'update:checking',
@@ -265,6 +266,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restore: (terminalId: string): void =>
       ipcRenderer.send('terminal:restore', terminalId),
 
+    updateWorktree: (terminalId: string, worktreeId: string, newCwd: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('terminal:update-worktree', terminalId, worktreeId, newCwd),
+
     // Events from main process - return unsubscribe functions for cleanup
     onData: (callback: (id: string, data: string) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, id: string, data: string) => callback(id, data)
@@ -288,6 +292,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) => callback(id, title)
       ipcRenderer.on('terminal:title', handler)
       return () => ipcRenderer.removeListener('terminal:title', handler)
+    },
+
+    onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, id: string, worktreeId: string) => callback(id, worktreeId)
+      ipcRenderer.on('terminal:worktree-updated', handler)
+      return () => ipcRenderer.removeListener('terminal:worktree-updated', handler)
     },
 
     onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => void): Unsubscribe => {

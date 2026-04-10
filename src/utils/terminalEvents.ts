@@ -5,6 +5,7 @@ type DataCallback = (data: string) => void
 type StateCallback = (state: TerminalState) => void
 type ExitCallback = (code: number) => void
 type TitleCallback = (title: string) => void
+type WorktreeUpdatedCallback = (worktreeId: string) => void
 type SessionRestoredCallback = (session: RestoredSession) => void
 
 /**
@@ -17,6 +18,7 @@ class TerminalEventManager {
   private stateCallbacks = new Map<string, StateCallback>()
   private exitCallbacks = new Map<string, ExitCallback>()
   private titleCallbacks = new Map<string, TitleCallback>()
+  private worktreeUpdatedCallbacks = new Map<string, WorktreeUpdatedCallback>()
   private sessionRestoredCallbacks: SessionRestoredCallback[] = []
   private initialized = false
   private unsubscribers: Unsubscribe[] = []
@@ -60,6 +62,13 @@ class TerminalEventManager {
     )
 
     this.unsubscribers.push(
+      api.terminal.onWorktreeUpdated((terminalId, worktreeId) => {
+        const callback = this.worktreeUpdatedCallbacks.get(terminalId)
+        if (callback) callback(worktreeId)
+      })
+    )
+
+    this.unsubscribers.push(
       api.terminal.onSessionRestored((session) => {
         for (const callback of this.sessionRestoredCallbacks) {
           callback(session)
@@ -73,13 +82,15 @@ class TerminalEventManager {
     onData: DataCallback,
     onState: StateCallback,
     onExit?: ExitCallback,
-    onTitle?: TitleCallback
+    onTitle?: TitleCallback,
+    onWorktreeUpdated?: WorktreeUpdatedCallback
   ) {
     this.init()
     this.dataCallbacks.set(terminalId, onData)
     this.stateCallbacks.set(terminalId, onState)
     if (onExit) this.exitCallbacks.set(terminalId, onExit)
     if (onTitle) this.titleCallbacks.set(terminalId, onTitle)
+    if (onWorktreeUpdated) this.worktreeUpdatedCallbacks.set(terminalId, onWorktreeUpdated)
   }
 
   unsubscribe(terminalId: string) {
@@ -87,6 +98,7 @@ class TerminalEventManager {
     this.stateCallbacks.delete(terminalId)
     this.exitCallbacks.delete(terminalId)
     this.titleCallbacks.delete(terminalId)
+    this.worktreeUpdatedCallbacks.delete(terminalId)
   }
 
   /**
@@ -111,6 +123,7 @@ class TerminalEventManager {
     this.stateCallbacks.clear()
     this.exitCallbacks.clear()
     this.titleCallbacks.clear()
+    this.worktreeUpdatedCallbacks.clear()
     this.sessionRestoredCallbacks = []
     this.initialized = false
   }
