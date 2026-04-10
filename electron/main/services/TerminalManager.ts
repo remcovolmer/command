@@ -46,6 +46,10 @@ export class TerminalManager {
   private evictedBuffers: Map<string, string> = new Map()
   private readonly MAX_BUFFER_SIZE = 1_048_576 // 1MB per terminal
 
+  // Sidecar output buffer: rolling buffer for type='normal' terminals
+  private sidecarBuffers: Map<string, string> = new Map()
+  private readonly MAX_SIDECAR_BUFFER_SIZE = 1_048_576 // 1MB per terminal
+
   constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher) {
     this.window = window
     this.hookWatcher = hookWatcher || null
@@ -110,6 +114,11 @@ export class TerminalManager {
     }
 
     ptyProcess.onData((data) => {
+      // Buffer output for sidecar (normal) terminals
+      if (terminal.type === 'normal') {
+        this.bufferSidecarData(id, data)
+      }
+
       if (this.evictedBuffers.has(id)) {
         // Buffer data for evicted terminal
         this.bufferEvictedData(id, data)
@@ -132,6 +141,7 @@ export class TerminalManager {
       this.terminalInputBuffers.delete(id)
       this.terminalTitled.delete(id)
       this.evictedBuffers.delete(id)
+      this.sidecarBuffers.delete(id)
     })
 
     this.terminals.set(id, terminal)
@@ -282,6 +292,9 @@ export class TerminalManager {
       // Clean up eviction state
       this.evictedBuffers.delete(terminalId)
 
+      // Clean up sidecar buffer
+      this.sidecarBuffers.delete(terminalId)
+
       if (terminal.pty) {
         // On Windows, kill the entire process tree to ensure child processes (like claude) are cleaned up
         if (process.platform === 'win32') {
@@ -332,6 +345,31 @@ export class TerminalManager {
       title: terminal.title,
       type: terminal.type,
     }
+  }
+
+  /**
+   * Get all terminals as a flat array (for query routes).
+   */
+  getAllTerminals(): Array<{ id: string; projectId: string; worktreeId?: string; title?: string; state: TerminalState; type: TerminalType }> {
+    return Array.from(this.terminals.values()).map(t => ({
+      id: t.id,
+      projectId: t.projectId,
+      worktreeId: t.worktreeId,
+      title: t.title,
+      state: t.state,
+      type: t.type,
+    }))
+  }
+
+  /**
+   * Set a terminal's title explicitly and notify the renderer.
+   */
+  setTerminalTitle(terminalId: string, title: string): void {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal) return
+    terminal.title = title
+    this.terminalTitled.set(terminalId, true)
+    this.sendToRenderer('terminal:title', terminalId, title)
   }
 
   /**
@@ -408,6 +446,61 @@ export class TerminalManager {
     }
 
     this.evictedBuffers.set(terminalId, buffer)
+  }
+
+  /**
+   * Buffer PTY data for a sidecar terminal with size cap.
+   */
+  private bufferSidecarData(terminalId: string, data: string): void {
+    let buffer = this.sidecarBuffers.get(terminalId) ?? ''
+    buffer += data
+    if (buffer.length > this.MAX_SIDECAR_BUFFER_SIZE) {
+      const excess = buffer.length - this.MAX_SIDECAR_BUFFER_SIZE
+      const lineBreak = buffer.indexOf('\n', excess)
+      buffer = lineBreak !== -1 ? buffer.slice(lineBreak + 1) : buffer.slice(excess)
+    }
+    this.sidecarBuffers.set(terminalId, buffer)
+  }
+
+  /**
+   * Get the output buffer for a sidecar terminal.
+   */
+  getSidecarBuffer(terminalId: string): string | null {
+    return this.sidecarBuffers.get(terminalId) ?? null
+  }
+
+  /**
+   * Write data to a terminal's PTY stdin.
+   * Returns true if the write succeeded, false if the terminal was not found.
+   */
+  writeToPty(terminalId: string, data: string): boolean {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal?.pty) return false
+    terminal.pty.write(data)
+    return true
+  }
+
+  /**
+   * Get all terminals matching a given project and optional worktree, filtered by type.
+   */
+  getTerminalsByContext(projectId: string, worktreeId: string | undefined, type: TerminalType): Array<{ id: string; title: string | undefined; lastActivity: number }> {
+    const results: Array<{ id: string; title: string | undefined; lastActivity: number }> = []
+    for (const terminal of this.terminals.values()) {
+      if (terminal.projectId !== projectId) continue
+      if (terminal.type !== type) continue
+      // Match worktree context: both undefined or both equal
+      if (worktreeId) {
+        if (terminal.worktreeId !== worktreeId) continue
+      } else {
+        if (terminal.worktreeId) continue
+      }
+      results.push({
+        id: terminal.id,
+        title: terminal.title,
+        lastActivity: Date.now(), // no per-terminal timestamp tracked; use current time
+      })
+    }
+    return results
   }
 
   /**

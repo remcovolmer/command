@@ -172,6 +172,35 @@ export function Sidebar() {
     return unsubscribe
   }, [addTerminal])
 
+  // Listen for server-created sidecar terminals
+  useEffect(() => {
+    const { registerSidecarTerminal } = useProjectStore.getState()
+    const unsubscribe = terminalEvents.onSidecarCreated((contextKey, terminal) => {
+      registerSidecarTerminal(contextKey, terminal)
+      console.log(`[Sidecar] Registered server-created sidecar ${terminal.id} in context ${contextKey}`)
+    })
+    return unsubscribe
+  }, [])
+
+  // Listen for CommandServer events: status messages, editor open file/diff
+  useEffect(() => {
+    const unsubStatus = terminalEvents.onStatusMessage((terminalId, message) => {
+      useProjectStore.getState().setTerminalStatus(terminalId, message)
+    })
+    const unsubOpenFile = terminalEvents.onEditorOpenFile((data) => {
+      useProjectStore.getState().openEditorTab(data.filePath, data.fileName, data.projectId)
+    })
+    const unsubOpenDiff = terminalEvents.onEditorOpenDiff((data) => {
+      const { openWorkingTreeDiffTab } = useProjectStore.getState()
+      openWorkingTreeDiffTab(data.filePath, data.fileName, 'unstaged', data.projectId)
+    })
+    return () => {
+      unsubStatus()
+      unsubOpenFile()
+      unsubOpenDiff()
+    }
+  }, [])
+
   const handleCheckForUpdate = async () => {
     setUpdateStatus('checking')
     try {

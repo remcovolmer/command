@@ -4,6 +4,7 @@ console.log('[PRELOAD] Script starting...')
 
 // Type definitions for the exposed API - Claude Code states (5 states)
 type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
+type TerminalType = 'claude' | 'normal'
 
 // Whitelist of channels that can have listeners removed
 const ALLOWED_LISTENER_CHANNELS = [
@@ -11,6 +12,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:state',
   'terminal:exit',
   'terminal:title',
+  'terminal:status',
   'terminal:worktree-updated',
   'session:restored',
   'app:close-request',
@@ -26,6 +28,9 @@ const ALLOWED_LISTENER_CHANNELS = [
   'automation:run-started',
   'automation:run-completed',
   'automation:run-failed',
+  'editor:open-file',
+  'editor:open-diff',
+  'sidecar:created',
 ] as const
 
 // NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
@@ -300,10 +305,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('terminal:worktree-updated', handler)
     },
 
+    onStatusMessage: (callback: (id: string, message: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, id: string, message: string) => callback(id, message)
+      ipcRenderer.on('terminal:status', handler)
+      return () => ipcRenderer.removeListener('terminal:status', handler)
+    },
+
     onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string }) => callback(session)
       ipcRenderer.on('session:restored', handler)
       return () => ipcRenderer.removeListener('session:restored', handler)
+    },
+
+    onSidecarCreated: (callback: (contextKey: string, terminal: { id: string; projectId: string; worktreeId: string | null; state: TerminalState; lastActivity: number; title: string; type: TerminalType }) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, contextKey: string, terminal: { id: string; projectId: string; worktreeId: string | null; state: TerminalState; lastActivity: number; title: string; type: TerminalType }) => callback(contextKey, terminal)
+      ipcRenderer.on('sidecar:created', handler)
+      return () => ipcRenderer.removeListener('sidecar:created', handler)
     },
   },
 
@@ -400,6 +417,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   notification: {
     show: (title: string, body: string): void =>
       ipcRenderer.send('notification:show', title, body),
+  },
+
+  // Editor events from CommandServer
+  editor: {
+    onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { filePath: string; fileName: string; projectId: string; line?: number }) => callback(data)
+      ipcRenderer.on('editor:open-file', handler)
+      return () => ipcRenderer.removeListener('editor:open-file', handler)
+    },
+
+    onOpenDiff: (callback: (data: { filePath: string; fileName: string; projectId: string }) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { filePath: string; fileName: string; projectId: string }) => callback(data)
+      ipcRenderer.on('editor:open-diff', handler)
+      return () => ipcRenderer.removeListener('editor:open-diff', handler)
+    },
   },
 
   // App lifecycle

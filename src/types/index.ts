@@ -389,8 +389,14 @@ export interface ElectronAPI {
     onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
     updateWorktree: (terminalId: string, worktreeId: string, newCwd: string) => Promise<{ success: boolean }>;
     onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
+    onStatusMessage: (callback: (id: string, message: string) => void) => Unsubscribe;
     onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void) => Unsubscribe;
     onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
+    onSidecarCreated: (callback: (contextKey: string, terminal: TerminalSession) => void) => Unsubscribe;
+  };
+  editor: {
+    onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void) => Unsubscribe;
+    onOpenDiff: (callback: (data: { filePath: string; fileName: string; projectId: string }) => void) => Unsubscribe;
   };
   project: {
     list: () => Promise<Project[]>;

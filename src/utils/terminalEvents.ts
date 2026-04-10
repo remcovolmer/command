@@ -1,5 +1,5 @@
 import { getElectronAPI } from './electron'
-import { isValidTerminalState, type TerminalState, type Unsubscribe, type RestoredSession } from '../types'
+import { isValidTerminalState, type TerminalState, type TerminalSession, type Unsubscribe, type RestoredSession } from '../types'
 
 type DataCallback = (data: string) => void
 type StateCallback = (state: TerminalState) => void
@@ -7,6 +7,10 @@ type ExitCallback = (code: number) => void
 type TitleCallback = (title: string) => void
 type WorktreeUpdatedCallback = (worktreeId: string) => void
 type SessionRestoredCallback = (session: RestoredSession) => void
+type SidecarCreatedCallback = (contextKey: string, terminal: TerminalSession) => void
+type StatusMessageCallback = (terminalId: string, message: string) => void
+type EditorOpenFileCallback = (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void
+type EditorOpenDiffCallback = (data: { filePath: string; fileName: string; projectId: string }) => void
 
 /**
  * Centralized terminal event manager.
@@ -20,6 +24,10 @@ class TerminalEventManager {
   private titleCallbacks = new Map<string, TitleCallback>()
   private worktreeUpdatedCallbacks = new Map<string, WorktreeUpdatedCallback>()
   private sessionRestoredCallbacks: SessionRestoredCallback[] = []
+  private sidecarCreatedCallbacks: SidecarCreatedCallback[] = []
+  private statusMessageCallbacks: StatusMessageCallback[] = []
+  private editorOpenFileCallbacks: EditorOpenFileCallback[] = []
+  private editorOpenDiffCallbacks: EditorOpenDiffCallback[] = []
   private initialized = false
   private unsubscribers: Unsubscribe[] = []
 
@@ -75,6 +83,38 @@ class TerminalEventManager {
         }
       })
     )
+
+    this.unsubscribers.push(
+      api.terminal.onSidecarCreated((contextKey, terminal) => {
+        for (const callback of this.sidecarCreatedCallbacks) {
+          callback(contextKey, terminal)
+        }
+      })
+    )
+
+    this.unsubscribers.push(
+      api.terminal.onStatusMessage((terminalId, message) => {
+        for (const callback of this.statusMessageCallbacks) {
+          callback(terminalId, message)
+        }
+      })
+    )
+
+    this.unsubscribers.push(
+      api.editor.onOpenFile((data) => {
+        for (const callback of this.editorOpenFileCallbacks) {
+          callback(data)
+        }
+      })
+    )
+
+    this.unsubscribers.push(
+      api.editor.onOpenDiff((data) => {
+        for (const callback of this.editorOpenDiffCallbacks) {
+          callback(data)
+        }
+      })
+    )
   }
 
   subscribe(
@@ -114,6 +154,54 @@ class TerminalEventManager {
   }
 
   /**
+   * Subscribe to sidecar created events (for registering server-created sidecars in store)
+   */
+  onSidecarCreated(callback: SidecarCreatedCallback): () => void {
+    this.init()
+    this.sidecarCreatedCallbacks.push(callback)
+    return () => {
+      const index = this.sidecarCreatedCallbacks.indexOf(callback)
+      if (index !== -1) this.sidecarCreatedCallbacks.splice(index, 1)
+    }
+  }
+
+  /**
+   * Subscribe to terminal status message events (from CommandServer /status route)
+   */
+  onStatusMessage(callback: StatusMessageCallback): () => void {
+    this.init()
+    this.statusMessageCallbacks.push(callback)
+    return () => {
+      const index = this.statusMessageCallbacks.indexOf(callback)
+      if (index !== -1) this.statusMessageCallbacks.splice(index, 1)
+    }
+  }
+
+  /**
+   * Subscribe to editor open file events (from CommandServer /open route)
+   */
+  onEditorOpenFile(callback: EditorOpenFileCallback): () => void {
+    this.init()
+    this.editorOpenFileCallbacks.push(callback)
+    return () => {
+      const index = this.editorOpenFileCallbacks.indexOf(callback)
+      if (index !== -1) this.editorOpenFileCallbacks.splice(index, 1)
+    }
+  }
+
+  /**
+   * Subscribe to editor open diff events (from CommandServer /diff route)
+   */
+  onEditorOpenDiff(callback: EditorOpenDiffCallback): () => void {
+    this.init()
+    this.editorOpenDiffCallbacks.push(callback)
+    return () => {
+      const index = this.editorOpenDiffCallbacks.indexOf(callback)
+      if (index !== -1) this.editorOpenDiffCallbacks.splice(index, 1)
+    }
+  }
+
+  /**
    * Cleanup all IPC listeners. Call when app is shutting down.
    */
   dispose() {
@@ -125,6 +213,10 @@ class TerminalEventManager {
     this.titleCallbacks.clear()
     this.worktreeUpdatedCallbacks.clear()
     this.sessionRestoredCallbacks = []
+    this.sidecarCreatedCallbacks = []
+    this.statusMessageCallbacks = []
+    this.editorOpenFileCallbacks = []
+    this.editorOpenDiffCallbacks = []
     this.initialized = false
   }
 }

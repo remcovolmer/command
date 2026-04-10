@@ -46,6 +46,10 @@ interface ProjectStore {
   theme: 'light' | 'dark' | 'system'
   resolvedTheme: 'light' | 'dark'
 
+  // Terminal status messages from CommandServer (not persisted)
+  terminalStatus: Record<string, string>
+  setTerminalStatus: (terminalId: string, message: string) => void
+
   // Git status state (not persisted)
   gitStatus: Record<string, GitStatus>
   gitStatusLoading: Record<string, boolean>
@@ -115,6 +119,7 @@ interface ProjectStore {
 
   // Sidecar terminal actions
   createSidecarTerminal: (contextKey: string, projectId: string, worktreeId?: string) => Promise<void>
+  registerSidecarTerminal: (contextKey: string, terminal: TerminalSession) => void
   closeSidecarTerminal: (contextKey: string, terminalId: string) => void
   setSidecarTerminalCollapsed: (collapsed: boolean) => void
   setActiveSidecarTerminal: (contextKey: string, id: string | null) => void
@@ -258,6 +263,9 @@ export const useProjectStore = create<ProjectStore>()(
       // Theme state (system follows OS preference)
       theme: 'system',
       resolvedTheme: typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+
+      // Terminal status messages (not persisted)
+      terminalStatus: {},
 
       // Git status state (not persisted)
       gitStatus: {},
@@ -591,6 +599,32 @@ export const useProjectStore = create<ProjectStore>()(
             activeSidecarTerminalId: {
               ...state.activeSidecarTerminalId,
               [contextKey]: terminalId,
+            },
+            sidecarTerminalCollapsed: false,
+            fileExplorerVisible: true,
+          }
+        })
+      },
+
+      registerSidecarTerminal: (contextKey, terminal) => {
+        set((state) => {
+          const existing = state.sidecarTerminals[contextKey] ?? []
+          // Enforce limit of 5 sidecar terminals per context
+          if (existing.length >= 5) return state
+          // Prevent duplicate registration
+          if (existing.includes(terminal.id)) return state
+          return {
+            terminals: {
+              ...state.terminals,
+              [terminal.id]: terminal,
+            },
+            sidecarTerminals: {
+              ...state.sidecarTerminals,
+              [contextKey]: [...existing, terminal.id],
+            },
+            activeSidecarTerminalId: {
+              ...state.activeSidecarTerminalId,
+              [contextKey]: terminal.id,
             },
             sidecarTerminalCollapsed: false,
             fileExplorerVisible: true,
@@ -1262,6 +1296,11 @@ export const useProjectStore = create<ProjectStore>()(
             },
           }
         }),
+
+      setTerminalStatus: (terminalId, message) =>
+        set((state) => ({
+          terminalStatus: { ...state.terminalStatus, [terminalId]: message },
+        })),
 
       setActiveTerminal: (id) =>
         set((state) => {
