@@ -54,7 +54,7 @@ export function TerminalTabBar({
   const activeIsEditor = activeCenterTabId != null && isEditorTabActive(activeCenterTabId)
 
   return (
-    <div ref={containerRef} className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto">
+    <div ref={containerRef} className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto scroll-hidden">
       {/* Terminal tabs */}
       {terminals.map((terminal) => {
         const isActive = !activeIsEditor && terminal.id === (activeCenterTabId ?? activeTerminalId)
