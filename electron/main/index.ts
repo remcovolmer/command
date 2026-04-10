@@ -264,6 +264,13 @@ async function restoreSessions(): Promise<void> {
         envOverrides,
       })
 
+      // Pre-associate the known session-terminal mapping so the hook watcher
+      // doesn't have to rely on cwd-based matching (which can misroute when
+      // multiple terminals share the same working directory)
+      if (sessionFileExists && hookWatcher) {
+        hookWatcher.preAssociateSession(session.claudeSessionId, terminalId)
+      }
+
       console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
 
       // Notify renderer about restored session
