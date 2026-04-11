@@ -37,12 +37,15 @@ export function useTerminalPool(
 
       if (!candidate) break
 
+      // Start buffering BEFORE destroying the xterm instance to avoid a race
+      // where PTY data arrives after unsubscribe but before main knows to buffer.
+      api.terminal.evict(candidate)
+
       const evicted = terminalPool.evict(candidate)
-      if (evicted) {
-        // Notify main process to start buffering PTY data
-        api.terminal.evict(candidate)
-      } else {
-        break // serialization failed, stop trying
+      if (!evicted) {
+        // Serialization failed — tell main to stop buffering and resume forwarding
+        api.terminal.restore(candidate)
+        break
       }
     }
   }, [activeTerminalId, splitTerminalIds, api])
