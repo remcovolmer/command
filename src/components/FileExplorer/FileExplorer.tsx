@@ -5,6 +5,7 @@ import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
 import { TasksPanel } from './TasksPanel'
 import { AutomationsPanel } from './AutomationsPanel'
+import { SessionsPanel } from './SessionsPanel'
 import { AutomationCreateDialog } from './AutomationCreateDialog'
 import { FileExplorerTabBar } from './FileExplorerTabBar'
 import { SidecarTerminalPanel } from './SidecarTerminalPanel'
@@ -268,7 +269,10 @@ export function FileExplorer() {
 
   return (
     <div className="h-full flex flex-col bg-sidebar" data-file-explorer>
-      {/* Tab Bar - at top */}
+      {/* Session info - always visible */}
+      <SessionsPanel />
+
+      {/* Tab Bar */}
       <FileExplorerTabBar
         activeTab={isLimitedProject && activeTab === 'git' ? 'files' : activeTab}
         onTabChange={setActiveTab}

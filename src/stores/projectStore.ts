@@ -1181,6 +1181,7 @@ export const useProjectStore = create<ProjectStore>()(
       addTerminal: (terminal) =>
         set((state) => ({
           terminals: { ...state.terminals, [terminal.id]: terminal },
+          activeProjectId: terminal.projectId,
           activeTerminalId: terminal.id,
           activeCenterTabId: terminal.id,
         })),

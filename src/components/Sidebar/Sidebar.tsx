@@ -35,6 +35,7 @@ export function Sidebar() {
   const {
     setActiveProject,
     setActiveTerminal,
+    setActiveCenterTab,
     addProject,
     removeProject,
     addTerminal,
@@ -50,6 +51,7 @@ export function Sidebar() {
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
       setActiveTerminal: s.setActiveTerminal,
+      setActiveCenterTab: s.setActiveCenterTab,
       addProject: s.addProject,
       removeProject: s.removeProject,
       addTerminal: s.addTerminal,
@@ -457,7 +459,14 @@ export function Sidebar() {
             getWorktreeTerminals={getWorktreeTerminals}
             activeProjectId={activeProjectId}
             activeTerminalId={activeTerminalId}
-            onSelect={setActiveProject}
+            onSelect={(projectId) => {
+              if (projectId === activeProjectId) {
+                // Clicking the already-active project toggles to overview
+                setActiveCenterTab(null)
+              } else {
+                setActiveProject(projectId)
+              }
+            }}
             onRemove={handleRemoveProject}
             onCreateTerminal={handleCreateTerminal}
             onCreateWorktree={handleCreateWorktree}
