@@ -166,7 +166,7 @@ async function verifyClaudeSessionAsync(cwd: string, sessionId: string): Promise
     const claudeDir = path.join(os.homedir(), '.claude', 'projects')
 
     // Claude encodes the path by replacing certain characters
-    const encodedPath = cwd.replace(/[/\\:]/g, '-').replace(/^-/, '')
+    const encodedPath = cwd.replace(/[/\\\\:]/g, '-').replace(/^-/, '')
     const sessionPath = path.join(claudeDir, encodedPath, `${sessionId}.json`)
 
     await fs.access(sessionPath)
@@ -335,9 +335,8 @@ async function createWindow() {
   // Initialize session index service
   sessionIndexService = new SessionIndexService(win)
 
-  // Wire session index to state changes — refresh summaries when terminals finish
-  unsubSessionIndex = hookWatcher.addStateChangeListener((terminalId, state) => {
-    if (state !== 'done' && state !== 'stopped') return
+  // Wire session index to state changes — refresh summaries on every state change
+  unsubSessionIndex = hookWatcher.addStateChangeListener((terminalId, _state) => {
     if (!sessionIndexService || !hookWatcher || !terminalManager) return
 
     const info = terminalManager.getTerminalInfo(terminalId)

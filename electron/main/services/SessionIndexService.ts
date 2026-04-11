@@ -37,7 +37,7 @@ interface SessionsIndexFile {
  * Extracted from verifyClaudeSessionAsync() for reuse.
  */
 export function encodeProjectPath(cwd: string): string {
-  return cwd.replace(/[/\\:]/g, '-').replace(/^-/, '')
+  return cwd.replace(/[/\\\\:]/g, '-').replace(/^-/, '')
 }
 
 /**
