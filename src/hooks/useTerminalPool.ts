@@ -37,11 +37,8 @@ export function useTerminalPool(
 
       if (!candidate) break
 
-      // Notify main process to start buffering PTY data BEFORE destroying
-      // the renderer-side xterm instance. Otherwise there is a race window
-      // between unsubscribing from terminal:data events (inside evict()) and
-      // the main process receiving the evict IPC — data arriving in that
-      // window would be forwarded to a missing subscriber and lost.
+      // Start buffering BEFORE destroying the xterm instance to avoid a race
+      // where PTY data arrives after unsubscribe but before main knows to buffer.
       api.terminal.evict(candidate)
 
       const evicted = terminalPool.evict(candidate)
