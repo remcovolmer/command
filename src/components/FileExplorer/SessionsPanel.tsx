@@ -30,7 +30,7 @@ export function SessionsPanel() {
       <div className="flex items-center gap-1.5 mb-0.5">
         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]}`} />
         <span className="text-xs font-medium text-sidebar-foreground truncate flex-1">
-          {terminal.title}
+          {terminal.generatedTitle || terminal.title}
         </span>
         <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
           <Clock className="w-2.5 h-2.5" />

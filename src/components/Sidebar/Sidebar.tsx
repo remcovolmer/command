@@ -47,6 +47,7 @@ export function Sidebar() {
     reorderProjects,
     checkVertexConfig,
     updateTerminalSummary,
+    updateTerminalGeneratedTitle,
   } = useProjectStore(
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
@@ -63,6 +64,7 @@ export function Sidebar() {
       reorderProjects: s.reorderProjects,
       checkVertexConfig: s.checkVertexConfig,
       updateTerminalSummary: s.updateTerminalSummary,
+      updateTerminalGeneratedTitle: s.updateTerminalGeneratedTitle,
     }))
   )
 
@@ -213,6 +215,14 @@ export function Sidebar() {
     })
     return unsubscribe
   }, [updateTerminalSummary])
+
+  // Listen for generated title updates from main process (SessionIndexService)
+  useEffect(() => {
+    const unsubscribe = terminalEvents.onGeneratedTitleUpdate((terminalId, title) => {
+      updateTerminalGeneratedTitle(terminalId, title)
+    })
+    return unsubscribe
+  }, [updateTerminalGeneratedTitle])
 
   const handleCheckForUpdate = async () => {
     setUpdateStatus('checking')

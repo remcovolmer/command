@@ -8,6 +8,7 @@ type TitleCallback = (title: string) => void
 type WorktreeUpdatedCallback = (worktreeId: string) => void
 type SummaryCallback = (summary: string) => void
 type SummaryUpdateCallback = (terminalId: string, summary: string) => void
+type GeneratedTitleUpdateCallback = (terminalId: string, title: string) => void
 type SessionRestoredCallback = (session: RestoredSession) => void
 type SidecarCreatedCallback = (contextKey: string, terminal: TerminalSession) => void
 type StatusMessageCallback = (terminalId: string, message: string) => void
@@ -27,6 +28,7 @@ class TerminalEventManager {
   private worktreeUpdatedCallbacks = new Map<string, WorktreeUpdatedCallback>()
   private summaryCallbacks = new Map<string, SummaryCallback>()
   private summaryUpdateCallbacks: SummaryUpdateCallback[] = []
+  private generatedTitleUpdateCallbacks: GeneratedTitleUpdateCallback[] = []
   private sessionRestoredCallbacks: SessionRestoredCallback[] = []
   private sidecarCreatedCallbacks: SidecarCreatedCallback[] = []
   private statusMessageCallbacks: StatusMessageCallback[] = []
@@ -87,6 +89,14 @@ class TerminalEventManager {
         // Also notify global listeners (used by Sidebar to update store)
         for (const cb of this.summaryUpdateCallbacks) {
           cb(terminalId, summary)
+        }
+      })
+    )
+
+    this.unsubscribers.push(
+      api.terminal.onGeneratedTitleChange((terminalId, title) => {
+        for (const cb of this.generatedTitleUpdateCallbacks) {
+          cb(terminalId, title)
         }
       })
     )
@@ -172,6 +182,18 @@ class TerminalEventManager {
   }
 
   /**
+   * Subscribe to generated title update events (for updating store when hook-generated titles arrive)
+   */
+  onGeneratedTitleUpdate(callback: GeneratedTitleUpdateCallback): () => void {
+    this.init()
+    this.generatedTitleUpdateCallbacks.push(callback)
+    return () => {
+      const index = this.generatedTitleUpdateCallbacks.indexOf(callback)
+      if (index !== -1) this.generatedTitleUpdateCallbacks.splice(index, 1)
+    }
+  }
+
+  /**
    * Subscribe to session restored events (for adding restored terminals to store)
    */
   onSessionRestored(callback: SessionRestoredCallback): () => void {
@@ -244,6 +266,7 @@ class TerminalEventManager {
     this.worktreeUpdatedCallbacks.clear()
     this.summaryCallbacks.clear()
     this.summaryUpdateCallbacks = []
+    this.generatedTitleUpdateCallbacks = []
     this.sessionRestoredCallbacks = []
     this.sidecarCreatedCallbacks = []
     this.statusMessageCallbacks = []

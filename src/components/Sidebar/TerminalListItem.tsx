@@ -41,7 +41,7 @@ export const TerminalListItem = memo(function TerminalListItem({
         className={`w-3 h-3 flex-shrink-0 ${isClaude ? 'mt-0.5' : ''} ${STATE_TEXT_COLORS[terminal.state]}`}
       />
       <div className="flex-1 min-w-0">
-        <span className="text-xs truncate block">{terminal.title}</span>
+        <span className="text-xs truncate block">{terminal.generatedTitle || terminal.title}</span>
         {isClaude && (
           <span className="text-[10px] text-text-secondary truncate block leading-tight opacity-70">
             {terminal.summary || '\u00A0'}

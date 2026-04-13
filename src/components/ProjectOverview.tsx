@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, GitBranch, MessageSquare, TerminalSquare } from 'lucide-react'
+import { Plus, GitBranch, MessageSquare, TerminalSquare, FileEdit, Clock, AlertTriangle } from 'lucide-react'
 import { getElectronAPI } from '../utils/electron'
 import type { SessionIndexEntry } from '../types'
 
@@ -25,6 +25,16 @@ function formatRelativeTime(dateStr: string): string {
   if (diffDays < 7) return `${diffDays}d ago`
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
   return date.toLocaleDateString()
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 60000) return '<1m'
+  const minutes = Math.floor(ms / 60000)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  if (hours < 24) return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+  return `${Math.floor(hours / 24)}d`
 }
 
 export function ProjectOverview({
@@ -105,17 +115,21 @@ export function ProjectOverview({
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span className="text-sm font-medium text-sidebar-foreground truncate flex-1">
-                    {session.summary || session.firstPrompt || 'Untitled session'}
+                    {session.generatedTitle || session.summary || session.firstPrompt || 'Untitled session'}
                   </span>
                   <span className="text-[10px] text-muted-foreground flex-shrink-0 mt-0.5">
                     {formatRelativeTime(session.modified)}
                   </span>
                 </div>
-                {session.summary && session.firstPrompt && session.summary !== session.firstPrompt && (
-                  <p className="text-xs text-muted-foreground truncate mb-2">
-                    {session.firstPrompt}
-                  </p>
-                )}
+                {(() => {
+                  const title = session.generatedTitle || session.summary || session.firstPrompt
+                  const subtitle = session.generatedSummary || session.firstPrompt
+                  return subtitle && subtitle !== title ? (
+                    <p className="text-xs text-muted-foreground truncate mb-2">
+                      {subtitle}
+                    </p>
+                  ) : null
+                })()}
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   {session.gitBranch && (
                     <span className="flex items-center gap-1">
@@ -127,6 +141,24 @@ export function ProjectOverview({
                     <MessageSquare className="w-3 h-3" />
                     {session.messageCount}
                   </span>
+                  {session.filesModified?.length > 0 && (
+                    <span className="flex items-center gap-1">
+                      <FileEdit className="w-3 h-3" />
+                      {session.filesModified.length}
+                    </span>
+                  )}
+                  {session.durationMs > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatDuration(session.durationMs)}
+                    </span>
+                  )}
+                  {session.errorCount > 0 && (
+                    <span className="flex items-center gap-1 text-destructive/70">
+                      <AlertTriangle className="w-3 h-3" />
+                      {session.errorCount}
+                    </span>
+                  )}
                 </div>
               </button>
             ))}

@@ -71,6 +71,7 @@ export interface TerminalSession {
   title: string;
   type: TerminalType;  // 'claude' or 'normal' shell
   summary?: string;  // Session summary from Claude Code's sessions-index.json
+  generatedTitle?: string;  // LLM-generated title from Ollama via session-summary-hook
 }
 
 /** Entry from Claude Code's sessions-index.json (used by project overview) */
@@ -84,6 +85,14 @@ export interface SessionIndexEntry {
   created: string;
   projectPath: string;
   isSidechain: boolean;
+  filesModified: string[];
+  filesRead: string[];
+  toolCounts: Record<string, number>;
+  errorCount: number;
+  durationMs: number;
+  assistantMessageCount: number;
+  generatedTitle?: string;  // LLM-generated title from Ollama
+  generatedSummary?: string;  // LLM-generated summary from Ollama
 }
 
 // Editor tab types
@@ -410,6 +419,7 @@ export interface ElectronAPI {
     onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
     onSidecarCreated: (callback: (contextKey: string, terminal: TerminalSession) => void) => Unsubscribe;
     onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe;
+    onGeneratedTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
   };
   editor: {
     onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void) => Unsubscribe;
