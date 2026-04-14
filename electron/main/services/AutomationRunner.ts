@@ -316,11 +316,16 @@ export class AutomationRunner {
         const age = Date.now() - createdAt
 
         if (age > maxAgeMs) {
-          // Don't delete worktrees that still have uncommitted changes —
-          // they may contain work from a crashed or killed automation run
+          // Don't delete worktrees that have uncommitted OR committed-but-unmerged changes —
+          // Claude typically commits its work, so git status alone would miss it
           const hasChanges = await this.worktreeHasChanges(wt.path, null)
           if (hasChanges) {
             console.log(`[AutomationRunner] GC: skipping worktree ${wt.branch} — has uncommitted changes`)
+            continue
+          }
+          const hasUnmergedCommits = await this.hasUnmergedCommits(wt.path)
+          if (hasUnmergedCommits) {
+            console.log(`[AutomationRunner] GC: skipping worktree ${wt.branch} — has unmerged commits`)
             continue
           }
 
@@ -374,6 +379,38 @@ export class AutomationRunner {
       return false
     } catch {
       // Assume changes exist on error to avoid destroying work
+      return true
+    }
+  }
+
+  /**
+   * Check if a worktree's HEAD has commits not present on any non-automation branch.
+   * Catches the case where Claude committed work but the run was interrupted
+   * before results were recorded — git status is clean but deleting the
+   * branch would destroy the committed output.
+   */
+  private async hasUnmergedCommits(worktreePath: string): Promise<boolean> {
+    try {
+      const { stdout: headRef } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+        cwd: worktreePath,
+        windowsHide: true,
+      })
+      const head = headRef.trim()
+      if (!head) return true
+
+      // Find all branches (local + remote) that contain this commit
+      const { stdout: branches } = await execFileAsync(
+        'git', ['branch', '-a', '--contains', head],
+        { cwd: worktreePath, windowsHide: true }
+      )
+      // If any non-automation branch contains HEAD, the work is merged
+      const hasNonAutoBranch = branches
+        .split('\n')
+        .map(b => b.trim().replace(/^\* /, ''))
+        .some(b => b && !b.startsWith('auto-'))
+      return !hasNonAutoBranch
+    } catch {
+      // On error, assume unmerged to avoid destroying work
       return true
     }
   }
