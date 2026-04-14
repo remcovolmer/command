@@ -1,59 +1,68 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
+import { homedir } from 'os'
 
 /**
- * Auto-installs the ccli skill file into every managed project.
+ * Installs the ccli skill as a global Claude Code skill (~/.claude/skills/ccli/skill.md).
  *
- * The skill file (.claude/commands/ccli.md) teaches Claude Code about
- * the ccli CLI and when to use each command. It is versioned so that
- * updates are applied automatically when the template changes.
+ * Previously this injected a command file into each project's .claude/commands/.
+ * Now it installs once globally, which is cleaner and avoids gitignore pollution.
+ * Also cleans up legacy per-project command files from older versions.
  */
 export class SkillInstaller {
   private readonly SKILL_VERSION = 'ccli-skill-v1'
-  private readonly SKILL_RELATIVE_PATH = join('.claude', 'commands', 'ccli.md')
-  private readonly GITIGNORE_ENTRY = '.claude/commands/ccli.md'
   private readonly skillTemplate: string
+  private readonly globalSkillDir: string
+  private readonly globalSkillPath: string
 
   constructor() {
+    this.globalSkillDir = join(homedir(), '.claude', 'skills', 'ccli')
+    this.globalSkillPath = join(this.globalSkillDir, 'skill.md')
     this.skillTemplate = this.loadTemplate()
   }
 
   /**
-   * Install or update the skill file in a project directory.
+   * Install or update the global ccli skill.
    * Idempotent: skips if the current version is already installed.
    */
-  async installOrUpdate(projectPath: string): Promise<void> {
+  async install(): Promise<void> {
     try {
-      if (!existsSync(projectPath)) {
-        console.log(`[SkillInstaller] Project path does not exist, skipping: ${projectPath}`)
-        return
-      }
-
-      const skillPath = join(projectPath, this.SKILL_RELATIVE_PATH)
-      const currentVersion = this.readCurrentVersion(skillPath)
+      const currentVersion = this.readCurrentVersion(this.globalSkillPath)
 
       if (currentVersion === this.SKILL_VERSION) {
         return // Already up to date
       }
 
-      // Create .claude/commands/ directory if needed
-      const commandsDir = join(projectPath, '.claude', 'commands')
-      if (!existsSync(commandsDir)) {
-        mkdirSync(commandsDir, { recursive: true })
+      if (!existsSync(this.globalSkillDir)) {
+        mkdirSync(this.globalSkillDir, { recursive: true })
       }
 
-      writeFileSync(skillPath, this.skillTemplate, 'utf-8')
-      console.log(`[SkillInstaller] ${currentVersion ? 'Updated' : 'Installed'} skill in ${projectPath}`)
-
-      this.ensureGitignore(projectPath)
+      writeFileSync(this.globalSkillPath, this.skillTemplate, 'utf-8')
+      console.log(`[SkillInstaller] ${currentVersion ? 'Updated' : 'Installed'} global ccli skill`)
     } catch (e) {
-      console.error(`[SkillInstaller] Failed to install skill in ${projectPath}:`, e)
+      console.error('[SkillInstaller] Failed to install global skill:', e)
     }
   }
 
   /**
-   * Read the version comment from the first line of the skill file.
-   * Returns null if the file doesn't exist or has no version comment.
+   * Remove legacy per-project command file (.claude/commands/ccli.md).
+   * Call this for each project to clean up old installations.
+   */
+  async cleanupLegacyCommand(projectPath: string): Promise<void> {
+    try {
+      const legacyPath = join(projectPath, '.claude', 'commands', 'ccli.md')
+      if (existsSync(legacyPath)) {
+        unlinkSync(legacyPath)
+        console.log(`[SkillInstaller] Removed legacy command from ${projectPath}`)
+      }
+    } catch (e) {
+      // Non-critical — log and move on
+      console.error(`[SkillInstaller] Failed to clean up legacy command in ${projectPath}:`, e)
+    }
+  }
+
+  /**
+   * Read the version comment from the first line of a skill file.
    */
   private readCurrentVersion(skillPath: string): string | null {
     if (!existsSync(skillPath)) {
@@ -71,46 +80,9 @@ export class SkillInstaller {
   }
 
   /**
-   * Ensure .claude/commands/ccli.md is listed in .gitignore.
-   */
-  private ensureGitignore(projectPath: string): void {
-    const gitignorePath = join(projectPath, '.gitignore')
-
-    let content = ''
-    if (existsSync(gitignorePath)) {
-      try {
-        content = readFileSync(gitignorePath, 'utf-8')
-      } catch {
-        return // Can't read, don't modify
-      }
-    }
-
-    // Check if the entry already exists (line by line to avoid partial matches)
-    const lines = content.split('\n').map(l => l.trim())
-    if (lines.includes(this.GITIGNORE_ENTRY)) {
-      return
-    }
-
-    // Append the entry, ensuring there's a newline before it
-    const suffix = content.length > 0 && !content.endsWith('\n') ? '\n' : ''
-    const newContent = content + suffix + this.GITIGNORE_ENTRY + '\n'
-
-    try {
-      writeFileSync(gitignorePath, newContent, 'utf-8')
-      console.log(`[SkillInstaller] Added ${this.GITIGNORE_ENTRY} to .gitignore in ${projectPath}`)
-    } catch (e) {
-      console.error(`[SkillInstaller] Failed to update .gitignore in ${projectPath}:`, e)
-    }
-  }
-
-  /**
-   * Load the skill template. Embedded as a string constant for simplicity —
-   * avoids file-loading complexity across dev/prod environments.
+   * Load the skill template from the bundled template file, with embedded fallback.
    */
   private loadTemplate(): string {
-    // Read from the template file at module load time
-    // In dev: relative to this source file
-    // In prod: the file is bundled in dist-electron
     try {
       const templatePath = join(__dirname, '..', 'templates', 'ccli-skill.md')
       if (existsSync(templatePath)) {
@@ -120,7 +92,6 @@ export class SkillInstaller {
       // Fall through to embedded template
     }
 
-    // Fallback: embedded template (ensures it always works even if file is missing)
     return `<!-- ${this.SKILL_VERSION} -->
 # ccli \u2014 Command Center CLI
 

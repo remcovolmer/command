@@ -385,12 +385,15 @@ async function createWindow() {
     mainWindow: win,
   })
 
-  // Initialize skill installer and install skills for all registered projects
+  // Install ccli as a global skill and clean up legacy per-project command files
   skillInstaller = new SkillInstaller()
+  skillInstaller.install().catch(err =>
+    console.error('[SkillInstaller] Global install failed:', err)
+  )
   const allProjectsForSkills = projectPersistence.getProjects()
   for (const project of allProjectsForSkills) {
-    skillInstaller.installOrUpdate(project.path).catch(err =>
-      console.error(`[SkillInstaller] Startup install failed for ${project.path}:`, err)
+    skillInstaller.cleanupLegacyCommand(project.path).catch(err =>
+      console.error(`[SkillInstaller] Legacy cleanup failed for ${project.path}:`, err)
     )
   }
 
@@ -567,9 +570,9 @@ ipcMain.handle('project:add', async (_event, projectPath: string, name?: string,
     throw new Error('Invalid project type')
   }
   const result = projectPersistence?.addProject(projectPath, name, type)
-  // Auto-install ccli skill file in the new project
-  skillInstaller?.installOrUpdate(projectPath).catch(err =>
-    console.error(`[SkillInstaller] Failed to install skill on project add:`, err)
+  // Clean up legacy ccli command file if present in the new project
+  skillInstaller?.cleanupLegacyCommand(projectPath).catch(err =>
+    console.error(`[SkillInstaller] Legacy cleanup failed on project add:`, err)
   )
   return result
 })

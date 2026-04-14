@@ -1,131 +1,121 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest'
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { SkillInstaller } from '../electron/main/services/SkillInstaller'
 
+// Mock homedir to use a temp directory so we don't touch the real ~/.claude
+vi.mock('os', async () => {
+  const actual = await vi.importActual<typeof import('os')>('os')
+  return {
+    ...actual,
+    homedir: () => (globalThis as Record<string, string>).__TEST_HOMEDIR__ ?? actual.homedir(),
+  }
+})
+
 describe('SkillInstaller', () => {
-  let tempDir: string
-  let installer: SkillInstaller
+  let fakeHome: string
+  let projectDir: string
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'skill-installer-test-'))
-    installer = new SkillInstaller()
+    fakeHome = mkdtempSync(join(tmpdir(), 'skill-installer-home-'))
+    ;(globalThis as Record<string, string>).__TEST_HOMEDIR__ = fakeHome
+    projectDir = mkdtempSync(join(tmpdir(), 'skill-installer-project-'))
   })
 
   afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true })
+    rmSync(fakeHome, { recursive: true, force: true })
+    rmSync(projectDir, { recursive: true, force: true })
+    delete (globalThis as Record<string, string>).__TEST_HOMEDIR__
   })
 
-  function skillPath(): string {
-    return join(tempDir, '.claude', 'commands', 'ccli.md')
+  function globalSkillPath(): string {
+    return join(fakeHome, '.claude', 'skills', 'ccli', 'skill.md')
   }
 
-  function gitignorePath(): string {
-    return join(tempDir, '.gitignore')
+  function legacyCommandPath(): string {
+    return join(projectDir, '.claude', 'commands', 'ccli.md')
   }
 
-  test('creates skill file when missing', async () => {
-    await installer.installOrUpdate(tempDir)
+  test('installs global skill when missing', async () => {
+    const installer = new SkillInstaller()
+    await installer.install()
 
-    expect(existsSync(skillPath())).toBe(true)
-    const content = readFileSync(skillPath(), 'utf-8')
+    expect(existsSync(globalSkillPath())).toBe(true)
+    const content = readFileSync(globalSkillPath(), 'utf-8')
     expect(content).toContain('<!-- ccli-skill-v1 -->')
     expect(content).toContain('ccli worktree create')
   })
 
-  test('creates .claude/commands/ directory if missing', async () => {
-    const commandsDir = join(tempDir, '.claude', 'commands')
-    expect(existsSync(commandsDir)).toBe(false)
+  test('creates ~/.claude/skills/ccli/ directory', async () => {
+    const skillDir = join(fakeHome, '.claude', 'skills', 'ccli')
+    expect(existsSync(skillDir)).toBe(false)
 
-    await installer.installOrUpdate(tempDir)
+    const installer = new SkillInstaller()
+    await installer.install()
 
-    expect(existsSync(commandsDir)).toBe(true)
+    expect(existsSync(skillDir)).toBe(true)
   })
 
-  test('updates skill file when version is outdated', async () => {
-    // Create an older version
-    const commandsDir = join(tempDir, '.claude', 'commands')
-    mkdirSync(commandsDir, { recursive: true })
-    writeFileSync(skillPath(), '<!-- ccli-skill-v0 -->\nOld content', 'utf-8')
+  test('skips when version matches', async () => {
+    const installer = new SkillInstaller()
+    await installer.install()
+    const firstContent = readFileSync(globalSkillPath(), 'utf-8')
 
-    await installer.installOrUpdate(tempDir)
+    // Append something to detect overwrites
+    writeFileSync(globalSkillPath(), firstContent + '\n# User addition', 'utf-8')
 
-    const content = readFileSync(skillPath(), 'utf-8')
+    await installer.install()
+
+    const finalContent = readFileSync(globalSkillPath(), 'utf-8')
+    expect(finalContent).toContain('# User addition')
+  })
+
+  test('updates when version is outdated', async () => {
+    const skillDir = join(fakeHome, '.claude', 'skills', 'ccli')
+    mkdirSync(skillDir, { recursive: true })
+    writeFileSync(globalSkillPath(), '<!-- ccli-skill-v0 -->\nOld content', 'utf-8')
+
+    const installer = new SkillInstaller()
+    await installer.install()
+
+    const content = readFileSync(globalSkillPath(), 'utf-8')
     expect(content).toContain('<!-- ccli-skill-v1 -->')
     expect(content).not.toContain('Old content')
   })
 
-  test('skips when version matches', async () => {
-    // Install first
-    await installer.installOrUpdate(tempDir)
-    const firstContent = readFileSync(skillPath(), 'utf-8')
+  test('removes legacy per-project command file', async () => {
+    const commandsDir = join(projectDir, '.claude', 'commands')
+    mkdirSync(commandsDir, { recursive: true })
+    writeFileSync(legacyCommandPath(), '<!-- ccli-skill-v1 -->\nOld', 'utf-8')
 
-    // Append something to detect overwrites
-    writeFileSync(skillPath(), firstContent + '\n# User addition', 'utf-8')
+    const installer = new SkillInstaller()
+    await installer.cleanupLegacyCommand(projectDir)
 
-    // Install again — should not overwrite because version matches
-    await installer.installOrUpdate(tempDir)
-
-    const finalContent = readFileSync(skillPath(), 'utf-8')
-    // The version line is still first, so version check passes.
-    // The file should NOT be rewritten since version matches.
-    expect(finalContent).toContain('# User addition')
+    expect(existsSync(legacyCommandPath())).toBe(false)
   })
 
-  test('adds .gitignore entry', async () => {
-    await installer.installOrUpdate(tempDir)
-
-    expect(existsSync(gitignorePath())).toBe(true)
-    const content = readFileSync(gitignorePath(), 'utf-8')
-    expect(content).toContain('.claude/commands/ccli.md')
-  })
-
-  test('does not duplicate .gitignore entry', async () => {
-    // Pre-create .gitignore with the entry
-    writeFileSync(gitignorePath(), 'node_modules\n.claude/commands/ccli.md\n', 'utf-8')
-
-    await installer.installOrUpdate(tempDir)
-
-    const content = readFileSync(gitignorePath(), 'utf-8')
-    const matches = content.split('.claude/commands/ccli.md').length - 1
-    expect(matches).toBe(1)
-  })
-
-  test('appends to existing .gitignore without duplicating', async () => {
-    writeFileSync(gitignorePath(), 'node_modules\ndist\n', 'utf-8')
-
-    await installer.installOrUpdate(tempDir)
-
-    const content = readFileSync(gitignorePath(), 'utf-8')
-    expect(content).toContain('node_modules')
-    expect(content).toContain('dist')
-    expect(content).toContain('.claude/commands/ccli.md')
-  })
-
-  test('handles .gitignore without trailing newline', async () => {
-    writeFileSync(gitignorePath(), 'node_modules', 'utf-8')
-
-    await installer.installOrUpdate(tempDir)
-
-    const content = readFileSync(gitignorePath(), 'utf-8')
-    // Should have a newline between existing content and new entry
-    expect(content).toBe('node_modules\n.claude/commands/ccli.md\n')
-  })
-
-  test('skips gracefully when project path does not exist', async () => {
-    const bogusPath = join(tempDir, 'nonexistent')
-
+  test('cleanup is safe when no legacy file exists', async () => {
+    const installer = new SkillInstaller()
     // Should not throw
-    await installer.installOrUpdate(bogusPath)
+    await installer.cleanupLegacyCommand(projectDir)
+    expect(existsSync(legacyCommandPath())).toBe(false)
+  })
 
-    expect(existsSync(join(bogusPath, '.claude'))).toBe(false)
+  test('is idempotent — multiple installs produce same result', async () => {
+    const installer = new SkillInstaller()
+    await installer.install()
+    const firstContent = readFileSync(globalSkillPath(), 'utf-8')
+
+    await installer.install()
+    expect(readFileSync(globalSkillPath(), 'utf-8')).toBe(firstContent)
   })
 
   test('skill file contains key instructions', async () => {
-    await installer.installOrUpdate(tempDir)
+    const installer = new SkillInstaller()
+    await installer.install()
 
-    const content = readFileSync(skillPath(), 'utf-8')
+    const content = readFileSync(globalSkillPath(), 'utf-8')
     expect(content).toContain('ccli worktree create')
     expect(content).toContain('git worktree add')
     expect(content).toContain('ccli open')
@@ -136,17 +126,5 @@ describe('SkillInstaller', () => {
     expect(content).toContain('ccli chat list')
     expect(content).toContain('ccli diff')
     expect(content).toContain('ccli worktree merge')
-  })
-
-  test('is idempotent — multiple calls produce same result', async () => {
-    await installer.installOrUpdate(tempDir)
-    const firstContent = readFileSync(skillPath(), 'utf-8')
-    const firstGitignore = readFileSync(gitignorePath(), 'utf-8')
-
-    await installer.installOrUpdate(tempDir)
-    // Skill file should be identical (not rewritten since version matches)
-    expect(readFileSync(skillPath(), 'utf-8')).toBe(firstContent)
-    // Gitignore should not have duplicate entries
-    expect(readFileSync(gitignorePath(), 'utf-8')).toBe(firstGitignore)
   })
 })
