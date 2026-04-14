@@ -25,6 +25,7 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
   const api = useMemo(() => getElectronAPI(), [])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const loadedRef = useRef<string | null>(null)
 
   const [contextMenu, setContextMenu] = useState<{
     entry: FileSystemEntry | null

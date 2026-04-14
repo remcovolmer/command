@@ -311,7 +311,7 @@ export class CommandServer {
    * Validate that a file path is within a project or worktree boundary.
    * Returns the resolved path or a CommandResponse error.
    */
-  private validateFilePath(filePath: unknown, context: RouteContext): { ok: true; resolved: string; projectId: string } | CommandResponse {
+  private validateFilePath(filePath: unknown, context: RouteContext): { ok: true; resolved: string; projectId: string } | (CommandResponse & { ok: false }) {
     if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
       return { ok: false, error: 'Missing or invalid "file" (absolute path string)' }
     }
