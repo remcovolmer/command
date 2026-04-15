@@ -12,28 +12,32 @@ export function DiscardConfirmDialog({ gitPath, onComplete }: DiscardConfirmDial
   const clearDiscardingFiles = useProjectStore((s) => s.clearDiscardingFiles)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const api = getElectronAPI()
 
   useEffect(() => {
     if (discardingFiles) {
       cancelRef.current?.focus()
       setError(null)
+      setLoading(false)
     }
   }, [discardingFiles])
 
   useEffect(() => {
     if (!discardingFiles) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !loading) {
         clearDiscardingFiles()
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [discardingFiles, clearDiscardingFiles])
+  }, [discardingFiles, clearDiscardingFiles, loading])
 
   const handleConfirm = useCallback(async () => {
-    if (!discardingFiles) return
+    if (!discardingFiles || loading) return
+    setLoading(true)
+    setError(null)
     try {
       if (discardingFiles.isUntracked) {
         await api.git.deleteUntrackedFiles(gitPath, discardingFiles.files)
@@ -44,8 +48,10 @@ export function DiscardConfirmDialog({ gitPath, onComplete }: DiscardConfirmDial
       onComplete?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Discard failed')
+    } finally {
+      setLoading(false)
     }
-  }, [api, gitPath, discardingFiles, clearDiscardingFiles, onComplete])
+  }, [api, gitPath, discardingFiles, clearDiscardingFiles, onComplete, loading])
 
   if (!discardingFiles) return null
 
@@ -81,15 +87,17 @@ export function DiscardConfirmDialog({ gitPath, onComplete }: DiscardConfirmDial
           <button
             ref={cancelRef}
             onClick={clearDiscardingFiles}
-            className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+            disabled={loading}
+            className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className="px-3 py-1.5 text-sm rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+            disabled={loading}
+            className="px-3 py-1.5 text-sm rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
           >
-            {isUntracked ? 'Delete' : 'Discard'}
+            {loading ? 'Working…' : isUntracked ? 'Delete' : 'Discard'}
           </button>
         </div>
       </div>
