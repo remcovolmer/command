@@ -18,6 +18,7 @@ import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
 import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
+import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { CommandServer } from './services/CommandServer'
@@ -503,10 +504,18 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   })
 })
 
-ipcMain.on('terminal:write', (_event, terminalId: string, data: string) => {
+ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
   if (!isValidUUID(terminalId)) return
-  if (typeof data !== 'string' || data.length > 1_000_000) return
-  terminalManager?.writeToTerminal(terminalId, data)
+  const result = validateTerminalWritePayload(data)
+  if (!result.ok) {
+    if (result.reason === 'too-large') {
+      const { title, body } = formatOversizeMessage(result.size, result.limit)
+      console.warn(`[terminal:write] Rejected ${result.size}B payload for ${terminalId}: exceeds ${result.limit}B limit`)
+      new Notification({ title, body }).show()
+    }
+    return
+  }
+  terminalManager?.writeToTerminal(terminalId, result.data)
 })
 
 ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: number) => {
