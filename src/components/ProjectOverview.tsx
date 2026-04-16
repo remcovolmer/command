@@ -125,7 +125,7 @@ export function ProjectOverview({
                   const title = session.generatedTitle || session.summary || session.firstPrompt
                   const subtitle = session.generatedSummary || session.firstPrompt
                   return subtitle && subtitle !== title ? (
-                    <p className="text-xs text-muted-foreground truncate mb-2">
+                    <p className="text-xs text-muted-foreground line-clamp-3 mb-2">
                       {subtitle}
                     </p>
                   ) : null
