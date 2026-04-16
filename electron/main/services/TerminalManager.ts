@@ -58,6 +58,12 @@ export class TerminalManager {
   private sidecarBuffers: Map<string, string> = new Map()
   private readonly MAX_SIDECAR_BUFFER_SIZE = 1_048_576 // 1MB per terminal
 
+  // Defensive PTY write chunking. See writePtySafe() for rationale.
+  private readonly PTY_CHUNK_THRESHOLD = 512
+  private readonly PTY_CHUNK_SIZE = 512
+  private readonly BRACKETED_PASTE_START = '\x1b[200~'
+  private readonly BRACKETED_PASTE_END = '\x1b[201~'
+
   constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher, options?: { commandServer?: CommandServerAccessor; cliDir?: string }) {
     this.window = window
     this.hookWatcher = hookWatcher || null
@@ -204,21 +210,114 @@ export class TerminalManager {
     return id
   }
 
-  writeToTerminal(terminalId: string, data: string): void {
+  async writeToTerminal(terminalId: string, data: string): Promise<void> {
     const terminal = this.terminals.get(terminalId)
-    if (terminal?.pty) {
-      // Auto-naming: buffer input and extract title on Enter (only for Claude terminals)
-      if (terminal.type === 'claude' && !this.terminalTitled.get(terminalId)) {
-        this.handleAutoNaming(terminalId, data)
+    if (!terminal?.pty) return
+
+    // Auto-naming: buffer input and extract title on Enter (only for Claude terminals)
+    if (terminal.type === 'claude' && !this.terminalTitled.get(terminalId)) {
+      this.handleAutoNaming(terminalId, data)
+    }
+
+    // When user presses Enter, set to busy immediately (only for Claude terminals)
+    // The hook system will update to done when Claude finishes
+    if (terminal.type === 'claude' && (data.includes('\r') || data.includes('\n'))) {
+      this.updateTerminalState(terminalId, 'busy')
+    }
+
+    await this.writePtySafe(terminalId, data)
+  }
+
+  /**
+   * Write to PTY with defensive chunking for large payloads.
+   *
+   * pre-1.2 node-pty silently drops EAGAIN writes at ~1KB (fixed upstream in
+   * PR #831). Windows ConPTY has its own ring-buffer backpressure that the
+   * upstream fix does not cover. Chunking + setImmediate yield gives the
+   * kernel / ConPTY a chance to drain between writes.
+   *
+   * Bracketed-paste markers (\x1b[200~ / \x1b[201~) are never split across
+   * chunk boundaries so Claude Code still recognises pastes as one unit.
+   * On Windows, \r bytes inside a bracketed-paste block are stripped because
+   * ConPTY interprets CRLF inconsistently mid-paste.
+   */
+  private async writePtySafe(terminalId: string, data: string): Promise<void> {
+    if (data.length === 0) return
+
+    if (data.length <= this.PTY_CHUNK_THRESHOLD) {
+      const terminal = this.terminals.get(terminalId)
+      terminal?.pty?.write(data)
+      return
+    }
+
+    const prepared = this.stripCarriageReturnsInBracketedPaste(data)
+    const chunks = this.chunkForPty(prepared)
+
+    for (const chunk of chunks) {
+      const terminal = this.terminals.get(terminalId)
+      if (!terminal?.pty) return
+      terminal.pty.write(chunk)
+      await new Promise<void>((resolve) => setImmediate(resolve))
+    }
+  }
+
+  /**
+   * Strip \r bytes that fall *inside* a bracketed-paste block on Windows.
+   * ConPTY interprets CRLF inconsistently mid-paste; removing \r between
+   * \x1b[200~ and \x1b[201~ avoids swallowed content and double-lines.
+   * No-op on non-Windows and on payloads without paste markers.
+   */
+  private stripCarriageReturnsInBracketedPaste(data: string): string {
+    if (process.platform !== 'win32') return data
+    if (!data.includes(this.BRACKETED_PASTE_START)) return data
+    return data.replace(
+      /\x1b\[200~([\s\S]*?)\x1b\[201~/g,
+      (_match, body: string) => `${this.BRACKETED_PASTE_START}${body.replace(/\r/g, '')}${this.BRACKETED_PASTE_END}`,
+    )
+  }
+
+  /**
+   * Split `data` into chunks of up to PTY_CHUNK_SIZE bytes, never cutting
+   * across a 6-byte bracketed-paste marker. If a naive boundary would split
+   * a marker, the boundary is rewound so the full marker lands in the next
+   * chunk.
+   */
+  private chunkForPty(data: string): string[] {
+    if (data.length <= this.PTY_CHUNK_SIZE) return [data]
+
+    const chunks: string[] = []
+    const markerLen = this.BRACKETED_PASTE_START.length // 6
+    let pos = 0
+
+    while (pos < data.length) {
+      let end = Math.min(pos + this.PTY_CHUNK_SIZE, data.length)
+
+      if (end < data.length) {
+        // Walk back up to markerLen-1 bytes looking for ESC. If we find one
+        // and it starts a bracketed-paste marker that extends past `end`,
+        // rewind `end` to the marker's start so the full marker lands in the
+        // next chunk. Only rewind if the result is still a non-empty chunk.
+        for (let back = 1; back < markerLen; back++) {
+          const probe = end - back
+          if (probe <= pos) break
+          if (data[probe] === '\x1b') {
+            const marker = data.slice(probe, probe + markerLen)
+            if (
+              (marker === this.BRACKETED_PASTE_START || marker === this.BRACKETED_PASTE_END) &&
+              probe + markerLen > end
+            ) {
+              end = probe
+            }
+            break
+          }
+        }
       }
 
-      // When user presses Enter, set to busy immediately (only for Claude terminals)
-      // The hook system will update to done when Claude finishes
-      if (terminal.type === 'claude' && (data.includes('\r') || data.includes('\n'))) {
-        this.updateTerminalState(terminalId, 'busy')
-      }
-      terminal.pty.write(data)
+      chunks.push(data.slice(pos, end))
+      pos = end
     }
+
+    return chunks
   }
 
   /**
