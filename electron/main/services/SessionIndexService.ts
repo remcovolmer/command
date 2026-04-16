@@ -106,8 +106,13 @@ async function parseSessionJsonl(filePath: string, projectPath: string): Promise
           userMessageCount++
           if (!firstPrompt) {
             const content = typeof obj.message === 'string' ? obj.message : (obj.message?.content || '')
-            // Strip command tags for cleaner display
-            firstPrompt = content.replace(/<command-[^>]*>[^<]*<\/command-[^>]*>\s*/g, '').trim().slice(0, 200)
+            const stringContent = typeof content === 'string' ? content : ''
+            firstPrompt = stringContent
+              .replace(/<command-[^>]*>[^<]*<\/command-[^>]*>\s*/g, '')
+              // Strip ANSI/xterm control sequences (e.g. SGR mouse tracking like [<35;21;8M)
+              .replace(/\x1b?\[[?<>!]?[\d;]*[a-zA-Z~]/g, '')
+              .trim()
+              .slice(0, 200)
             if (!gitBranch) gitBranch = obj.gitBranch || ''
           }
 
