@@ -44,8 +44,7 @@
         "arch": ["x64"]
       }
     ],
-    "artifactName": "${productName}_${version}.${ext}",
-    "signAndEditExecutable": false
+    "artifactName": "${productName}_${version}.${ext}"
   },
   "portable": {
     "artifactName": "${productName}_${version}_portable.${ext}"
