@@ -270,8 +270,10 @@ export class TerminalManager {
   private stripCarriageReturnsInBracketedPaste(data: string): string {
     if (process.platform !== 'win32') return data
     if (!data.includes(this.BRACKETED_PASTE_START)) return data
+    // Greedy match: xterm.js wraps each paste in exactly one \x1b[200~…\x1b[201~ pair.
+    // Literal close markers inside user content must be treated as content, not block ends.
     return data.replace(
-      /\x1b\[200~([\s\S]*?)\x1b\[201~/g,
+      /\x1b\[200~([\s\S]*)\x1b\[201~/,
       (_match, body: string) => `${this.BRACKETED_PASTE_START}${body.replace(/\r/g, '')}${this.BRACKETED_PASTE_END}`,
     )
   }
