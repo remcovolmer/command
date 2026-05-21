@@ -1,5 +1,26 @@
 import { describe, test, expect } from 'vitest'
-import { buildBaseHref, injectBaseHref } from '../src/components/Editor/HtmlPreview'
+import { buildBaseHref, injectBaseHref, IFRAME_SANDBOX } from '../src/components/Editor/HtmlPreview'
+
+describe('IFRAME_SANDBOX', () => {
+  // Locks the security posture. Any change to the sandbox attribute requires
+  // an explicit update here. See HtmlPreview.tsx comment block for why each
+  // token is on/off.
+  test('omits allow-same-origin so the iframe cannot reach window.parent.electronAPI', () => {
+    expect(IFRAME_SANDBOX).not.toContain('allow-same-origin')
+  })
+
+  test('omits allow-top-navigation so previewed scripts cannot redirect the editor', () => {
+    expect(IFRAME_SANDBOX).not.toContain('allow-top-navigation')
+  })
+
+  test('omits allow-popups-to-escape-sandbox so popups remain sandboxed', () => {
+    expect(IFRAME_SANDBOX).not.toContain('allow-popups-to-escape-sandbox')
+  })
+
+  test('matches the agreed-upon token set exactly', () => {
+    expect(IFRAME_SANDBOX).toBe('allow-scripts allow-forms allow-modals allow-popups')
+  })
+})
 
 describe('buildBaseHref', () => {
   test('converts a Windows directory to a file:/// URL', () => {
@@ -75,5 +96,17 @@ describe('injectBaseHref', () => {
     expect(ourPos).toBeGreaterThan(-1)
     expect(theirPos).toBeGreaterThan(-1)
     expect(ourPos).toBeLessThan(theirPos)
+  })
+
+  test('escapes double-quote in baseHref so a quote-bearing path cannot break out of the href attribute', () => {
+    const evil = 'file:///tmp/"><script>steal()</script>/'
+    const out = injectBaseHref('<html></html>', evil)
+    expect(out).not.toContain('<script>steal()</script>')
+    expect(out).toContain('&quot;')
+  })
+
+  test('escapes ampersand in baseHref', () => {
+    const out = injectBaseHref('<html></html>', 'file:///tmp/a&b/')
+    expect(out).toContain('file:///tmp/a&amp;b/')
   })
 })

@@ -46,12 +46,15 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
   const [debouncedContent, setDebouncedContent] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const savedContentRef = useRef<string>('')
-  const currentContentRef = useRef<string>('')
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const lastDirtyRef = useRef<boolean>(false)
   const isDeletedRef = useRef(isDeletedExternally)
   isDeletedRef.current = isDeletedExternally
   const readSeqRef = useRef(0)
+  // Timestamp of the last local writeFile. Used to suppress the chokidar echo
+  // (file-changed fires shortly after our own save) so a watcher reload reading
+  // pre-save content cannot stomp the editor with stale text.
+  const pendingSelfWriteAtRef = useRef<number>(0)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const normalizedPath = useMemo(() => normalizeFilePath(filePath), [filePath])
   const fileDir = useMemo(() => getParentPath(filePath), [filePath])
@@ -63,7 +66,10 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
     }
   }, [])
 
-  useEffect(() => () => cancelDebounce(), [cancelDebounce])
+  // Cancel any pending debounce on unmount or when filePath changes — without
+  // the filePath dep, a stale setDebouncedContent from the previous file could
+  // flash into the preview just after the new file loads.
+  useEffect(() => () => cancelDebounce(), [filePath, cancelDebounce])
 
   // Load file
   useEffect(() => {
@@ -83,7 +89,6 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
         setContent(text)
         setDebouncedContent(text)
         savedContentRef.current = text
-        currentContentRef.current = text
       })
       .catch((err) => {
         clearTimeout(timeoutId)
@@ -108,6 +113,30 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
       const seq = ++readSeqRef.current
       api.fs.readFile(filePath).then((text) => {
         if (cancelled || seq !== readSeqRef.current) return
+
+        // Suppress the chokidar echo of our own save: disk matches what we
+        // just wrote and the event arrived within the watcher batch window.
+        if (
+          text === savedContentRef.current &&
+          Date.now() - pendingSelfWriteAtRef.current < 1000
+        ) {
+          return
+        }
+
+        // Don't clobber unsaved user edits. If the buffer is dirty AND disk
+        // content actually differs from the last save, keep the user's work
+        // and surface a console warning so the divergence is diagnosable.
+        // (When disk matches savedContentRef, the watcher echo is harmless
+        // and falls through to a no-op-ish refresh.)
+        if (lastDirtyRef.current && text !== savedContentRef.current) {
+          console.warn(
+            'External change to',
+            filePath,
+            'ignored — buffer has unsaved edits',
+          )
+          return
+        }
+
         cancelDebounce()
         const ed = editorRef.current
         if (ed) {
@@ -118,7 +147,6 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
         setContent(text)
         setDebouncedContent(text)
         savedContentRef.current = text
-        currentContentRef.current = text
         lastDirtyRef.current = false
         setEditorDirty(tabId, false)
         setEditorTabDeletedExternally(tabId, false)
@@ -164,7 +192,7 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
     try {
       await api.fs.writeFile(filePath, value)
       savedContentRef.current = value
-      currentContentRef.current = value
+      pendingSelfWriteAtRef.current = Date.now()
       setEditorDirty(tabId, false)
       lastDirtyRef.current = false
       setEditorTabDeletedExternally(tabId, false)
@@ -203,7 +231,6 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
 
   const handleChange = useCallback((value: string | undefined) => {
     if (value === undefined) return
-    currentContentRef.current = value
     const dirty = value !== savedContentRef.current
     if (dirty !== lastDirtyRef.current) {
       lastDirtyRef.current = dirty

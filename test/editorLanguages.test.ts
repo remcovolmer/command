@@ -17,6 +17,10 @@ describe('getMonacoLanguage', () => {
   test('handles uppercase extensions', () => {
     expect(getMonacoLanguage('INDEX.HTM')).toBe('html')
   })
+
+  test('handles uppercase .HTML extension', () => {
+    expect(getMonacoLanguage('INDEX.HTML')).toBe('html')
+  })
 })
 
 describe('isEditableFile', () => {
