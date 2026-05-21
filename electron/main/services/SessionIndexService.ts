@@ -109,8 +109,10 @@ async function parseSessionJsonl(filePath: string, projectPath: string): Promise
             const stringContent = typeof content === 'string' ? content : ''
             firstPrompt = stringContent
               .replace(/<command-[^>]*>[^<]*<\/command-[^>]*>\s*/g, '')
-              // Strip ANSI/xterm control sequences (e.g. SGR mouse tracking like [<35;21;8M)
-              .replace(/\x1b?\[[?<>!]?[\d;]*[a-zA-Z~]/g, '')
+              // Strip ANSI/xterm control sequences. Match either a real CSI
+              // (ESC + `[`) or a bare `[` that begins with a private-marker
+              // byte (`?<>!`) so plain prompts like "[wip]" aren't mangled.
+              .replace(/\x1b\[[?<>!]?[\d;]*[a-zA-Z~]|\[[?<>!][\d;]*[a-zA-Z~]/g, '')
               .trim()
               .slice(0, 200)
             if (!gitBranch) gitBranch = obj.gitBranch || ''

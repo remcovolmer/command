@@ -284,6 +284,51 @@ describe('SessionIndexService', () => {
     })
   })
 
+  describe('firstPrompt sanitization', () => {
+    test('strips real ESC-prefixed CSI mouse-tracking sequences', async () => {
+      setupJsonlFiles([{
+        name: 'session-1.jsonl',
+        mtimeMs: Date.now(),
+        lines: makeSessionLines({
+          sessionId: 'session-1',
+          firstPrompt: '\x1b[<35;21;8MHello world',
+        }),
+      }])
+      await service.loadForProject('C:\\Users\\test\\project')
+
+      expect(service.getSessionSummary('session-1')?.firstPrompt).toBe('Hello world')
+    })
+
+    test('strips bare CSI sequences that begin with a private-marker byte', async () => {
+      setupJsonlFiles([{
+        name: 'session-1.jsonl',
+        mtimeMs: Date.now(),
+        lines: makeSessionLines({
+          sessionId: 'session-1',
+          firstPrompt: '[<35;21;8MHello world',
+        }),
+      }])
+      await service.loadForProject('C:\\Users\\test\\project')
+
+      expect(service.getSessionSummary('session-1')?.firstPrompt).toBe('Hello world')
+    })
+
+    test('preserves plain bracketed text in user prompts', async () => {
+      setupJsonlFiles([{
+        name: 'session-1.jsonl',
+        mtimeMs: Date.now(),
+        lines: makeSessionLines({
+          sessionId: 'session-1',
+          firstPrompt: '[wip] [TODO] fix the bug in [feature-x]',
+        }),
+      }])
+      await service.loadForProject('C:\\Users\\test\\project')
+
+      expect(service.getSessionSummary('session-1')?.firstPrompt)
+        .toBe('[wip] [TODO] fix the bug in [feature-x]')
+    })
+  })
+
   describe('compact summary support', () => {
     test('uses compact summary when available', async () => {
       const lines = makeSessionLines({ sessionId: 'session-1', firstPrompt: 'Fix the bug' })
