@@ -110,9 +110,11 @@ async function parseSessionJsonl(filePath: string, projectPath: string): Promise
             firstPrompt = stringContent
               .replace(/<command-[^>]*>[^<]*<\/command-[^>]*>\s*/g, '')
               // Strip ANSI/xterm control sequences. Match either a real CSI
-              // (ESC + `[`) or a bare `[` that begins with a private-marker
-              // byte (`?<>!`) so plain prompts like "[wip]" aren't mangled.
-              .replace(/\x1b\[[?<>!]?[\d;]*[a-zA-Z~]|\[[?<>!][\d;]*[a-zA-Z~]/g, '')
+              // (ESC + `[`) or the specific xterm SGR mouse-tracking shape
+              // `[<num;num;numM|m]` that survives ESC stripping. Anything
+              // looser (e.g. `\[[?<>!]`) would mangle plain prompts like
+              // "[!p]" or "[<a]".
+              .replace(/\x1b\[[?<>!]?[\d;]*[a-zA-Z~]|\[<[\d;]+[Mm]/g, '')
               .trim()
               .slice(0, 200)
             if (!gitBranch) gitBranch = obj.gitBranch || ''

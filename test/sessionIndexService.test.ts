@@ -327,6 +327,35 @@ describe('SessionIndexService', () => {
       expect(service.getSessionSummary('session-1')?.firstPrompt)
         .toBe('[wip] [TODO] fix the bug in [feature-x]')
     })
+
+    test('preserves bracketed private-marker-like text that is not mouse tracking', async () => {
+      setupJsonlFiles([{
+        name: 'session-1.jsonl',
+        mtimeMs: Date.now(),
+        lines: makeSessionLines({
+          sessionId: 'session-1',
+          firstPrompt: 'soft reset [!p] and angle [<a] should survive',
+        }),
+      }])
+      await service.loadForProject('C:\\Users\\test\\project')
+
+      expect(service.getSessionSummary('session-1')?.firstPrompt)
+        .toBe('soft reset [!p] and angle [<a] should survive')
+    })
+
+    test('strips CSI sequences in the middle of a prompt', async () => {
+      setupJsonlFiles([{
+        name: 'session-1.jsonl',
+        mtimeMs: Date.now(),
+        lines: makeSessionLines({
+          sessionId: 'session-1',
+          firstPrompt: 'before \x1b[<35;21;8Mafter',
+        }),
+      }])
+      await service.loadForProject('C:\\Users\\test\\project')
+
+      expect(service.getSessionSummary('session-1')?.firstPrompt).toBe('before after')
+    })
   })
 
   describe('compact summary support', () => {
