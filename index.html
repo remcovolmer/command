@@ -5,7 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <!--
+      CSP is relaxed compared to a minimal app because the HTML Preview feature
+      renders user-authored HTML inside a sandboxed iframe; srcdoc iframes
+      inherit the parent CSP and intersect it with their own. To support
+      arbitrary HTML (inline scripts, CDN-loaded libraries, file:// base href
+      for relative assets) we widen script-src, base-uri, frame-src, etc.
+      Defense-in-depth retained: object-src 'none', form-action 'self', and
+      the iframe itself stays sandboxed (no allow-top-navigation).
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: file: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; style-src 'self' 'unsafe-inline' data: blob: https:; img-src 'self' data: blob: file: https: http:; font-src 'self' data: blob: https:; connect-src 'self' data: blob: file: https: ws: wss:; frame-src 'self' data: blob:; object-src 'none'; base-uri 'self' file:; form-action 'self';" />
     <title>Command</title>
   </head>
   <body>

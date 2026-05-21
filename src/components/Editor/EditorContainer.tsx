@@ -13,6 +13,10 @@ const MarkdownEditor = lazy(() =>
   import('./MarkdownEditor').then(m => ({ default: m.MarkdownEditor }))
 )
 
+const HtmlEditor = lazy(() =>
+  import('./HtmlEditor').then(m => ({ default: m.HtmlEditor }))
+)
+
 interface EditorContainerProps {
   tabId: string
   filePath: string
@@ -22,13 +26,66 @@ interface EditorContainerProps {
 /**
  * Router component that chooses the appropriate editor based on file type.
  * - Markdown files (.md) can toggle between Milkdown (WYSIWYG) and Monaco (raw)
+ * - HTML files (.html, .htm) can toggle between sandboxed preview and Monaco (raw)
  * - All other files use Monaco code editor
  */
 export function EditorContainer({ tabId, filePath, isActive }: EditorContainerProps) {
-  const isMarkdown = filePath.toLowerCase().endsWith('.md')
+  const lowerPath = filePath.toLowerCase()
+  const isMarkdown = lowerPath.endsWith('.md')
+  const isHtml = lowerPath.endsWith('.html') || lowerPath.endsWith('.htm')
   const [useWysiwyg, setUseWysiwyg] = useState(true)
+  const [usePreview, setUsePreview] = useState(true)
 
-  // Non-markdown files always use Monaco
+  // HTML files: Preview ⇄ Raw toggle, both panes mounted to preserve Monaco undo history.
+  if (isHtml) {
+    return (
+      <div style={{ display: isActive ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%' }}>
+        {/* Toggle button */}
+        <div className="flex items-center justify-end px-2 py-1 border-b border-border bg-background">
+          <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
+            <button
+              onClick={() => setUsePreview(false)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                !usePreview
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Raw HTML (Monaco)"
+            >
+              <Code size={14} />
+              <span>Raw</span>
+            </button>
+            <button
+              onClick={() => setUsePreview(true)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                usePreview
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Preview (sandboxed)"
+            >
+              <Eye size={14} />
+              <span>Preview</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Editor area */}
+        <div className="flex-1 min-h-0">
+          <Suspense fallback={<EditorSkeleton />}>
+            <HtmlEditor
+              tabId={tabId}
+              filePath={filePath}
+              isActive={isActive}
+              mode={usePreview ? 'preview' : 'raw'}
+            />
+          </Suspense>
+        </div>
+      </div>
+    )
+  }
+
+  // Non-markdown, non-HTML files always use Monaco
   if (!isMarkdown) {
     return (
       <CodeEditor

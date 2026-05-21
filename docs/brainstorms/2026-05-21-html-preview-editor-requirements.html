@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>HTML Preview in the Editor — Requirements</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f5;
+    --fg: #18181b;
+    --fg-muted: #52525b;
+    --fg-dim: #71717a;
+    --border: #e4e4e7;
+    --border-strong: #d4d4d8;
+
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --accent-fg: #1e40af;
+
+    --routing: #8b5cf6;
+    --routing-soft: #ede9fe;
+    --fidelity: #0ea5e9;
+    --fidelity-soft: #e0f2fe;
+    --update: #10b981;
+    --update-soft: #d1fae5;
+
+    --danger: #ef4444;
+    --danger-soft: #fee2e2;
+    --warn: #f59e0b;
+    --warn-soft: #fef3c7;
+
+    --code-bg: #f4f4f5;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #09090b;
+      --surface: #131316;
+      --surface-2: #1c1c1f;
+      --fg: #fafafa;
+      --fg-muted: #a1a1aa;
+      --fg-dim: #71717a;
+      --border: #27272a;
+      --border-strong: #3f3f46;
+
+      --accent: #60a5fa;
+      --accent-soft: #1e3a8a40;
+      --accent-fg: #93c5fd;
+
+      --routing: #a78bfa;
+      --routing-soft: #4c1d9540;
+      --fidelity: #38bdf8;
+      --fidelity-soft: #0c4a6e40;
+      --update: #34d399;
+      --update-soft: #064e3b40;
+
+      --danger: #f87171;
+      --danger-soft: #7f1d1d40;
+      --warn: #fbbf24;
+      --warn-soft: #78350f40;
+
+      --code-bg: #1c1c1f;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ---------- Layout ---------- */
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    margin: 0 -24px 48px;
+    padding: 64px 24px 56px;
+    background:
+      radial-gradient(ellipse at top left, var(--accent-soft) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, var(--routing-soft) 0%, transparent 50%),
+      var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  .hero .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    margin-bottom: 16px;
+  }
+  .hero .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .hero h1 {
+    font-size: clamp(28px, 4.5vw, 44px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    font-weight: 700;
+  }
+  .hero p.lede {
+    font-size: 17px;
+    color: var(--fg-muted);
+    max-width: 640px;
+    margin: 0 0 28px;
+    line-height: 1.55;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--fg-muted);
+  }
+  .pill code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--fg);
+  }
+
+  /* ---------- Stats ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 0 0 56px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .stat .num {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    line-height: 1;
+  }
+  .stat .label {
+    margin-top: 6px;
+    font-size: 12.5px;
+    color: var(--fg-muted);
+  }
+
+  /* ---------- Sections ---------- */
+  section { margin-bottom: 56px; scroll-margin-top: 20px; }
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 8px;
+  }
+  .section-head h2 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .section-head .badge {
+    width: 28px; height: 28px;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .section-sub {
+    color: var(--fg-muted);
+    font-size: 14.5px;
+    margin: 0 0 24px;
+    max-width: 70ch;
+  }
+
+  /* ---------- TL;DR cards ---------- */
+  .tldr {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 760px) { .tldr { grid-template-columns: 1fr; } }
+  .tldr-card {
+    position: relative;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .tldr-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+  }
+  .tldr-card[data-color="fidelity"]::before { background: var(--fidelity); }
+  .tldr-card[data-color="update"]::before    { background: var(--update); }
+  .tldr-card[data-color="routing"]::before   { background: var(--routing); }
+  .tldr-card .label {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-dim);
+    margin-bottom: 6px;
+  }
+  .tldr-card .value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  .tldr-card .reason {
+    font-size: 13.5px;
+    color: var(--fg-muted);
+    line-height: 1.55;
+  }
+
+  /* ---------- Mock UI ---------- */
+  .mock-frame {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .mock-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--fg-muted);
+  }
+  .traffic { display: flex; gap: 6px; }
+  .traffic span {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--border-strong);
+  }
+  .mock-tabbar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .mock-tab {
+    padding: 9px 16px;
+    font-size: 13px;
+    color: var(--fg-muted);
+    border-right: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mock-tab.active {
+    background: var(--bg);
+    color: var(--fg);
+    border-bottom: 2px solid var(--accent);
+  }
+  .mock-toggle-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .seg {
+    display: inline-flex;
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .seg button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--fg-muted);
+    cursor: default;
+  }
+  .seg button.active {
+    background: var(--surface);
+    color: var(--fg);
+    box-shadow: var(--shadow-sm);
+  }
+  .mock-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 220px;
+    background: var(--bg);
+  }
+  @media (max-width: 720px) { .mock-body { grid-template-columns: 1fr; } }
+  .mock-pane {
+    padding: 18px;
+    font-family: ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--fg-muted);
+    line-height: 1.7;
+    border-right: 1px solid var(--border);
+  }
+  .mock-pane:last-child { border-right: none; }
+  .mock-pane .ln {
+    color: var(--fg-dim);
+    margin-right: 12px;
+    user-select: none;
+  }
+  .mock-pane .tag { color: var(--routing); }
+  .mock-pane .str { color: var(--update); }
+  .mock-render {
+    padding: 24px;
+    background: var(--surface);
+    font-family: -apple-system, sans-serif;
+    color: var(--fg);
+  }
+  .mock-render h3 {
+    font-size: 22px;
+    margin: 0 0 8px;
+    color: var(--fg);
+  }
+  .mock-render p { font-size: 13px; color: var(--fg-muted); margin: 0; }
+
+  /* ---------- Requirements groups ---------- */
+  .req-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 980px) { .req-grid { grid-template-columns: 1fr; } }
+  .req-group {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .req-group header {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .req-group header .icon {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border-radius: 8px;
+  }
+  .req-group[data-color="routing"]  header .icon { background: var(--routing-soft); color: var(--routing); }
+  .req-group[data-color="fidelity"] header .icon { background: var(--fidelity-soft); color: var(--fidelity); }
+  .req-group[data-color="update"]   header .icon { background: var(--update-soft);  color: var(--update); }
+  .req-group header h3 {
+    margin: 0;
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+  .req-group header .count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--fg-dim);
+    background: var(--surface-2);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .req-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px 0;
+  }
+  .req-list li {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 10px;
+    padding: 12px 18px;
+    font-size: 14px;
+    line-height: 1.55;
+    border-bottom: 1px solid var(--border);
+  }
+  .req-list li:last-child { border-bottom: none; }
+  .req-list .rid {
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--fg);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 2px 0;
+    text-align: center;
+    height: fit-content;
+    margin-top: 2px;
+  }
+  .req-group[data-color="routing"]  .req-list .rid { color: var(--routing); border-color: var(--routing-soft); }
+  .req-group[data-color="fidelity"] .req-list .rid { color: var(--fidelity); border-color: var(--fidelity-soft); }
+  .req-group[data-color="update"]   .req-list .rid { color: var(--update); border-color: var(--update-soft); }
+
+  /* ---------- Flow diagram ---------- */
+  .flow {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+  }
+  .flow svg { display: block; width: 100%; height: auto; max-width: 900px; margin: 0 auto; }
+
+  /* ---------- Decisions ---------- */
+  .decisions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 760px) { .decisions { grid-template-columns: 1fr; } }
+  .decision {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .decision .title {
+    font-weight: 600;
+    margin: 0 0 6px;
+    color: var(--fg);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .decision .title .num {
+    width: 22px; height: 22px;
+    display: inline-grid; place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+  }
+  .decision p { margin: 0; color: var(--fg-muted); font-size: 13.5px; line-height: 1.6; }
+
+  /* ---------- Scope split ---------- */
+  .scope-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 760px) { .scope-split { grid-template-columns: 1fr; } }
+  .scope-col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .scope-col.in  { border-left: 3px solid var(--update); }
+  .scope-col.out { border-left: 3px solid var(--danger); }
+  .scope-col h4 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .scope-col ul { list-style: none; margin: 0; padding: 0; }
+  .scope-col li {
+    padding: 8px 0;
+    font-size: 13.5px;
+    color: var(--fg);
+    line-height: 1.55;
+    border-bottom: 1px dashed var(--border);
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 8px;
+    align-items: start;
+  }
+  .scope-col li:last-child { border-bottom: none; }
+  .scope-col li .mark {
+    margin-top: 4px;
+    color: var(--update);
+  }
+  .scope-col.out li .mark { color: var(--danger); }
+
+  /* ---------- Assumptions / risks ---------- */
+  .alert {
+    background: var(--warn-soft);
+    border: 1px solid var(--warn);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .alert .icon { color: var(--warn); margin-top: 2px; }
+  .alert .body { font-size: 13.5px; color: var(--fg); line-height: 1.6; }
+  .alert .body strong { display: block; margin-bottom: 2px; }
+
+  /* ---------- Success ---------- */
+  .success-list { list-style: none; padding: 0; margin: 0; }
+  .success-list li {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .success-list li .check {
+    color: var(--update);
+    margin-top: 2px;
+  }
+
+  /* ---------- CTA ---------- */
+  .cta {
+    margin-top: 32px;
+    padding: 24px;
+    background:
+      linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  @media (max-width: 600px) { .cta { flex-direction: column; align-items: flex-start; } }
+  .cta .arrow {
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .cta-text strong { display: block; font-size: 15px; margin-bottom: 4px; }
+  .cta-text span { color: var(--fg-muted); font-size: 13.5px; }
+
+  /* ---------- icons inline ---------- */
+  .ico { width: 16px; height: 16px; display: inline-block; vertical-align: -3px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      Brainstorm · Standard scope
+    </div>
+    <h1>HTML Preview in the Editor</h1>
+    <p class="lede">
+      <code>.html</code>-bestanden krijgen dezelfde Preview ⇄ Raw toggle als Markdown.
+      Eén nieuwe branch in <code>EditorContainer</code>, sandboxed iframe, live debounced
+      updates — zonder de bestaande editor-architectuur te verbouwen.
+    </p>
+    <div class="meta-row">
+      <span class="pill">📅 <code>2026-05-21</code></span>
+      <span class="pill">🏷 <code>html-preview-editor</code></span>
+      <span class="pill">🌿 <code>feat/render-html</code></span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+<!-- ========== STATS ========== -->
+<div class="stats">
+  <div class="stat"><div class="num">9</div><div class="label">Requirements</div></div>
+  <div class="stat"><div class="num">3</div><div class="label">Groepen</div></div>
+  <div class="stat"><div class="num">4</div><div class="label">Key decisions</div></div>
+  <div class="stat"><div class="num">~300ms</div><div class="label">Debounce target</div></div>
+</div>
+
+<!-- ========== TL;DR ========== -->
+<section id="tldr">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    </span>
+    <h2>TL;DR — drie beslissingen sturen de bouw</h2>
+  </div>
+  <p class="section-sub">
+    Dit zijn de keuzes die in het brainstorm-gesprek zijn vastgelegd. Elk bepaalt
+    een concrete implementatie-knop in de planning-fase.
+  </p>
+
+  <div class="tldr">
+    <div class="tldr-card" data-color="fidelity">
+      <div class="label">Fidelity</div>
+      <div class="value">Volledig — scripts + assets</div>
+      <div class="reason">Sandboxed iframe met <code>allow-scripts</code> en <code>&lt;base href&gt;</code>. Closest to real browser. Trade-off: HTML kan JS draaien, maar dat is geen nieuwe threat.</div>
+    </div>
+    <div class="tldr-card" data-color="update">
+      <div class="label">Update mode</div>
+      <div class="value">Live, gedebounced</div>
+      <div class="reason">~300ms na laatste keystroke. Match met Markdown WYSIWYG-feel. JS-state reset per render — geaccepteerd.</div>
+    </div>
+    <div class="tldr-card" data-color="routing">
+      <div class="label">Default &amp; extensies</div>
+      <div class="value">Preview-first, <code>.html</code> + <code>.htm</code></div>
+      <div class="reason">Consistent met Markdown die in WYSIWYG opent. SVG/XHTML buiten v1 — andere content model, geen duidelijk payoff.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PROBLEM FRAME ========== -->
+<section id="problem">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    </span>
+    <h2>Problem Frame</h2>
+  </div>
+  <p class="section-sub">
+    <code>.html</code> opent vandaag in Monaco als ruwe tekst — wie wil zien hoe de pagina er
+    uitziet, moet naar de browser. De Markdown-flow bewijst het patroon al:
+    <code>EditorContainer</code> routeert <code>.md</code> naar een Code/Eye toggle tussen Monaco
+    en Milkdown. Voor prototypes, demopagina's en Claude-gegenereerde HTML
+    haalt dezelfde toggle op <code>.html</code>/<code>.htm</code> een dagelijkse wrijving weg.
+  </p>
+</section>
+
+<!-- ========== MOCK UI ========== -->
+<section id="mock">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>
+    </span>
+    <h2>Hoe het eruitziet</h2>
+  </div>
+  <p class="section-sub">Bestaande Markdown-toggle (Code/Eye) hergebruikt voor HTML. Zelfde positie, zelfde shape, andere content erin.</p>
+
+  <div class="mock-frame">
+    <div class="mock-titlebar">
+      <div class="traffic"><span></span><span></span><span></span></div>
+      <span style="margin-left:8px">Command · my-project</span>
+    </div>
+    <div class="mock-tabbar">
+      <div class="mock-tab">📄 README.md</div>
+      <div class="mock-tab active">📄 index.html</div>
+      <div class="mock-tab">⚙ settings.json</div>
+    </div>
+    <div class="mock-toggle-bar">
+      <div class="seg" role="tablist" aria-label="Editor mode">
+        <button>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Raw
+        </button>
+        <button class="active">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Preview
+        </button>
+      </div>
+    </div>
+    <div class="mock-body">
+      <div class="mock-pane">
+        <div><span class="ln">1</span><span class="tag">&lt;h1&gt;</span>Hello<span class="tag">&lt;/h1&gt;</span></div>
+        <div><span class="ln">2</span><span class="tag">&lt;p&gt;</span>This is a preview.<span class="tag">&lt;/p&gt;</span></div>
+        <div><span class="ln">3</span><span class="tag">&lt;script&gt;</span></div>
+        <div><span class="ln">4</span>&nbsp;&nbsp;console.log(<span class="str">"alive"</span>);</div>
+        <div><span class="ln">5</span><span class="tag">&lt;/script&gt;</span></div>
+      </div>
+      <div class="mock-render">
+        <h3>Hello</h3>
+        <p>This is a preview.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== REQUIREMENTS ========== -->
+<section id="requirements">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </span>
+    <h2>Requirements</h2>
+  </div>
+  <p class="section-sub">Negen requirements over drie concerns. R-IDs lopen door — R1–R3 routing, R4–R6 fidelity, R7–R9 update behavior.</p>
+
+  <div class="req-grid">
+    <article class="req-group" data-color="routing">
+      <header>
+        <span class="icon">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </span>
+        <h3>Editor routing</h3>
+        <span class="count">3</span>
+      </header>
+      <ul class="req-list">
+        <li><span class="rid">R1</span><span><code>EditorContainer</code> routeert <code>.html</code> en <code>.htm</code> naar een Preview ⇄ Raw toggle, identiek aan de Markdown-UI.</span></li>
+        <li><span class="rid">R2</span><span>Bestanden openen standaard in Preview. Raw gebruikt Monaco — zelfde code path als nu.</span></li>
+        <li><span class="rid">R3</span><span>Toggle is per-tab en blijft staan zolang de tab leeft; opnieuw openen start weer in Preview.</span></li>
+      </ul>
+    </article>
+
+    <article class="req-group" data-color="fidelity">
+      <header>
+        <span class="icon">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </span>
+        <h3>Preview fidelity</h3>
+        <span class="count">3</span>
+      </header>
+      <ul class="req-list">
+        <li><span class="rid">R4</span><span>Sandboxed iframe. Inline en externe <code>&lt;script&gt;</code> draaien. CSS, fonts, images laden.</span></li>
+        <li><span class="rid">R5</span><span>Relatieve paden (<code>./style.css</code>, <code>img/foo.png</code>) resolven t.o.v. de file-directory — zoals een browser het bestand direct zou openen.</span></li>
+        <li><span class="rid">R6</span><span>Console output, network errors en JS exceptions blijven binnen de iframe — geen crash of leak naar de host renderer.</span></li>
+      </ul>
+    </article>
+
+    <article class="req-group" data-color="update">
+      <header>
+        <span class="icon">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </span>
+        <h3>Update behavior</h3>
+        <span class="count">3</span>
+      </header>
+      <ul class="req-list">
+        <li><span class="rid">R7</span><span>Edits in Raw propageren naar Preview, debounced ~300ms na laatste keystroke.</span></li>
+        <li><span class="rid">R8</span><span>Saven (Ctrl+S) levert geen extra re-render naast wat de debounce al deed.</span></li>
+        <li><span class="rid">R9</span><span>Raw → Preview togglen toont de huidige buffer (incl. ongesavede edits), niet de disk-versie.</span></li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- ========== FLOW DIAGRAM ========== -->
+<section id="flow">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6a6 6 0 0 0 6 6h3"/></svg>
+    </span>
+    <h2>Update flow</h2>
+  </div>
+  <p class="section-sub">Van keystroke tot rendered DOM in &lt; 350ms. Geen save-trigger nodig.</p>
+
+  <div class="flow">
+    <svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--fg-muted)"/>
+        </marker>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="var(--accent-soft)"/>
+          <stop offset="100%" stop-color="var(--routing-soft)"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Boxes -->
+      <g font-family="-apple-system, sans-serif" font-size="13">
+        <!-- Keystroke -->
+        <rect x="20" y="80" width="140" height="60" rx="10" fill="var(--surface)" stroke="var(--border-strong)"/>
+        <text x="90" y="105" text-anchor="middle" fill="var(--fg)" font-weight="600">Keystroke</text>
+        <text x="90" y="124" text-anchor="middle" fill="var(--fg-muted)" font-size="11">Monaco onChange</text>
+
+        <!-- Debounce -->
+        <rect x="220" y="80" width="160" height="60" rx="10" fill="var(--update-soft)" stroke="var(--update)"/>
+        <text x="300" y="105" text-anchor="middle" fill="var(--fg)" font-weight="600">Debounce 300ms</text>
+        <text x="300" y="124" text-anchor="middle" fill="var(--fg-muted)" font-size="11">flush latest buffer</text>
+
+        <!-- Wrap HTML -->
+        <rect x="440" y="80" width="180" height="60" rx="10" fill="var(--fidelity-soft)" stroke="var(--fidelity)"/>
+        <text x="530" y="105" text-anchor="middle" fill="var(--fg)" font-weight="600">Inject &lt;base href&gt;</text>
+        <text x="530" y="124" text-anchor="middle" fill="var(--fg-muted)" font-size="11">resolve relative assets</text>
+
+        <!-- Iframe -->
+        <rect x="680" y="80" width="200" height="60" rx="10" fill="var(--routing-soft)" stroke="var(--routing)"/>
+        <text x="780" y="105" text-anchor="middle" fill="var(--fg)" font-weight="600">iframe srcdoc</text>
+        <text x="780" y="124" text-anchor="middle" fill="var(--fg-muted)" font-size="11">sandbox allow-scripts</text>
+
+        <!-- arrows -->
+        <line x1="160" y1="110" x2="220" y2="110" stroke="var(--fg-muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="380" y1="110" x2="440" y2="110" stroke="var(--fg-muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="620" y1="110" x2="680" y2="110" stroke="var(--fg-muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- top labels -->
+        <text x="90" y="55" text-anchor="middle" fill="var(--fg-dim)" font-size="11">R7</text>
+        <text x="300" y="55" text-anchor="middle" fill="var(--fg-dim)" font-size="11">R7 · R8</text>
+        <text x="530" y="55" text-anchor="middle" fill="var(--fg-dim)" font-size="11">R5</text>
+        <text x="780" y="55" text-anchor="middle" fill="var(--fg-dim)" font-size="11">R4 · R6</text>
+
+        <!-- bottom note -->
+        <text x="450" y="190" text-anchor="middle" fill="var(--fg-muted)" font-size="12">
+          Save-event (Ctrl+S) tikt de debounce niet extra aan — R8 wordt afgedwongen door de pipeline zelf.
+        </text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- ========== SUCCESS ========== -->
+<section id="success">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+    </span>
+    <h2>Success Criteria</h2>
+  </div>
+  <p class="section-sub">Hieraan herken je dat het ding doet wat het moet doen.</p>
+
+  <ul class="success-list">
+    <li>
+      <svg class="ico check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>Gebruiker opent <code>index.html</code>, ziet meteen de gerenderde output, switcht naar Raw, edit een heading, en ziet de preview binnen ~300ms updaten — zonder te saven.</span>
+    </li>
+    <li>
+      <svg class="ico check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>Een statische site met relatieve CSS &amp; image references rendert hetzelfde als wanneer een browser het bestand direct opent.</span>
+    </li>
+    <li>
+      <svg class="ico check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>Implementatie hergebruikt het toggle-patroon uit <code>EditorContainer</code> — geen nieuwe UI-affordances of editor-abstractie nodig.</span>
+    </li>
+  </ul>
+</section>
+
+<!-- ========== SCOPE ========== -->
+<section id="scope">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+    </span>
+    <h2>Scope Boundaries</h2>
+  </div>
+  <p class="section-sub">Wat zit erin, wat blijft eruit. Expliciete out-of-scope items maken planning veel sneller.</p>
+
+  <div class="scope-split">
+    <div class="scope-col in">
+      <h4>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+        In scope
+      </h4>
+      <ul>
+        <li><span class="mark">+</span><span><code>.html</code> en <code>.htm</code> bestanden</span></li>
+        <li><span class="mark">+</span><span>Preview ⇄ Raw toggle in bestaande editor-tab</span></li>
+        <li><span class="mark">+</span><span>Sandboxed iframe met scripts + asset loading</span></li>
+        <li><span class="mark">+</span><span>Live, gedebounced updates (~300ms)</span></li>
+        <li><span class="mark">+</span><span>Relatieve paden via <code>&lt;base href&gt;</code></span></li>
+      </ul>
+    </div>
+    <div class="scope-col out">
+      <h4>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Bewust buiten scope
+      </h4>
+      <ul>
+        <li><span class="mark">×</span><span>Aparte "preview" panel-architectuur — leeft in bestaand tab-systeem</span></li>
+        <li><span class="mark">×</span><span><code>.svg</code>, <code>.xhtml</code>, andere markup formats</span></li>
+        <li><span class="mark">×</span><span>DevTools, element inspector, responsive-viewport toggle</span></li>
+        <li><span class="mark">×</span><span>Live reload van externe files (CSS in andere tab edit → geen auto-reload)</span></li>
+        <li><span class="mark">×</span><span>Eigen script-sandboxing bovenop iframe <code>sandbox</code></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== DECISIONS ========== -->
+<section id="decisions">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </span>
+    <h2>Key Decisions</h2>
+  </div>
+  <p class="section-sub">Vier keuzes met de rationale erachter — zodat een planner of code-reviewer ze niet opnieuw hoeft te maken.</p>
+
+  <div class="decisions">
+    <div class="decision">
+      <p class="title"><span class="num">1</span> Sandboxed iframe + base href</p>
+      <p>Closest to real browser behavior. Trade-off: previewed HTML draait JS, dus vijandige HTML kan proberen te phone-homen — maar de gebruiker draait toch al <code>npm install</code> en willekeurige terminal-commands op deze code. Threat model verandert niet.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">2</span> Live debounced (~300ms)</p>
+      <p>Match met hoe Markdown's WYSIWYG nu al voelt. Scripts re-runnen bij elke preview rebuild — geaccepteerd, want R7 gaat over snelle feedback bij editing, niet over JS-state behouden.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">3</span> Preview-first default</p>
+      <p>Consistent met Markdown die in WYSIWYG opent. Wie source-first wil, klikt de toggle één keer; we persisteren die voorkeur nog niet.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">4</span> <code>.html</code> + <code>.htm</code> alleen</p>
+      <p>SVG ziet er aantrekkelijk uit maar voegt een as toe (ander content model, andere sizing) zonder duidelijke payoff. Defer naar later.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== ASSUMPTIONS ========== -->
+<section id="assumptions">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </span>
+    <h2>Te checken in planning</h2>
+  </div>
+  <p class="section-sub">Twee aannames die planning moet smoke-testen voordat de implementatie start.</p>
+
+  <div class="alert">
+    <span class="icon">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </span>
+    <div class="body">
+      <strong>Electron renderer + <code>srcdoc</code> + <code>&lt;base href="file://…"&gt;</code></strong>
+      Standaard browserpatroon, maar Electron's <code>webSecurity</code> / <code>fileAccess</code> flags
+      kunnen ermee interacteren. Snelle smoke test tijdens planning.
+    </div>
+  </div>
+
+  <div class="alert">
+    <span class="icon">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </span>
+    <div class="body">
+      <strong>EditorContainer toggle-patroon generaliseert</strong>
+      Wordt de <code>isMarkdown</code>-tak een <code>kind: 'monaco' | 'markdown' | 'html'</code> switch,
+      of komt er een parallelle branch? Planning beslist.
+    </div>
+  </div>
+</section>
+
+<!-- ========== CTA ========== -->
+<div class="cta">
+  <div class="arrow">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+  </div>
+  <div class="cta-text">
+    <strong>Next step → <code>/ce-plan</code></strong>
+    <span>Klaar voor een implementatieplan op deze requirements. Beide aannames hierboven worden in Phase 1 van het plan opgepakt.</span>
+  </div>
+</div>
+
+</main>
+
+</body>
+</html>
