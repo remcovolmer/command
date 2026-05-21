@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>HTML Preview in the Editor — Implementation Plan</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f5;
+    --fg: #18181b;
+    --fg-muted: #52525b;
+    --fg-dim: #71717a;
+    --border: #e4e4e7;
+    --border-strong: #d4d4d8;
+
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --accent-fg: #1e40af;
+
+    --u1: #f59e0b;
+    --u1-soft: #fef3c7;
+    --u2: #0ea5e9;
+    --u2-soft: #e0f2fe;
+    --u3: #8b5cf6;
+    --u3-soft: #ede9fe;
+    --u4: #10b981;
+    --u4-soft: #d1fae5;
+
+    --danger: #ef4444;
+    --danger-soft: #fee2e2;
+    --warn: #f59e0b;
+    --warn-soft: #fef3c7;
+    --ok: #10b981;
+    --ok-soft: #d1fae5;
+
+    --code-bg: #f4f4f5;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #09090b;
+      --surface: #131316;
+      --surface-2: #1c1c1f;
+      --fg: #fafafa;
+      --fg-muted: #a1a1aa;
+      --fg-dim: #71717a;
+      --border: #27272a;
+      --border-strong: #3f3f46;
+
+      --accent: #60a5fa;
+      --accent-soft: #1e3a8a40;
+      --accent-fg: #93c5fd;
+
+      --u1: #fbbf24;
+      --u1-soft: #78350f40;
+      --u2: #38bdf8;
+      --u2-soft: #0c4a6e40;
+      --u3: #a78bfa;
+      --u3-soft: #4c1d9540;
+      --u4: #34d399;
+      --u4-soft: #064e3b40;
+
+      --danger: #f87171;
+      --danger-soft: #7f1d1d40;
+      --warn: #fbbf24;
+      --warn-soft: #78350f40;
+      --ok: #34d399;
+      --ok-soft: #064e3b40;
+
+      --code-bg: #1c1c1f;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  pre {
+    margin: 0;
+    padding: 16px 18px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--fg);
+  }
+
+  .page { max-width: 1100px; margin: 0 auto; padding: 0 24px 120px; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    margin: 0 -24px 48px;
+    padding: 56px 24px 48px;
+    background:
+      radial-gradient(ellipse at top left, var(--u3-soft) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, var(--u2-soft) 0%, transparent 50%),
+      var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--fg-muted); margin-bottom: 16px;
+  }
+  .hero .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .hero h1 {
+    font-size: clamp(28px, 4.5vw, 40px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    font-weight: 700;
+  }
+  .hero p.lede {
+    font-size: 16px;
+    color: var(--fg-muted);
+    max-width: 700px;
+    margin: 0 0 24px;
+    line-height: 1.55;
+  }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--fg-muted);
+  }
+  .pill code { background: transparent; border: none; padding: 0; color: var(--fg); }
+  .pill.active { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+
+  /* ---------- Stats ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 56px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .stat .num {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--fg); line-height: 1;
+  }
+  .stat .label { margin-top: 6px; font-size: 12.5px; color: var(--fg-muted); }
+
+  /* ---------- Section ---------- */
+  section { margin-bottom: 56px; scroll-margin-top: 20px; }
+  .section-head {
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 0 8px;
+  }
+  .section-head h2 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
+  }
+  .section-head .badge {
+    width: 28px; height: 28px;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .section-sub {
+    color: var(--fg-muted); font-size: 14.5px; margin: 0 0 24px; max-width: 75ch;
+  }
+
+  /* ---------- TOC ---------- */
+  .toc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 56px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .toc a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    color: var(--fg-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-radius: 6px;
+  }
+  .toc a:hover { background: var(--surface-2); color: var(--fg); }
+  .toc a .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* ---------- Requirements (R-IDs) ---------- */
+  .req-pill-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+  }
+  .req-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 10px;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .req-item .rid {
+    background: var(--accent-soft);
+    color: var(--accent-fg);
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 5px;
+    padding: 4px 0;
+    text-align: center;
+    height: fit-content;
+  }
+
+  /* ---------- Tech design (code-block) ---------- */
+  .design-note {
+    background: var(--warn-soft);
+    border-left: 3px solid var(--warn);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--fg);
+    margin-bottom: 12px;
+  }
+
+  /* ---------- Implementation units (timeline) ---------- */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px; top: 14px; bottom: 14px;
+    width: 2px;
+    background: var(--border-strong);
+  }
+  .unit {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0;
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .unit::before {
+    content: '';
+    position: absolute;
+    left: -27px; top: 18px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--accent);
+    z-index: 2;
+  }
+  .unit[data-u="1"]::before { border-color: var(--u1); background: var(--u1); }
+  .unit[data-u="2"]::before { border-color: var(--u2); background: var(--u2); }
+  .unit[data-u="3"]::before { border-color: var(--u3); background: var(--u3); }
+  .unit[data-u="4"]::before { border-color: var(--u4); background: var(--u4); }
+
+  .unit-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .unit-head .uid {
+    display: inline-grid; place-items: center;
+    font-family: ui-monospace, monospace;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: white;
+    width: 32px; height: 24px;
+    border-radius: 5px;
+  }
+  .unit[data-u="1"] .uid { background: var(--u1); }
+  .unit[data-u="2"] .uid { background: var(--u2); }
+  .unit[data-u="3"] .uid { background: var(--u3); }
+  .unit[data-u="4"] .uid { background: var(--u4); }
+  .unit-head h3 {
+    margin: 0; font-size: 15.5px; font-weight: 600; letter-spacing: -0.005em;
+  }
+  .unit-head .deps {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--fg-muted);
+    background: var(--surface-2);
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .unit-body { padding: 0; }
+  .unit-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 16px;
+    padding: 12px 18px;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .unit-row:last-child { border-bottom: none; }
+  .unit-row .label {
+    color: var(--fg-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .unit-row .body ul {
+    margin: 0; padding-left: 18px;
+  }
+  .unit-row .body li { margin: 3px 0; }
+  .files {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .files .file {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: ui-monospace, monospace;
+    font-size: 12.5px;
+  }
+  .files .file .tag {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent-fg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-family: -apple-system, sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    min-width: 50px;
+    text-align: center;
+  }
+  .files .file .tag.create { background: var(--ok-soft); color: var(--ok); }
+  .files .file .tag.modify { background: var(--warn-soft); color: var(--warn); }
+  .files .file .tag.test   { background: var(--u3-soft); color: var(--u3); }
+  .scenario-tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .scenario-tag.happy   { background: var(--ok-soft);     color: var(--ok); }
+  .scenario-tag.edge    { background: var(--warn-soft);   color: var(--warn); }
+  .scenario-tag.error   { background: var(--danger-soft); color: var(--danger); }
+  .scenario-tag.integ   { background: var(--u3-soft);     color: var(--u3); }
+
+  /* ---------- Decisions ---------- */
+  .decisions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 760px) { .decisions { grid-template-columns: 1fr; } }
+  .decision {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .decision .title {
+    font-weight: 600; margin: 0 0 6px; color: var(--fg);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px;
+  }
+  .decision .title .num {
+    width: 22px; height: 22px;
+    display: inline-grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 6px;
+    font-size: 12px; font-weight: 700; font-family: ui-monospace, monospace;
+  }
+  .decision p { margin: 0; color: var(--fg-muted); font-size: 13px; line-height: 1.6; }
+
+  /* ---------- Open questions ---------- */
+  .q-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 760px) { .q-split { grid-template-columns: 1fr; } }
+  .q-col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .q-col.resolved { border-left: 3px solid var(--ok); }
+  .q-col.deferred { border-left: 3px solid var(--warn); }
+  .q-col h4 {
+    margin: 0 0 12px; font-size: 13px; font-weight: 600;
+    color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .q-list { list-style: none; padding: 0; margin: 0; }
+  .q-list li {
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .q-list li:last-child { border-bottom: none; }
+  .q-list .q { color: var(--fg); font-weight: 500; margin-bottom: 3px; }
+  .q-list .a { color: var(--fg-muted); }
+
+  /* ---------- Risk table ---------- */
+  .risks {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .risks table { width: 100%; border-collapse: collapse; }
+  .risks th, .risks td {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  .risks tr:last-child td { border-bottom: none; }
+  .risks th {
+    background: var(--surface-2);
+    color: var(--fg-muted);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .risks td:first-child { width: 45%; color: var(--fg); }
+
+  /* ---------- Dep graph ---------- */
+  .dep-graph {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+  }
+  .dep-graph svg { display: block; width: 100%; height: auto; max-width: 760px; margin: 0 auto; }
+
+  /* ---------- Files manifest ---------- */
+  .file-list {
+    list-style: none; padding: 0; margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .file-list li {
+    display: grid;
+    grid-template-columns: 60px 1fr 100px;
+    gap: 12px;
+    padding: 10px 16px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+  }
+  .file-list li:last-child { border-bottom: none; }
+  .file-list .badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-align: center;
+    padding: 3px 0;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .file-list .badge.create { background: var(--ok-soft); color: var(--ok); }
+  .file-list .badge.modify { background: var(--warn-soft); color: var(--warn); }
+  .file-list .uref {
+    color: var(--fg-muted);
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    text-align: right;
+  }
+
+  /* ---------- CTA ---------- */
+  .cta {
+    margin-top: 32px;
+    padding: 24px;
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; align-items: center; gap: 18px;
+  }
+  @media (max-width: 600px) { .cta { flex-direction: column; align-items: flex-start; } }
+  .cta .arrow {
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    background: var(--accent); color: white;
+    border-radius: 50%; flex-shrink: 0;
+  }
+  .cta-text strong { display: block; font-size: 15px; margin-bottom: 4px; }
+  .cta-text span { color: var(--fg-muted); font-size: 13.5px; }
+
+  .ico { width: 16px; height: 16px; display: inline-block; vertical-align: -3px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      Plan · Standard scope · 4 units
+    </div>
+    <h1>HTML Preview in the Editor — Implementation Plan</h1>
+    <p class="lede">
+      Vier units. Eén nieuwe component (<code>HtmlPreview</code>), één state-owner
+      (<code>HtmlEditor</code>), één extensie-tabel update, één router-branch in
+      <code>EditorContainer</code>. Geen refactor van bestaande editors — alleen toevoegen.
+    </p>
+    <div class="meta-row">
+      <span class="pill">📅 <code>2026-05-21</code></span>
+      <span class="pill">🏷 <code>feat</code></span>
+      <span class="pill active">● active</span>
+      <span class="pill">🌿 <code>feat/render-html</code></span>
+      <span class="pill">📄 origin: <code>html-preview-editor-requirements.md</code></span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+<!-- ============ STATS ============ -->
+<div class="stats">
+  <div class="stat"><div class="num">4</div><div class="label">Implementation units</div></div>
+  <div class="stat"><div class="num">9</div><div class="label">Requirements traced</div></div>
+  <div class="stat"><div class="num">2</div><div class="label">Nieuwe files</div></div>
+  <div class="stat"><div class="num">2</div><div class="label">Bestaande files raken</div></div>
+  <div class="stat"><div class="num">5</div><div class="label">Risks</div></div>
+</div>
+
+<!-- ============ TOC ============ -->
+<nav class="toc" aria-label="Inhoudsopgave">
+  <a href="#problem"><span class="dot"></span> Problem Frame</a>
+  <a href="#req"><span class="dot"></span> Requirements</a>
+  <a href="#design"><span class="dot"></span> Technical Design</a>
+  <a href="#units"><span class="dot"></span> Implementation Units</a>
+  <a href="#decisions"><span class="dot"></span> Key Decisions</a>
+  <a href="#questions"><span class="dot"></span> Open Questions</a>
+  <a href="#files"><span class="dot"></span> Files Manifest</a>
+  <a href="#risks"><span class="dot"></span> Risks &amp; Impact</a>
+</nav>
+
+<!-- ============ PROBLEM FRAME ============ -->
+<section id="problem">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    </span>
+    <h2>Problem Frame</h2>
+  </div>
+  <p class="section-sub">
+    <code>.html</code> opent vandaag in Monaco als ruwe source. De Markdown-branch in
+    <code>src/components/Editor/EditorContainer.tsx</code> heeft het toggle-patroon
+    al uitgewerkt — Code/Eye-buttons die Monaco vervangen door Milkdown. We knippen
+    dat patroon, plakken het voor HTML.
+  </p>
+</section>
+
+<!-- ============ REQUIREMENTS ============ -->
+<section id="req">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </span>
+    <h2>Requirements Trace</h2>
+  </div>
+  <p class="section-sub">Negen requirements uit de origin doorgetrokken naar dit plan. Elke unit hieronder linkt expliciet terug.</p>
+  <div class="req-pill-grid">
+    <div class="req-item"><span class="rid">R1</span><span>Routing: <code>.html</code>/<code>.htm</code> krijgen Preview ⇄ Raw toggle</span></div>
+    <div class="req-item"><span class="rid">R2</span><span>Preview is default-mode; Raw via bestaand Monaco-pad</span></div>
+    <div class="req-item"><span class="rid">R3</span><span>Toggle per-tab, niet persistent across reopen</span></div>
+    <div class="req-item"><span class="rid">R4</span><span>Sandboxed iframe; scripts, CSS, fonts, images laden</span></div>
+    <div class="req-item"><span class="rid">R5</span><span>Relatieve paden resolven t.o.v. file-directory</span></div>
+    <div class="req-item"><span class="rid">R6</span><span>Iframe errors blijven binnen iframe — geen host crash</span></div>
+    <div class="req-item"><span class="rid">R7</span><span>Raw → Preview debounce ~300ms</span></div>
+    <div class="req-item"><span class="rid">R8</span><span>Ctrl+S triggert geen extra re-render</span></div>
+    <div class="req-item"><span class="rid">R9</span><span>Toggle naar Preview toont live buffer, niet disk</span></div>
+  </div>
+</section>
+
+<!-- ============ DESIGN ============ -->
+<section id="design">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v6a6 6 0 0 0 6 6h3"/></svg>
+    </span>
+    <h2>High-Level Technical Design</h2>
+  </div>
+  <p class="section-sub">Structuur op één blik. Volgorde: file-router → owner → preview-iframe.</p>
+
+  <div class="design-note">
+    <strong>Note:</strong> deze schets illustreert de richting voor review — geen implementatie-spec. Een implementing agent gebruikt het als context, niet als code-template.
+  </div>
+
+  <pre>EditorContainer  (file router)
+   │
+   ├─ .md           ──►  MarkdownEditor   (existing, unchanged)
+   │
+   ├─ .html | .htm  ──►  HtmlEditor       (NEW)
+   │                       │
+   │                       ├─ owns content (string)
+   │                       ├─ Raw     ──► Monaco (mounted always)
+   │                       └─ Preview ──► HtmlPreview (NEW)
+   │                                          │
+   │                                          └─ &lt;iframe sandbox="allow-scripts"
+   │                                                     srcdoc={withBaseHref(content, fileDir)} /&gt;
+   │
+   └─ *             ──►  CodeEditor      (existing, unchanged)
+
+   Monaco.onChange ──► setContent ──► debounce(300ms) ──► iframe.srcdoc</pre>
+</section>
+
+<!-- ============ DEP GRAPH ============ -->
+<section id="depgraph">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    </span>
+    <h2>Dependency graph</h2>
+  </div>
+  <p class="section-sub">U1 staat los; U3 hangt aan U2; U4 hangt aan U3.</p>
+
+  <div class="dep-graph">
+    <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--fg-muted)"/>
+        </marker>
+      </defs>
+      <g font-family="-apple-system, sans-serif" font-size="13">
+        <!-- U1 -->
+        <rect x="40"  y="40"  width="140" height="60" rx="10" fill="var(--u1-soft)" stroke="var(--u1)" stroke-width="1.5"/>
+        <text x="110" y="65" text-anchor="middle" fill="var(--fg)" font-weight="600">U1</text>
+        <text x="110" y="84" text-anchor="middle" fill="var(--fg-muted)" font-size="11">Register .htm</text>
+
+        <!-- U2 -->
+        <rect x="220" y="40"  width="140" height="60" rx="10" fill="var(--u2-soft)" stroke="var(--u2)" stroke-width="1.5"/>
+        <text x="290" y="65" text-anchor="middle" fill="var(--fg)" font-weight="600">U2</text>
+        <text x="290" y="84" text-anchor="middle" fill="var(--fg-muted)" font-size="11">HtmlPreview</text>
+
+        <!-- U3 -->
+        <rect x="400" y="40"  width="140" height="60" rx="10" fill="var(--u3-soft)" stroke="var(--u3)" stroke-width="1.5"/>
+        <text x="470" y="65" text-anchor="middle" fill="var(--fg)" font-weight="600">U3</text>
+        <text x="470" y="84" text-anchor="middle" fill="var(--fg-muted)" font-size="11">HtmlEditor</text>
+
+        <!-- U4 -->
+        <rect x="580" y="40"  width="140" height="60" rx="10" fill="var(--u4-soft)" stroke="var(--u4)" stroke-width="1.5"/>
+        <text x="650" y="65" text-anchor="middle" fill="var(--fg)" font-weight="600">U4</text>
+        <text x="650" y="84" text-anchor="middle" fill="var(--fg-muted)" font-size="11">EditorContainer</text>
+
+        <!-- arrows -->
+        <line x1="360" y1="70" x2="400" y2="70" stroke="var(--fg-muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="540" y1="70" x2="580" y2="70" stroke="var(--fg-muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- U1 standalone label -->
+        <text x="110" y="125" text-anchor="middle" fill="var(--fg-dim)" font-size="10.5">parallel — geen dep</text>
+        <text x="290" y="125" text-anchor="middle" fill="var(--fg-dim)" font-size="10.5">pure component</text>
+        <text x="470" y="125" text-anchor="middle" fill="var(--fg-dim)" font-size="10.5">needs U2</text>
+        <text x="650" y="125" text-anchor="middle" fill="var(--fg-dim)" font-size="10.5">needs U3</text>
+
+        <!-- requirements row -->
+        <text x="110" y="170" text-anchor="middle" fill="var(--fg-muted)" font-size="11">R1</text>
+        <text x="290" y="170" text-anchor="middle" fill="var(--fg-muted)" font-size="11">R4 · R5 · R6</text>
+        <text x="470" y="170" text-anchor="middle" fill="var(--fg-muted)" font-size="11">R2 · R3 · R6–R9</text>
+        <text x="650" y="170" text-anchor="middle" fill="var(--fg-muted)" font-size="11">R1 · R2 · R3</text>
+
+        <text x="380" y="200" text-anchor="middle" fill="var(--fg-dim)" font-size="11">Volgorde: U1 ⊥ U2 (parallel) → U3 → U4</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- ============ UNITS ============ -->
+<section id="units">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </span>
+    <h2>Implementation Units</h2>
+  </div>
+  <p class="section-sub">Vier eenheden, dependency-ordered. Elk is een commit-grootte stuk werk.</p>
+
+  <div class="timeline">
+
+    <!-- ===== U1 ===== -->
+    <article class="unit" data-u="1">
+      <div class="unit-head">
+        <span class="uid">U1</span>
+        <h3>Register <code>.htm</code> as an editable file type</h3>
+        <span class="deps">deps: none</span>
+      </div>
+      <div class="unit-body">
+        <div class="unit-row"><span class="label">Goal</span><div class="body">Zonder dit opent <code>.htm</code> niet eens als editor-tab; de router in U4 ziet zo'n bestand nooit langskomen.</div></div>
+        <div class="unit-row"><span class="label">Reqs</span><div class="body">R1</div></div>
+        <div class="unit-row"><span class="label">Files</span>
+          <div class="body files">
+            <span class="file"><span class="tag modify">modify</span><code>src/utils/editorLanguages.ts</code></span>
+            <span class="file"><span class="tag test">test</span><code>test/editorLanguages.test.ts</code> <em>(create if missing)</em></span>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Approach</span><div class="body">Eén regel toevoegen aan <code>EXT_TO_LANGUAGE</code>: <code>htm: 'html'</code>.</div></div>
+        <div class="unit-row"><span class="label">Test scenarios</span>
+          <div class="body">
+            <ul>
+              <li><span class="scenario-tag happy">Happy</span><code>isEditableFile('index.htm', 'htm')</code> → <code>true</code></li>
+              <li><span class="scenario-tag happy">Happy</span><code>getMonacoLanguage('foo/bar.htm')</code> → <code>'html'</code></li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Verification</span><div class="body">Een <code>.htm</code> uit de file explorer opent als editor-tab i.p.v. binary/unknown.</div></div>
+      </div>
+    </article>
+
+    <!-- ===== U2 ===== -->
+    <article class="unit" data-u="2">
+      <div class="unit-head">
+        <span class="uid">U2</span>
+        <h3><code>HtmlPreview</code> — sandboxed iframe wrapper</h3>
+        <span class="deps">deps: none</span>
+      </div>
+      <div class="unit-body">
+        <div class="unit-row"><span class="label">Goal</span><div class="body">Pure presentational: krijgt content + file-directory, rendert sandboxed iframe met geïnjecteerde <code>&lt;base href&gt;</code>. Geen file-IO, geen debounce.</div></div>
+        <div class="unit-row"><span class="label">Reqs</span><div class="body">R4 · R5 · R6</div></div>
+        <div class="unit-row"><span class="label">Files</span>
+          <div class="body files">
+            <span class="file"><span class="tag create">create</span><code>src/components/Editor/HtmlPreview.tsx</code></span>
+            <span class="file"><span class="tag test">test</span><code>test/HtmlPreview.test.tsx</code></span>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Approach</span>
+          <div class="body">
+            <ul>
+              <li>Props: <code>{ content: string; fileDir: string }</code></li>
+              <li>Injecteer <code>&lt;base href="file:///{fileDir}/"&gt;</code> aan het begin van <code>&lt;head&gt;</code> (prepend als head ontbreekt)</li>
+              <li><code>&lt;iframe sandbox="allow-scripts" srcdoc={injected} /&gt;</code></li>
+              <li>Smoke-test tijdens implementatie: laadt <code>&lt;img src="./foo.png"&gt;</code> daadwerkelijk? Zo niet → zie Deferred questions vóór scope uitbreiden.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Test scenarios</span>
+          <div class="body">
+            <ul>
+              <li><span class="scenario-tag happy">Happy</span>Content met <code>&lt;h1&gt;</code> levert iframe waarvan srcdoc <code>&lt;h1&gt;</code> bevat (assert op prop, niet op iframe-DOM)</li>
+              <li><span class="scenario-tag edge">Edge</span>Empty content → iframe met empty srcdoc, geen crash</li>
+              <li><span class="scenario-tag edge">Edge</span>Content zonder <code>&lt;head&gt;</code> → base href wordt prepended</li>
+              <li><span class="scenario-tag edge">Edge</span>Content met bestaande <code>&lt;base&gt;</code> → onze prepend wordt door eigen base overschreven (declaration-order). Documenteer in code-comment.</li>
+              <li><span class="scenario-tag error">Error</span>Invalid HTML → iframe rendert wat het kan, geen host-side throw</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Verification</span><div class="body">Iframe rendert met de gedocumenteerde <code>sandbox</code>/<code>srcdoc</code> attributen. Standalone harness bevestigt dat relatieve assets resolven.</div></div>
+      </div>
+    </article>
+
+    <!-- ===== U3 ===== -->
+    <article class="unit" data-u="3">
+      <div class="unit-head">
+        <span class="uid">U3</span>
+        <h3><code>HtmlEditor</code> — state owner met Raw + Preview</h3>
+        <span class="deps">deps: U2</span>
+      </div>
+      <div class="unit-body">
+        <div class="unit-row"><span class="label">Goal</span><div class="body">Eigenaar van de content-buffer voor een HTML-tab. Laadt file, watcher, dirty, Ctrl+S, debounce, beide panes mounted (CSS hide).</div></div>
+        <div class="unit-row"><span class="label">Reqs</span><div class="body">R2 · R3 · R6 · R7 · R8 · R9</div></div>
+        <div class="unit-row"><span class="label">Files</span>
+          <div class="body files">
+            <span class="file"><span class="tag create">create</span><code>src/components/Editor/HtmlEditor.tsx</code></span>
+            <span class="file"><span class="tag test">test</span><code>test/HtmlEditor.test.tsx</code></span>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Approach</span>
+          <div class="body">
+            <ul>
+              <li>Spiegel <code>MarkdownEditor</code>'s lifecycle: <code>api.fs.readFile</code>, <code>fileWatcherEvents</code> subscribe, <code>savedContentRef</code>/<code>currentContentRef</code>, Ctrl+S + <code>editor-save-request</code>, dirty in projectStore.</li>
+              <li>Interne state: <code>mode</code> (default <code>'preview'</code>), <code>content</code>, <code>debouncedContent</code>.</li>
+              <li>Mount Monaco direct via <code>@monaco-editor/react</code> — niet via <code>CodeEditor.tsx</code> embedden.</li>
+              <li>Beide panes mounted; <code>display</code> schakelt — preserves Monaco undo-history.</li>
+              <li>Save schrijft live buffer; debounce-timer ongemoeid → R8.</li>
+              <li>File-watcher: externe edit → reload <code>content</code> + <code>debouncedContent</code> tegelijk.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Execution note</span><div class="body">Bouw Raw + load/save/watch eerst. Voeg debounce + Preview pas toe als Monaco's <code>onChange</code> in deze context bevestigd is.</div></div>
+        <div class="unit-row"><span class="label">Test scenarios</span>
+          <div class="body">
+            <ul>
+              <li><span class="scenario-tag happy">Happy</span>Typen in Raw → <code>debouncedContent</code> update na 300ms, niet eerder</li>
+              <li><span class="scenario-tag happy">Happy</span>Raw → Preview toont live buffer incl. unsaved edits (R9)</li>
+              <li><span class="scenario-tag edge">Edge</span>Ctrl+S schrijft buffer; preview srcdoc verandert NIET tussen laatste debounce-flush en save (R8)</li>
+              <li><span class="scenario-tag edge">Edge</span>External edit (watcher) refresht <code>content</code> én <code>debouncedContent</code> samen, dirty=false</li>
+              <li><span class="scenario-tag edge">Edge</span>20 keystrokes in 200ms → één debounced update</li>
+              <li><span class="scenario-tag error">Error</span>File-read fail → zelfde error UI als Markdown/Code editor</li>
+              <li><span class="scenario-tag integ">Integ</span>Dirty flag in projectStore flipt true → false bij save (mirror bestaande editors)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Verification</span><div class="body">.html opent → preview → switch Raw → edit → preview update ~300ms → Ctrl+S → dirty-indicator clear.</div></div>
+      </div>
+    </article>
+
+    <!-- ===== U4 ===== -->
+    <article class="unit" data-u="4">
+      <div class="unit-head">
+        <span class="uid">U4</span>
+        <h3><code>EditorContainer</code> routing for <code>.html</code>/<code>.htm</code></h3>
+        <span class="deps">deps: U3</span>
+      </div>
+      <div class="unit-body">
+        <div class="unit-row"><span class="label">Goal</span><div class="body">Derde branch in <code>EditorContainer.tsx</code> — Code/Eye toggle bar + <code>HtmlEditor</code> voor HTML-files.</div></div>
+        <div class="unit-row"><span class="label">Reqs</span><div class="body">R1 · R2 · R3</div></div>
+        <div class="unit-row"><span class="label">Files</span>
+          <div class="body files">
+            <span class="file"><span class="tag modify">modify</span><code>src/components/Editor/EditorContainer.tsx</code></span>
+            <span class="file"><span class="tag test">test</span><code>test/EditorContainer.test.tsx</code> <em>(create if missing)</em></span>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Approach</span>
+          <div class="body">
+            <ul>
+              <li><code>const isHtml = filePath.toLowerCase().endsWith('.html') || …'.htm'</code></li>
+              <li>Branch naast <code>isMarkdown</code>; predicates zijn disjoint dus volgorde maakt niet uit</li>
+              <li>Toggle-JSX 1:1 kopiëren, <code>useWysiwyg</code> → <code>usePreview</code>, default <code>true</code></li>
+              <li>Lazy import voor consistente bundle-shape, ook al is HtmlEditor lichter dan Milkdown</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Test scenarios</span>
+          <div class="body">
+            <ul>
+              <li><span class="scenario-tag happy">Happy</span><code>filePath="index.html"</code> → toggle bar + HtmlEditor in Preview-mode</li>
+              <li><span class="scenario-tag happy">Happy</span><code>filePath="index.htm"</code> → idem</li>
+              <li><span class="scenario-tag happy">Happy</span>Code-button click → Raw, Eye-button click → Preview</li>
+              <li><span class="scenario-tag edge">Edge</span><code>"index.HTML"</code> (uppercase) routes nog steeds naar HTML-branch</li>
+              <li><span class="scenario-tag edge">Edge</span><code>"readme.md"</code> blijft naar MarkdownEditor (geen regressie)</li>
+              <li><span class="scenario-tag edge">Edge</span><code>"config.json"</code> blijft naar CodeEditor (geen regressie)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Verification</span><div class="body">.html opent met toggle-bar, Preview default. .md en .json gedragen zich byte-identiek aan vandaag.</div></div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ============ DECISIONS ============ -->
+<section id="decisions">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </span>
+    <h2>Key Technical Decisions</h2>
+  </div>
+  <p class="section-sub">Zes keuzes met de rationale erachter — reviewer hoeft ze niet opnieuw te maken.</p>
+
+  <div class="decisions">
+    <div class="decision">
+      <p class="title"><span class="num">1</span> Nieuwe <code>HtmlEditor</code>, geen refactor van <code>CodeEditor</code></p>
+      <p>Geen blast radius op andere extensies; matcht <code>MarkdownEditor</code>'s pattern (ook eigen owner). Kost wat dupe-lifecycle, levert nul risico op bestaande paden.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">2</span> <code>srcdoc</code> + base href, niet <code>src="file://"</code></p>
+      <p>srcdoc kan de live buffer renderen (R9); <code>src=</code> kan dat niet. Base href dekt R5. Risico: Electron security flags — eerste smoke-test in U2.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">3</span> Sandbox: alleen <code>allow-scripts</code></p>
+      <p>Minimum voor script-execution (R4). <code>allow-same-origin</code> bewust uit — null-origin permitteert assets via base href maar blokkeert cookie/storage access. <code>allow-top-navigation</code> uit — geen browser-jacks.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">4</span> Debounce in component, geen shared util</p>
+      <p>300ms timer op Monaco's <code>onChange</code>. Niemand anders heeft dezelfde need; geen reden om dit als shared hook te abstraheren.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">5</span> Preview-first default, niet user-persisted</p>
+      <p>Match met Markdown WYSIWYG-default. Last-used-mode persistence is een follow-up als gebruikers erom vragen.</p>
+    </div>
+    <div class="decision">
+      <p class="title"><span class="num">6</span> <code>.htm</code> mee in <code>EXT_TO_LANGUAGE</code></p>
+      <p>Beide zijn real-world HTML. Eén tabel-entry. Zero risk.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ QUESTIONS ============ -->
+<section id="questions">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </span>
+    <h2>Open Questions</h2>
+  </div>
+  <p class="section-sub">Wat is hier opgelost; wat moet de implementing agent ontdekken.</p>
+
+  <div class="q-split">
+    <div class="q-col resolved">
+      <h4>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Resolved tijdens planning
+      </h4>
+      <ul class="q-list">
+        <li>
+          <div class="q">Moet de markdown-branch een <code>kind</code>-enum worden?</div>
+          <div class="a">Nee. Component is ~95 lines; derde branch kost ~15 lines. Switch-refactor is churn zonder simplificatie.</div>
+        </li>
+        <li>
+          <div class="q">Moet <code>CodeEditor</code> controllable worden om de Monaco-instance te delen met de preview?</div>
+          <div class="a">Nee. <code>HtmlEditor</code> mount eigen Monaco direct. Duplication is contained en voorspelbaar.</div>
+        </li>
+      </ul>
+    </div>
+    <div class="q-col deferred">
+      <h4>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Deferred naar implementatie
+      </h4>
+      <ul class="q-list">
+        <li>
+          <div class="q">Werkt <code>srcdoc</code> + <code>&lt;base href="file://"&gt;</code> onder Electron's default <code>webSecurity: true</code>?</div>
+          <div class="a">Test in U2 wire-up. Fallback bij blokkade: (a) Electron protocol-handler die file-dir served, of (b) inline-resolve assets als data-URLs. Beide zwaarder — alleen invoeren als simpel pad faalt.</div>
+        </li>
+        <li>
+          <div class="q">Gedraagt dev (Vite localhost) zich anders dan production (<code>file://</code>)?</div>
+          <div class="a">Beide testen in U2/U3. Als dev breekt maar prod werkt: documenteer de dev-limitatie i.p.v. extra infrastructure bouwen.</div>
+        </li>
+        <li>
+          <div class="q">Iframe <code>key={debouncedContent}</code> voor remount, of <code>srcdoc</code> in-place updaten?</div>
+          <div class="a">Eerst srcdoc-mutation. Bij script-misgedrag op update → switch naar remount. Eén regel verschil.</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FILES ============ -->
+<section id="files">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </span>
+    <h2>Files Manifest</h2>
+  </div>
+  <p class="section-sub">Twee nieuwe components, twee bestaande files raken. Geen migraties, geen IPC-changes.</p>
+
+  <ul class="file-list">
+    <li><span class="badge create">create</span><span>src/components/Editor/HtmlPreview.tsx</span><span class="uref">U2</span></li>
+    <li><span class="badge create">create</span><span>src/components/Editor/HtmlEditor.tsx</span><span class="uref">U3</span></li>
+    <li><span class="badge modify">modify</span><span>src/components/Editor/EditorContainer.tsx</span><span class="uref">U4</span></li>
+    <li><span class="badge modify">modify</span><span>src/utils/editorLanguages.ts</span><span class="uref">U1</span></li>
+    <li><span class="badge create">test</span><span>test/HtmlPreview.test.tsx</span><span class="uref">U2</span></li>
+    <li><span class="badge create">test</span><span>test/HtmlEditor.test.tsx</span><span class="uref">U3</span></li>
+    <li><span class="badge create">test</span><span>test/editorLanguages.test.ts</span><span class="uref">U1</span></li>
+    <li><span class="badge create">test</span><span>test/EditorContainer.test.tsx</span><span class="uref">U4</span></li>
+  </ul>
+</section>
+
+<!-- ============ RISKS ============ -->
+<section id="risks">
+  <div class="section-head">
+    <span class="badge">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </span>
+    <h2>Risks &amp; Mitigations</h2>
+  </div>
+  <p class="section-sub">Wat kan fout gaan; wat is het plan.</p>
+
+  <div class="risks">
+    <table>
+      <thead>
+        <tr><th>Risk</th><th>Mitigation</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>srcdoc</code> + <code>file://</code> base geblokkeerd door Electron <code>webSecurity</code></td>
+          <td>U2-wire-up test dit eerst. Fallbacks (protocol-handler, data-URL inlining) gedocumenteerd. Geen investering vóór bevestigde blokkade.</td>
+        </tr>
+        <tr>
+          <td>Vite dev-server gedraagt zich anders dan production <code>file://</code></td>
+          <td>Beide environments testen in U2/U3. Dev-limitatie documenteren i.p.v. dev-only infrastructure bouwen.</td>
+        </tr>
+        <tr>
+          <td>Vijandige HTML in workspace runt JS in preview</td>
+          <td>Geaccepteerd. Zelfde threat model als <code>npm install</code> en terminal-commands die de app al draait. Geen mitigatie in v1.</td>
+        </tr>
+        <tr>
+          <td>Zware/looping JS bevriest preview-iframe</td>
+          <td>Renderer-proces is niet de iframe; toggle naar Raw werkt nog. Geen timeout-kill in v1.</td>
+        </tr>
+        <tr>
+          <td>Bundle size groeit door nieuw editor-module</td>
+          <td>Verwaarloosbaar — Monaco + React zijn al geladen; alleen ~200 lines nieuwe component-code.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<div class="cta">
+  <div class="arrow">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+  </div>
+  <div class="cta-text">
+    <strong>Next → <code>/ce-work</code></strong>
+    <span>Klaar voor implementatie. Begin met U1 (parallel met U2 als je twee branches wil), dan U3, dan U4.</span>
+  </div>
+</div>
+
+</main>
+
+</body>
+</html>

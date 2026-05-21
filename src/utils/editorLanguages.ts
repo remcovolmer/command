@@ -9,6 +9,7 @@ export const EXT_TO_LANGUAGE: Record<string, string> = {
   css: 'css',
   scss: 'scss',
   html: 'html',
+  htm: 'html',
   xml: 'xml',
   yaml: 'yaml',
   yml: 'yaml',
