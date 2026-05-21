@@ -361,3 +361,106 @@ describe('TerminalManager writeToTerminal Claude terminal integration', () => {
     expect(mockWrite.mock.calls.length).toBeGreaterThan(1)
   })
 })
+
+describe('TerminalManager auto-naming: ANSI stripping', () => {
+  let manager: TerminalManager
+  const mockWindow = {
+    isDestroyed: vi.fn(() => false),
+    webContents: { send: vi.fn() },
+  } as any
+
+  // Helper: return the title arg from the last terminal:title call for `id`, or null
+  function lastTitleFor(id: string): string | null {
+    const calls = mockWindow.webContents.send.mock.calls as unknown[][]
+    for (let i = calls.length - 1; i >= 0; i--) {
+      const call = calls[i]
+      if (call[0] === 'terminal:title' && call[1] === id) return call[2] as string
+    }
+    return null
+  }
+
+  async function createClaudeTerminal(opts: { initialTitle?: string } = {}): Promise<string> {
+    vi.useFakeTimers()
+    const id = manager.createTerminal({ cwd: '/test', claudeMode: 'chat', ...opts })
+    await vi.runAllTimersAsync()
+    vi.useRealTimers()
+    // Clear setup events so assertions only see what the test itself produces
+    mockWindow.webContents.send.mockClear()
+    mockWrite.mockClear()
+    return id
+  }
+
+  beforeEach(() => {
+    mockWrite.mockClear()
+    mockWindow.webContents.send.mockClear()
+    manager = new TerminalManager(mockWindow)
+  })
+
+  test('plain text input produces a clean, capitalized title (regression guard)', async () => {
+    const id = await createClaudeTerminal()
+    // xterm delivers typed characters as separate PTY events; Enter arrives on its own.
+    await manager.writeToTerminal(id, 'refactor terminal pool')
+    await manager.writeToTerminal(id, '\r')
+    expect(lastTitleFor(id)).toBe('Refactor terminal pool')
+  })
+
+  test('SGR mouse-tracking reports never reach the title buffer', async () => {
+    const id = await createClaudeTerminal()
+    // Mouse events arrive before the user types, then the actual prompt, then Enter.
+    const mouseNoise = '\x1b[<35;103;14M\x1b[<35;100;15M\x1b[<0;96;16M'
+    await manager.writeToTerminal(id, mouseNoise)
+    await manager.writeToTerminal(id, 'hello world')
+    await manager.writeToTerminal(id, '\r')
+    expect(lastTitleFor(id)).toBe('Hello world')
+  })
+
+  test('mouse-tracking reports interleaved with typing still produce a clean title', async () => {
+    const id = await createClaudeTerminal()
+    // xterm may deliver mouse bytes in the same data callback as typed characters.
+    await manager.writeToTerminal(id, 'fix \x1b[<32;50;20Mbug\x1b[<35;60;20m in parser')
+    await manager.writeToTerminal(id, '\r')
+    expect(lastTitleFor(id)).toBe('Fix bug in parser')
+  })
+
+  test('SS3 arrow-key sequences are stripped entirely, including the final byte', async () => {
+    const id = await createClaudeTerminal()
+    // Application-mode arrow keys: ESC O A/B/C/D. All three bytes must go,
+    // otherwise a stray 'A'/'B' would leak into the title.
+    await manager.writeToTerminal(id, '\x1bOA\x1bOB')
+    await manager.writeToTerminal(id, 'deploy')
+    await manager.writeToTerminal(id, '\r')
+    expect(lastTitleFor(id)).toBe('Deploy')
+  })
+
+  test('OSC sequences (ESC ] … BEL) are stripped; only trailing text becomes the title', async () => {
+    const id = await createClaudeTerminal()
+    // PTY stdin rarely carries OSC, but we strip it as cheap insurance.
+    await manager.writeToTerminal(id, '\x1b]0;ignored window title\x07task name')
+    await manager.writeToTerminal(id, '\r')
+    expect(lastTitleFor(id)).toBe('Task name')
+  })
+
+  test('bracketed-paste markers are stripped — only the pasted text forms the title', async () => {
+    const id = await createClaudeTerminal()
+    await manager.writeToTerminal(id, '\x1b[200~investigate flaky test\x1b[201~')
+    await manager.writeToTerminal(id, '\r')
+    expect(lastTitleFor(id)).toBe('Investigate flaky test')
+  })
+
+  test('noise-only input (mouse events, no real text) does not set a title', async () => {
+    const id = await createClaudeTerminal()
+    await manager.writeToTerminal(id, '\x1b[<35;103;14M\x1b[<35;100;15M\r')
+    expect(lastTitleFor(id)).toBeNull()
+  })
+
+  test('already-titled terminals ignore mouse noise (no retitle)', async () => {
+    const id = await createClaudeTerminal({ initialTitle: 'Seeded' })
+    // Untitled-gate at writeToTerminal short-circuits; mouse bytes should never
+    // trigger a new terminal:title event.
+    await manager.writeToTerminal(id, '\x1b[<35;103;14M\x1b[<35;100;15Mfoo\r')
+    const titles = (mockWindow.webContents.send.mock.calls as unknown[][])
+      .filter((c) => c[0] === 'terminal:title' && c[1] === id)
+      .map((c) => c[2])
+    expect(titles).toEqual([])
+  })
+})

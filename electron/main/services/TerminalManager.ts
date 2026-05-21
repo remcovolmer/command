@@ -350,8 +350,20 @@ export class TerminalManager {
       return
     }
 
-    // Strip ANSI escape sequences and control characters, only buffer printable text
-    const cleaned = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/[\x00-\x1f\x7f]/g, '')
+    // Strip ANSI escape sequences before buffering. PTY stdin can carry mouse-tracking
+    // reports (SGR: ESC [ < Pb ; Px ; Py M/m), SS2/SS3 arrow keys, and (rarely) OSC —
+    // none of which belong in a chat title. The previous narrow CSI regex missed
+    // private-marker sequences like \x1b[<…M, leaving "[<35;103;14M…" in the title buffer.
+    //   - CSI: ESC '[' (private marker 0x3C-0x3F)? (params 0x30-0x3F)* (intermediates 0x20-0x2F)* final (0x40-0x7E)
+    //   - SS2/SS3: ESC N|O + one byte (xterm application-mode arrow keys use SS3)
+    //   - OSC: ESC ']' … terminated by BEL (0x07) or ST (ESC \) — cheap insurance
+    // A trailing pass removes any lone control bytes (stray ESC, \x7f not caught by
+    // the backspace branch above, etc.) that weren't part of a recognized sequence.
+    const cleaned = data
+      .replace(/\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]/g, '')
+      .replace(/\x1b[NO][\x20-\x7e]/g, '')
+      .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+      .replace(/[\x00-\x1f\x7f]/g, '')
     if (cleaned) {
       const buffer = this.terminalInputBuffers.get(terminalId) || ''
       this.terminalInputBuffers.set(terminalId, buffer + cleaned)
