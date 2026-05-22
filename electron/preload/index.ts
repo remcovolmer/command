@@ -252,6 +252,29 @@ interface UpdateErrorInfo {
 // Unsubscribe function type
 type Unsubscribe = () => void
 
+// NOTE: SessionIndexEntry duplicated here due to Electron process isolation.
+// Keep in sync with src/types/index.ts and electron/main/services/SessionIndexService.ts.
+interface SessionIndexEntry {
+  sessionId: string
+  summary: string
+  firstPrompt: string
+  messageCount: number
+  gitBranch: string
+  modified: string
+  created: string
+  projectPath: string
+  isSidechain: boolean
+  filesModified: string[]
+  filesRead: string[]
+  toolCounts: Record<string, number>
+  errorCount: number
+  durationMs: number
+  assistantMessageCount: number
+  generatedTitle?: string
+  generatedSummary?: string
+  worktreeName?: string
+}
+
 // Expose secure API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
@@ -341,7 +364,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Session index operations (for project overview)
   sessionIndex: {
-    getForProject: (projectPath: string): Promise<Array<{ sessionId: string; summary: string; firstPrompt: string; messageCount: number; gitBranch: string; modified: string; created: string; projectPath: string; isSidechain: boolean }>> =>
+    getForProject: (projectPath: string): Promise<SessionIndexEntry[]> =>
       ipcRenderer.invoke('session-index:getForProject', projectPath),
   },
 

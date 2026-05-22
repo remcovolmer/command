@@ -522,12 +522,17 @@ describe('SessionIndexService', () => {
       expect(service.getSessionSummary('cmd')?.firstPrompt).toBe('command work')
     })
 
-    test('matches all three worktree suffix patterns', async () => {
+    test('matches the two anchored worktree suffix patterns', async () => {
+      // Only `--worktrees-` (from `.worktrees/`) and `--claude-worktrees-`
+      // (from `.claude/worktrees/`) are recognised — both anchored by `--`,
+      // which Claude's encoding produces from `/.`. A bare `-worktrees-`
+      // pattern was intentionally dropped because it collides with sibling
+      // projects literally named `<X>-worktrees-<Y>` (see the false-positive
+      // regression test below).
       setupMultiDirJsonlFiles({
         encodedKey: 'C--Users-test-proj',
         dirs: [
           {
-            // dotted: <proj>/.worktrees/...  -> `--worktrees-`
             dirName: 'C--Users-test-proj--worktrees-dotted',
             files: [{
               name: 'a.jsonl',
@@ -536,16 +541,6 @@ describe('SessionIndexService', () => {
             }],
           },
           {
-            // plain: <proj>/worktrees/...  -> `-worktrees-`
-            dirName: 'C--Users-test-proj-worktrees-plain',
-            files: [{
-              name: 'b.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'b' }),
-            }],
-          },
-          {
-            // Claude Code-managed: <proj>/.claude/worktrees/...  -> `--claude-worktrees-`
             dirName: 'C--Users-test-proj--claude-worktrees-managed',
             files: [{
               name: 'c.jsonl',
@@ -560,8 +555,64 @@ describe('SessionIndexService', () => {
 
       const recent = service.getRecentSessions()
       expect(recent.find(e => e.sessionId === 'a')?.worktreeName).toBe('dotted')
-      expect(recent.find(e => e.sessionId === 'b')?.worktreeName).toBe('plain')
       expect(recent.find(e => e.sessionId === 'c')?.worktreeName).toBe('managed')
+    })
+
+    test('does NOT misclassify sibling project literally named `<X>-worktrees-<Y>`', async () => {
+      // Regression guard: a sibling project at literal disk path
+      // `C:\Users\test\command-worktrees-bar` encodes to
+      // `C--Users-test-command-worktrees-bar`. The encoded form is
+      // indistinguishable from a worktree of `command` under a bare
+      // `worktrees/` subdir, so we no longer match that shape — the sibling
+      // project must not contribute sessions to `command`'s overview.
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-command',
+        dirs: [
+          {
+            dirName: 'C--Users-test-command',
+            files: [{
+              name: 'cmd.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'cmd', firstPrompt: 'command work' }),
+            }],
+          },
+        ],
+        extraProjectsRootDirs: [
+          'C--Users-test-command-worktrees-bar', // sibling project, NOT a worktree
+        ],
+      })
+
+      await service.loadForProject('C:\\Users\\test\\command')
+
+      expect(service.getRecentSessions()).toHaveLength(1)
+      expect(service.getSessionSummary('cmd')?.firstPrompt).toBe('command work')
+    })
+
+    test('rejects worktree dir whose name is only dash artefacts', async () => {
+      // A worktree literally named `.` or `_` encodes its suffix to `-`,
+      // which would render a meaningless `Worktree: -` badge. The classifier
+      // skips these.
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-proj',
+        dirs: [
+          {
+            dirName: 'C--Users-test-proj',
+            files: [{
+              name: 'root.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'root' }),
+            }],
+          },
+        ],
+        extraProjectsRootDirs: [
+          'C--Users-test-proj--worktrees--',   // worktree name == '-'
+          'C--Users-test-proj--worktrees---',  // worktree name == '--'
+        ],
+      })
+
+      await service.loadForProject('C:\\Users\\test\\proj')
+
+      expect(service.getRecentSessions()).toHaveLength(1)
     })
 
     test('returns no sessions when root and worktree dirs are all empty', async () => {
