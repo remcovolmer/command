@@ -102,6 +102,32 @@ describe('encodeProjectPath', () => {
   test('strips leading hyphen after encoding', () => {
     expect(encodeProjectPath('/root')).toBe('root')
   })
+
+  test('replaces underscores with dashes (matches Claude Code)', () => {
+    // Claude Code's dir naming on disk is `C--Users-X-Code-pascal-ai` for
+    // `C:\Users\X\Code\pascal_ai` — the underscore becomes a dash.
+    expect(encodeProjectPath('C:\\Users\\test\\Code\\pascal_ai')).toBe('C--Users-test-Code-pascal-ai')
+  })
+
+  test('replaces dots with dashes (matches Claude Code)', () => {
+    // `.claude` directory becomes `--claude` (preceded by the `\` -> `-` from
+    // the path separator, then `.` -> `-`).
+    expect(encodeProjectPath('C:\\Users\\test\\.claude')).toBe('C--Users-test--claude')
+  })
+
+  test('preserves existing dashes', () => {
+    expect(encodeProjectPath('C:\\Users\\test\\my-project')).toBe('C--Users-test-my-project')
+  })
+
+  test('encodes path with .worktrees subdirectory', () => {
+    expect(encodeProjectPath('C:\\Users\\test\\command\\.worktrees\\fix-x'))
+      .toBe('C--Users-test-command--worktrees-fix-x')
+  })
+
+  test('encodes path with spaces', () => {
+    expect(encodeProjectPath('C:\\Users\\test\\my project'))
+      .toBe('C--Users-test-my-project')
+  })
 })
 
 describe('SessionIndexService', () => {
@@ -114,14 +140,53 @@ describe('SessionIndexService', () => {
     service = new SessionIndexService(mockWindow as import('electron').BrowserWindow)
   })
 
-  /** Set up mock filesystem with JSONL files */
-  function setupJsonlFiles(files: Array<{ name: string; mtimeMs: number; lines: Record<string, unknown>[] }>) {
+  /**
+   * Set up mock filesystem with JSONL files for a single project dir (no worktrees).
+   * Mocks: 1st readdir = projects root (one matching dir), 2nd readdir = the dir's jsonls.
+   */
+  function setupJsonlFiles(
+    files: Array<{ name: string; mtimeMs: number; lines: Record<string, unknown>[] }>,
+    opts?: { encodedProjectDir?: string }
+  ) {
+    const projectDir = opts?.encodedProjectDir ?? 'C--Users-test-project'
+    // 1st readdir: projects root contains just this project dir
+    mockReaddir.mockResolvedValueOnce([projectDir] as never)
+    // 2nd readdir: list jsonls in the project dir
     mockReaddir.mockResolvedValueOnce(files.map(f => f.name) as never)
     for (const f of files) {
       mockStat.mockResolvedValueOnce({ mtimeMs: f.mtimeMs } as never)
     }
     for (const f of files) {
       mockJsonlFile(f.lines)
+    }
+  }
+
+  /**
+   * Set up mock filesystem with files split across the root project dir and
+   * one or more worktree dirs. Used to test worktree aggregation.
+   */
+  function setupMultiDirJsonlFiles(args: {
+    encodedKey: string
+    dirs: Array<{
+      dirName: string
+      files: Array<{ name: string; mtimeMs: number; lines: Record<string, unknown>[] }>
+    }>
+    extraProjectsRootDirs?: string[] // dirs in projects root that should NOT match
+  }) {
+    const projectRootListing = [
+      ...args.dirs.map(d => d.dirName),
+      ...(args.extraProjectsRootDirs ?? []),
+    ]
+    mockReaddir.mockResolvedValueOnce(projectRootListing as never)
+    // For each matching dir, a readdir + stats + jsonl mocks
+    for (const dir of args.dirs) {
+      mockReaddir.mockResolvedValueOnce(dir.files.map(f => f.name) as never)
+      for (const f of dir.files) {
+        mockStat.mockResolvedValueOnce({ mtimeMs: f.mtimeMs } as never)
+      }
+      for (const f of dir.files) {
+        mockJsonlFile(f.lines)
+      }
     }
   }
 
@@ -355,6 +420,183 @@ describe('SessionIndexService', () => {
       await service.loadForProject('C:\\Users\\test\\project')
 
       expect(service.getSessionSummary('session-1')?.firstPrompt).toBe('before after')
+    })
+  })
+
+  describe('worktree aggregation', () => {
+    test('aggregates sessions from root and worktree dirs into one cache', async () => {
+      const projectPath = 'C:\\Users\\test\\command'
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-command',
+        dirs: [
+          {
+            dirName: 'C--Users-test-command',
+            files: [{
+              name: 'root-session.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'root-session', firstPrompt: 'Root work' }),
+            }],
+          },
+          {
+            dirName: 'C--Users-test-command--worktrees-feat-x',
+            files: [{
+              name: 'wt-x-session.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'wt-x-session', firstPrompt: 'Feature x' }),
+            }],
+          },
+          {
+            dirName: 'C--Users-test-command--worktrees-fix-y',
+            files: [{
+              name: 'wt-y-session.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'wt-y-session', firstPrompt: 'Fix y' }),
+            }],
+          },
+        ],
+      })
+
+      await service.loadForProject(projectPath)
+
+      expect(service.getSessionSummary('root-session')?.firstPrompt).toBe('Root work')
+      expect(service.getSessionSummary('wt-x-session')?.firstPrompt).toBe('Feature x')
+      expect(service.getSessionSummary('wt-y-session')?.firstPrompt).toBe('Fix y')
+    })
+
+    test('stores worktreeName for worktree sessions and leaves it undefined for root', async () => {
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-command',
+        dirs: [
+          {
+            dirName: 'C--Users-test-command',
+            files: [{
+              name: 'root-session.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'root-session' }),
+            }],
+          },
+          {
+            dirName: 'C--Users-test-command--worktrees-feat-x',
+            files: [{
+              name: 'wt-x-session.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'wt-x-session' }),
+            }],
+          },
+        ],
+      })
+
+      await service.loadForProject('C:\\Users\\test\\command')
+
+      const recent = service.getRecentSessions()
+      const root = recent.find(e => e.sessionId === 'root-session')
+      const worktree = recent.find(e => e.sessionId === 'wt-x-session')
+      expect(root?.worktreeName).toBeUndefined()
+      expect(worktree?.worktreeName).toBe('feat-x')
+    })
+
+    test('does NOT match unrelated projects with similar prefix', async () => {
+      // `command-mvp` shares the prefix `command-` but is a separate project.
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-command',
+        dirs: [
+          {
+            dirName: 'C--Users-test-command',
+            files: [{
+              name: 'cmd.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'cmd', firstPrompt: 'command work' }),
+            }],
+          },
+        ],
+        extraProjectsRootDirs: [
+          'C--Users-test-command-mvp',                // different project
+          'C--Users-test-command-mvp--worktrees-foo', // worktree of different project
+          'C--Users-test-other',                       // entirely different
+        ],
+      })
+
+      await service.loadForProject('C:\\Users\\test\\command')
+
+      expect(service.getRecentSessions()).toHaveLength(1)
+      expect(service.getSessionSummary('cmd')?.firstPrompt).toBe('command work')
+    })
+
+    test('matches all three worktree suffix patterns', async () => {
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-proj',
+        dirs: [
+          {
+            // dotted: <proj>/.worktrees/...  -> `--worktrees-`
+            dirName: 'C--Users-test-proj--worktrees-dotted',
+            files: [{
+              name: 'a.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'a' }),
+            }],
+          },
+          {
+            // plain: <proj>/worktrees/...  -> `-worktrees-`
+            dirName: 'C--Users-test-proj-worktrees-plain',
+            files: [{
+              name: 'b.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'b' }),
+            }],
+          },
+          {
+            // Claude Code-managed: <proj>/.claude/worktrees/...  -> `--claude-worktrees-`
+            dirName: 'C--Users-test-proj--claude-worktrees-managed',
+            files: [{
+              name: 'c.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'c' }),
+            }],
+          },
+        ],
+      })
+
+      await service.loadForProject('C:\\Users\\test\\proj')
+
+      const recent = service.getRecentSessions()
+      expect(recent.find(e => e.sessionId === 'a')?.worktreeName).toBe('dotted')
+      expect(recent.find(e => e.sessionId === 'b')?.worktreeName).toBe('plain')
+      expect(recent.find(e => e.sessionId === 'c')?.worktreeName).toBe('managed')
+    })
+
+    test('returns no sessions when root and worktree dirs are all empty', async () => {
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-empty',
+        dirs: [], // no matching project dirs at all
+      })
+
+      await service.loadForProject('C:\\Users\\test\\empty')
+
+      expect(service.getRecentSessions()).toHaveLength(0)
+    })
+
+    test('still finds worktree sessions when root project dir does not exist', async () => {
+      // Use case: user opens a project, but the only sessions ever started
+      // were inside worktrees. The root cwd never spawned a chat.
+      setupMultiDirJsonlFiles({
+        encodedKey: 'C--Users-test-proj',
+        dirs: [
+          {
+            dirName: 'C--Users-test-proj--worktrees-only',
+            files: [{
+              name: 'wt.jsonl',
+              mtimeMs: Date.now(),
+              lines: makeSessionLines({ sessionId: 'wt', firstPrompt: 'Worktree only' }),
+            }],
+          },
+        ],
+      })
+
+      await service.loadForProject('C:\\Users\\test\\proj')
+
+      const recent = service.getRecentSessions()
+      expect(recent.find(e => e.sessionId === 'wt')?.firstPrompt).toBe('Worktree only')
+      expect(recent.find(e => e.sessionId === 'wt')?.worktreeName).toBe('only')
     })
   })
 

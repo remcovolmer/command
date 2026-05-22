@@ -26,6 +26,8 @@ export interface SessionIndexEntry {
   assistantMessageCount: number
   generatedTitle?: string
   generatedSummary?: string
+  /** Name of the worktree this session was started in (undefined for root-cwd sessions) */
+  worktreeName?: string
 }
 
 /** Subset pushed to renderer for a terminal's summary */
@@ -50,24 +52,70 @@ interface SummaryCacheEntry {
 
 /**
  * Encode a project path the same way Claude Code does for its projects directory.
+ *
+ * Claude Code replaces every non-alphanumeric character (except `-`) with `-`,
+ * without collapsing consecutive dashes. Empirically verified from
+ * `~/.claude/projects/` directory names:
+ *   - `C:\Users\X\Code\command`           -> `C--Users-X-Code-command`
+ *   - `C:\Users\X\Code\pascal_ai`         -> `C--Users-X-Code-pascal-ai`   (`_` -> `-`)
+ *   - `C:\Users\X\.claude`                -> `C--Users-X--claude`          (`.` -> `-`)
+ *   - `C:\Users\X\Code\command\.worktrees\fix-y`
+ *                                          -> `C--Users-X-Code-command--worktrees-fix-y`
+ *
+ * The leading-dash strip is for Unix paths starting with `/`.
  */
 export function encodeProjectPath(cwd: string): string {
-  return cwd.replace(/[/\\\\:]/g, '-').replace(/^-/, '')
+  return cwd.replace(/[^A-Za-z0-9-]/g, '-').replace(/^-/, '')
+}
+
+/** Root directory where Claude Code stores per-cwd project session caches. */
+function getProjectsRoot(): string {
+  return join(homedir(), '.claude', 'projects')
 }
 
 /**
- * Get the Claude projects directory for a given project path.
+ * Suffix patterns that indicate a Claude Code project dir belongs to a worktree
+ * of another project. Order matters: longer/more-specific patterns first so
+ * `--claude-worktrees-` wins over `-worktrees-`.
  */
-function getProjectDir(projectPath: string): string {
-  const encoded = encodeProjectPath(projectPath)
-  return join(homedir(), '.claude', 'projects', encoded)
+const WORKTREE_SUFFIX_PATTERNS = [
+  '--claude-worktrees-', // Claude Code-managed worktrees: `<project>/.claude/worktrees/<name>`
+  '--worktrees-',        // Dotted worktrees dir: `<project>/.worktrees/<name>`
+  '-worktrees-',         // Plain worktrees dir: `<project>/worktrees/<name>`
+] as const
+
+/**
+ * Classify a project dir name against an encoded project key.
+ * Returns whether it matches the project (root or one of its worktrees).
+ */
+function classifyProjectDir(
+  dirName: string,
+  encodedKey: string
+): { match: boolean; isWorktree: boolean; worktreeName?: string } {
+  if (dirName === encodedKey) {
+    return { match: true, isWorktree: false }
+  }
+  for (const pattern of WORKTREE_SUFFIX_PATTERNS) {
+    const prefix = encodedKey + pattern
+    if (dirName.startsWith(prefix)) {
+      const worktreeName = dirName.slice(prefix.length)
+      if (worktreeName.length > 0) {
+        return { match: true, isWorktree: true, worktreeName }
+      }
+    }
+  }
+  return { match: false, isWorktree: false }
 }
 
 /**
  * Extract metadata from a single JSONL session file by reading only what we need.
  * Reads the first few lines for session info, then skips to count messages.
  */
-async function parseSessionJsonl(filePath: string, projectPath: string): Promise<SessionIndexEntry | null> {
+async function parseSessionJsonl(
+  filePath: string,
+  projectPath: string,
+  worktreeName?: string,
+): Promise<SessionIndexEntry | null> {
   try {
     const rl = createInterface({ input: createReadStream(filePath), crlfDelay: Infinity })
 
@@ -193,6 +241,7 @@ async function parseSessionJsonl(filePath: string, projectPath: string): Promise
       errorCount,
       durationMs,
       assistantMessageCount,
+      worktreeName,
     }
   } catch {
     return null
@@ -253,73 +302,113 @@ export class SessionIndexService {
   }
 
   /**
-   * Scan JSONL files in the project directory and populate the cache.
-   * Only parses files that are newer than our cached version (incremental).
+   * Scan JSONL files for the project AND all of its worktree project dirs,
+   * populating the cache. Only parses files that are newer than our cached
+   * version (incremental).
+   *
+   * Claude Code creates a separate `~/.claude/projects/<encoded-cwd>` directory
+   * per active cwd, so sessions started in a worktree live in their own dir.
+   * We discover those by prefix-matching against the project's encoded key
+   * (see `classifyProjectDir`).
    */
   private async scanJsonlFiles(projectPath: string): Promise<void> {
-    const dir = getProjectDir(projectPath)
+    const projectsRoot = getProjectsRoot()
+    const encodedKey = encodeProjectPath(projectPath)
+
+    let projectDirs: Array<{ dirName: string; worktreeName?: string }>
     try {
-      const files = await readdir(dir)
-      const jsonlFiles = files.filter(f => f.endsWith('.jsonl'))
-
-      if (jsonlFiles.length === 0) {
-        this.cache.clear()
-        return
-      }
-
-      // Get file stats to determine which files need parsing
-      const fileStats = await Promise.all(
-        jsonlFiles.map(async (f) => {
-          const filePath = join(dir, f)
-          const s = await stat(filePath).catch(() => null)
-          return s ? { name: f, path: filePath, mtimeMs: s.mtimeMs } : null
-        })
-      )
-      const validFiles = fileStats.filter((f): f is NonNullable<typeof f> => f !== null)
-
-      // Remove cached entries for deleted files
-      const currentIds = new Set(validFiles.map(f => f.name.replace('.jsonl', '')))
-      for (const id of this.cache.keys()) {
-        if (!currentIds.has(id)) this.cache.delete(id)
-      }
-
-      // Only parse files that are new or modified since last cache
-      const filesToParse = validFiles.filter(f => {
-        const sessionId = f.name.replace('.jsonl', '')
-        const cached = this.cache.get(sessionId)
-        if (!cached) return true
-        // Re-parse if file was modified after our cached modified timestamp
-        const cachedMs = new Date(cached.modified).getTime()
-        return f.mtimeMs > cachedMs + 1000 // 1s tolerance
-      })
-
-      if (filesToParse.length > 0) {
-        // Parse in batches of 10 to avoid overwhelming file handles
-        const BATCH_SIZE = 10
-        for (let i = 0; i < filesToParse.length; i += BATCH_SIZE) {
-          const batch = filesToParse.slice(i, i + BATCH_SIZE)
-          const results = await Promise.all(
-            batch.map(f => parseSessionJsonl(f.path, projectPath))
-          )
-          for (const entry of results) {
-            if (entry) this.cache.set(entry.sessionId, entry)
-          }
+      const allDirs = await readdir(projectsRoot)
+      projectDirs = []
+      for (const dirName of allDirs) {
+        const cls = classifyProjectDir(dirName, encodedKey)
+        if (cls.match) {
+          projectDirs.push({ dirName, worktreeName: cls.worktreeName })
         }
-      }
-
-      // Read and merge hook-generated summaries
-      this.summaryCache = await this.readSummaryCache()
-      this.mergeSummaryCacheIntoEntries()
-
-      if (isDev) {
-        console.log(`[SessionIndex] ${this.cache.size} sessions (parsed ${filesToParse.length} new/updated) for ${projectPath}`)
       }
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         this.cache.clear()
-      } else if (isDev) {
-        console.error('[SessionIndex] Scan error:', err)
+        return
       }
+      if (isDev) console.error('[SessionIndex] Failed to read projects root:', err)
+      return
+    }
+
+    if (projectDirs.length === 0) {
+      this.cache.clear()
+      return
+    }
+
+    // Collect jsonl file entries from every matching dir
+    type FileEntry = {
+      name: string
+      path: string
+      mtimeMs: number
+      worktreeName?: string
+    }
+    const allFiles: FileEntry[] = []
+
+    for (const { dirName, worktreeName } of projectDirs) {
+      const dirPath = join(projectsRoot, dirName)
+      try {
+        const files = await readdir(dirPath)
+        const jsonlFiles = files.filter(f => f.endsWith('.jsonl'))
+        const fileStats = await Promise.all(
+          jsonlFiles.map(async (f) => {
+            const filePath = join(dirPath, f)
+            const s = await stat(filePath).catch(() => null)
+            return s ? { name: f, path: filePath, mtimeMs: s.mtimeMs, worktreeName } : null
+          })
+        )
+        for (const entry of fileStats) {
+          if (entry) allFiles.push(entry)
+        }
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT' && isDev) {
+          console.error(`[SessionIndex] Failed to read dir ${dirName}:`, err)
+        }
+        // Continue with other dirs even if one fails
+      }
+    }
+
+    // Remove cached entries for files that no longer exist anywhere
+    const currentIds = new Set(allFiles.map(f => f.name.replace('.jsonl', '')))
+    for (const id of this.cache.keys()) {
+      if (!currentIds.has(id)) this.cache.delete(id)
+    }
+
+    // Only parse files that are new or modified since last cache
+    const filesToParse = allFiles.filter(f => {
+      const sessionId = f.name.replace('.jsonl', '')
+      const cached = this.cache.get(sessionId)
+      if (!cached) return true
+      const cachedMs = new Date(cached.modified).getTime()
+      return f.mtimeMs > cachedMs + 1000 // 1s tolerance
+    })
+
+    if (filesToParse.length > 0) {
+      const BATCH_SIZE = 10
+      for (let i = 0; i < filesToParse.length; i += BATCH_SIZE) {
+        const batch = filesToParse.slice(i, i + BATCH_SIZE)
+        const results = await Promise.all(
+          batch.map(f => parseSessionJsonl(f.path, projectPath, f.worktreeName))
+        )
+        for (const entry of results) {
+          if (entry) this.cache.set(entry.sessionId, entry)
+        }
+      }
+    }
+
+    // Read and merge hook-generated summaries
+    this.summaryCache = await this.readSummaryCache()
+    this.mergeSummaryCacheIntoEntries()
+
+    if (isDev) {
+      const worktreeCount = projectDirs.filter(d => d.worktreeName).length
+      console.log(
+        `[SessionIndex] ${this.cache.size} sessions across ${projectDirs.length} dir(s)` +
+        ` (${worktreeCount} worktree, parsed ${filesToParse.length} new/updated) for ${projectPath}`
+      )
     }
   }
 

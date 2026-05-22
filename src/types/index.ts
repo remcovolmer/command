@@ -93,6 +93,7 @@ export interface SessionIndexEntry {
   assistantMessageCount: number;
   generatedTitle?: string;  // LLM-generated title from Ollama
   generatedSummary?: string;  // LLM-generated summary from Ollama
+  worktreeName?: string;  // Name of worktree this session was started in (undefined for root-cwd)
 }
 
 // Editor tab types
