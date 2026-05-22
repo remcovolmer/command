@@ -33,6 +33,14 @@ interface TerminalInstance {
   type: TerminalType
   title?: string
   timeouts: ReturnType<typeof setTimeout>[]
+  // Set to true on first onData callback. Lets onExit distinguish a worker
+  // that died before producing any output (treated as a failed spawn that
+  // never reached the user) from a normal lifetime exit.
+  dataReceived: boolean
+  // Set when closeTerminal/destroy intentionally killed this PTY. Suppresses
+  // the orphan-cleanup spawn-failed event in onExit because the user (or app)
+  // initiated the close — the renderer already removed the terminal.
+  killedDeliberately: boolean
 }
 
 export interface CommandServerAccessor {
@@ -138,7 +146,9 @@ export class TerminalManager {
       }
     } catch (err) {
       if (err instanceof SpawnError) throw err
-      const code = (err as NodeJS.ErrnoException)?.code
+      const code = err instanceof Error && 'code' in err
+        ? (err as NodeJS.ErrnoException).code
+        : undefined
       if (code === 'ENOENT') {
         throw new SpawnError('CWD_MISSING', cwd, { cause: err })
       }
@@ -172,6 +182,8 @@ export class TerminalManager {
       type,
       title: initialTitle,
       timeouts: [],
+      dataReceived: false,
+      killedDeliberately: false,
     }
 
     // Register with hook watcher for state detection (only for Claude terminals)
@@ -180,6 +192,10 @@ export class TerminalManager {
     }
 
     ptyProcess.onData((data) => {
+      // Mark that the worker produced output. Any later onExit is a normal
+      // lifetime exit, not an orphan-spawn cleanup case.
+      terminal.dataReceived = true
+
       // Buffer output for sidecar (normal) terminals
       if (terminal.type === 'normal') {
         this.bufferSidecarData(id, data)
@@ -195,14 +211,38 @@ export class TerminalManager {
     })
 
     ptyProcess.onExit(({ exitCode }) => {
+      // Async pty worker error path: if the worker exited before producing any
+      // output and we did not deliberately kill it, treat as a failed spawn.
+      // node-pty's WindowsPtyAgent surfaces "Cannot create process, error 267"
+      // from a worker thread for some races between statSync and CreateProcessW
+      // — that escapes the pre-flight try/catch and lands here as a bare exit.
+      const orphanedSpawnFailure =
+        !terminal.dataReceived && !terminal.killedDeliberately
+
       // Unregister from hook watcher (only for Claude terminals)
       if (terminal.type === 'claude' && this.hookWatcher) {
         this.hookWatcher.unregisterTerminal(id)
       }
 
       terminal.state = 'stopped'
-      this.sendToRenderer('terminal:state', id, 'stopped')
-      this.sendToRenderer('terminal:exit', id, exitCode)
+
+      if (orphanedSpawnFailure) {
+        // Skip the normal terminal:state / terminal:exit pair — the renderer
+        // never finished setting up this terminal in the first place. Surface
+        // it as a toast instead so the user sees what happened.
+        this.sendToRenderer('terminal:spawn-failed', {
+          projectId: terminal.projectId,
+          worktreeId: terminal.worktreeId,
+          code: 'SPAWN_FAILED',
+          cwd: terminal.cwd,
+          message:
+            'PTY worker exited before any output (likely cwd or shell issue)',
+        })
+      } else {
+        this.sendToRenderer('terminal:state', id, 'stopped')
+        this.sendToRenderer('terminal:exit', id, exitCode)
+      }
+
       this.terminals.delete(id)
       this.terminalInputBuffers.delete(id)
       this.terminalTitled.delete(id)
@@ -450,6 +490,10 @@ export class TerminalManager {
   closeTerminal(terminalId: string): void {
     const terminal = this.terminals.get(terminalId)
     if (terminal) {
+      // Mark before killing so onExit treats this as a deliberate close and
+      // skips the orphan-spawn-failure path.
+      terminal.killedDeliberately = true
+
       // Clear pending timeouts
       terminal.timeouts?.forEach(clearTimeout)
 

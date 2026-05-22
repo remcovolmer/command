@@ -350,6 +350,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'dialog',
     enabled: true,
   },
+  'dialog.dismissTopmostToast': {
+    key: 'Escape',
+    modifiers: [],
+    description: 'Dismiss topmost toast notification',
+    category: 'dialog',
+    enabled: true,
+  },
 };
 
 /**

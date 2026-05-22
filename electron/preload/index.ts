@@ -5,6 +5,16 @@ console.log('[PRELOAD] Script starting...')
 // Type definitions for the exposed API - Claude Code states (5 states)
 type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
 type TerminalType = 'claude' | 'normal'
+// Mirror of SpawnFailureCode in src/types — kept inline because the preload
+// is bundled separately and cannot import from src/.
+type SpawnFailureCode = 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'
+interface SpawnFailedPayload {
+  projectId?: string
+  worktreeId?: string
+  code: SpawnFailureCode
+  cwd: string
+  message: string
+}
 
 // Whitelist of channels that can have listeners removed
 const ALLOWED_LISTENER_CHANNELS = [
@@ -258,7 +268,7 @@ type Unsubscribe = () => void
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal', resumeSessionId?: string): Promise<string> =>
+    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal', resumeSessionId?: string): Promise<string | null> =>
       ipcRenderer.invoke('terminal:create', projectId, worktreeId, type, resumeSessionId),
 
     write: (terminalId: string, data: string): void =>
@@ -340,13 +350,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('terminal:generated-title', handler)
     },
 
-    onSpawnFailed: (
-      callback: (event: { projectId?: string; worktreeId?: string; code: 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'; cwd: string; message: string }) => void
-    ): Unsubscribe => {
-      const handler = (
-        _event: Electron.IpcRendererEvent,
-        payload: { projectId?: string; worktreeId?: string; code: 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'; cwd: string; message: string }
-      ) => callback(payload)
+    onSpawnFailed: (callback: (event: SpawnFailedPayload) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: SpawnFailedPayload) =>
+        callback(payload)
       ipcRenderer.on('terminal:spawn-failed', handler)
       return () => ipcRenderer.removeListener('terminal:spawn-failed', handler)
     },

@@ -3,9 +3,9 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-export type CrashSource = 'uncaughtException' | 'unhandledRejection'
+export type CrashSource = 'uncaughtException' | 'unhandledRejection' | 'spawnFailed'
 
-interface LogEntry {
+export interface LogEntry {
   source: CrashSource
   message: string
   logPath: string
@@ -16,17 +16,21 @@ const MAX_WRITES_PER_MINUTE = 5
 export class CrashLogger {
   private writeTimestamps: number[] = []
   private cachedLogPath: string | null = null
+  private suppressedSinceLastNotice = 0
 
   /**
    * Resolve crash.log path lazily. Before app.whenReady() the userData path
    * may not be available, so we fall back to os.tmpdir() to keep early-boot
-   * crashes loggable.
+   * crashes loggable. The fallback path is NOT cached — once the app becomes
+   * ready, the next call upgrades to userData/crash.log.
    */
   private resolveLogPath(): string {
     if (this.cachedLogPath) return this.cachedLogPath
     let baseDir: string
+    let ready = false
     try {
-      baseDir = app.isReady() ? app.getPath('userData') : os.tmpdir()
+      ready = app.isReady()
+      baseDir = ready ? app.getPath('userData') : os.tmpdir()
     } catch {
       baseDir = os.tmpdir()
     }
@@ -35,8 +39,10 @@ export class CrashLogger {
     } catch {
       // best-effort; appendFileSync below will report the real failure
     }
-    this.cachedLogPath = path.join(baseDir, 'crash.log')
-    return this.cachedLogPath
+    const resolved = path.join(baseDir, 'crash.log')
+    // Only pin the cache once we know we are on the final (userData) path.
+    if (ready) this.cachedLogPath = resolved
+    return resolved
   }
 
   /**
@@ -54,13 +60,22 @@ export class CrashLogger {
   log(error: unknown, source: CrashSource): LogEntry | null {
     const now = Date.now()
     if (!this.allowWrite(now)) {
+      this.suppressedSinceLastNotice++
       return null
     }
     const logPath = this.resolveLogPath()
     const timestamp = new Date(now).toISOString()
     const stack = this.formatError(error)
     const versions = `node ${process.versions.node} / electron ${process.versions.electron ?? 'n/a'}`
-    const entry = `[${timestamp}] [${source}] ${versions}\n${stack}\n\n`
+    // If prior writes were rate-limit-suppressed, surface the count alongside
+    // the next accepted write so the noise floor stays low without losing the
+    // signal that the process is unhealthy.
+    const suppressionNotice =
+      this.suppressedSinceLastNotice > 0
+        ? `[rate-limit: ${this.suppressedSinceLastNotice} prior error(s) suppressed in the 60s window]\n`
+        : ''
+    this.suppressedSinceLastNotice = 0
+    const entry = `[${timestamp}] [${source}] ${versions}\n${suppressionNotice}${stack}\n\n`
     try {
       appendFileSync(logPath, entry, { encoding: 'utf8' })
     } catch (writeErr) {
@@ -76,7 +91,18 @@ export class CrashLogger {
 
   private formatError(error: unknown): string {
     if (error instanceof Error) {
-      return error.stack ?? `${error.name}: ${error.message}`
+      const segments: string[] = []
+      let current: unknown = error
+      let depth = 0
+      // Walk the .cause chain so wrapped errors (e.g. SpawnError around ENOENT)
+      // don't lose the original stack. Depth-cap defends against cyclic refs.
+      while (current instanceof Error && depth < 5) {
+        const prefix = depth === 0 ? '' : `Caused by: `
+        segments.push(prefix + (current.stack ?? `${current.name}: ${current.message}`))
+        current = (current as { cause?: unknown }).cause
+        depth++
+      }
+      return segments.join('\n')
     }
     try {
       return JSON.stringify(error)

@@ -6,8 +6,9 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
-import { SpawnError, isSpawnError } from './services/errors'
-import { CrashLogger } from './services/CrashLogger'
+import { CrashLogger, type LogEntry } from './services/CrashLogger'
+import { handleTerminalCreate } from './handlers/terminalCreate'
+import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
 import { GitService } from './services/GitService'
 import { WorktreeService } from './services/WorktreeService'
@@ -39,7 +40,7 @@ process.stderr?.on('error', () => {})
 // app.whenReady so early-boot errors are also captured.
 const crashLogger = new CrashLogger()
 
-function notifyUncaughtError(entry: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string } | null): void {
+function notifyUncaughtError(entry: LogEntry | null): void {
   if (!entry || !win || win.isDestroyed()) return
   try {
     win.webContents.send('app:uncaught-error', entry)
@@ -48,17 +49,30 @@ function notifyUncaughtError(entry: { source: 'uncaughtException' | 'unhandledRe
   }
 }
 
-process.on('uncaughtException', (err) => {
-  const entry = crashLogger.log(err, 'uncaughtException')
-  console.error('[uncaughtException]', err)
-  notifyUncaughtError(entry)
-})
+// Re-entrancy guard. If logging or IPC-notifying itself throws, Node would
+// re-enter the handler with the new error and recurse until stack overflow,
+// defeating the very protection these handlers add.
+let handlingCrash = false
+function safeHandleCrash(err: unknown, source: 'uncaughtException' | 'unhandledRejection'): void {
+  if (handlingCrash) {
+    // Last-resort visibility; cannot use the logger or IPC without risking recursion.
+    try { console.error(`[${source}] (re-entrant, suppressed)`, err) } catch { /* nothing */ }
+    return
+  }
+  handlingCrash = true
+  try {
+    const entry = crashLogger.log(err, source)
+    console.error(`[${source}]`, err)
+    notifyUncaughtError(entry)
+  } catch (innerErr) {
+    try { console.error(`[${source}] handler failed:`, innerErr) } catch { /* nothing */ }
+  } finally {
+    handlingCrash = false
+  }
+}
 
-process.on('unhandledRejection', (reason) => {
-  const entry = crashLogger.log(reason, 'unhandledRejection')
-  console.error('[unhandledRejection]', reason)
-  notifyUncaughtError(entry)
-})
+process.on('uncaughtException', (err) => safeHandleCrash(err, 'uncaughtException'))
+process.on('unhandledRejection', (reason) => safeHandleCrash(reason, 'unhandledRejection'))
 
 // Validation helpers
 const isValidUUID = (id: string): boolean =>
@@ -220,123 +234,19 @@ async function pathExistsAsync(targetPath: string): Promise<boolean> {
 }
 
 /**
- * Restore sessions from previous app close
+ * Restore sessions from previous app close. Thin wrapper around the testable
+ * implementation in ./handlers/restoreSessions.
  */
 async function restoreSessions(): Promise<void> {
-  if (!projectPersistence || !terminalManager || !win) {
-    console.log('[Session] Cannot restore: services not initialized')
-    return
-  }
-
-  const sessions = projectPersistence.getSessions()
-  if (sessions.length === 0) {
-    console.log('[Session] No sessions to restore')
-    return
-  }
-
-  console.log(`[Session] Attempting to restore ${sessions.length} sessions`)
-
-  const projects = projectPersistence.getProjects()
-  const projectMap = new Map(projects.map(p => [p.id, p]))
-
-  // Pre-validate all sessions in parallel for better performance
-  const validationResults = await Promise.all(
-    sessions.map(async (session) => {
-      // Verify project still exists
-      const project = projectMap.get(session.projectId)
-      if (!project) {
-        return { session, valid: false, reason: `project ${session.projectId} no longer exists` }
-      }
-
-      // Verify worktree still exists (if applicable)
-      if (session.worktreeId) {
-        const worktree = projectPersistence!.getWorktreeById(session.worktreeId)
-        if (!worktree) {
-          return { session, valid: false, reason: `worktree ${session.worktreeId} no longer exists` }
-        }
-        // Verify worktree path still exists on disk
-        const worktreeExists = await pathExistsAsync(worktree.path)
-        if (!worktreeExists) {
-          return { session, valid: false, reason: `worktree path ${worktree.path} no longer exists` }
-        }
-      }
-
-      // Verify CWD still exists
-      const cwdExists = await pathExistsAsync(session.cwd)
-      if (!cwdExists) {
-        return { session, valid: false, reason: `cwd ${session.cwd} no longer exists` }
-      }
-
-      // Verify Claude session file exists (optional - Claude handles gracefully if missing)
-      const sessionFileExists = await verifyClaudeSessionAsync(session.cwd, session.claudeSessionId)
-
-      return { session, project, valid: true, sessionFileExists }
-    })
-  )
-
-  // Process validated sessions
-  for (const result of validationResults) {
-    if (!result.valid) {
-      console.log(`[Session] Skipping session: ${result.reason}`)
-      continue
-    }
-
-    const { session, project, sessionFileExists } = result
-
-    try {
-      if (!sessionFileExists) {
-        console.log(`[Session] Session file not found for ${session.claudeSessionId}, starting fresh`)
-      }
-
-      // Resolve env overrides for profile auth mode
-      const envOverrides = resolveEnvOverrides(project)
-
-      // Create terminal with --resume flag (or fresh if session file missing)
-      const terminalId = terminalManager.createTerminal({
-        cwd: session.cwd,
-        type: 'claude',
-        initialTitle: session.title || undefined,
-        projectId: session.projectId,
-        worktreeId: session.worktreeId ?? undefined,
-        resumeSessionId: sessionFileExists ? session.claudeSessionId : undefined,  // only resume if session file exists
-        claudeMode: project?.settings?.claudeMode,
-        envOverrides,
-      })
-
-      // Pre-associate the known session-terminal mapping so the hook watcher
-      // doesn't have to rely on cwd-based matching (which can misroute when
-      // multiple terminals share the same working directory)
-      if (sessionFileExists && hookWatcher) {
-        hookWatcher.preAssociateSession(session.claudeSessionId, terminalId)
-      }
-
-      console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
-
-      // Notify renderer about restored session (include summary if persisted)
-      win.webContents.send('session:restored', {
-        terminalId,
-        projectId: session.projectId,
-        worktreeId: session.worktreeId,
-        title: session.title,
-        summary: session.summary,
-      })
-    } catch (error) {
-      if (isSpawnError(error)) {
-        // Restore-time spawn failures are silent: log the cause and skip the
-        // session. We do NOT modal-bomb the user during startup for stale
-        // worktrees — those projects show up missing in the sidebar anyway.
-        console.warn(
-          `[Session] Skipping session ${session.claudeSessionId}: ${error.code} for cwd ${error.cwd}`
-        )
-      } else {
-        console.error(`[Session] Failed to restore session:`, error)
-      }
-    }
-  }
-
-  // Clear persisted sessions after restoration
-  projectPersistence.clearSessions()
-  console.log('[Session] Restoration complete, cleared persisted sessions')
+  return restoreSessionsImpl({
+    projectPersistence,
+    terminalManager,
+    hookWatcher,
+    getWindow: () => win,
+    verifyClaudeSession: verifyClaudeSessionAsync,
+    pathExists: pathExistsAsync,
+    resolveEnvOverrides,
+  })
 }
 
 const preload = path.join(__dirname, '../preload/index.cjs')
@@ -494,72 +404,17 @@ async function createWindow() {
 
 // IPC Handlers for Terminal operations
 ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude', resumeSessionId?: string) => {
-  if (!isValidUUID(projectId)) {
-    throw new Error('Invalid project ID')
-  }
-  if (worktreeId && !isValidUUID(worktreeId)) {
-    throw new Error('Invalid worktree ID')
-  }
-  if (type !== undefined && type !== 'claude' && type !== 'normal') {
-    throw new Error('Invalid terminal type')
-  }
-  if (resumeSessionId !== undefined && (typeof resumeSessionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(resumeSessionId))) {
-    throw new Error('Invalid session ID format')
-  }
-
-  // Look up project for settings and path
-  const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
-
-  // Determine the working directory and initial title
-  let cwd: string
-  let initialTitle: string | undefined
-
-  if (worktreeId) {
-    // Use worktree path if provided
-    const worktree = projectPersistence?.getWorktreeById(worktreeId)
-    if (!worktree) {
-      throw new Error(`Worktree not found: ${worktreeId}`)
-    }
-    cwd = worktree.path
-    // Use worktree name as terminal title
-    initialTitle = worktree.name
-  } else {
-    cwd = project?.path ?? process.cwd()
-  }
-
-  // Resolve env overrides for profile auth mode
-  const envOverrides = resolveEnvOverrides(project)
-
-  try {
-    return terminalManager?.createTerminal({
-      cwd,
-      type,
-      initialTitle,
-      projectId,
-      worktreeId: worktreeId ?? undefined,
-      resumeSessionId: resumeSessionId ?? undefined,
-      claudeMode: project?.settings?.claudeMode,
-      envOverrides,
-    })
-  } catch (error) {
-    // Convert SpawnError into a non-throwing, renderer-visible event so the
-    // user gets an inline toast instead of an unhandled IPC rejection or the
-    // Electron "JavaScript error in main process" dialog. Other errors keep
-    // their existing throw path.
-    if (isSpawnError(error)) {
-      win?.webContents.send('terminal:spawn-failed', {
-        projectId,
-        worktreeId,
-        code: error.code,
-        cwd: error.cwd,
-        message: error.message,
-      })
-      console.warn(`[Terminal] Spawn failed: ${error.code} for cwd ${error.cwd}`)
-      return null
-    }
-    throw error
-  }
+  return handleTerminalCreate(
+    {
+      terminalManager,
+      projectPersistence,
+      crashLogger,
+      getWindow: () => win,
+      resolveEnvOverrides,
+      isValidUUID,
+    },
+    { projectId, worktreeId, type, resumeSessionId },
+  )
 })
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {

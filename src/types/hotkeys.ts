@@ -79,7 +79,8 @@ export type HotkeyAction =
   | 'ui.cycleClaudeMode'
   // Dialogs
   | 'dialog.close'
-  | 'dialog.confirm';
+  | 'dialog.confirm'
+  | 'dialog.dismissTopmostToast';
 
 // Complete hotkey configuration
 export type HotkeyConfig = Record<HotkeyAction, HotkeyBinding>;

@@ -43,9 +43,17 @@ vi.mock('node:fs', async () => {
   }
 })
 
+import type { BrowserWindow } from 'electron'
 import { statSync } from 'node:fs'
+import { spawn as ptySpawn } from 'node-pty'
 import { TerminalManager } from '../electron/main/services/TerminalManager'
 import { SpawnError } from '../electron/main/services/errors'
+
+type MockBrowserWindow = Pick<BrowserWindow, 'isDestroyed' | 'webContents'>
+
+function asBrowserWindow(w: MockBrowserWindow): BrowserWindow {
+  return w as unknown as BrowserWindow
+}
 
 // Helper to flush setTimeout (the SHELL_READY_DELAY_MS timeout)
 function flushTimers() {
@@ -480,21 +488,23 @@ describe('TerminalManager auto-naming: ANSI stripping', () => {
 
 describe('TerminalManager createTerminal cwd validation', () => {
   let manager: TerminalManager
-  const mockWindow = {
+  const mockWindow: MockBrowserWindow = {
     isDestroyed: vi.fn(() => false),
-    webContents: { send: vi.fn() },
-  } as any
+    webContents: { send: vi.fn() } as unknown as BrowserWindow['webContents'],
+  }
   const mockedStat = statSync as unknown as ReturnType<typeof vi.fn>
+  const mockedSpawn = ptySpawn as unknown as ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     vi.useFakeTimers()
     mockWrite.mockClear()
     mockOnData.mockClear()
     mockOnExit.mockClear()
-    mockWindow.webContents.send.mockClear()
+    ;(mockWindow.webContents.send as ReturnType<typeof vi.fn>).mockClear()
     mockedStat.mockReset()
     mockedStat.mockReturnValue({ isDirectory: () => true })
-    manager = new TerminalManager(mockWindow)
+    mockedSpawn.mockClear()
+    manager = new TerminalManager(asBrowserWindow(mockWindow))
   })
 
   afterEach(() => {
@@ -559,5 +569,22 @@ describe('TerminalManager createTerminal cwd validation', () => {
     expect(typeof id).toBe('string')
     expect(id.length).toBeGreaterThan(0)
     expect(manager.hasActiveTerminals()).toBe(true)
+  })
+
+  test('statSync passes but pty.spawn throws synchronously → SpawnError code SPAWN_FAILED', () => {
+    mockedStat.mockReturnValue({ isDirectory: () => true })
+    mockedSpawn.mockImplementationOnce(() => {
+      throw new Error('native pty failure')
+    })
+
+    try {
+      manager.createTerminal({ cwd: '/test', type: 'normal' })
+      throw new Error('expected SpawnError')
+    } catch (err) {
+      expect(err).toBeInstanceOf(SpawnError)
+      expect((err as SpawnError).code).toBe('SPAWN_FAILED')
+    }
+    // failure must not leak state
+    expect(manager.hasActiveTerminals()).toBe(false)
   })
 })

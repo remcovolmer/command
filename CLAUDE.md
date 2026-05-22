@@ -218,5 +218,5 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 ### Dialogs
 | Shortcut | Action |
 |----------|--------|
-| `Escape` | Close dialog |
+| `Escape` | Dismiss topmost toast (if any), otherwise close dialog |
 | `Enter` | Confirm dialog |

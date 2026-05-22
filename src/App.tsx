@@ -8,6 +8,8 @@ import { getElectronAPI } from './utils/electron'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
 import { fileWatcherEvents } from './utils/fileWatcherEvents'
 import { useThemeResolver } from './hooks/useThemeResolver'
+import { dismissTopmostToast } from './utils/toastRegistry'
+import { DEFAULT_HOTKEY_CONFIG, matchesBinding } from './utils/hotkeys'
 
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
@@ -402,6 +404,31 @@ function App() {
     () => {}, // Don't confirm close on Enter
     { enabled: showCloseDialog, canConfirm: false }
   )
+
+  // Escape → dismiss topmost toast (if any) BEFORE dialog-close handlers run.
+  // A direct listener (capture, registered in useEffect) is used because the
+  // generic useHotkeys flow would unconditionally consume Escape, breaking
+  // dialog close when no toast is on screen. Here we only consume the key if
+  // a toast actually existed; otherwise we let downstream listeners proceed.
+  // Reads binding from the persisted hotkey config so user re-bindings apply.
+  const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
+  const dismissBindingRef = useRef(hotkeyConfig['dialog.dismissTopmostToast'] ?? DEFAULT_HOTKEY_CONFIG['dialog.dismissTopmostToast'])
+  dismissBindingRef.current = hotkeyConfig['dialog.dismissTopmostToast'] ?? DEFAULT_HOTKEY_CONFIG['dialog.dismissTopmostToast']
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!matchesBinding(e, dismissBindingRef.current)) return
+      if (!dismissTopmostToast()) return
+      // A toast was consumed — stop dialog-close and any other Escape handlers
+      // on this same press from firing.
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+    }
+    // Capture phase so this runs before useHotkeys / useDialogHotkeys listeners
+    window.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true })
+  }, [])
 
   // Resolve theme preference (system/light/dark) → apply to DOM + sync to Claude Code
   useThemeResolver()

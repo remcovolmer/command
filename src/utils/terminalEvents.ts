@@ -1,5 +1,5 @@
 import { getElectronAPI } from './electron'
-import { isValidTerminalState, type TerminalState, type TerminalSession, type Unsubscribe, type RestoredSession } from '../types'
+import { isValidTerminalState, type TerminalState, type TerminalSession, type Unsubscribe, type RestoredSession, type SpawnFailedEvent } from '../types'
 
 type DataCallback = (data: string) => void
 type StateCallback = (state: TerminalState) => void
@@ -14,6 +14,7 @@ type SidecarCreatedCallback = (contextKey: string, terminal: TerminalSession) =>
 type StatusMessageCallback = (terminalId: string, message: string) => void
 type EditorOpenFileCallback = (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void
 type EditorOpenDiffCallback = (data: { filePath: string; fileName: string; projectId: string }) => void
+type SpawnFailedCallback = (event: SpawnFailedEvent) => void
 
 /**
  * Centralized terminal event manager.
@@ -34,6 +35,7 @@ class TerminalEventManager {
   private statusMessageCallbacks: StatusMessageCallback[] = []
   private editorOpenFileCallbacks: EditorOpenFileCallback[] = []
   private editorOpenDiffCallbacks: EditorOpenDiffCallback[] = []
+  private spawnFailedCallbacks: SpawnFailedCallback[] = []
   private initialized = false
   private unsubscribers: Unsubscribe[] = []
 
@@ -137,6 +139,14 @@ class TerminalEventManager {
       api.editor.onOpenDiff((data) => {
         for (const callback of this.editorOpenDiffCallbacks) {
           callback(data)
+        }
+      })
+    )
+
+    this.unsubscribers.push(
+      api.terminal.onSpawnFailed((event) => {
+        for (const callback of this.spawnFailedCallbacks) {
+          callback(event)
         }
       })
     )
@@ -254,6 +264,20 @@ class TerminalEventManager {
   }
 
   /**
+   * Subscribe to terminal spawn-failed events (surfaced as toast notifications).
+   * Routed through the manager so the IPC listener is registered once globally
+   * instead of per-component, mirroring the pattern used for session-restored.
+   */
+  onSpawnFailed(callback: SpawnFailedCallback): () => void {
+    this.init()
+    this.spawnFailedCallbacks.push(callback)
+    return () => {
+      const index = this.spawnFailedCallbacks.indexOf(callback)
+      if (index !== -1) this.spawnFailedCallbacks.splice(index, 1)
+    }
+  }
+
+  /**
    * Cleanup all IPC listeners. Call when app is shutting down.
    */
   dispose() {
@@ -272,6 +296,7 @@ class TerminalEventManager {
     this.statusMessageCallbacks = []
     this.editorOpenFileCallbacks = []
     this.editorOpenDiffCallbacks = []
+    this.spawnFailedCallbacks = []
     this.initialized = false
   }
 }
