@@ -74,7 +74,12 @@ export interface TerminalSession {
   generatedTitle?: string;  // LLM-generated title from Ollama via session-summary-hook
 }
 
-/** Entry from Claude Code's sessions-index.json (used by project overview) */
+/**
+ * Session metadata extracted from Claude Code JSONL transcripts.
+ * Keep in sync with the canonical declaration in
+ * `electron/main/services/SessionIndexService.ts` — Electron process isolation
+ * prevents a shared import here, so changes must be applied to both files.
+ */
 export interface SessionIndexEntry {
   sessionId: string;
   summary: string;
@@ -93,6 +98,7 @@ export interface SessionIndexEntry {
   assistantMessageCount: number;
   generatedTitle?: string;  // LLM-generated title from Ollama
   generatedSummary?: string;  // LLM-generated summary from Ollama
+  worktreeName?: string;  // Name of worktree this session was started in (undefined for root-cwd)
 }
 
 // Editor tab types

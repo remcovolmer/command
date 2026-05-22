@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<title>Fix: Chat titles & summaries onvolledig in project overview</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1c212c;
+    --border: #2a3140;
+    --text: #e8ecf3;
+    --muted: #9aa4b6;
+    --accent: #4f9cf9;
+    --accent-soft: rgba(79,156,249,.12);
+    --danger: #ef6f6f;
+    --warn: #f3b955;
+    --ok: #5dd39e;
+    --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--text); }
+  body {
+    margin: 0;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    padding: 32px 24px 96px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header.top { margin-bottom: 28px; }
+  .eyebrow {
+    color: var(--muted); font-size: 12px;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+  h1 {
+    font-size: 28px; line-height: 1.25; margin: 4px 0 8px;
+  }
+  .meta {
+    color: var(--muted); font-size: 13px;
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .meta b { color: var(--text); font-weight: 600; }
+  h2 {
+    margin: 36px 0 12px;
+    font-size: 18px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  h3 { margin: 22px 0 8px; font-size: 16px; }
+  p { margin: 8px 0 12px; }
+  code, kbd {
+    font-family: var(--mono);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 4px;
+    font-size: .88em;
+  }
+  pre {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 12px 14px; border-radius: 8px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px; line-height: 1.5;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 14px 0;
+  }
+  .grid-2 {
+    display: grid; gap: 14px;
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
+  .pill {
+    display: inline-block; font-size: 11px;
+    padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-right: 6px;
+  }
+  .pill.danger { color: var(--danger); border-color: rgba(239,111,111,.35); background: rgba(239,111,111,.07); }
+  .pill.warn   { color: var(--warn);   border-color: rgba(243,185,85,.35);  background: rgba(243,185,85,.07); }
+  .pill.ok     { color: var(--ok);     border-color: rgba(93,211,158,.35);  background: rgba(93,211,158,.07); }
+  .pill.accent { color: var(--accent); border-color: rgba(79,156,249,.45);  background: var(--accent-soft); }
+  table {
+    width: 100%; border-collapse: collapse;
+    margin: 10px 0 8px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left; padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  ul, ol { margin: 6px 0 10px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .unit-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 6px;
+  }
+  .unit-head h3 { margin: 0; }
+  .field { margin: 8px 0; }
+  .field .label {
+    color: var(--muted); font-size: 12px;
+    text-transform: uppercase; letter-spacing: .06em;
+    margin-right: 6px;
+  }
+  .quote {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 10px 14px; border-radius: 6px;
+    color: var(--text);
+    margin: 10px 0;
+  }
+  .quote em { color: var(--muted); font-style: normal; }
+  .toc {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px;
+    columns: 2; column-gap: 24px;
+    font-size: 13px;
+  }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .arrow { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">Fix Plan · Command Center</div>
+  <h1>Chat titels en samenvattingen worden sporadisch getoond in project overview</h1>
+  <div class="meta">
+    <span><b>Datum:</b> 2026-05-22</span>
+    <span><b>Branch:</b> <code>fix/chat-summary-overview</code></span>
+    <span><b>Type:</b> bugfix</span>
+    <span><b>Depth:</b> Standard</span>
+    <span class="pill danger">data verlies in UI</span>
+  </div>
+</header>
+
+<div class="toc">
+  <a href="#probleem">1. Probleem</a><br/>
+  <a href="#oorzaak">2. Root cause</a><br/>
+  <a href="#design">3. Design / Aanpak</a><br/>
+  <a href="#units">4. Implementation Units</a><br/>
+  <a href="#tests">5. Tests</a><br/>
+  <a href="#risks">6. Risks &amp; Edge Cases</a><br/>
+  <a href="#verify">7. Verificatie</a><br/>
+  <a href="#scope">8. Scope &amp; Defers</a>
+</div>
+
+<!-- ============= 1. PROBLEEM ============= -->
+<h2 id="probleem">1. Probleem</h2>
+
+<div class="card">
+  <p><b>Wat de gebruiker ziet:</b></p>
+  <ul>
+    <li>In het <code>command</code> repo verschijnt maar <b>1 chat</b> in het project overview, terwijl er gisteren meerdere chats waren.</li>
+    <li>Bij andere repos in <code>C:\Users\RemcoVolmer\Code\</code> (bv. <code>pascal_ai</code>) verschijnen <b>helemaal geen chats</b> in het overview, ook al is daar gisteren in gewerkt.</li>
+    <li>Hook-gegenereerde titels en samenvattingen (<code>~/.claude/session-summaries.json</code>) zijn aanwezig en up-to-date, maar koppelen niet aan sessies.</li>
+  </ul>
+  <p><b>Impact:</b> "Recent sessions" in <code>ProjectOverview.tsx</code> is voor de meeste projecten leeg of incompleet. Resuming via overview is daardoor effectief stuk.</p>
+</div>
+
+<!-- ============= 2. OORZAAK ============= -->
+<h2 id="oorzaak">2. Root cause &mdash; twee gerelateerde bugs</h2>
+
+<h3>Bug A &nbsp;<span class="pill danger">CRITICAL</span>&nbsp; Encoding mismatch met Claude Code</h3>
+
+<p><code>encodeProjectPath()</code> in <code>electron/main/services/SessionIndexService.ts</code> (regels 54-56) vervangt alleen <code>/</code>, <code>\</code> en <code>:</code> door <code>-</code>:</p>
+
+<pre>export function encodeProjectPath(cwd: string): string {
+  return cwd.replace(/[/\\\\:]/g, '-').replace(/^-/, '')
+}</pre>
+
+<p>Claude Code zelf vervangt echter <b>elk niet-alfanumeriek karakter</b> (behalve <code>-</code>) door <code>-</code>. Bewijs uit <code>~/.claude/projects/</code>:</p>
+
+<table>
+  <thead><tr><th>Project path op disk</th><th>Claude Code dirnaam</th><th>Wat command zoekt</th><th>Match?</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>C:\Users\RemcoVolmer\Code\command</code></td>
+      <td><code>C--Users-RemcoVolmer-Code-command</code></td>
+      <td><code>C--Users-RemcoVolmer-Code-command</code></td>
+      <td><span class="pill ok">ok</span></td>
+    </tr>
+    <tr>
+      <td><code>C:\Users\RemcoVolmer\Code\pascal_ai</code></td>
+      <td><code>C--Users-RemcoVolmer-Code-pascal-ai</code></td>
+      <td><code>C--Users-RemcoVolmer-Code-pascal_ai</code></td>
+      <td><span class="pill danger">404</span></td>
+    </tr>
+    <tr>
+      <td><code>...\.claude</code> (subpath)</td>
+      <td><code>...--claude</code> (dot &rarr; dash)</td>
+      <td><code>...-.claude</code> (dot blijft staan)</td>
+      <td><span class="pill danger">404</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Geraakt zijn dus alle repos met <code>_</code>, <code>.</code> of andere speciale chars in het pad. In <code>C:\Users\RemcoVolmer\Code\</code> staat:</p>
+<p style="font-family: var(--mono); font-size: 13px;">
+  command, deep_personality, fbto_coaching, intern_ai, intern_transcriptie, intern_zorgvergelijker, local_llm, mark_dadchelor, nn_bp_dashboard, pascal_ai, pascal_jurisprudentie, portfolio, portfolio_tracker, riverwise_marketplace, unive_klantcontact_ai, vattenfall_voorkomen, vattenfall_voorkomen_handover, VolmerEnterprise
+</p>
+<p>&rArr; <b>14 van de 18 projecten</b> worden geraakt door deze encoding bug.</p>
+
+<h3>Bug B &nbsp;<span class="pill warn">HIGH</span>&nbsp; Worktree-sessies aggregeren niet in parent overview</h3>
+
+<p>Claude Code gebruikt <i>per actieve cwd</i> een aparte projectdirectory. Een chat gestart in <code>command\.worktrees\fix-chat-summary-overview</code> komt in een eigen dir terecht:</p>
+
+<pre>~/.claude/projects/
+  C--Users-RemcoVolmer-Code-command                                          &larr; 2 jsonls
+  C--Users-RemcoVolmer-Code-command--worktrees-fix-chat-summary-overview     &larr; 1 jsonl
+  C--Users-RemcoVolmer-Code-command--worktrees-feat-improve-design           &larr; jsonls
+  C--Users-RemcoVolmer-Code-command--worktrees-feat-file-editor              &larr; jsonls
+  ...&gt; 30 worktree-dirs voor het command project</pre>
+
+<p>De huidige <code>SessionIndexService.scanJsonlFiles()</code> kijkt alleen in de letterlijke project-dir. Dus als de gebruiker het <code>command</code>-project opent in Command Center, ziet ie alleen de 2 jsonls van de root &mdash; niet de tientallen worktree-sessies. <b>Dit verklaart het "maar 1 chat"-symptoom.</b></p>
+
+<div class="quote">
+  <b>Verifieerbaar:</b> de directory <code>C--Users-RemcoVolmer-Code-pascal-ai</code> bevat 10 jsonls, w.o. eentje van 21 mei (gisteren). Na Bug A-fix verschijnen die direct.
+</div>
+
+<!-- ============= 3. DESIGN ============= -->
+<h2 id="design">3. Design / Aanpak</h2>
+
+<div class="grid-2">
+  <div class="card">
+    <h3 style="margin-top:0;">Fix Bug A &mdash; Encoding</h3>
+    <p>Vervang regex in <code>encodeProjectPath()</code> door een class die <b>alles behalve <code>[A-Za-z0-9-]</code></b> vervangt door <code>-</code>. Geen multi-dash collapse: Claude Code doet dat ook niet (zie <code>C--Users-RemcoVolmer--claude</code> met dubbele dash bij <code>\\.</code>).</p>
+    <pre>cwd.replace(/[^A-Za-z0-9-]/g, '-').replace(/^-/, '')</pre>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Fix Bug B &mdash; Worktree-aggregatie</h3>
+    <p>In <code>scanJsonlFiles()</code>: lees <i>alle</i> directories in <code>~/.claude/projects/</code> waarvan de naam start met <code>&lt;encoded-project&gt;-</code> (extra trailing dash). Parse jsonls uit de root-dir &Eacute;n de matchende worktree-dirs in &eacute;&eacute;n cache.</p>
+    <p>Voordeel: <i>geen</i> afhankelijkheid van <code>WorktreeService</code> &mdash; we vinden ook sessies van inmiddels verwijderde worktrees, en het werkt voor mensen die <code>git worktree</code> buiten Command Center om gebruiken.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Waarom geen "scan alle dirs"?</h3>
+  <p>Alternatief was: scan altijd <code>~/.claude/projects/</code> volledig, filter op cwd-prefix in elke jsonl. Verworpen &mdash; te duur (1000-en jsonls bij power users), bovendien staat de cwd niet altijd in elke jsonl-regel. Prefix-match op dirnaam is goedkoop en deterministisch.</p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">False-positive risico bij prefix-match</h3>
+  <p><code>command</code> &rArr; prefix <code>C--Users-RemcoVolmer-Code-command-</code>. Match: <code>C--Users-RemcoVolmer-Code-command-mvp</code> als de gebruiker ooit een ander project <code>command-mvp</code> had. <b>Niet kritisch</b> (de jsonl-content bepaalt of het &eacute;cht een command-sessie is), maar we filteren strenger: alleen dirs die na de prefix beginnen met <code>-worktrees-</code> of <code>--worktrees-</code> (Claude's encoding van <code>/worktrees</code> resp. <code>/.worktrees</code>) tellen mee.</p>
+</div>
+
+<!-- ============= 4. UNITS ============= -->
+<h2 id="units">4. Implementation Units</h2>
+
+<!-- U1 -->
+<div class="card">
+  <div class="unit-head">
+    <span class="pill accent">U1</span>
+    <h3>Fix <code>encodeProjectPath()</code> &mdash; volledige Claude Code-encoding</h3>
+  </div>
+  <div class="field"><span class="label">Goal</span> Path-encoding matcht 1:1 met Claude Code's dirnaam-conventie.</div>
+  <div class="field"><span class="label">Files</span>
+    <ul>
+      <li><code>electron/main/services/SessionIndexService.ts</code> &mdash; regels 54-56</li>
+      <li><code>test/sessionIndexService.test.ts</code> &mdash; encoding-tests toevoegen</li>
+    </ul>
+  </div>
+  <div class="field"><span class="label">Approach</span>
+    <ol>
+      <li>Vervang regex door <code>/[^A-Za-z0-9-]/g</code>.</li>
+      <li>Vervolg-call <code>.replace(/^-/, '')</code> blijft staan (strip eventuele leading dash voor Unix-paden).</li>
+      <li>Voeg JSDoc toe met expliciete verwijzing naar Claude Code's encoding-regel en voorbeelden.</li>
+      <li>Check of <code>encodeProjectPath</code> elders in de codebase wordt gebruikt &mdash; gebruik momenteel beperkt tot <code>SessionIndexService</code> (zie grep-resultaat in research).</li>
+    </ol>
+  </div>
+  <div class="field"><span class="label">Dependencies</span> geen</div>
+</div>
+
+<!-- U2 -->
+<div class="card">
+  <div class="unit-head">
+    <span class="pill accent">U2</span>
+    <h3>Aggregeer worktree-sessies in <code>scanJsonlFiles()</code></h3>
+  </div>
+  <div class="field"><span class="label">Goal</span> Het project overview toont sessies van zowel de root-cwd als alle worktrees onder dat project.</div>
+  <div class="field"><span class="label">Files</span>
+    <ul>
+      <li><code>electron/main/services/SessionIndexService.ts</code> &mdash; <code>scanJsonlFiles()</code>, <code>getProjectDir()</code></li>
+    </ul>
+  </div>
+  <div class="field"><span class="label">Approach</span>
+    <ol>
+      <li>Splits <code>getProjectDir(projectPath)</code> in: <code>getEncodedProjectKey(projectPath)</code> (return de string) + <code>getProjectsRoot()</code> (return <code>~/.claude/projects</code>).</li>
+      <li>In <code>scanJsonlFiles()</code>: lees <code>readdir(projectsRoot)</code>, filter dirs die exact <code>encodedKey</code> matchen <b>of</b> starten met <code>encodedKey + '-worktrees-'</code> <b>of</b> <code>encodedKey + '--worktrees-'</code>.</li>
+      <li>Parse jsonls uit alle matchende dirs in dezelfde batch-loop. Cache key blijft <code>sessionId</code> (uniek per jsonl-bestand).</li>
+      <li>Per <code>SessionIndexEntry</code> opslaan welke dir hij vandaan komt (nieuw veld <code>sourceProjectDir?: string</code> &mdash; optioneel, alleen voor debug/logging).</li>
+      <li>Sortering/limit blijft <code>getRecentSessions()</code> (sorts on <code>modified</code>) &mdash; geen wijzigingen nodig.</li>
+    </ol>
+  </div>
+  <div class="field"><span class="label">Dependencies</span> U1 (encoding moet kloppen voordat prefix-match werkt)</div>
+</div>
+
+<!-- U3 -->
+<div class="card">
+  <div class="unit-head">
+    <span class="pill accent">U3</span>
+    <h3>Strengere worktree-prefix filter (anti-false-positive)</h3>
+  </div>
+  <div class="field"><span class="label">Goal</span> Voorkom dat een ongerelateerd project <code>command-mvp</code> matcht als worktree van <code>command</code>.</div>
+  <div class="field"><span class="label">Files</span>
+    <ul>
+      <li><code>electron/main/services/SessionIndexService.ts</code></li>
+    </ul>
+  </div>
+  <div class="field"><span class="label">Approach</span>
+    <ul>
+      <li>Match alleen wanneer de suffix start met <code>-worktrees-</code> (Unix) of <code>--worktrees-</code> (Windows met <code>.worktrees</code>) of <code>--claude-worktrees-</code> (Claude Code's eigen worktree-format, zie evidence: <code>C--Users-RemcoVolmer-Code-pascal-ai--claude-worktrees-interesting-knuth-9f27fc</code>).</li>
+      <li>Definieer als constante <code>const WORKTREE_SUFFIX_PATTERNS = ['-worktrees-', '--worktrees-', '--claude-worktrees-']</code>.</li>
+    </ul>
+  </div>
+  <div class="field"><span class="label">Dependencies</span> U2</div>
+</div>
+
+<!-- U4 -->
+<div class="card">
+  <div class="unit-head">
+    <span class="pill accent">U4</span>
+    <h3>UI: <i>(optioneel)</i> worktree-badge in sessions-lijst</h3>
+  </div>
+  <div class="field"><span class="label">Goal</span> Gebruiker ziet welke sessies uit een worktree komen, zodat "ik dacht dat dit in main was" niet verwarrend wordt.</div>
+  <div class="field"><span class="label">Files</span>
+    <ul>
+      <li><code>src/components/ProjectOverview.tsx</code></li>
+      <li><code>src/types/index.ts</code> (eventueel <code>worktreeName?: string</code> veld toevoegen)</li>
+    </ul>
+  </div>
+  <div class="field"><span class="label">Approach</span>
+    <ul>
+      <li>Toon naast de <code>GitBranch</code> indicator een subtiele label "(worktree)" voor sessies die uit een worktree-dir komen. De <code>gitBranch</code> in de sessie-entry geeft al de branchnaam &mdash; dit is verfijning, niet kern.</li>
+      <li>Markeer als <b>defer</b> tenzij U2 evident verwarring oplevert tijdens manual test.</li>
+    </ul>
+  </div>
+  <div class="field"><span class="label">Dependencies</span> U2</div>
+</div>
+
+<!-- ============= 5. TESTS ============= -->
+<h2 id="tests">5. Test scenarios</h2>
+
+<div class="card">
+  <h3 style="margin-top:0;">U1 &mdash; <code>encodeProjectPath</code> (unit, <code>test/sessionIndexService.test.ts</code>)</h3>
+  <ul>
+    <li><code>C:\Users\Foo\Code\command</code> &rarr; <code>C--Users-Foo-Code-command</code> (baseline, regressie-check)</li>
+    <li><code>C:\Users\Foo\Code\pascal_ai</code> &rarr; <code>C--Users-Foo-Code-pascal-ai</code> (underscore &rarr; dash) <span class="pill danger">faalt nu</span></li>
+    <li><code>C:\Users\Foo\.claude</code> &rarr; <code>C--Users-Foo--claude</code> (dot &rarr; dash, dubbele dash blijft) <span class="pill danger">faalt nu</span></li>
+    <li><code>C:\Users\Foo\Code\command\.worktrees\fix-x</code> &rarr; <code>C--Users-Foo-Code-command--worktrees-fix-x</code></li>
+    <li><code>/Users/foo/code/pascal_ai</code> (Unix) &rarr; <code>Users-foo-code-pascal-ai</code> (leading dash gestript)</li>
+    <li>Path met spaties: <code>C:\Users\Foo\Code\my project</code> &rarr; <code>C--Users-Foo-Code-my-project</code></li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">U2/U3 &mdash; worktree-aggregatie (integration, <code>test/sessionIndexService.test.ts</code>)</h3>
+  <ul>
+    <li>Mock <code>readdir</code> voor <code>~/.claude/projects/</code> die dirs returnt: <code>C--Users-Foo-Code-command</code>, <code>C--Users-Foo-Code-command--worktrees-feat-x</code>, <code>C--Users-Foo-Code-command--worktrees-fix-y</code>, <code>C--Users-Foo-Code-other</code>. Verwacht: bij <code>loadForProject('C:\Users\Foo\Code\command')</code> worden alleen de eerste drie gescand, <code>-other</code> niet.</li>
+    <li>False-positive guard: dir <code>C--Users-Foo-Code-command-mvp</code> mag <b>niet</b> matchen op project <code>command</code>.</li>
+    <li>Lege root-dir maar wel worktree-dirs &rarr; sessies uit worktrees verschijnen alsnog (regression check op de huidige early-return bij <code>jsonlFiles.length === 0</code>).</li>
+    <li>Sortering: sessies uit verschillende dirs worden gemengd gesorteerd op <code>modified</code>.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Manual smoke (geen test, voor <code>npm run dev</code>)</h3>
+  <ol>
+    <li>Open <code>command</code> project &rarr; verwacht meerdere sessies in overview, inclusief van vandaag <code>1cbfba5f-...</code> en <code>3c409f99-...</code> &Eacute;n recente worktree-sessies.</li>
+    <li>Open <code>pascal_ai</code> project &rarr; verwacht 10 sessies, w.o. die van 21 mei.</li>
+    <li>Klik een worktree-sessie aan &rarr; resume werkt zonder errors (sessionId is uniek, terminal start met <code>claude --resume &lt;id&gt;</code>).</li>
+    <li>Hook-titels uit <code>session-summaries.json</code> verschijnen waar aanwezig (test met sessie <code>8aad4558-...</code>).</li>
+  </ol>
+</div>
+
+<!-- ============= 6. RISKS ============= -->
+<h2 id="risks">6. Risks &amp; Edge Cases</h2>
+
+<table>
+  <thead><tr><th>Risk</th><th>Likelihood</th><th>Mitigatie</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Claude Code wijzigt encoding in toekomstige versie</td>
+      <td>laag</td>
+      <td>JSDoc bij <code>encodeProjectPath</code> die expliciet verwijst naar empirische bron (lijst <code>~/.claude/projects/</code>). Tests fixeren de current rule. Versie-noot in <code>SessionIndexService.ts</code>.</td>
+    </tr>
+    <tr>
+      <td>Aggregatie scant te veel dirs &rarr; trage initial load</td>
+      <td>middel bij power users (100+ projects)</td>
+      <td><code>readdir</code> in <code>~/.claude/projects/</code> is &eacute;&eacute;n syscall, dirnamen-filter is O(n) string-match. Batch-parser van 10 jsonls tegelijk blijft de bottleneck en is ongewijzigd.</td>
+    </tr>
+    <tr>
+      <td>False-positive prefix-match op vergelijkbare projectnaam</td>
+      <td>middel</td>
+      <td>U3: alleen <code>-worktrees-</code>, <code>--worktrees-</code>, <code>--claude-worktrees-</code> suffix patronen.</td>
+    </tr>
+    <tr>
+      <td>Worktree-sessies van inmiddels verwijderde worktrees worden getoond</td>
+      <td>hoog (verwacht)</td>
+      <td>By design &mdash; user wil ze juist kunnen resumen. <code>git worktree remove</code> verwijdert geen jsonls. Eventuele cleanup is een aparte feature.</td>
+    </tr>
+    <tr>
+      <td>Encoding-fix breekt bestaande caches</td>
+      <td>nihil</td>
+      <td>Cache is in-memory <code>Map</code> per service-instance, geen persistente cache-key. Geen migratie nodig.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============= 7. VERIFY ============= -->
+<h2 id="verify">7. Verificatie &mdash; klaar als</h2>
+
+<div class="card">
+  <ul>
+    <li><code>npm run test -- test/sessionIndexService.test.ts</code> groen, inclusief nieuwe encoding-tests en aggregatie-tests.</li>
+    <li>Handmatige test op <code>command</code>: minimaal &gt; 2 sessies zichtbaar in overview (er staan tientallen worktree-dirs).</li>
+    <li>Handmatige test op <code>pascal_ai</code>: minimaal 10 sessies zichtbaar.</li>
+    <li>Geen regressie op projecten die nu wel werken (puur alfanumerieke naam zonder worktrees, bv. <code>portfolio</code> &mdash; check dat encoding identiek blijft).</li>
+    <li><code>npm run build</code> compileert zonder type-errors.</li>
+    <li>Geen ESLint-warnings op gewijzigde files.</li>
+  </ul>
+</div>
+
+<!-- ============= 8. SCOPE ============= -->
+<h2 id="scope">8. Scope &amp; Defers</h2>
+
+<div class="grid-2">
+  <div class="card">
+    <h3 style="margin-top:0;">In scope</h3>
+    <ul>
+      <li>Path-encoding match met Claude Code (U1)</li>
+      <li>Worktree-sessie aggregatie in overview (U2-U3)</li>
+      <li>Tests + manual verify</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0;">Defer</h3>
+    <ul>
+      <li>U4 worktree-badge in UI (afhankelijk van manual-test verwarring)</li>
+      <li>Cleanup van weeskinderen-jsonls van verwijderde worktrees</li>
+      <li>"Show sessions from all projects" view</li>
+      <li>Persistente sessie-cache (file-gebaseerd) &mdash; nu in-memory en goedkoop genoeg</li>
+      <li>Reverse-encoding helper (van encoded key &rarr; cwd) &mdash; alleen nodig als we worktree-naam willen tonen, en die kunnen we ook uit <code>gitBranch</code> halen</li>
+    </ul>
+  </div>
+</div>
+
+<div class="quote">
+  <b>Eerste concrete stap (&lt; 10 min):</b> open <code>electron/main/services/SessionIndexService.ts</code>, pas regel 55 aan naar <code>/[^A-Za-z0-9-]/g</code>, run <code>npm run dev</code>, open <code>pascal_ai</code> in Command Center, check of er sessies verschijnen. Dat valideert Bug A direct &mdash; daarna pas aan U2 beginnen.
+</div>
+
+</div>
+</body>
+</html>

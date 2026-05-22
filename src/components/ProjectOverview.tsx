@@ -137,6 +137,14 @@ export function ProjectOverview({
                       {session.gitBranch}
                     </span>
                   )}
+                  {session.worktreeName && (
+                    <span
+                      className="px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground"
+                      title={`Worktree: ${session.worktreeName}`}
+                    >
+                      worktree
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <MessageSquare className="w-3 h-3" />
                     {session.messageCount}
