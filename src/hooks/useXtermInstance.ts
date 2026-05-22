@@ -162,15 +162,12 @@ export function useXtermInstance({
             api.fs.stat(decision.resolved).then((stat) => {
               if (stat.exists && stat.isFile) {
                 store.openEditorTab(stat.resolved, decision.fileName, projectId)
-              } else {
-                console.warn('[osc8] file not found or outside project:', decision.resolved)
               }
-            }).catch((err) => {
-              console.warn('[osc8] stat failed:', err)
-            })
+            }).catch(() => { /* silent — fs:stat never throws but defense in depth */ })
             return
           }
-          console.warn('[osc8] ignored:', decision.reason, text)
+          // decision.kind === 'ignore' — silent no-op (wrong extension, traversal,
+          // unsupported scheme, oversized URI, etc.)
         },
       } : undefined,
     })
