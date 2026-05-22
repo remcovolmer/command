@@ -79,7 +79,7 @@ export function TerminalTabBar({
           >
             <TerminalIcon className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="text-xs font-medium whitespace-nowrap">
-              {terminal.title}
+              {terminal.generatedTitle || terminal.title}
             </span>
             <span
               className={`w-2 h-2 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${

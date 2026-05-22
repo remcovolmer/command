@@ -160,7 +160,7 @@ export function TerminalArea() {
     [activeProjectId, setSplitSizes]
   )
 
-  const handleResumeSession = useCallback(async (sessionId: string) => {
+  const handleResumeSession = useCallback(async (sessionId: string, initialTitle?: string) => {
     if (!activeProjectId) return
     const terminalId = await api.terminal.create(activeProjectId, undefined, 'claude', sessionId)
     if (terminalId) {
@@ -170,7 +170,7 @@ export function TerminalArea() {
         worktreeId: null,
         state: 'busy',
         lastActivity: Date.now(),
-        title: 'Resuming...',
+        title: initialTitle || 'Resuming...',
         type: 'claude',
       })
       setActiveCenterTab(terminalId)

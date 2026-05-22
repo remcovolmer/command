@@ -8,7 +8,7 @@ interface ProjectOverviewProps {
   projectName: string
   projectPath: string
   onCreateTerminal: () => void
-  onResumeSession: (sessionId: string) => void
+  onResumeSession: (sessionId: string, initialTitle?: string) => void
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -107,29 +107,28 @@ export function ProjectOverview({
             Recent Sessions
           </h3>
           <div className="space-y-2">
-            {sessions.map((session) => (
+            {sessions.map((session) => {
+              const sessionTitle = session.generatedTitle || session.summary || session.firstPrompt
+              const subtitle = session.generatedSummary || session.firstPrompt
+              return (
               <button
                 key={session.sessionId}
-                onClick={() => onResumeSession(session.sessionId)}
+                onClick={() => onResumeSession(session.sessionId, sessionTitle)}
                 className="w-full text-left p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span className="text-sm font-medium text-sidebar-foreground truncate flex-1">
-                    {session.generatedTitle || session.summary || session.firstPrompt || 'Untitled session'}
+                    {sessionTitle || 'Untitled session'}
                   </span>
                   <span className="text-[10px] text-muted-foreground flex-shrink-0 mt-0.5">
                     {formatRelativeTime(session.modified)}
                   </span>
                 </div>
-                {(() => {
-                  const title = session.generatedTitle || session.summary || session.firstPrompt
-                  const subtitle = session.generatedSummary || session.firstPrompt
-                  return subtitle && subtitle !== title ? (
-                    <p className="text-xs text-muted-foreground line-clamp-3 mb-2">
-                      {subtitle}
-                    </p>
-                  ) : null
-                })()}
+                {subtitle && subtitle !== sessionTitle ? (
+                  <p className="text-xs text-muted-foreground line-clamp-3 mb-2">
+                    {subtitle}
+                  </p>
+                ) : null}
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   {session.gitBranch && (
                     <span className="flex items-center gap-1">
@@ -161,7 +160,8 @@ export function ProjectOverview({
                   )}
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
