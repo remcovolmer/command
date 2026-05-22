@@ -68,6 +68,30 @@ describe('AutomationPersistence.pruneRuns', () => {
     expect(updated?.status).toBe('completed')
   })
 
+  test('mixed running + terminal: caps terminal, keeps running', () => {
+    const automationId = 'automation-mixed'
+
+    persistence.addRun({
+      automationId,
+      projectId: 'project-1',
+      status: 'running',
+      startedAt: '2026-05-21T00:00:00.000Z',
+      read: false,
+    })
+
+    const baseTime = new Date('2026-05-22T00:00:00.000Z').getTime()
+    for (let i = 0; i < MAX_RUNS_PER_AUTOMATION + 5; i++) {
+      addCompletedRun(persistence, automationId, new Date(baseTime + i * 1000).toISOString())
+    }
+
+    const all = persistence.getRuns(automationId)
+    const running = all.filter(r => r.status === 'running')
+    const terminal = all.filter(r => r.status !== 'running')
+
+    expect(running.length).toBe(1)
+    expect(terminal.length).toBe(MAX_RUNS_PER_AUTOMATION)
+  })
+
   test('still caps terminal-state runs at MAX_RUNS_PER_AUTOMATION', () => {
     const automationId = 'automation-2'
     const baseTime = new Date('2026-05-22T00:00:00.000Z').getTime()

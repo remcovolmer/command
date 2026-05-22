@@ -168,7 +168,13 @@ export class AutomationPersistence {
 
   updateRun(id: string, updates: Partial<Omit<AutomationRun, 'id' | 'automationId'>>): AutomationRun | null {
     const run = this.runState.runs.find(r => r.id === id)
-    if (!run) return null
+    if (!run) {
+      // A missing id here means the record was lost between addRun() and the
+      // owning updateRun() — most likely a pruning bug. Surface it so the
+      // silent-failure mode this guard was added against is debuggable.
+      console.warn(`[AutomationPersistence] updateRun: no run with id ${id}; update dropped`)
+      return null
+    }
 
     Object.assign(run, updates)
     this.saveRuns()
