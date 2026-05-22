@@ -205,7 +205,9 @@ export class AutomationPersistence {
   // --- Private helpers ---
 
   private pruneRuns(): void {
-    // Group by automationId, keep max MAX_RUNS_PER_AUTOMATION per automation
+    // Running runs are never pruned: their later updateRun() call would no-op
+    // and the result (sessionId, exitCode, worktreeBranch, PR info) would be
+    // silently dropped. Apply the cap to terminal-state runs only.
     const byAutomation = new Map<string, AutomationRun[]>()
     for (const run of this.runState.runs) {
       const list = byAutomation.get(run.automationId) ?? []
@@ -215,8 +217,13 @@ export class AutomationPersistence {
 
     const kept: AutomationRun[] = []
     for (const [, runs] of byAutomation) {
-      runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-      kept.push(...runs.slice(0, MAX_RUNS_PER_AUTOMATION))
+      const running: AutomationRun[] = []
+      const terminal: AutomationRun[] = []
+      for (const run of runs) {
+        (run.status === 'running' ? running : terminal).push(run)
+      }
+      terminal.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+      kept.push(...running, ...terminal.slice(0, MAX_RUNS_PER_AUTOMATION))
     }
     this.runState.runs = kept
   }
