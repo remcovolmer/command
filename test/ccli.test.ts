@@ -356,9 +356,23 @@ describe('ccli', () => {
     beforeAll(
       () =>
         new Promise<void>((resolve) => {
-          server = http.createServer((_req, res) => {
-            res.writeHead(500, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ ok: false, error: 'Internal server error' }))
+          // Node's http.globalAgent has keepAlive: true since v19; pooled sockets
+          // from the earlier `httpRequest` describe can race this describe's
+          // server close and surface as ECONNRESET on Windows. Destroy the pool
+          // up front so the request below opens a fresh socket.
+          http.globalAgent.destroy()
+          server = http.createServer((req, res) => {
+            // Drain the request body before responding, and signal `Connection: close`
+            // so the client tears down cleanly instead of returning the socket to
+            // the keep-alive pool, where it would be reaped racily.
+            req.on('data', () => {})
+            req.on('end', () => {
+              res.writeHead(500, {
+                'Content-Type': 'application/json',
+                'Connection': 'close',
+              })
+              res.end(JSON.stringify({ ok: false, error: 'Internal server error' }))
+            })
           })
           server.listen(0, '127.0.0.1', () => {
             const addr = server.address()
