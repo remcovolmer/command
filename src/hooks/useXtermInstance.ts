@@ -10,6 +10,7 @@ import { getElectronAPI } from '../utils/electron'
 import { terminalEvents } from '../utils/terminalEvents'
 import { buildTerminalTheme, invalidateTerminalThemeCache } from '../utils/terminalTheme'
 import { createFileLinkProvider } from '../utils/fileLinkProvider'
+import { classifyOsc8Uri } from '../utils/osc8LinkRouter'
 import { terminalPool } from '../utils/terminalPool'
 
 // Timing constants for terminal dimension calculations
@@ -125,6 +126,15 @@ export function useXtermInstance({
     isDisposedRef.current = false
     isReadyRef.current = false
 
+    // Resolve project/worktree base path up front — shared by linkHandler (OSC 8
+    // hyperlinks below) and the FileLinkProvider (plain-text paths, registered
+    // after terminal.open). Empty for sidecar/normal terminals without a project.
+    const store = useProjectStore.getState()
+    const termSession = store.terminals[id]
+    const worktree = termSession?.worktreeId ? store.worktrees[termSession.worktreeId] : null
+    const project = store.projects.find(p => p.id === projectId)
+    const contextPath = projectId ? (worktree?.path || project?.path || '') : ''
+
     const terminal = new XTerm({
       cursorBlink: true,
       cursorStyle: 'block',
@@ -136,6 +146,30 @@ export function useXtermInstance({
       allowProposedApi: true,
       letterSpacing: 0,
       customGlyphs: true,
+      // OSC 8 hyperlink handler for chat terminals. Claude Code wraps every
+      // markdown link in OSC 8 with a bare relative path as URI; xterm's default
+      // filters non-HTTP protocols, so allowNonHttpProtocols is required. The
+      // classifier in osc8LinkRouter is the single security chokepoint.
+      linkHandler: contextPath ? {
+        allowNonHttpProtocols: true,
+        activate: (_event, text) => {
+          const decision = classifyOsc8Uri(text, contextPath)
+          if (decision.kind === 'external') {
+            api.shell.openExternal(decision.url).catch(console.error)
+            return
+          }
+          if (decision.kind === 'editor') {
+            api.fs.stat(decision.resolved).then((stat) => {
+              if (stat.exists && stat.isFile) {
+                store.openEditorTab(stat.resolved, decision.fileName, projectId)
+              }
+            }).catch(() => { /* silent — fs:stat never throws but defense in depth */ })
+            return
+          }
+          // decision.kind === 'ignore' — silent no-op (wrong extension, traversal,
+          // unsupported scheme, oversized URI, etc.)
+        },
+      } : undefined,
     })
 
     const fitAddon = new FitAddon()
@@ -202,20 +236,14 @@ export function useXtermInstance({
     // Activate Unicode 11 for correct character width calculations
     terminal.unicode.activeVersion = '11'
 
-    // Register file link provider for clickable file paths
-    if (projectId) {
-      const store = useProjectStore.getState()
-      const termSession = store.terminals[id]
-      const worktree = termSession?.worktreeId ? store.worktrees[termSession.worktreeId] : null
-      const project = store.projects.find(p => p.id === projectId)
-      const contextPath = worktree?.path || project?.path || ''
-      if (contextPath) {
-        terminal.registerLinkProvider(
-          createFileLinkProvider(terminal, contextPath, api, (filePath, fileName) => {
-            store.openEditorTab(filePath, fileName, projectId)
-          })
-        )
-      }
+    // Register file link provider for plain-text clickable file paths (Ctrl+click).
+    // OSC 8 hyperlinks are handled separately by linkHandler above.
+    if (projectId && contextPath) {
+      terminal.registerLinkProvider(
+        createFileLinkProvider(terminal, contextPath, api, (filePath, fileName) => {
+          store.openEditorTab(filePath, fileName, projectId)
+        })
+      )
     }
 
     terminalRef.current = terminal

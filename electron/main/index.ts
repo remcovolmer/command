@@ -829,7 +829,17 @@ ipcMain.handle('fs:writeFile', async (_event, filePath: string, content: string)
 })
 
 ipcMain.handle('fs:stat', async (_event, filePath: string) => {
-  const resolved = validateFilePathInProject(filePath)
+  // fs:stat is an existence-check IPC: it never throws. Validation failures
+  // (path outside any registered project) and stat failures (file missing)
+  // both collapse to { exists: false }. Callers like fileLinkProvider and the
+  // OSC 8 linkHandler in useXtermInstance rely on this for silent rejection
+  // of unknown paths without surfacing main-process error logs.
+  let resolved: string
+  try {
+    resolved = validateFilePathInProject(filePath)
+  } catch {
+    return { exists: false, isFile: false, resolved: '' }
+  }
   try {
     const stat = await fs.stat(resolved)
     return { exists: true, isFile: stat.isFile(), resolved }

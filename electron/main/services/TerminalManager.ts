@@ -118,6 +118,15 @@ export class TerminalManager {
     }
     env.COMMAND_CENTER_TERMINAL_ID = id
 
+    // Force Claude (and other supports-hyperlinks-aware CLIs) to emit OSC 8
+    // hyperlinks for chat sessions. xterm.js renders these as styled links and
+    // the linkHandler in useXtermInstance routes md/html clicks into the editor.
+    // Without this, Claude detects xterm-256color as a non-hyperlink terminal
+    // and falls back to plain "label (url)" prose.
+    if (type === 'claude') {
+      env.FORCE_HYPERLINK = '1'
+    }
+
     // Prepend CLI directory to PATH so `ccli` is available
     const existingPath = env.PATH || env.Path || ''
     env.PATH = this.cliDir + path.delimiter + existingPath
