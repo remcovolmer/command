@@ -6,6 +6,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
+import { SpawnError, isSpawnError } from './services/errors'
+import { CrashLogger } from './services/CrashLogger'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
 import { GitService } from './services/GitService'
 import { WorktreeService } from './services/WorktreeService'
@@ -29,6 +31,34 @@ import { randomUUID } from 'node:crypto'
 // (happens when parent terminal closes its stdout pipe)
 process.stdout?.on('error', () => {})
 process.stderr?.on('error', () => {})
+
+// Global safety net: prevents the Electron "JavaScript error in main process"
+// crash dialog. The most common trigger is node-pty's WindowsPtyAgent emitting
+// "Cannot create process, error code: 267" from a worker thread when a cwd
+// disappears between project registration and pty.spawn. Registered before
+// app.whenReady so early-boot errors are also captured.
+const crashLogger = new CrashLogger()
+
+function notifyUncaughtError(entry: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string } | null): void {
+  if (!entry || !win || win.isDestroyed()) return
+  try {
+    win.webContents.send('app:uncaught-error', entry)
+  } catch {
+    // window may be in the process of tearing down; nothing we can do
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  const entry = crashLogger.log(err, 'uncaughtException')
+  console.error('[uncaughtException]', err)
+  notifyUncaughtError(entry)
+})
+
+process.on('unhandledRejection', (reason) => {
+  const entry = crashLogger.log(reason, 'unhandledRejection')
+  console.error('[unhandledRejection]', reason)
+  notifyUncaughtError(entry)
+})
 
 // Validation helpers
 const isValidUUID = (id: string): boolean =>
@@ -291,7 +321,16 @@ async function restoreSessions(): Promise<void> {
         summary: session.summary,
       })
     } catch (error) {
-      console.error(`[Session] Failed to restore session:`, error)
+      if (isSpawnError(error)) {
+        // Restore-time spawn failures are silent: log the cause and skip the
+        // session. We do NOT modal-bomb the user during startup for stale
+        // worktrees — those projects show up missing in the sidebar anyway.
+        console.warn(
+          `[Session] Skipping session ${session.claudeSessionId}: ${error.code} for cwd ${error.cwd}`
+        )
+      } else {
+        console.error(`[Session] Failed to restore session:`, error)
+      }
     }
   }
 
@@ -492,16 +531,35 @@ ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?:
   // Resolve env overrides for profile auth mode
   const envOverrides = resolveEnvOverrides(project)
 
-  return terminalManager?.createTerminal({
-    cwd,
-    type,
-    initialTitle,
-    projectId,
-    worktreeId: worktreeId ?? undefined,
-    resumeSessionId: resumeSessionId ?? undefined,
-    claudeMode: project?.settings?.claudeMode,
-    envOverrides,
-  })
+  try {
+    return terminalManager?.createTerminal({
+      cwd,
+      type,
+      initialTitle,
+      projectId,
+      worktreeId: worktreeId ?? undefined,
+      resumeSessionId: resumeSessionId ?? undefined,
+      claudeMode: project?.settings?.claudeMode,
+      envOverrides,
+    })
+  } catch (error) {
+    // Convert SpawnError into a non-throwing, renderer-visible event so the
+    // user gets an inline toast instead of an unhandled IPC rejection or the
+    // Electron "JavaScript error in main process" dialog. Other errors keep
+    // their existing throw path.
+    if (isSpawnError(error)) {
+      win?.webContents.send('terminal:spawn-failed', {
+        projectId,
+        worktreeId,
+        code: error.code,
+        cwd: error.cwd,
+        message: error.message,
+      })
+      console.warn(`[Terminal] Spawn failed: ${error.code} for cwd ${error.cwd}`)
+      return null
+    }
+    throw error
+  }
 })
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
@@ -1384,6 +1442,16 @@ ipcMain.on('app:confirm-close', () => {
 
 ipcMain.on('app:cancel-close', () => {
   // User cancelled, do nothing
+})
+
+ipcMain.handle('app:open-crash-log', async () => {
+  const logPath = crashLogger.getLogPath()
+  try {
+    await shell.openPath(logPath)
+    return { success: true, path: logPath }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
 })
 
 // Sync theme to Claude Code's config (~/.claude.json)

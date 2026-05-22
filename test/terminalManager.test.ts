@@ -32,7 +32,20 @@ vi.mock('electron', () => ({
   BrowserWindow: vi.fn(),
 }))
 
+// Default: cwd validation passes. Individual tests override statSync for
+// missing-dir / not-a-dir scenarios.
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  return {
+    ...actual,
+    statSync: vi.fn(() => ({ isDirectory: () => true })),
+    accessSync: vi.fn(),
+  }
+})
+
+import { statSync } from 'node:fs'
 import { TerminalManager } from '../electron/main/services/TerminalManager'
+import { SpawnError } from '../electron/main/services/errors'
 
 // Helper to flush setTimeout (the SHELL_READY_DELAY_MS timeout)
 function flushTimers() {
@@ -462,5 +475,89 @@ describe('TerminalManager auto-naming: ANSI stripping', () => {
       .filter((c) => c[0] === 'terminal:title' && c[1] === id)
       .map((c) => c[2])
     expect(titles).toEqual([])
+  })
+})
+
+describe('TerminalManager createTerminal cwd validation', () => {
+  let manager: TerminalManager
+  const mockWindow = {
+    isDestroyed: vi.fn(() => false),
+    webContents: { send: vi.fn() },
+  } as any
+  const mockedStat = statSync as unknown as ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockWrite.mockClear()
+    mockOnData.mockClear()
+    mockOnExit.mockClear()
+    mockWindow.webContents.send.mockClear()
+    mockedStat.mockReset()
+    mockedStat.mockReturnValue({ isDirectory: () => true })
+    manager = new TerminalManager(mockWindow)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  test('missing cwd → throws SpawnError with code CWD_MISSING', () => {
+    const enoent: NodeJS.ErrnoException = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    mockedStat.mockImplementation(() => {
+      throw enoent
+    })
+
+    expect(() => manager.createTerminal({ cwd: 'C:\\does\\not\\exist' })).toThrowError(SpawnError)
+    try {
+      manager.createTerminal({ cwd: 'C:\\does\\not\\exist' })
+    } catch (err) {
+      expect(err).toBeInstanceOf(SpawnError)
+      expect((err as SpawnError).code).toBe('CWD_MISSING')
+      expect((err as SpawnError).cwd).toBe('C:\\does\\not\\exist')
+    }
+  })
+
+  test('cwd is a file (not a directory) → throws SpawnError with code CWD_NOT_DIR', () => {
+    mockedStat.mockReturnValue({ isDirectory: () => false })
+
+    expect(() => manager.createTerminal({ cwd: 'C:\\some\\file.txt' })).toThrowError(SpawnError)
+    try {
+      manager.createTerminal({ cwd: 'C:\\some\\file.txt' })
+    } catch (err) {
+      expect((err as SpawnError).code).toBe('CWD_NOT_DIR')
+    }
+  })
+
+  test('unexpected stat error (EACCES) → throws SpawnError with code SPAWN_FAILED', () => {
+    const eacces: NodeJS.ErrnoException = Object.assign(new Error('EACCES'), { code: 'EACCES' })
+    mockedStat.mockImplementation(() => {
+      throw eacces
+    })
+
+    try {
+      manager.createTerminal({ cwd: 'C:\\protected' })
+      throw new Error('expected SpawnError')
+    } catch (err) {
+      expect(err).toBeInstanceOf(SpawnError)
+      expect((err as SpawnError).code).toBe('SPAWN_FAILED')
+    }
+  })
+
+  test('failure does not leak state: terminals map stays empty after CWD_MISSING', () => {
+    const enoent: NodeJS.ErrnoException = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    mockedStat.mockImplementation(() => {
+      throw enoent
+    })
+
+    expect(() => manager.createTerminal({ cwd: 'C:\\gone' })).toThrow(SpawnError)
+    expect(manager.hasActiveTerminals()).toBe(false)
+  })
+
+  test('valid cwd → succeeds and returns terminal id', () => {
+    mockedStat.mockReturnValue({ isDirectory: () => true })
+    const id = manager.createTerminal({ cwd: '/test', type: 'normal' })
+    expect(typeof id).toBe('string')
+    expect(id.length).toBeGreaterThan(0)
+    expect(manager.hasActiveTerminals()).toBe(true)
   })
 })

@@ -4,6 +4,7 @@ import { Sidebar } from '../Sidebar/Sidebar'
 import { TerminalArea } from './TerminalArea'
 import { FileExplorer } from '../FileExplorer/FileExplorer'
 import { UpdateNotification } from '../UpdateNotification'
+import { SpawnErrorToast } from '../notifications/SpawnErrorToast'
 import { useProjectStore } from '../../stores/projectStore'
 
 export function MainLayout() {
@@ -25,6 +26,7 @@ export function MainLayout() {
   return (
     <div className="h-screen w-screen bg-background">
       <UpdateNotification />
+      <SpawnErrorToast />
       <PanelGroup direction="horizontal" autoSaveId="main-layout">
         {/* Sidebar */}
         <Panel

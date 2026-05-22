@@ -401,9 +401,25 @@ export interface RestoredSession {
   summary?: string;
 }
 
+export type SpawnFailureCode = 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED';
+
+export interface SpawnFailedEvent {
+  projectId?: string;
+  worktreeId?: string;
+  code: SpawnFailureCode;
+  cwd: string;
+  message: string;
+}
+
+export interface UncaughtErrorEvent {
+  source: 'uncaughtException' | 'unhandledRejection';
+  message: string;
+  logPath: string;
+}
+
 export interface ElectronAPI {
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: TerminalType, resumeSessionId?: string) => Promise<string>;
+    create: (projectId: string, worktreeId?: string, type?: TerminalType, resumeSessionId?: string) => Promise<string | null>;
     write: (terminalId: string, data: string) => void;
     resize: (terminalId: string, cols: number, rows: number) => void;
     close: (terminalId: string) => void;
@@ -420,6 +436,7 @@ export interface ElectronAPI {
     onSidecarCreated: (callback: (contextKey: string, terminal: TerminalSession) => void) => Unsubscribe;
     onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe;
     onGeneratedTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
+    onSpawnFailed: (callback: (event: SpawnFailedEvent) => void) => Unsubscribe;
   };
   editor: {
     onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void) => Unsubscribe;
@@ -472,6 +489,8 @@ export interface ElectronAPI {
     cancelClose: () => void;
     storeHydrated: () => void;
     syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>;
+    onUncaughtError: (callback: (event: UncaughtErrorEvent) => void) => Unsubscribe;
+    openCrashLog: () => Promise<{ success: boolean; path?: string; error?: string }>;
   };
   fs: {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;

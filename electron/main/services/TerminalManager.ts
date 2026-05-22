@@ -1,9 +1,10 @@
 import { BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { accessSync } from 'node:fs'
+import { accessSync, statSync } from 'node:fs'
 import * as path from 'node:path'
 import * as pty from 'node-pty'
 import { ClaudeHookWatcher } from './ClaudeHookWatcher'
+import { SpawnError } from './errors'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
 
 const SHELL_READY_DELAY_MS = 100
@@ -127,13 +128,39 @@ export class TerminalManager {
       Object.assign(env, options.envOverrides)
     }
 
-    const ptyProcess = pty.spawn(shell, [], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd,
-      env,
-    })
+    // Pre-flight cwd validation. Without this, an invalid cwd surfaces as a
+    // Windows error 267 (ERROR_DIRECTORY) inside node-pty's worker thread,
+    // which escapes as an uncaught exception and the Electron crash dialog.
+    try {
+      const stat = statSync(cwd)
+      if (!stat.isDirectory()) {
+        throw new SpawnError('CWD_NOT_DIR', cwd)
+      }
+    } catch (err) {
+      if (err instanceof SpawnError) throw err
+      const code = (err as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT') {
+        throw new SpawnError('CWD_MISSING', cwd, { cause: err })
+      }
+      throw new SpawnError('SPAWN_FAILED', cwd, { cause: err })
+    }
+
+    // node-pty does not expose a public onError event for async worker
+    // failures (e.g. TOCTOU race between statSync and CreateProcessW). The
+    // try/catch here covers synchronous spawn failures; async failures still
+    // route through the global uncaughtException handler (see CrashLogger).
+    let ptyProcess: pty.IPty
+    try {
+      ptyProcess = pty.spawn(shell, [], {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 24,
+        cwd,
+        env,
+      })
+    } catch (err) {
+      throw new SpawnError('SPAWN_FAILED', cwd, { cause: err })
+    }
 
     const terminal: TerminalInstance = {
       id,

@@ -186,6 +186,7 @@ function App() {
 
       ;(async () => {
         const terminalId = await api.terminal.create(activeProjectId)
+        if (!terminalId) return // spawn-failed event surfaces the error to the user
         const terminal: TerminalSession = {
           id: terminalId,
           projectId: activeProjectId,

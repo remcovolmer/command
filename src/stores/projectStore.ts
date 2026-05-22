@@ -578,6 +578,7 @@ export const useProjectStore = create<ProjectStore>()(
 
         const api = getElectronAPI()
         const terminalId = await api.terminal.create(projectId, worktreeId, 'normal')
+        if (!terminalId) return // spawn-failed event surfaces the error to the user
 
         set((state) => {
           const existing = state.sidecarTerminals[contextKey] ?? []

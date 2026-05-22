@@ -16,8 +16,10 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:worktree-updated',
   'terminal:summary',
   'terminal:generated-title',
+  'terminal:spawn-failed',
   'session:restored',
   'app:close-request',
+  'app:uncaught-error',
   'update:checking',
   'update:available',
   'update:not-available',
@@ -337,6 +339,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('terminal:generated-title', handler)
       return () => ipcRenderer.removeListener('terminal:generated-title', handler)
     },
+
+    onSpawnFailed: (
+      callback: (event: { projectId?: string; worktreeId?: string; code: 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'; cwd: string; message: string }) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        payload: { projectId?: string; worktreeId?: string; code: 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'; cwd: string; message: string }
+      ) => callback(payload)
+      ipcRenderer.on('terminal:spawn-failed', handler)
+      return () => ipcRenderer.removeListener('terminal:spawn-failed', handler)
+    },
   },
 
   // Session index operations (for project overview)
@@ -480,6 +493,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),
+
+    onUncaughtError: (
+      callback: (event: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string }) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        payload: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string }
+      ) => callback(payload)
+      ipcRenderer.on('app:uncaught-error', handler)
+      return () => ipcRenderer.removeListener('app:uncaught-error', handler)
+    },
+
+    openCrashLog: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('app:open-crash-log'),
   },
 
   // File system operations
