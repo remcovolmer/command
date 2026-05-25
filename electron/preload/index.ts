@@ -5,6 +5,16 @@ console.log('[PRELOAD] Script starting...')
 // Type definitions for the exposed API - Claude Code states (5 states)
 type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
 type TerminalType = 'claude' | 'normal'
+// Mirror of SpawnFailureCode in src/types — kept inline because the preload
+// is bundled separately and cannot import from src/.
+type SpawnFailureCode = 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'
+interface SpawnFailedPayload {
+  projectId?: string
+  worktreeId?: string
+  code: SpawnFailureCode
+  cwd: string
+  message: string
+}
 
 // Whitelist of channels that can have listeners removed
 const ALLOWED_LISTENER_CHANNELS = [
@@ -16,8 +26,10 @@ const ALLOWED_LISTENER_CHANNELS = [
   'terminal:worktree-updated',
   'terminal:summary',
   'terminal:generated-title',
+  'terminal:spawn-failed',
   'session:restored',
   'app:close-request',
+  'app:uncaught-error',
   'update:checking',
   'update:available',
   'update:not-available',
@@ -279,7 +291,7 @@ interface SessionIndexEntry {
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal', resumeSessionId?: string): Promise<string> =>
+    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal', resumeSessionId?: string): Promise<string | null> =>
       ipcRenderer.invoke('terminal:create', projectId, worktreeId, type, resumeSessionId),
 
     write: (terminalId: string, data: string): void =>
@@ -359,6 +371,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) => callback(id, title)
       ipcRenderer.on('terminal:generated-title', handler)
       return () => ipcRenderer.removeListener('terminal:generated-title', handler)
+    },
+
+    onSpawnFailed: (callback: (event: SpawnFailedPayload) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: SpawnFailedPayload) =>
+        callback(payload)
+      ipcRenderer.on('terminal:spawn-failed', handler)
+      return () => ipcRenderer.removeListener('terminal:spawn-failed', handler)
     },
   },
 
@@ -503,6 +522,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),
+
+    onUncaughtError: (
+      callback: (event: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string }) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        payload: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string }
+      ) => callback(payload)
+      ipcRenderer.on('app:uncaught-error', handler)
+      return () => ipcRenderer.removeListener('app:uncaught-error', handler)
+    },
+
+    openCrashLog: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('app:open-crash-log'),
   },
 
   // File system operations

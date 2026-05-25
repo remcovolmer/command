@@ -53,11 +53,15 @@ export function useCreateTerminal() {
         return null
       }
 
-      let terminalId: string
+      let terminalId: string | null
       try {
         terminalId = await api.terminal.create(projectId, worktreeId)
       } catch {
         api.notification.show('Error', 'Failed to create terminal')
+        return null
+      }
+      if (!terminalId) {
+        // SpawnError already surfaced via terminal:spawn-failed event/toast
         return null
       }
 

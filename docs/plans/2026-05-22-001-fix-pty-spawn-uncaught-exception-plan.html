@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<title>Fix: PTY spawn uncaught exception (Windows error 267) — Plan</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #151821;
+    --panel-2: #1c2030;
+    --text: #e6e8ef;
+    --muted: #9aa3b2;
+    --accent: #7aa2f7;
+    --accent-2: #bb9af7;
+    --good: #9ece6a;
+    --warn: #e0af68;
+    --bad: #f7768e;
+    --border: #262b3a;
+    --code-bg: #0b0d13;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--text); }
+  body {
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 32px 48px 80px;
+    max-width: 1080px;
+    margin-inline: auto;
+  }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 18px;
+    margin: 36px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: -0.01em;
+  }
+  h3 { font-size: 15px; margin: 18px 0 8px; color: var(--accent); }
+  p { margin: 8px 0; }
+  .meta {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  .meta span + span::before {
+    content: " · ";
+    color: var(--border);
+    margin: 0 4px;
+  }
+  code, pre, kbd {
+    font-family: "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
+    font-size: 13px;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; border: 0; padding: 0; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+  .panel.bad { border-color: rgba(247,118,142,0.45); }
+  .panel.good { border-color: rgba(158,206,106,0.45); }
+  .panel.warn { border-color: rgba(224,175,104,0.45); }
+  .panel h3 { margin-top: 0; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .tag.bad  { color: var(--bad);  border-color: rgba(247,118,142,0.4); }
+  .tag.warn { color: var(--warn); border-color: rgba(224,175,104,0.4); }
+  .tag.good { color: var(--good); border-color: rgba(158,206,106,0.4); }
+  .unit {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+  }
+  .unit h3 { color: var(--text); margin-top: 0; }
+  .unit .field {
+    margin: 6px 0;
+  }
+  .unit .field strong { color: var(--accent); }
+  .unit ul { margin: 4px 0 0 0; padding-left: 22px; }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--panel-2); color: var(--muted); font-weight: 600; }
+  ul.tight li { margin: 2px 0; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
+  .footer { color: var(--muted); font-size: 12px; margin-top: 40px; }
+  .arrow { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Fix: PTY spawn crashes main process with "Cannot create process, error code: 267"</h1>
+<div class="meta">
+  <span>Plan: <code>docs/plans/2026-05-22-001-fix-pty-spawn-uncaught-exception-plan.html</code></span>
+  <span>Branch: <code>fix/pop-up-error</code></span>
+  <span>Type: fix</span>
+  <span>Depth: Standard</span>
+  <span class="tag bad">crash bug</span>
+</div>
+
+<h2>1. Problem Frame</h2>
+
+<div class="panel bad">
+  <p>Op Windows verschijnt onder bepaalde omstandigheden de Electron systeem-dialog:</p>
+  <pre><code>A JavaScript error occurred in the main process
+Uncaught Exception:
+Error: Cannot create process, error code: 267
+    at WindowsPtyAgent._completePtyConnection
+    at EventEmitter2.fire
+    at Worker.&lt;anonymous&gt;
+    at MessagePort.&lt;anonymous&gt; (node:internal/worker:331:53)</code></pre>
+  <p>Na <code>OK</code> klikken kan de app stuk zijn of in een halve staat doorlopen. Dit is een zichtbare, vertrouwen-erodende crash.</p>
+</div>
+
+<h3>Scope</h3>
+<ul class="tight">
+  <li><strong>In scope:</strong> elimineer de uncaught exception bij <code>pty.spawn</code>, zowel root-cause (ongeldige cwd) als safety-net (global handler).</li>
+  <li><strong>Out of scope:</strong> rewrite van session-restore flow, UI om "kapotte" projecten te herstellen, node-pty upgrade (los traject).</li>
+</ul>
+
+<hr/>
+
+<h2>2. Root Cause Analysis</h2>
+
+<div class="panel">
+  <p><strong>Windows error 267</strong> = <code>ERROR_DIRECTORY</code> — "The directory name is invalid". Wordt teruggegeven door <code>CreateProcessW</code> wanneer <code>lpCurrentDirectory</code> niet bestaat, geen directory is, of niet bereikbaar is.</p>
+</div>
+
+<h3>De keten naar de pop-up</h3>
+<table>
+  <thead>
+    <tr><th>#</th><th>Locatie</th><th>Wat er gebeurt</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><code>electron/main/index.ts:457-505</code> (<code>terminal:create</code> IPC)</td>
+      <td>Valideert ID-vormen, kiest <code>cwd</code> uit project/worktree. <strong>Geen disk-existence check</strong> in deze IPC-pad (de session-restore pad checkt wél, lijn 234-238).</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>electron/main/services/TerminalManager.ts:130-136</code></td>
+      <td><code>pty.spawn(shell, [], { cwd, env, ... })</code> — synchroon, geen try/catch, geen pre-validatie.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>node-pty WindowsPtyAgent._completePtyConnection</code></td>
+      <td>Roept <code>CreateProcessW</code> aan op een worker thread. Bij niet-bestaande cwd → error 267.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>Worker.emit('error', ...)</code> via <code>MessagePort</code></td>
+      <td>Error wordt async terug naar de main-thread <code>EventEmitter</code> gefired.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>electron/main/index.ts</code></td>
+      <td><strong>Geen <code>process.on('uncaughtException', …)</code> handler.</strong> (grep bevestigt: 0 matches.) Electron toont default crash-dialog.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Waarom cwd kan verdwijnen tussen registratie en spawn</h3>
+<ul class="tight">
+  <li>Worktree is buiten de app verwijderd (<code>git worktree remove</code>, <code>rm -rf</code>, IDE).</li>
+  <li>Project folder is hernoemd of verplaatst sinds toevoegen aan <code>projects.json</code>.</li>
+  <li>Externe / netwerk drive is ontkoppeld.</li>
+  <li>UNC path of pad met rare karakters dat <code>CreateProcessW</code> afwijst.</li>
+  <li>Race: worktree wordt verwijderd terwijl restore loopt (validatie passeert, spawn faalt milliseconden later).</li>
+</ul>
+
+<h3>Conclusie</h3>
+<div class="panel good">
+  <p>Eén onveilige call (<code>pty.spawn</code> zonder pre-flight check), één ontbrekende vangnet (<code>uncaughtException</code> handler), en één inconsistente IPC-pad (alleen session-restore valideert cwd). Alle drie zijn klein en lokaal te fixen.</p>
+</div>
+
+<hr/>
+
+<h2>3. Solution Approach</h2>
+
+<p>Drie lagen van defense, van specifiek naar generiek:</p>
+
+<div class="grid-2">
+  <div class="panel">
+    <h3>Laag 1 — Voorkomen <span class="tag good">primair</span></h3>
+    <p>cwd valideren <em>vóór</em> <code>pty.spawn</code>. Bij missende cwd: gooi een typed <code>SpawnError</code> die de IPC handler vangt en als gebruikersvriendelijke foutmelding terugstuurt — geen crash.</p>
+  </div>
+  <div class="panel">
+    <h3>Laag 2 — Inkapselen <span class="tag warn">secundair</span></h3>
+    <p>Zelfs als pre-flight passeert (race, UNC, perms): wrap <code>pty.spawn</code> in try/catch én vang async pty <code>error</code> events op. Nooit een unhandled error vanuit de pty laag.</p>
+  </div>
+  <div class="panel">
+    <h3>Laag 3 — Vangnet <span class="tag warn">safety net</span></h3>
+    <p>Globale <code>process.on('uncaughtException')</code> + <code>'unhandledRejection'</code> handler in <code>main/index.ts</code>. Logt naar bestand, stuurt event naar renderer, voorkomt de system-dialog. Generic — vangt ook toekomstige onbekende failure-modes.</p>
+  </div>
+  <div class="panel">
+    <h3>Laag 4 — UX <span class="tag">optioneel</span></h3>
+    <p>Renderer toont een toast/inline error in de terminal-tab: "Working directory bestaat niet meer — wil je het project verwijderen of het pad updaten?" — Buiten scope van deze fix, opgenomen onder <em>Deferred</em>.</p>
+  </div>
+</div>
+
+<hr/>
+
+<h2>4. Key Technical Decisions</h2>
+
+<table>
+  <thead><tr><th>Beslissing</th><th>Keuze</th><th>Waarom</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Waar valideren?</td>
+      <td>In <code>TerminalManager.createTerminal</code> (single source of truth) <em>plus</em> early-return in <code>terminal:create</code> IPC voor betere UX.</td>
+      <td>De manager wordt vanuit 2 plekken aangeroepen (IPC + session restore). Validatie in de manager garandeert dat <em>elke</em> call-site beschermd is. De IPC-laag voegt een sneller, vriendelijker error-pad toe.</td>
+    </tr>
+    <tr>
+      <td>Sync vs async check</td>
+      <td><code>fs.statSync</code> in manager (sync, snel, geen race-window tussen check en spawn).</td>
+      <td><code>pty.spawn</code> zelf is sync; een async pre-check zou een TOCTOU race introduceren met externe rmdir. De check moet zo dicht mogelijk vóór spawn staan.</td>
+    </tr>
+    <tr>
+      <td>Error type</td>
+      <td>Nieuwe <code>class SpawnError extends Error</code> met <code>code: 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'</code>.</td>
+      <td>Typed errors zodat renderer per code een passende UX kan tonen. Sluit aan op bestaande convention (<code>terminal:exit</code> events).</td>
+    </tr>
+    <tr>
+      <td>Vangnet output</td>
+      <td>Log naar <code>userData/crash.log</code>, stuur <code>app:uncaught-error</code> event naar renderer, géén <code>app.exit()</code>.</td>
+      <td>Behoud van de andere terminals. Een uncaughtException van een pty worker is geen reden om alle Claude-sessies van de gebruiker te killen.</td>
+    </tr>
+    <tr>
+      <td>Bestaande session-restore check</td>
+      <td>Laten staan, niet dupliceren.</td>
+      <td>Geeft betere logging (<code>console.log('worktree path X no longer exists')</code>) vóór de IPC pas. Manager-validatie is de garantie; restore-validatie is de optimalisatie.</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr/>
+
+<h2>5. Implementation Units</h2>
+
+<div class="unit">
+  <h3>U1. Pre-flight cwd validation in <code>TerminalManager.createTerminal</code></h3>
+  <div class="field"><strong>Goal:</strong> Voorkom dat <code>pty.spawn</code> ooit met een niet-bestaande cwd wordt aangeroepen — root-cause fix.</div>
+  <div class="field"><strong>Files:</strong>
+    <ul>
+      <li><code>electron/main/services/TerminalManager.ts</code> (modify)</li>
+      <li><code>electron/main/services/errors.ts</code> (new — kleine bestand voor <code>SpawnError</code>)</li>
+      <li><code>test/TerminalManager.spawn-validation.test.ts</code> (new)</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Approach:</strong>
+    <ul>
+      <li>Export <code>class SpawnError extends Error</code> met <code>code</code> en <code>cwd</code> velden uit <code>errors.ts</code>.</li>
+      <li>In <code>createTerminal</code>, vlak vóór de <code>pty.spawn</code> call (lijn ±130): <code>statSync(cwd)</code> in try/catch. Gooi <code>SpawnError('CWD_MISSING', cwd)</code> als ENOENT, <code>'CWD_NOT_DIR'</code> als <code>!stat.isDirectory()</code>.</li>
+      <li>Wrap de <code>pty.spawn</code> call zelf óók in try/catch → <code>SpawnError('SPAWN_FAILED', cwd, { cause })</code>. Vangt UNC/perm/race issues op.</li>
+      <li>Op de <code>ptyProcess</code>: registreer <code>onError</code> wanneer beschikbaar; anders verlaat je je op <code>onExit</code> + de spawn-tijd try/catch (node-pty exposes geen publiek <code>onError</code> — async errors uit de worker komen via process exit). Documenteer in comment.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Test scenarios:</strong>
+    <ul>
+      <li>Spawn met een bestaand pad → terminal-ID terug, geen error.</li>
+      <li>Spawn met niet-bestaande cwd → throws <code>SpawnError</code> met <code>code === 'CWD_MISSING'</code>, geen pty process gecreëerd, geen registratie in <code>terminals</code> map.</li>
+      <li>Spawn met cwd die een file is (geen directory) → throws <code>SpawnError</code> met <code>code === 'CWD_NOT_DIR'</code>.</li>
+      <li>Spawn met geldige cwd maar shell-pad ongeldig (mock) → throws <code>SpawnError</code> met <code>code === 'SPAWN_FAILED'</code>.</li>
+      <li>Bij failure: <code>hookWatcher.registerTerminal</code> wordt niet aangeroepen, geen lekkende state in <code>terminalInputBuffers</code> / <code>terminalTitled</code>.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Verification:</strong> Vitest groen; handmatig: hernoem een project-folder, klik "new terminal" → inline error in plaats van crash-dialog.</div>
+</div>
+
+<div class="unit">
+  <h3>U2. IPC handler vertaalt <code>SpawnError</code> naar renderer-event</h3>
+  <div class="field"><strong>Goal:</strong> Gebruiker ziet een nette inline melding, geen unhandled IPC rejection.</div>
+  <div class="field"><strong>Dependencies:</strong> U1</div>
+  <div class="field"><strong>Files:</strong>
+    <ul>
+      <li><code>electron/main/index.ts</code> (modify <code>terminal:create</code> handler ±lijn 457-505 + session-restore call site ±lijn 264-274)</li>
+      <li><code>electron/preload/index.ts</code> (modify — niets, IPC blijft hetzelfde) <span class="tag">no change</span></li>
+      <li><code>src/types/index.ts</code> (modify — voeg <code>'terminal:spawn-failed'</code> event toe aan electronAPI type)</li>
+      <li><code>src/utils/terminalEvents.ts</code> (modify — dispatch handler)</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Approach:</strong>
+    <ul>
+      <li>Wrap de <code>createTerminal</code> call in <code>terminal:create</code> in try/catch. Bij <code>SpawnError</code>: stuur <code>terminal:spawn-failed</code> event met <code>{ projectId, worktreeId, code, cwd, message }</code>; throw alleen voor IPC-validatie errors (zoals nu).</li>
+      <li>Session-restore loop: <code>catch (error)</code> bestaat al (lijn 293) — voeg discriminatie toe, log <code>SpawnError</code> verschillend (gebruiker krijgt geen modal bij restore, alleen log + skip).</li>
+      <li>Renderer luistert via <code>terminalEvents.ts</code> en toont een toast/banner.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Test scenarios:</strong>
+    <ul>
+      <li>IPC <code>terminal:create</code> met project waarvan pad is verwijderd → renderer ontvangt <code>terminal:spawn-failed</code> event, geen promise rejection, geen system-dialog.</li>
+      <li>Session-restore met cwd die net buiten de validatie window verwijderd is → loop slaat sessie over, console-log bevat <code>SpawnError</code>, andere sessies herstellen normaal.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Verification:</strong> E2E (Playwright): start app met fake project waarvan pad ontbreekt, klik new terminal, assert toast tekst.</div>
+</div>
+
+<div class="unit">
+  <h3>U3. Global <code>uncaughtException</code> + <code>unhandledRejection</code> safety net</h3>
+  <div class="field"><strong>Goal:</strong> Nooit meer de Electron system-crash-dialog, zelfs niet bij onbekende failure-modes.</div>
+  <div class="field"><strong>Dependencies:</strong> none (kan parallel met U1/U2)</div>
+  <div class="field"><strong>Files:</strong>
+    <ul>
+      <li><code>electron/main/index.ts</code> (modify — vroeg in <code>app.whenReady</code>, of nog beter top-level)</li>
+      <li><code>electron/main/services/CrashLogger.ts</code> (new — klein, append-only)</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Approach:</strong>
+    <ul>
+      <li>Registreer handlers <em>vóór</em> <code>app.whenReady</code> zodat ze ook vroege bootstrap errors vangen.</li>
+      <li><code>CrashLogger.log(error, { source: 'uncaughtException' | 'unhandledRejection' })</code> schrijft naar <code>app.getPath('userData')/crash.log</code> met timestamp + stack + Electron/Node versies.</li>
+      <li>Stuur <code>app:uncaught-error</code> event naar renderer met sanitized message (geen filesystem paths uit stacktrace). Renderer toont discrete toast: "Er is een interne fout opgetreden. Details in <code>crash.log</code>." met "Open log"-knop.</li>
+      <li><strong>Geen</strong> <code>app.exit()</code>. De pty worker heeft één terminal kapot gemaakt; de andere blijven werken.</li>
+      <li>Rate-limit: max 5 log writes per minuut, anders log-spam bij een herhalende error.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Test scenarios:</strong>
+    <ul>
+      <li>Unit test: <code>CrashLogger.log</code> schrijft correct geformatteerde regels, rate-limit kicked in na 5 calls.</li>
+      <li>Manual: gooi <code>setTimeout(() =&gt; { throw new Error('test') }, 100)</code> in main → geen system-dialog, wel toast, wel <code>crash.log</code> regel.</li>
+      <li>Manual: reproduceer het originele scenario (delete project folder, klik new terminal vóór U1 patches) → safety net vangt het, app blijft draaien.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Verification:</strong> Manuele reproductie met origineel scenario; check <code>crash.log</code>; assert dialog blijft weg.</div>
+</div>
+
+<div class="unit">
+  <h3>U4. Renderer toast/banner voor spawn-failures</h3>
+  <div class="field"><strong>Goal:</strong> Gebruiker begrijpt wat er mis is en weet wat te doen.</div>
+  <div class="field"><strong>Dependencies:</strong> U2</div>
+  <div class="field"><strong>Files:</strong>
+    <ul>
+      <li><code>src/components/notifications/SpawnErrorToast.tsx</code> (new)</li>
+      <li><code>src/App.tsx</code> (modify — listener registreren)</li>
+      <li><code>src/stores/projectStore.ts</code> (modify — geen state; alleen kleine notification queue als die nog niet bestaat)</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Approach:</strong>
+    <ul>
+      <li>Eén kleine component, gestyled met Tailwind, gebruikt bestaande theme CSS variabelen.</li>
+      <li>Mapping van <code>SpawnError.code</code> naar tekst:
+        <ul>
+          <li><code>CWD_MISSING</code> → "De working directory bestaat niet meer: <code>{cwd}</code>. Verwijder het project of pas het pad aan."</li>
+          <li><code>CWD_NOT_DIR</code> → "Het pad <code>{cwd}</code> is geen directory."</li>
+          <li><code>SPAWN_FAILED</code> → "Kon geen shell starten in <code>{cwd}</code>. Zie <code>crash.log</code>."</li>
+        </ul>
+      </li>
+      <li>Auto-dismiss na 8s, "Open log"-actie voor <code>SPAWN_FAILED</code>.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Test scenarios:</strong>
+    <ul>
+      <li>Component renders met elke <code>code</code> variant.</li>
+      <li>E2E: trigger spawn-failure → toast verschijnt → 8s later weg.</li>
+    </ul>
+  </div>
+  <div class="field"><strong>Verification:</strong> Manueel in dev-server; visuele check.</div>
+</div>
+
+<hr/>
+
+<h2>6. System-Wide Impact</h2>
+<ul class="tight">
+  <li><strong>Performance:</strong> één extra <code>statSync</code> per terminal-create — verwaarloosbaar (microseconden).</li>
+  <li><strong>Bestaande sessions-restore flow:</strong> validatie blijft, wordt nu een snelle pad; <code>SpawnError</code> in restore wordt zachter behandeld dan in user-initiated create.</li>
+  <li><strong>Logging:</strong> nieuwe <code>crash.log</code> in <code>userData/</code>. Documenteer in support-paragraaf van README.</li>
+  <li><strong>Bestaande tests:</strong> <code>TerminalPool</code> + <code>projectStore</code> unit tests onaangetast. Nieuwe tests breiden coverage uit.</li>
+</ul>
+
+<h2>7. Risks &amp; Mitigations</h2>
+<table>
+  <thead><tr><th>Risk</th><th>Likelihood</th><th>Mitigation</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>node-pty gooit ook andere worker-errors die we per ongeluk swallowen.</td>
+      <td>Laag</td>
+      <td>Safety net logt altijd volledig stacktrace; rate-limit is hoog genoeg om iteratieve debug toe te staan.</td>
+    </tr>
+    <tr>
+      <td>TOCTOU: cwd verdwijnt tussen <code>statSync</code> en <code>pty.spawn</code>.</td>
+      <td>Zeer laag</td>
+      <td>De try/catch om <code>pty.spawn</code> heen vangt het op; vertaalt naar <code>SPAWN_FAILED</code>.</td>
+    </tr>
+    <tr>
+      <td>Toast verschijnt in een achtergrond-window dat gebruiker niet ziet.</td>
+      <td>Laag</td>
+      <td>Notification queue bewaart laatste 3 errors; ook zichtbaar via een history-icoon (Deferred — niet in deze PR).</td>
+    </tr>
+    <tr>
+      <td>uncaughtException handler te vroeg geregistreerd, voordat logger pad weet.</td>
+      <td>Laag</td>
+      <td>CrashLogger gebruikt <code>app.getPath('userData')</code> lazy bij eerste <code>log()</code>; valt terug op <code>os.tmpdir()</code> als app niet ready is.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>8. Scope Boundaries</h2>
+
+<h3>Deferred to follow-up</h3>
+<ul class="tight">
+  <li>"Repair project" UX: knop op het project in de sidebar om pad opnieuw te kiezen wanneer cwd ontbreekt.</li>
+  <li>Notification history-panel.</li>
+  <li>Automatische detectie van verdwenen worktrees bij app-start (proactieve cleanup).</li>
+</ul>
+
+<h3>Niet onderdeel van dit fix</h3>
+<ul class="tight">
+  <li>node-pty versie-upgrade.</li>
+  <li>Vervangen van de Electron crash-dialog door een custom in-app dialog voor andere uncaught errors (zou kunnen, niet nodig voor deze fix).</li>
+</ul>
+
+<h2>9. Verification &amp; Acceptance</h2>
+<div class="panel good">
+  <ol>
+    <li>Maak een project aan dat naar <code>C:\Temp\test-proj</code> wijst. Verwijder die map. Klik "new terminal" → <strong>geen</strong> system-dialog; toast: "De working directory bestaat niet meer …".</li>
+    <li>Maak een worktree aan, verwijder die met <code>git worktree remove --force</code> via een externe shell. Klik op de chat van die worktree → toast i.p.v. crash.</li>
+    <li>Sluit de app met 3 actieve sessies, verwijder één van de cwd's op disk, start app opnieuw → 2 sessies herstellen, 1 wordt overgeslagen met log-regel.</li>
+    <li>Gooi handmatig <code>throw new Error('synthetic')</code> in <code>main/index.ts</code> bij app-ready → safety-net vangt het, app blijft draaien, <code>crash.log</code> bevat regel.</li>
+    <li><code>npm run test</code> groen, inclusief nieuwe spawn-validation tests.</li>
+  </ol>
+</div>
+
+<h2>10. Sequencing</h2>
+<pre><code>U1 (manager validation + SpawnError)
+  │
+  ├── U2 (IPC translation, depends on U1)
+  │     │
+  │     └── U4 (renderer toast, depends on U2)
+  │
+  └── U3 (safety net, kan parallel)</code></pre>
+<p>Aanbeveling: U1 + U3 in één PR als kleine, snelle eerste landing (eliminates the crash). U2 + U4 in een opvolg-PR voor de polish.</p>
+
+<div class="footer">
+  Plan gegenereerd 2026-05-22 · gebaseerd op stack trace screenshot · root cause geverifieerd via grep van <code>uncaughtException</code> (0 matches), <code>accessSync</code> (alleen gebruikt voor git bash detectie), en <code>pty.spawn</code> call site in <code>TerminalManager.ts:130-136</code>.
+</div>
+
+</body>
+</html>
