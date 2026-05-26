@@ -259,10 +259,12 @@ export const WorktreeItem = memo(function WorktreeItem({
     }
   }, [terminal, onSelectTerminal, onCreateTerminal])
 
-  // Merge button visibility (show for any open, conflict-free PR)
+  // Merge button visibility (show for any open, conflict-free PR with fresh data)
+  // Hide while stale so the destructive merge can't fire against acknowledged-stale checks.
   const showMergeButton = prStatus && !prStatus.noPR &&
     prStatus.state === 'OPEN' &&
-    prStatus.mergeable === 'MERGEABLE'
+    prStatus.mergeable === 'MERGEABLE' &&
+    !prStatus.stale
 
   const hasPR = prStatus && !prStatus.noPR && prStatus.state === 'OPEN'
   const hasConflicts = prStatus?.mergeable === 'CONFLICTING'

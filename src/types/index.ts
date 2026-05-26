@@ -536,6 +536,8 @@ export interface ElectronAPI {
   };
   github: {
     checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;
+    // Rejects on transient gh failures (timeout, network, rate-limit). Callers
+    // must catch and call markPRStatusStale to preserve last-known-good data.
     getPRStatus: (projectPath: string) => Promise<PRStatus>;
     mergePR: (projectPath: string, prNumber: number) => Promise<void>;
     startPolling: (key: string, projectPath: string) => Promise<void>;
