@@ -37,6 +37,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'update:downloaded',
   'update:error',
   'github:pr-status-update',
+  'github:pr-status-stale',
   'fs:watch:changes',
   'fs:watch:error',
   'automation:run-started',
@@ -231,6 +232,7 @@ interface PRStatus {
   loading?: boolean
   error?: string
   lastUpdated?: number
+  stale?: boolean
 }
 
 interface UpdateCheckResult {
@@ -647,6 +649,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: Electron.IpcRendererEvent, key: string, status: PRStatus) => callback(key, status)
       ipcRenderer.on('github:pr-status-update', handler)
       return () => ipcRenderer.removeListener('github:pr-status-update', handler)
+    },
+
+    onPRStatusStale: (callback: (key: string, error: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, key: string, error: string) => callback(key, error)
+      ipcRenderer.on('github:pr-status-stale', handler)
+      return () => ipcRenderer.removeListener('github:pr-status-stale', handler)
     },
   },
 

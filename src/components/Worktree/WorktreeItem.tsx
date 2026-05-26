@@ -128,6 +128,7 @@ export const WorktreeItem = memo(function WorktreeItem({
   const prStatus = useProjectStore((s) => s.prStatus[worktree.id])
   const ghAvailable = useProjectStore((s) => s.ghAvailable)
   const setPRStatus = useProjectStore((s) => s.setPRStatus)
+  const markPRStatusStale = useProjectStore((s) => s.markPRStatusStale)
   const setGhAvailable = useProjectStore((s) => s.setGhAvailable)
   const removeTerminal = useProjectStore((s) => s.removeTerminal)
   const removeWorktree = useProjectStore((s) => s.removeWorktree)
@@ -153,17 +154,24 @@ export const WorktreeItem = memo(function WorktreeItem({
 
     api.github.startPolling(key, worktree.path)
 
-    const unsub = api.github.onPRStatusUpdate((k, status) => {
+    const unsubUpdate = api.github.onPRStatusUpdate((k, status) => {
       if (k === key) {
         setPRStatus(key, status)
       }
     })
 
+    const unsubStale = api.github.onPRStatusStale((k, errorMessage) => {
+      if (k === key) {
+        markPRStatusStale(key, errorMessage)
+      }
+    })
+
     return () => {
       api.github.stopPolling(key)
-      unsub()
+      unsubUpdate()
+      unsubStale()
     }
-  }, [worktree.id, worktree.path, ghAvailable, setPRStatus])
+  }, [worktree.id, worktree.path, ghAvailable, setPRStatus, markPRStatusStale])
 
   const handleRefresh = useCallback(async () => {
     const api = getElectronAPI()
@@ -172,8 +180,10 @@ export const WorktreeItem = memo(function WorktreeItem({
       setPRStatus(worktree.id, status)
     } catch (err) {
       console.error('[WorktreeItem] Failed to refresh PR status:', err)
+      const message = err instanceof Error ? err.message : 'Refresh failed'
+      markPRStatusStale(worktree.id, message)
     }
-  }, [worktree.id, worktree.path, setPRStatus])
+  }, [worktree.id, worktree.path, setPRStatus, markPRStatusStale])
 
   const handleMerge = useCallback(async () => {
     if (!prStatus?.number) return
@@ -249,10 +259,12 @@ export const WorktreeItem = memo(function WorktreeItem({
     }
   }, [terminal, onSelectTerminal, onCreateTerminal])
 
-  // Merge button visibility (show for any open, conflict-free PR)
+  // Merge button visibility (show for any open, conflict-free PR with fresh data)
+  // Hide while stale so the destructive merge can't fire against acknowledged-stale checks.
   const showMergeButton = prStatus && !prStatus.noPR &&
     prStatus.state === 'OPEN' &&
-    prStatus.mergeable === 'MERGEABLE'
+    prStatus.mergeable === 'MERGEABLE' &&
+    !prStatus.stale
 
   const hasPR = prStatus && !prStatus.noPR && prStatus.state === 'OPEN'
   const hasConflicts = prStatus?.mergeable === 'CONFLICTING'
@@ -323,7 +335,9 @@ export const WorktreeItem = memo(function WorktreeItem({
           className={`
             flex items-center gap-1.5 pl-9 pr-3 py-1 text-muted-foreground
             ${isActive ? 'bg-sidebar-accent rounded-b-md' : ''}
+            ${prStatus.stale ? 'opacity-60' : ''}
           `}
+          title={prStatus.stale ? `PR status update failed — showing last known data. ${prStatus.error ?? ''}`.trim() : undefined}
         >
           {/* PR number */}
           <button

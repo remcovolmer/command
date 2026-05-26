@@ -194,6 +194,7 @@ interface ProjectStore {
 
   // GitHub PR status actions
   setPRStatus: (key: string, status: PRStatus) => void
+  markPRStatusStale: (key: string, error: string) => void
   setGhAvailable: (available: { installed: boolean; authenticated: boolean }) => void
 
   // Project actions
@@ -990,6 +991,20 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           prStatus: { ...state.prStatus, [key]: status },
         })),
+
+      markPRStatusStale: (key, error) =>
+        set((state) => {
+          const prior = state.prStatus[key]
+          // No prior data to preserve — nothing meaningful to show; skip so
+          // we don't render a stale row that has never been populated.
+          if (!prior) return state
+          return {
+            prStatus: {
+              ...state.prStatus,
+              [key]: { ...prior, stale: true, error, lastUpdated: Date.now() },
+            },
+          }
+        }),
 
       setGhAvailable: (available) =>
         set({ ghAvailable: available }),

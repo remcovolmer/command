@@ -256,6 +256,9 @@ export interface PRStatus {
   loading?: boolean;
   error?: string;
   lastUpdated?: number;
+  // True when the most recent refresh failed transiently. The rest of the
+  // fields hold the last known-good values so the UI can keep showing them.
+  stale?: boolean;
 }
 
 // Task types
@@ -533,11 +536,14 @@ export interface ElectronAPI {
   };
   github: {
     checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;
+    // Rejects on transient gh failures (timeout, network, rate-limit). Callers
+    // must catch and call markPRStatusStale to preserve last-known-good data.
     getPRStatus: (projectPath: string) => Promise<PRStatus>;
     mergePR: (projectPath: string, prNumber: number) => Promise<void>;
     startPolling: (key: string, projectPath: string) => Promise<void>;
     stopPolling: (key: string) => Promise<void>;
     onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void) => Unsubscribe;
+    onPRStatusStale: (callback: (key: string, error: string) => void) => Unsubscribe;
   };
   update: {
     check: () => Promise<UpdateCheckResult>;
