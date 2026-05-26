@@ -382,4 +382,65 @@ describe('projectStore activeCenterTabId', () => {
       expect(state.activeCenterTabId).toBeNull()
     })
   })
+
+  describe('PR status', () => {
+    test('markPRStatusStale preserves prior fields and only flips stale/error/lastUpdated', () => {
+      const prior = {
+        noPR: false,
+        number: 42,
+        title: 'feat: cool thing',
+        url: 'https://example.test/pr/42',
+        state: 'OPEN' as const,
+        mergeable: 'MERGEABLE' as const,
+        statusCheckRollup: [{ name: 'ci', state: 'SUCCESS', bucket: 'pass' }],
+        additions: 100,
+        deletions: 20,
+        lastUpdated: 1_000,
+      }
+      useProjectStore.setState({ prStatus: { 'wt-1': prior } })
+
+      useProjectStore.getState().markPRStatusStale('wt-1', 'network timeout')
+
+      const updated = useProjectStore.getState().prStatus['wt-1']
+      expect(updated.stale).toBe(true)
+      expect(updated.error).toBe('network timeout')
+      expect(updated.lastUpdated).toBeGreaterThan(prior.lastUpdated)
+      expect(updated.number).toBe(42)
+      expect(updated.title).toBe(prior.title)
+      expect(updated.url).toBe(prior.url)
+      expect(updated.state).toBe('OPEN')
+      expect(updated.mergeable).toBe('MERGEABLE')
+      expect(updated.statusCheckRollup).toEqual(prior.statusCheckRollup)
+      expect(updated.additions).toBe(100)
+      expect(updated.deletions).toBe(20)
+      expect(updated.noPR).toBe(false)
+    })
+
+    test('markPRStatusStale is a no-op when no prior PR status exists', () => {
+      useProjectStore.setState({ prStatus: {} })
+
+      useProjectStore.getState().markPRStatusStale('wt-unknown', 'whatever')
+
+      expect(useProjectStore.getState().prStatus['wt-unknown']).toBeUndefined()
+    })
+
+    test('a fresh setPRStatus clears stale/error from prior state', () => {
+      useProjectStore.setState({
+        prStatus: {
+          'wt-1': { noPR: false, number: 1, state: 'OPEN', stale: true, error: 'prev error', lastUpdated: 0 },
+        },
+      })
+
+      useProjectStore.getState().setPRStatus('wt-1', {
+        noPR: false,
+        number: 1,
+        state: 'OPEN',
+        lastUpdated: 5_000,
+      })
+
+      const updated = useProjectStore.getState().prStatus['wt-1']
+      expect(updated.stale).toBeUndefined()
+      expect(updated.error).toBeUndefined()
+    })
+  })
 })

@@ -27,6 +27,14 @@ export interface PRStatus {
   loading?: boolean
   error?: string
   lastUpdated?: number
+  stale?: boolean
+}
+
+export class TransientGhError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TransientGhError'
+  }
 }
 
 export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict'
@@ -127,14 +135,15 @@ export class GitHubService {
       }
     } catch (error: unknown) {
       const err = error as { stderr?: string; code?: number }
-      if (err.stderr?.includes('no pull requests found') || err.stderr?.includes('Could not resolve')) {
+      const stderr = err.stderr ?? ''
+      // Only treat as confirmed "no PR" when gh tells us so explicitly. Any
+      // other failure (timeout, network, rate-limit, gh crash) is transient
+      // and must NOT overwrite the renderer's last known-good PR data.
+      if (stderr.includes('no pull requests found') || stderr.includes('Could not resolve')) {
         return { noPR: true, lastUpdated: Date.now() }
       }
-      return {
-        noPR: true,
-        error: err.stderr || 'Failed to fetch PR status',
-        lastUpdated: Date.now(),
-      }
+      const message = stderr.trim() || (error instanceof Error ? error.message : 'Failed to fetch PR status')
+      throw new TransientGhError(message)
     }
   }
 
@@ -320,8 +329,13 @@ export class GitHubService {
         if (ctx) this.emitPREvent(projectPath, 'pr-opened', ctx)
       }
       this.previousStates.set(key, status)
-    } catch {
-      // Silently ignore poll errors
+    } catch (err) {
+      // Transient gh failure: don't overwrite the renderer's good data with a
+      // synthetic noPR. Tell it to flag the existing entry as stale instead.
+      // previousStates is intentionally not updated so the next successful
+      // poll runs transition detection against the last-known-good state.
+      const message = err instanceof Error ? err.message : 'Failed to fetch PR status'
+      this.sendToRenderer('github:pr-status-stale', key, message)
     } finally {
       this.activeRequests--
     }
