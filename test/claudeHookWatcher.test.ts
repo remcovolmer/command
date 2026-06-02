@@ -426,6 +426,65 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     expect(send).toHaveBeenCalledTimes(1) // NOT called again
   })
 
+  test('input state (question) surfaces even when a racing busy was processed first with a higher timestamp', () => {
+    // Reproduces the AskUserQuestion bug: async hook write-order race causes a 'busy'
+    // write to be processed before the 'question'/'permission' write, but with a HIGHER
+    // timestamp. The older-timestamp input state must NOT be dropped as stale.
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    const send = (mockWindow as any).webContents.send
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 2000, // racing busy won the timestamp
+      hook_event: 'PreToolUse',
+    })
+    expect(send).toHaveBeenCalledTimes(1)
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'question',
+      timestamp: 1500, // fired earlier / wrote with a lower timestamp
+      hook_event: 'PreToolUse',
+    })
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send).toHaveBeenLastCalledWith('terminal:state', 't1', 'question')
+  })
+
+  test('an unchanged input state is not re-emitted on re-read (no spam)', () => {
+    watcher.registerTerminal('t1', 'c:/projects/foo')
+    const send = (mockWindow as any).webContents.send
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'permission',
+      timestamp: 2000,
+      hook_event: 'PermissionRequest',
+    })
+    expect(send).toHaveBeenCalledTimes(1)
+
+    // Exact re-read of the same permission — must be deduped.
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'permission',
+      timestamp: 2000,
+      hook_event: 'PermissionRequest',
+    })
+    // An older-timestamp re-read of the SAME input state is also not a new surfacing.
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'permission',
+      timestamp: 1900,
+      hook_event: 'PermissionRequest',
+    })
+    expect(send).toHaveBeenCalledTimes(1) // no re-emission
+  })
+
   test('different sessions with same timestamp are processed independently', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
     watcher.registerTerminal('t2', 'c:/projects/foo')

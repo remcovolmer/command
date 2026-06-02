@@ -260,15 +260,22 @@ export class ClaudeHookWatcher {
     // get re-read with unchanged data.
     const last = this.lastProcessedState.get(sessionId)
     if (last) {
-      if (hookState.timestamp < last.timestamp) {
-        return  // Stale event
-      }
       if (
         hookState.timestamp === last.timestamp &&
         hookState.hook_event === last.hookEvent &&
         hookState.state === last.state
       ) {
         return  // Duplicate re-read of unchanged session
+      }
+      // Older-timestamp events are normally stale and dropped. Exception: input states
+      // (question/permission) must still surface even when a racing 'busy'/'done' write
+      // was processed first with a higher timestamp (async hook write-order race). Without
+      // this, AskUserQuestion's orange attention dot is silently suppressed. The exact-
+      // duplicate check above still prevents repeat emissions of an unchanged input state.
+      const isInputState = hookState.state === 'question' || hookState.state === 'permission'
+      const surfacingNewInputState = isInputState && last.state !== hookState.state
+      if (hookState.timestamp < last.timestamp && !surfacingNewInputState) {
+        return  // Stale event
       }
     }
     const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
