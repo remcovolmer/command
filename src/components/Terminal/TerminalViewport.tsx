@@ -156,7 +156,7 @@ export function TerminalViewport({
       className="h-full w-full relative"
       onDragOver={(e) => e.preventDefault()}
     >
-      <div className="h-full w-full">
+      <div className="h-full w-full relative">
         {/* Render all terminals (hidden if not active) */}
         {terminals.map((terminal) => (
           <Terminal
@@ -230,7 +230,7 @@ function SplitPanel({ terminal, isActive, isLast, onSelect }: SplitPanelProps) {
     <>
       <Panel id={`split-${terminal.id}`} defaultSize={50} minSize={20}>
         <div
-          className={`h-full ${isActive ? 'ring-2 ring-primary ring-inset' : ''}`}
+          className={`h-full relative ${isActive ? 'ring-2 ring-primary ring-inset' : ''}`}
           onClick={onSelect}
         >
           <Terminal id={terminal.id} isActive={isActive} />

@@ -19,9 +19,15 @@ export function Terminal({ id, isActive }: TerminalProps) {
   return (
     <div
       ref={containerRef}
-      className={`terminal-container w-full h-full bg-sidebar relative ${
-        isActive ? 'block pointer-events-auto' : 'hidden pointer-events-none'
-      }`}
+      className="terminal-container absolute inset-0 bg-sidebar"
+      style={{
+        // Use visibility (not display:none) so inactive terminals keep their layout
+        // dimensions. display:none zeroes the layout, which throttles xterm's
+        // rAF-driven viewport sync and leaves the scrollbar stale on reactivation.
+        // Mirrors the proven sidecar terminal approach (SidecarTerminalPanel).
+        visibility: isActive ? 'visible' : 'hidden',
+        pointerEvents: isActive ? 'auto' : 'none',
+      }}
       data-terminal-active={isActive ? 'true' : 'false'}
     />
   )
