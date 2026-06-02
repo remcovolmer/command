@@ -108,9 +108,24 @@ export function useXtermInstance({
     }
 
     try {
+      const term = terminalRef.current
+      const prevCols = term.cols
+      const prevRows = term.rows
       fitAddonRef.current.fit()
+      // FitAddon.fit() is a complete no-op when the proposed cols/rows equal the
+      // current dimensions (verified in @xterm/addon-fit): it skips terminal.resize(),
+      // so xterm never re-syncs the viewport scroll area. When the buffer has grown
+      // (long conversations) but the container size is unchanged, the scrollbar can
+      // stay stale and disappear until a real resize happens. Force an immediate
+      // viewport re-sync in that case so scrollability is restored without a resize.
+      if (term.cols === prevCols && term.rows === prevRows) {
+        const core = term as unknown as {
+          _core?: { viewport?: { syncScrollArea?: (immediate?: boolean) => void } }
+        }
+        core._core?.viewport?.syncScrollArea?.(true)
+      }
     } catch {
-      // Ignore fit errors (can happen during rapid resizing or disposal)
+      // Ignore fit/sync errors (can happen during rapid resizing or disposal)
     }
   }, [])
 

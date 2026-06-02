@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Development Commands
 
@@ -34,13 +34,13 @@ Tests require a pre-build step (`npm run pretest` runs automatically). E2E tests
 
 ## Architecture
 
-This is an **Electron + React + TypeScript** desktop app for managing multiple Claude Code sessions. One window with a project sidebar, terminal area (center), file explorer (right), and optional sidecar shell panels.
+This is an **Electron + React + TypeScript** desktop app for managing multiple Codex sessions. One window with a project sidebar, terminal area (center), file explorer (right), and optional sidecar shell panels.
 
 ## Terminology
 
 | Term | Meaning |
 |------|---------|
-| **Chat** | A Claude Code terminal session (`type: 'claude'`), shown in the center area |
+| **Chat** | A Codex terminal session (`type: 'Codex'`), shown in the center area |
 | **Terminal / Sidecar** | A plain shell (`type: 'normal'`) in a collapsible right-side panel for quick tasks |
 | **Worktree** | Git worktree for parallel feature development; terminals can be scoped to a worktree |
 | **Center Tab** | Either a terminal tab or an editor/diff tab in the main content area |
@@ -76,8 +76,8 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | Service | Purpose |
 |---------|---------|
 | `TerminalManager.ts` | PTY spawning via node-pty, data routing, session resume, auto-naming |
-| `ClaudeHookWatcher.ts` | Polls `~/.claude/command-center-state.json` every 250ms, maps session states to terminals via BiMap |
-| `HookInstaller.ts` | Injects `claude-state-hook.cjs` into `~/.claude/settings.json` for 6 Claude Code events |
+| `ClaudeHookWatcher.ts` | Polls `~/.Codex/command-center-state.json` every 250ms, maps session states to terminals via BiMap |
+| `HookInstaller.ts` | Injects `Codex-state-hook.cjs` into `~/.Codex/settings.json` for 6 Codex events |
 | `ProjectPersistence.ts` | JSON file storage in `userData/projects.json`, session persistence for resume |
 | `WorktreeService.ts` | Git worktree CRUD (create, list, remove, has-changes) |
 | `GitService.ts` | Git operations (status, fetch, pull, push, commit log/detail) |
@@ -86,17 +86,17 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | `AutomationRunner.ts` | Executes automation runs in isolated worktrees |
 | `AutomationPersistence.ts` | Stores automations and run history in `userData/automations.json` |
 | `FileWatcherService.ts` | Chokidar-based file watching for file explorer and automation triggers |
-| `SessionIndexService.ts` | Reads Claude Code's `sessions-index.json` per project, caches summaries, pushes to renderer |
+| `SessionIndexService.ts` | Reads Codex's `sessions-index.json` per project, caches summaries, pushes to renderer |
 | `TaskService.ts` | Scans project files for TODO/FIXME markers |
 | `UpdateService.ts` | Auto-updates via electron-updater |
 
-### Claude State Detection (Hook System)
+### Codex State Detection (Hook System)
 
 This is the core mechanism that powers the attention indicator:
 
-1. `HookInstaller` writes into `~/.claude/settings.json` to register `claude-state-hook.cjs` for events: `PreToolUse`, `Stop`, `SessionStart`, `UserPromptSubmit`, `PermissionRequest`, `Notification`
-2. When Claude Code fires an event, it executes the hook script which reads JSON from stdin
-3. The hook maps events to states and writes atomically to `~/.claude/command-center-state.json`
+1. `HookInstaller` writes into `~/.Codex/settings.json` to register `Codex-state-hook.cjs` for events: `PreToolUse`, `Stop`, `SessionStart`, `UserPromptSubmit`, `PermissionRequest`, `Notification`
+2. When Codex fires an event, it executes the hook script which reads JSON from stdin
+3. The hook maps events to states and writes atomically to `~/.Codex/command-center-state.json`
 4. `ClaudeHookWatcher` polls this file, matches sessions to terminals via a BiMap (session ID ↔ terminal ID), and emits `terminal:state` events
 5. States: `busy` (gray), `permission` (orange), `question` (orange), `done` (green), `stopped` (red)
 
@@ -113,9 +113,9 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 ### Data Flow
 
 1. User adds project → `project:add` IPC → `ProjectPersistence` saves to `userData/projects.json`
-2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command (with `--resume <sessionId>` if resuming)
+2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `Codex` command (with `--resume <sessionId>` if resuming)
 3. Chat output → `terminal:data` event → `TerminalEventManager` routes to specific `Terminal` component → xterm.js renders
-4. Claude state changes → hook file → `ClaudeHookWatcher` → `terminal:state` event → UI shows attention indicator
+4. Codex state changes → hook file → `ClaudeHookWatcher` → `terminal:state` event → UI shows attention indicator
 5. On app close → `ClaudeHookWatcher.getTerminalSessions()` captures session IDs → persisted for resume on restart
 
 ### Key Patterns
@@ -213,7 +213,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + ,` | Open settings |
 | `Ctrl + Shift + T` | Toggle theme |
 | `Ctrl + /` | Show shortcuts |
-| `Ctrl + Shift + M` | Cycle Claude mode |
+| `Ctrl + Shift + M` | Cycle Codex mode |
 
 ### Dialogs
 | Shortcut | Action |
