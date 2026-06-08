@@ -13,72 +13,117 @@ const os = require('os');
 const STALE_SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Read hook input from stdin
-let input = '';
-process.stdin.on('data', chunk => input += chunk);
-process.stdin.on('end', async () => {
-  try {
-    const data = JSON.parse(input);
+// How long a freshly-surfaced input state (question/permission) is protected from being
+// downgraded to 'busy' by a racing or near-simultaneous hook write.
+//
+// Why this is needed: AskUserQuestion fires THREE events in rapid succession
+// (PreToolUse->question, PermissionRequest->permission ~8ms later, and a delayed
+// Notification(permission_prompt)->permission ~6s later). Hooks run with async:true, so
+// node-process startup variance (~150-300ms on Windows, larger than the 250ms watcher
+// poll) means a surrounding 'busy' write can land AFTER the input-state write and erase
+// the orange attention dot before the user ever sees it. The window covers that variance
+// plus several poll cycles; a genuine "Claude resumed" busy fires only after the user
+// answers (typically well beyond this window) and so still clears the dot.
+const INPUT_STATE_GUARD_MS = 2500;
 
-    // Validate session_id format to prevent prototype pollution
-    if (!data.session_id || !UUID_REGEX.test(data.session_id)) {
-      return; // Invalid session ID, skip
+const INPUT_STATES = new Set(['question', 'permission']);
+
+/**
+ * Map a raw Claude Code hook event to a Command terminal state.
+ * Returns null when the event should not change state.
+ */
+function mapEventToState(data) {
+  switch (data.hook_event_name) {
+    case 'PreToolUse':
+      // AskUserQuestion = Claude is asking the user something (orange); any other
+      // tool call means Claude is working (gray).
+      return data.tool_name === 'AskUserQuestion' ? 'question' : 'busy';
+    case 'SessionStart':
+      return 'busy';
+    case 'Stop':
+    case 'SessionEnd':
+      return 'done';
+    case 'Notification':
+      if (data.notification_type === 'permission_prompt') return 'permission';
+      // Claude waiting 60+ seconds for user input = done (green).
+      if (data.notification_type === 'idle_prompt') return 'done';
+      // auth_success and other types don't change state.
+      return null;
+    case 'UserPromptSubmit':
+      return 'busy';
+    case 'PermissionRequest':
+      return 'permission';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Decide whether an incoming state write should be SKIPPED given the session's current
+ * on-disk state. Pure function — exported for unit testing.
+ *
+ * @param {object|undefined} current  current stored state for this session
+ * @param {object} incoming           { state, hook_event, timestamp, ... } about to be written
+ * @param {number} now                Date.now()
+ * @param {number} guardMs            input-state protection window
+ * @returns {boolean} true to skip the write
+ */
+function shouldSkipWrite(current, incoming, now, guardMs = INPUT_STATE_GUARD_MS) {
+  if (!current) return false;
+  const cur = current.state;
+
+  // 1. Redundant busy from PreToolUse — already busy, nothing changes.
+  //    Reduces file writes by ~80% during active work (PreToolUse fires per tool call).
+  if (incoming.hook_event === 'PreToolUse' && incoming.state === 'busy' && cur === 'busy') {
+    return true;
+  }
+
+  // 2. Protect a freshly-surfaced input state from being clobbered.
+  if (INPUT_STATES.has(cur)) {
+    const age = now - (current.timestamp || 0);
+    // A 'busy' write inside the guard window is a race partner of the input state,
+    // not a genuine resume — skip it so the orange dot survives until the user acts.
+    if (incoming.state === 'busy' && age < guardMs) {
+      return true;
     }
-
-    const stateFile = path.join(
-      process.env.HOME || process.env.USERPROFILE || os.homedir(),
-      '.claude',
-      'command-center-state.json'
-    );
-
-    // Map hook event to state
-    let state = null;
-    const hookEvent = data.hook_event_name;
-
-    switch (hookEvent) {
-      case 'PreToolUse':
-        // Check if Claude is asking a question
-        if (data.tool_name === 'AskUserQuestion') {
-          // Question asked = question (orange)
-          state = 'question';
-        } else {
-          // Working with tools = busy (gray)
-          state = 'busy';
-        }
-        break;
-      case 'SessionStart':
-        // Starting = busy (gray)
-        state = 'busy';
-        break;
-      case 'Stop':
-      case 'SessionEnd':
-        // Finished or session ended = done (green)
-        state = 'done';
-        break;
-      case 'Notification':
-        switch (data.notification_type) {
-          case 'permission_prompt':
-            // Permission needed = permission (orange)
-            state = 'permission';
-            break;
-          case 'idle_prompt':
-            // Claude waiting 60+ seconds for user input = done (green)
-            state = 'done';
-            break;
-          // auth_success and other types don't change state
-        }
-        break;
-      case 'UserPromptSubmit':
-        // User submitted a prompt = busy (gray)
-        state = 'busy';
-        break;
-      case 'PermissionRequest':
-        // Permission requested = permission (orange)
-        state = 'permission';
-        break;
+    // An idle 'done' (Notification) while an input state is pending is wrong by
+    // definition: the user hasn't acted, so the question/permission still stands.
+    // (A real Stop/SessionEnd 'done' is allowed through and clears the dot.)
+    if (incoming.state === 'done' && incoming.hook_event === 'Notification') {
+      return true;
     }
+  }
 
-    if (state) {
+  return false;
+}
+
+module.exports = { mapEventToState, shouldSkipWrite, INPUT_STATE_GUARD_MS };
+
+// Only wire up stdin when executed directly by Claude Code (not when required by tests).
+if (require.main === module) {
+  let input = '';
+  process.stdin.on('data', chunk => input += chunk);
+  process.stdin.on('end', async () => {
+    try {
+      const data = JSON.parse(input);
+
+      // Validate session_id format to prevent prototype pollution
+      if (!data.session_id || !UUID_REGEX.test(data.session_id)) {
+        process.exit(0); // Invalid session ID, skip
+      }
+
+      const stateFile = path.join(
+        process.env.HOME || process.env.USERPROFILE || os.homedir(),
+        '.claude',
+        'command-center-state.json'
+      );
+
+      const state = mapEventToState(data);
+      if (!state) {
+        process.exit(0); // Event doesn't change state
+      }
+      const hookEvent = data.hook_event_name;
+
       const stateData = {
         session_id: data.session_id,
         cwd: data.cwd,
@@ -88,25 +133,34 @@ process.stdin.on('end', async () => {
       };
 
       // Read-merge-write pattern for multi-session support.
-      // NOTE: With async hooks, concurrent writes are possible (e.g. rapid PreToolUse events).
-      // Last-writer-wins race is acceptable here because state is self-healing —
-      // the next hook event will overwrite with fresh state within milliseconds.
-      // Use Object.create(null) to prevent prototype pollution
-      let allStates = Object.create(null);
-      try {
-        const existing = await fs.promises.readFile(stateFile, 'utf-8');
-        allStates = Object.assign(Object.create(null), JSON.parse(existing));
-      } catch (e) {
-        // Start fresh if file doesn't exist or is invalid
+      // Use Object.create(null) to prevent prototype pollution.
+      const readStates = async () => {
+        let all = Object.create(null);
+        try {
+          const existing = await fs.promises.readFile(stateFile, 'utf-8');
+          all = Object.assign(Object.create(null), JSON.parse(existing));
+        } catch (e) {
+          // Start fresh if file doesn't exist or is invalid
+        }
+        return all;
+      };
+
+      let allStates = await readStates();
+
+      // Early skip using the state read at entry (redundant busy / protected input state).
+      if (shouldSkipWrite(allStates[data.session_id], stateData, Date.now())) {
+        process.exit(0);
       }
 
-      // Skip redundant busy writes from PreToolUse — reduces file writes by ~80%
-      // during active Claude work (PreToolUse fires for every tool call).
-      // Uses the already-read state to avoid a double file read.
-      if (hookEvent === 'PreToolUse' && state === 'busy') {
-        if (allStates[data.session_id]?.state === 'busy') {
-          process.exit(0); // Already busy, skip write
+      // For downgrade writes (busy/done) re-read immediately before writing. This catches
+      // an input state (question/permission) that ANOTHER hook process wrote AFTER our
+      // first read — the actual async write-order race that silently erased the orange dot.
+      if (state === 'busy' || state === 'done') {
+        const fresh = await readStates();
+        if (shouldSkipWrite(fresh[data.session_id], stateData, Date.now())) {
+          process.exit(0);
         }
+        allStates = fresh;
       }
 
       // Write this session's state keyed by session_id
@@ -129,11 +183,11 @@ process.stdin.on('end', async () => {
         // Cleanup temp file on error
         try { await fs.promises.unlink(tempFile); } catch (e) {}
       }
+    } catch (e) {
+      // Silent fail - don't interfere with Claude Code
     }
-  } catch (e) {
-    // Silent fail - don't interfere with Claude Code
-  }
 
-  // Ensure prompt exit — avoids lingering process blocking Claude Code
-  process.exit(0);
-});
+    // Ensure prompt exit — avoids lingering process blocking Claude Code
+    process.exit(0);
+  });
+}
