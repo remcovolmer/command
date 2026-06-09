@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { handleTaskCheckboxClick } from '../src/components/Editor/MarkdownEditor'
+import { handleTaskCheckboxClick } from '../src/components/Editor/taskCheckbox'
 
 // --- Pure mock helpers (no DOM environment needed) ---
 
