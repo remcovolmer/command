@@ -28,7 +28,7 @@ export class WorktreeService {
       windowsHide: true,
       timeout: 30_000,
     })
-    return stdout.trim()
+    return stdout.replace(/\r\n/g, '\n').trim()
   }
 
   /**
