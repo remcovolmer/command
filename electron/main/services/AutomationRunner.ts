@@ -316,11 +316,14 @@ export class AutomationRunner {
         const age = Date.now() - createdAt
 
         if (age > maxAgeMs) {
-          // Don't delete worktrees that still have uncommitted changes —
-          // they may contain work from a crashed or killed automation run
+          // Don't delete worktrees that have uncommitted changes or unmerged
+          // commits — they may contain work from a crashed or killed automation run.
+          // worktreeHasChanges with null startCommit only checks git status,
+          // so we also need to check for commits unique to this branch.
           const hasChanges = await this.worktreeHasChanges(wt.path, null)
-          if (hasChanges) {
-            console.log(`[AutomationRunner] GC: skipping worktree ${wt.branch} — has uncommitted changes`)
+          const hasUnmergedCommits = await this.branchHasUnmergedCommits(projectPath, wt.branch)
+          if (hasChanges || hasUnmergedCommits) {
+            console.log(`[AutomationRunner] GC: skipping worktree ${wt.branch} — has ${hasChanges ? 'uncommitted changes' : 'unmerged commits'}`)
             continue
           }
 
@@ -375,6 +378,23 @@ export class AutomationRunner {
     } catch {
       // Assume changes exist on error to avoid destroying work
       return true
+    }
+  }
+
+  private async branchHasUnmergedCommits(projectPath: string, branchName: string): Promise<boolean> {
+    try {
+      // Check if the branch has commits not reachable from HEAD (the main worktree).
+      // `git log HEAD..<branch> --oneline` lists commits on the branch that aren't
+      // in the main branch. If there are any, the branch has unmerged work.
+      const { stdout } = await execFileAsync('git', ['log', `HEAD..${branchName}`, '--oneline', '-1'], {
+        cwd: projectPath,
+        windowsHide: true,
+        timeout: 10_000,
+      })
+      return stdout.trim().length > 0
+    } catch {
+      // If the check fails (e.g., branch was already deleted), assume no unmerged commits
+      return false
     }
   }
 
