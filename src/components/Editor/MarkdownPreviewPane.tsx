@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
 import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
@@ -62,7 +62,7 @@ const PreviewInner = forwardRef<MarkdownPreviewHandle, PreviewInnerProps>(
     }, [defaultValue])
 
     const [loading, getEditor] = useInstance()
-    const isReady = () => !loading && getEditor() != null
+    const isReady = useCallback(() => !loading && getEditor() != null, [loading, getEditor])
 
     // Notify the owner once the editor instance is usable, so it can flush any
     // content sync that was requested before the editor finished initializing.
@@ -72,7 +72,7 @@ const PreviewInner = forwardRef<MarkdownPreviewHandle, PreviewInnerProps>(
         firedReadyRef.current = true
         onReadyRef.current?.()
       }
-    }, [loading, getEditor])
+    }, [isReady])
 
     useImperativeHandle(ref, () => ({
       replace: (content: string) => {

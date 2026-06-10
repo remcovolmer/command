@@ -12,11 +12,12 @@ import type { FileWatchEvent } from '../../types'
 
 // Milkdown's listener debounces `markdownUpdated` by 200ms (lodash debounce in
 // @milkdown/plugin-listener), so the change event from a programmatic
-// replaceAll() fires asynchronously. We suppress preview change events for a
-// window longer than that debounce after a programmatic push, so the push does
-// not bounce back into the canonical buffer or spuriously mark the tab dirty.
-// (Monaco's onChange fires synchronously on setValue, so the raw pane uses an
-// immediate boolean guard instead — see syncingMonacoRef.)
+// replaceAll() fires asynchronously. We recognize that bounce by BOTH timing
+// (within this window of the push) AND value (equals what we pushed), so it is
+// dropped while a genuine edit made inside the window — which differs in value —
+// still updates the canonical buffer and dirty state. (Monaco's onChange fires
+// synchronously on setValue, so the raw pane uses an immediate boolean guard
+// instead — see syncingMonacoRef.)
 const PREVIEW_BOUNCE_SUPPRESS_MS = 400
 
 interface MarkdownEditorProps {
@@ -65,8 +66,12 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
   // this true→false around the call brackets the resulting event.
   const syncingMonacoRef = useRef<boolean>(false)
   // Time guard for Milkdown: replaceAll's markdownUpdated fires ~200ms later, so
-  // we ignore preview change events until this timestamp after a push.
+  // we ignore the bounce until this timestamp after a push.
   const suppressPreviewUntilRef = useRef<number>(0)
+  // The exact content last pushed into the preview. Combined with the time
+  // window, this lets us suppress ONLY the bounce (same value, within window)
+  // and never a genuine edit (which differs in value) made in that window.
+  const lastPushedToPreviewRef = useRef<string | null>(null)
   const isDeletedRef = useRef(isDeletedExternally)
   isDeletedRef.current = isDeletedExternally
   const readSeqRef = useRef(0)
@@ -107,6 +112,7 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
     } else {
       const pv = previewRef.current
       if (!pv || !pv.isReady() || !needsSync(canonical, previewSyncedRef.current)) return
+      lastPushedToPreviewRef.current = canonical
       suppressPreviewUntilRef.current = Date.now() + PREVIEW_BOUNCE_SUPPRESS_MS
       pv.replace(canonical)
       previewSyncedRef.current = canonical
@@ -278,9 +284,14 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
   }, [updateDirty])
 
   const handlePreviewUpdated = useCallback((markdown: string) => {
-    // Ignore the debounced bounce from a programmatic replace (see
-    // PREVIEW_BOUNCE_SUPPRESS_MS); only genuine user edits update canonical.
-    if (Date.now() < suppressPreviewUntilRef.current) return
+    // Ignore only the debounced bounce from a programmatic replace: it arrives
+    // within the suppress window AND its value matches what we just pushed. A
+    // genuine edit differs in value, so it is never suppressed — even one made
+    // inside the window — and a late bounce past the window falls through to a
+    // harmless no-op dirty check.
+    if (Date.now() < suppressPreviewUntilRef.current && markdown === lastPushedToPreviewRef.current) {
+      return
+    }
     currentContentRef.current = markdown
     previewSyncedRef.current = markdown
     updateDirty(markdown)

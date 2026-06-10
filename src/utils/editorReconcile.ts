@@ -31,8 +31,11 @@ export type ReloadDecision = 'apply' | 'skip-echo' | 'skip-dirty'
  * logic in HtmlEditor:
  *  - `skip-echo`  — the change is the chokidar echo of our own save (disk equals
  *    what we just wrote, within the watcher batch window).
- *  - `skip-dirty` — the buffer has unsaved edits AND disk diverged from the last
- *    save; keep the user's work rather than clobbering it.
+ *  - `skip-dirty` — the buffer has unsaved edits; keep the user's work rather
+ *    than clobbering it. This holds even when disk happens to equal the last
+ *    save (a spurious or same-content watcher event): reloading saved content
+ *    over a dirty buffer would silently discard the user's edits, and there is
+ *    nothing new on disk to adopt anyway.
  *  - `apply`      — refresh both panes from disk.
  */
 export function decideExternalReload(params: {
@@ -43,6 +46,6 @@ export function decideExternalReload(params: {
 }): ReloadDecision {
   const { diskText, savedContent, isDirty, msSinceSelfWrite } = params
   if (diskText === savedContent && msSinceSelfWrite < 1000) return 'skip-echo'
-  if (isDirty && diskText !== savedContent) return 'skip-dirty'
+  if (isDirty) return 'skip-dirty'
   return 'apply'
 }

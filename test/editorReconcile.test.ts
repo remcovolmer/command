@@ -14,6 +14,13 @@ describe('needsSync', () => {
   test('empty-vs-empty does not trigger a sync', () => {
     expect(needsSync('', '')).toBe(false)
   })
+
+  test('asymmetric empty cases both need a sync (the initial-load path)', () => {
+    // On load both synced refs start as '' while content is the file text, so
+    // the first reconcile compares needsSync(fileText, '').
+    expect(needsSync('content', '')).toBe(true)
+    expect(needsSync('', 'content')).toBe(true)
+  })
 })
 
 describe('computeDirty', () => {
@@ -61,5 +68,22 @@ describe('decideExternalReload', () => {
     expect(decideExternalReload({
       diskText: 'saved', savedContent: 'saved', isDirty: true, msSinceSelfWrite: 200,
     })).toBe('skip-echo')
+  })
+
+  test('echo window boundary: 999ms still echoes, 1000ms no longer does', () => {
+    expect(decideExternalReload({
+      diskText: 'x', savedContent: 'x', isDirty: false, msSinceSelfWrite: 999,
+    })).toBe('skip-echo')
+    expect(decideExternalReload({
+      diskText: 'x', savedContent: 'x', isDirty: false, msSinceSelfWrite: 1000,
+    })).toBe('apply')
+  })
+
+  test('skip-dirty protects unsaved edits even when disk equals the last save', () => {
+    // A spurious/same-content watcher event must not reload over a dirty buffer:
+    // there is nothing new on disk to adopt, and applying would discard edits.
+    expect(decideExternalReload({
+      diskText: 'saved', savedContent: 'saved', isDirty: true, msSinceSelfWrite: 5000,
+    })).toBe('skip-dirty')
   })
 })

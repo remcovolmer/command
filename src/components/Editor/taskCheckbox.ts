@@ -1,9 +1,9 @@
 import { $prose } from '@milkdown/utils'
 import { Plugin } from '@milkdown/prose/state'
+import type { EditorView } from '@milkdown/prose/view'
 
 /** Returns true if the click should toggle a task checkbox, and dispatches the transaction. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function handleTaskCheckboxClick(view: any, pos: number, event: MouseEvent): boolean {
+export function handleTaskCheckboxClick(view: EditorView, pos: number, event: MouseEvent): boolean {
   const target = event.target
   if (!(target instanceof HTMLElement)) return false
   const li = target.closest('li[data-item-type="task"]')

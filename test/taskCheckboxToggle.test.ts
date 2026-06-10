@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { EditorView } from '@milkdown/prose/view'
 import { handleTaskCheckboxClick } from '../src/components/Editor/taskCheckbox'
 
 // --- Pure mock helpers (no DOM environment needed) ---
@@ -26,7 +27,7 @@ function makeView(nodes: ReturnType<typeof makeNode>[], depth: number) {
         tr: { setNodeMarkup },
       },
       dispatch,
-    },
+    } as unknown as EditorView,
     dispatch,
     setNodeMarkup,
   }
