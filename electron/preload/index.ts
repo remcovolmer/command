@@ -38,6 +38,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'update:error',
   'github:pr-status-update',
   'github:pr-status-stale',
+  'usage:update',
   'fs:watch:changes',
   'fs:watch:error',
   'automation:run-started',
@@ -265,6 +266,24 @@ interface UpdateErrorInfo {
 
 // Unsubscribe function type
 type Unsubscribe = () => void
+
+// NOTE: UsageData duplicated here due to Electron process isolation.
+// Keep in sync with src/types/index.ts and electron/main/services/UsageService.ts.
+interface UsageWindow {
+  utilization: number
+  resetsAt: string
+}
+
+interface UsageData {
+  status: 'ok' | 'unavailable'
+  fiveHour?: UsageWindow
+  sevenDay?: UsageWindow
+  sevenDaySonnet?: UsageWindow
+  extraUsage?: {
+    usedCredits: number
+    currency: string
+  }
+}
 
 // NOTE: SessionIndexEntry duplicated here due to Electron process isolation.
 // Keep in sync with src/types/index.ts and electron/main/services/SessionIndexService.ts.
@@ -655,6 +674,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: Electron.IpcRendererEvent, key: string, error: string) => callback(key, error)
       ipcRenderer.on('github:pr-status-stale', handler)
       return () => ipcRenderer.removeListener('github:pr-status-stale', handler)
+    },
+  },
+
+  // Plan-usage indicator
+  usage: {
+    setEnabled: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke('usage:set-enabled', enabled),
+
+    onUpdate: (callback: (data: UsageData) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, data: UsageData) => callback(data)
+      ipcRenderer.on('usage:update', handler)
+      return () => ipcRenderer.removeListener('usage:update', handler)
     },
   },
 

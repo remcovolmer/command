@@ -261,6 +261,25 @@ export interface PRStatus {
   stale?: boolean;
 }
 
+// Plan-usage types
+// NOTE: Duplicated due to Electron process isolation. Keep in sync with
+// electron/main/services/UsageService.ts and electron/preload/index.ts.
+export interface UsageWindow {
+  utilization: number;
+  resetsAt: string;
+}
+
+export interface UsageData {
+  status: 'ok' | 'unavailable';
+  fiveHour?: UsageWindow;
+  sevenDay?: UsageWindow;
+  sevenDaySonnet?: UsageWindow;
+  extraUsage?: {
+    usedCredits: number;
+    currency: string;
+  };
+}
+
 // Task types
 export interface TaskItem {
   id: string;                    // Generated: `${filePath}:${lineNumber}`
@@ -544,6 +563,10 @@ export interface ElectronAPI {
     stopPolling: (key: string) => Promise<void>;
     onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void) => Unsubscribe;
     onPRStatusStale: (callback: (key: string, error: string) => void) => Unsubscribe;
+  };
+  usage: {
+    setEnabled: (enabled: boolean) => Promise<void>;
+    onUpdate: (callback: (data: UsageData) => void) => Unsubscribe;
   };
   update: {
     check: () => Promise<UpdateCheckResult>;
