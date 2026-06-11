@@ -5,7 +5,7 @@ import fsAsync from 'node:fs/promises'
 import path from 'node:path'
 
 // NOTE: Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
-type ProjectType = 'workspace' | 'project' | 'code'
+type ProjectType = 'project' | 'code'
 type AuthMode = 'subscription' | 'profile'
 type ClaudeMode = 'chat' | 'auto' | 'full-auto'
 

@@ -1,5 +1,5 @@
 // Project types
-export type ProjectType = 'workspace' | 'project' | 'code';
+export type ProjectType = 'project' | 'code';
 
 export type AuthMode = 'subscription' | 'profile';
 

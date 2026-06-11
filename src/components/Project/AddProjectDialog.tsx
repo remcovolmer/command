@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
-import { X, Code, FolderOpen, Loader2, Star } from 'lucide-react'
+import { X, Code, FolderOpen, Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import type { Project, ProjectType } from '../../types'
 
 const PROJECT_TYPE_OPTIONS = [
-  { type: 'workspace' as const, icon: Star, label: 'Workspace', description: 'Pinned overview' },
   { type: 'project' as const, icon: FolderOpen, label: 'Project', description: 'Files + Claude' },
   { type: 'code' as const, icon: Code, label: 'Code', description: 'Full dev tools' },
 ]

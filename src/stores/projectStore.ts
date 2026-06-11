@@ -551,10 +551,13 @@ export const useProjectStore = create<ProjectStore>()(
               (t) => t.projectId === state.activeProjectId
             )
             const activeProject = state.projects.find(p => p.id === state.activeProjectId)
-            if (activeProject && activeProject.type !== 'workspace' && !hasTerminals) {
+            // Pinned projects sit in the always-visible Pinned section; only a
+            // non-pinned project with no terminals gets hidden when the inactive
+            // section collapses, so switch away from it to a visible one.
+            if (activeProject && !activeProject.pinned && !hasTerminals) {
               const firstVisible = state.projects.find(
-                (p) => p.type !== 'workspace' && terminalValues.some((t) => t.projectId === p.id)
-              ) ?? state.projects.find((p) => p.type === 'workspace')
+                (p) => terminalValues.some((t) => t.projectId === p.id)
+              ) ?? state.projects.find((p) => p.pinned)
               if (firstVisible) {
                 return {
                   inactiveSectionCollapsed: newCollapsed,
