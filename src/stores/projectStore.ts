@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, CenterTab, TasksData, AccountProfile } from '../types'
+import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, UsageData, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, CenterTab, TasksData, AccountProfile } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
@@ -57,6 +57,12 @@ interface ProjectStore {
   // GitHub PR status (not persisted)
   prStatus: Record<string, PRStatus>  // key (worktreeId or projectId) -> PRStatus
   ghAvailable: { installed: boolean; authenticated: boolean } | null
+
+  // Plan-usage indicator (data not persisted; toggle is)
+  usageData: UsageData | null
+  setUsageData: (data: UsageData) => void
+  showUsageIndicator: boolean
+  toggleUsageIndicator: () => void
 
   // Editor tab state (includes both file editor and diff tabs)
   editorTabs: Record<string, CenterTab>  // tabId -> EditorTab | DiffTab
@@ -283,6 +289,10 @@ export const useProjectStore = create<ProjectStore>()(
       // GitHub PR status (not persisted)
       prStatus: {},
       ghAvailable: null,
+
+      // Plan-usage indicator
+      usageData: null,
+      showUsageIndicator: true,
 
       // Tasks state
       tasksData: {},
@@ -1009,6 +1019,20 @@ export const useProjectStore = create<ProjectStore>()(
       setGhAvailable: (available) =>
         set({ ghAvailable: available }),
 
+      setUsageData: (data) => set({ usageData: data }),
+
+      // Single owner of the toggle side effect: Settings UI and the hotkey
+      // both call this action, so main-process start/stop cannot diverge.
+      toggleUsageIndicator: () => {
+        const next = !get().showUsageIndicator
+        set({ showUsageIndicator: next })
+        try {
+          getElectronAPI().usage.setEnabled(next).catch(() => {})
+        } catch {
+          // electronAPI not available (e.g., in tests)
+        }
+      },
+
       // Project actions
       setProjects: (projects) => set({ projects }),
 
@@ -1649,6 +1673,8 @@ export const useProjectStore = create<ProjectStore>()(
         hotkeyConfig: state.hotkeyConfig,
         // Terminal pool settings
         terminalPoolSize: state.terminalPoolSize,
+        // Plan-usage indicator toggle
+        showUsageIndicator: state.showUsageIndicator,
         // Confirmed mode dialog keys
         confirmedModeKeys: state.confirmedModeKeys,
         // Profile state
@@ -1677,6 +1703,19 @@ export const useProjectStore = create<ProjectStore>()(
         }
         // Sync persisted terminal pool size to the pool singleton
         terminalPool.setMaxSize(useProjectStore.getState().terminalPoolSize)
+        // Start usage polling per the persisted toggle and register the single
+        // global subscription that feeds the sidebar indicator. This callback is
+        // the one place the renderer subscribes to usage:update — components
+        // read usageData from the store.
+        try {
+          const api = getElectronAPI()
+          api.usage.setEnabled(useProjectStore.getState().showUsageIndicator).catch(() => {})
+          api.usage.onUpdate((data) => {
+            useProjectStore.getState().setUsageData(data)
+          })
+        } catch {
+          // electronAPI not available (e.g., in tests)
+        }
         // Mark renderer ready so the subscriber below starts processing
         isRendererReady = true
       },

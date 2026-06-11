@@ -147,9 +147,20 @@ export class UsageService {
     this.window = window
   }
 
-  /** Idempotent: repeated calls with the current value are no-ops. */
+  /**
+   * Idempotent for timers: repeated calls never double the interval. A
+   * repeated enable signals a (re)loaded renderer with empty state, so it
+   * forces a fresh emit via an immediate poll instead of waiting for the
+   * data to change.
+   */
   setEnabled(enabled: boolean) {
-    if (enabled === this.enabled) return
+    if (enabled === this.enabled) {
+      if (enabled) {
+        this.lastPushed = null
+        void this.pollOnce()
+      }
+      return
+    }
     this.enabled = enabled
     if (enabled) {
       // Force a fresh emit for the (possibly reloaded) renderer.

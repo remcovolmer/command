@@ -5,6 +5,11 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: any) => fn,
 }))
 
+// Hoisted spy so the usage side effect is inspectable across getElectronAPI calls
+const { usageSetEnabledMock } = vi.hoisted(() => ({
+  usageSetEnabledMock: vi.fn(() => Promise.resolve()),
+}))
+
 // Mock electron API before importing store
 vi.mock('../src/utils/electron', () => ({
   getElectronAPI: () => ({
@@ -12,6 +17,7 @@ vi.mock('../src/utils/electron', () => ({
     project: { list: vi.fn(), update: vi.fn(), reorder: vi.fn(), setActiveWatcher: vi.fn().mockResolvedValue(undefined) },
     worktree: { list: vi.fn() },
     fs: { readDirectory: vi.fn() },
+    usage: { setEnabled: usageSetEnabledMock, onUpdate: vi.fn() },
   }),
 }))
 
@@ -442,5 +448,39 @@ describe('projectStore activeCenterTabId', () => {
       expect(updated.stale).toBeUndefined()
       expect(updated.error).toBeUndefined()
     })
+  })
+})
+
+describe('projectStore usage indicator', () => {
+  beforeEach(() => {
+    usageSetEnabledMock.mockClear()
+    useProjectStore.setState({ showUsageIndicator: true, usageData: null })
+  })
+
+  test('toggleUsageIndicator flips the flag and notifies main with the new value', () => {
+    useProjectStore.getState().toggleUsageIndicator()
+
+    expect(useProjectStore.getState().showUsageIndicator).toBe(false)
+    expect(usageSetEnabledMock).toHaveBeenCalledTimes(1)
+    expect(usageSetEnabledMock).toHaveBeenCalledWith(false)
+
+    useProjectStore.getState().toggleUsageIndicator()
+
+    expect(useProjectStore.getState().showUsageIndicator).toBe(true)
+    expect(usageSetEnabledMock).toHaveBeenLastCalledWith(true)
+  })
+
+  test('setUsageData stores the pushed payload', () => {
+    useProjectStore.getState().setUsageData({
+      status: 'ok',
+      fiveHour: { utilization: 45, resetsAt: '2026-06-11T17:50:00+00:00' },
+    })
+
+    expect(useProjectStore.getState().usageData?.status).toBe('ok')
+    expect(useProjectStore.getState().usageData?.fiveHour?.utilization).toBe(45)
+
+    useProjectStore.getState().setUsageData({ status: 'unavailable' })
+
+    expect(useProjectStore.getState().usageData).toEqual({ status: 'unavailable' })
   })
 })
