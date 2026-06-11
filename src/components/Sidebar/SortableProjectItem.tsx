@@ -2,9 +2,10 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { Plus, FolderOpen, X, GitBranch, Code, Coins, AlertTriangle } from 'lucide-react'
+import { Plus, FolderOpen, X, GitBranch, Code, Coins, AlertTriangle, ChevronRight } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
+import { getProjectRollupState } from '../../utils/projectRollup'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { TerminalListItem } from './TerminalListItem'
 import { ContextMenu } from './ContextMenu'
@@ -60,6 +61,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   } = useSortable({ id: project.id })
 
   const hasVertexConfig = useProjectStore((s) => s.projectVertexConfigs[project.id] ?? false)
+  const isCollapsed = useProjectStore((s) => s.collapsedProjects[project.id] ?? false)
+  const toggleProjectCollapsed = useProjectStore((s) => s.toggleProjectCollapsed)
   const hasMismatch = useProjectStore((s) => {
     const authMode = project.settings?.authMode ?? 'subscription'
     const profileId = project.settings?.profileId
@@ -113,6 +116,9 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const showEmptyState = isActive && terminals.length === 0 &&
     (project.type !== 'code' || worktrees.length === 0)
 
+  // Highest-priority child status, shown as a dot on the collapsed header
+  const rollupState = isCollapsed ? getProjectRollupState(terminals) : null
+
   return (
     <motion.li
       ref={setNodeRef}
@@ -152,6 +158,21 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
         `}
       >
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleProjectCollapsed(project.id)
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-expanded={!isCollapsed}
+          className="p-0.5 -ml-1.5 rounded hover:bg-border flex-shrink-0"
+          title={isCollapsed ? 'Expand project' : 'Collapse project'}
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`w-3 h-3 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`}
+          />
+        </button>
         {project.type === 'code' ? (
           <Code
             className={`w-4 h-4 flex-shrink-0 ${
@@ -168,6 +189,24 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <span className="flex-1 text-sm truncate" title={project.path}>
           {project.name}
         </span>
+
+        {/* Collapsed summary: counter chip + highest-priority child status dot */}
+        {isCollapsed && (
+          <span
+            className="flex items-center gap-1.5 flex-shrink-0"
+            title={`${terminals.length} chat${terminals.length === 1 ? '' : 's'} · ${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`}
+          >
+            <span className="text-[11px] tabular-nums text-muted-foreground bg-muted rounded-full px-1.5 py-px">
+              {worktrees.length > 0 ? `${terminals.length} · ${worktrees.length}` : terminals.length}
+            </span>
+            {rollupState && (
+              <span
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${rollupState === 'attention' ? 'attention-rail' : ''}`}
+                style={{ backgroundColor: `var(--status-${rollupState})` }}
+              />
+            )}
+          </span>
+        )}
 
         {/* Indicators */}
         {hasVertexConfig && (
@@ -223,7 +262,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       </div>
 
       {/* Direct Chats (not in worktree) */}
-      {directTerminals.length > 0 && (
+      {!isCollapsed && directTerminals.length > 0 && (
         <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30">
           {directTerminals.map((terminal) => (
             <TerminalListItem
@@ -238,7 +277,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       )}
 
       {/* Worktrees - hidden for inactive projects unless selected */}
-      {(!isInactive || isActive) && worktrees.map((worktree) => (
+      {!isCollapsed && (!isInactive || isActive) && worktrees.map((worktree) => (
         <WorktreeItem
           key={worktree.id}
           worktree={worktree}
@@ -252,7 +291,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       ))}
 
       {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
-      {showEmptyState && (
+      {!isCollapsed && showEmptyState && (
         <div className="ml-6 pl-3 py-2 border-l border-border/30">
           <button
             onClick={() => onCreateTerminal(project.id)}

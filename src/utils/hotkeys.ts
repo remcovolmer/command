@@ -304,6 +304,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'sidebar',
     enabled: true,
   },
+  'sidebar.toggleProjectCollapse': {
+    key: 'p',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle collapse active project',
+    category: 'sidebar',
+    enabled: true,
+  },
 
   // UI & Settings
   'ui.openSettings': {

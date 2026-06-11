@@ -87,7 +87,10 @@ export function useHotkeys(
     for (const [action, handler] of Object.entries(handlers) as [HotkeyAction, () => void][]) {
       if (!handler) continue;
 
-      const binding = config[action];
+      // Persisted configs from existing users may predate newly added actions;
+      // fall back to the default binding so new hotkeys work without a reset
+      // (same pattern as dialog.dismissTopmostToast in App.tsx).
+      const binding = config[action] ?? DEFAULT_HOTKEY_CONFIG[action];
       if (!binding) continue;
 
       if (matchesBinding(e, binding)) {

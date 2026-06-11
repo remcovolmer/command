@@ -112,6 +112,10 @@ interface ProjectStore {
   inactiveSectionCollapsed: boolean
   toggleInactiveSectionCollapsed: () => void
 
+  // Per-project collapse state (persisted; keyed record for O(1) lookup)
+  collapsedProjects: Record<string, true>
+  toggleProjectCollapsed: (projectId: string) => void
+
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
   sidecarTerminalCollapsed: boolean
@@ -563,6 +567,20 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
           return { inactiveSectionCollapsed: newCollapsed }
+        }),
+
+      // Per-project collapse state. Click handler and hotkey both call this
+      // single action so the behavior cannot drift apart (KTD5).
+      collapsedProjects: {},
+      toggleProjectCollapsed: (projectId) =>
+        set((state) => {
+          const next = { ...state.collapsedProjects }
+          if (next[projectId]) {
+            delete next[projectId]
+          } else {
+            next[projectId] = true
+          }
+          return { collapsedProjects: next }
         }),
 
       // Sidecar terminal state
@@ -1090,6 +1108,8 @@ export const useProjectStore = create<ProjectStore>()(
           const newTasksData = { ...state.tasksData }
           const newTasksLoading = { ...state.tasksLoading }
           const newExpandedPaths = { ...state.expandedPaths }
+          const newCollapsedProjects = { ...state.collapsedProjects }
+          delete newCollapsedProjects[id]
           for (const key of cleanKeys) {
             delete newGitStatus[key]
             delete newGitStatusLoading[key]
@@ -1146,6 +1166,7 @@ export const useProjectStore = create<ProjectStore>()(
             tasksData: newTasksData,
             tasksLoading: newTasksLoading,
             expandedPaths: newExpandedPaths,
+            collapsedProjects: newCollapsedProjects,
             directoryCache: newDirectoryCache,
           }
         }),
@@ -1156,10 +1177,19 @@ export const useProjectStore = create<ProjectStore>()(
           const visible = getVisibleTerminals(state.terminals, state.sidecarTerminals, id ?? '')
           const newActiveTerminalId = visible.length > 0 ? visible[0].id : null
 
+          // Auto-expand: selecting a project clears its collapse entry in the
+          // same set-call, so the active project can never be hidden (KTD5)
+          let newCollapsedProjects = state.collapsedProjects
+          if (id && newCollapsedProjects[id]) {
+            newCollapsedProjects = { ...newCollapsedProjects }
+            delete newCollapsedProjects[id]
+          }
+
           // Clear directoryCache to prevent unbounded growth across project switches
           // File tree reloads lazily when the user browses
           return {
             activeProjectId: id,
+            collapsedProjects: newCollapsedProjects,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveTerminalId,
             directoryCache: {},
@@ -1643,6 +1673,8 @@ export const useProjectStore = create<ProjectStore>()(
         sidecarTerminalCollapsed: state.sidecarTerminalCollapsed,
         // Inactive section collapse state
         inactiveSectionCollapsed: state.inactiveSectionCollapsed,
+        // Per-project collapse state (additive field, hydrates safely without migration)
+        collapsedProjects: state.collapsedProjects,
         // Theme state
         theme: state.theme,
         // Hotkey configuration
