@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Requirements — Raw/Preview scroll & edit-behoud</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --ink:#0f172a; --ink-soft:#334155; --muted:#64748b; --line:#e2e8f0;
+    --bg:#f8fafc; --card:#ffffff; --accent:#0d9488; --accent-soft:#ccfbf1;
+    --pain:#dc2626; --pain-soft:#fee2e2; --win:#16a34a; --win-soft:#dcfce7;
+    --risk:#d97706; --risk-soft:#fef3c7; --info:#2563eb; --info-soft:#dbeafe;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; font-size:15px;
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:48px 28px 80px}
+  header.doc{border-bottom:3px solid var(--ink); padding-bottom:20px; margin-bottom:8px}
+  .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:700}
+  h1{font-size:30px; line-height:1.2; margin:8px 0 16px; letter-spacing:-.02em}
+  .meta{display:flex; flex-wrap:wrap; gap:8px 0; border:1px solid var(--line); border-radius:10px; background:var(--card); overflow:hidden}
+  .meta div{flex:1 1 150px; padding:10px 16px; border-right:1px solid var(--line)}
+  .meta div:last-child{border-right:none}
+  .meta dt{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:700; margin:0}
+  .meta dd{margin:3px 0 0; font-size:14px; font-weight:600}
+  h2{font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:44px 0 6px; font-weight:700}
+  .at{font-size:21px; line-height:1.3; margin:2px 0 18px; letter-spacing:-.01em; font-weight:650; color:var(--ink)}
+  p{margin:0 0 14px; color:var(--ink-soft)}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:14px 0}
+  .callout{border-radius:12px; padding:16px 18px; margin:16px 0; border-left:5px solid}
+  .callout.summary{background:var(--accent-soft); border-color:var(--accent)}
+  .callout.risk{background:var(--risk-soft); border-color:var(--risk)}
+  .callout.win{background:var(--win-soft); border-color:var(--win)}
+  .callout p{color:var(--ink); margin:0}
+  .callout .label{font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; display:block; margin-bottom:6px}
+  .callout.risk .label{color:var(--risk)} .callout.win .label{color:var(--win)} .callout.summary .label{color:#0f766e}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:16px 0}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--card)}
+  .panel .head{padding:10px 16px; font-weight:700; font-size:13px; letter-spacing:.04em; color:#fff}
+  .panel.now .head{background:var(--pain)} .panel.next .head{background:var(--win)}
+  .panel .body{padding:14px 16px}
+  .panel ul{margin:0; padding-left:18px} .panel li{margin:6px 0; font-size:14px; color:var(--ink-soft)}
+  .step{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0 4px}
+  .chip{display:inline-block; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:4px 9px; font-size:12px; font-weight:600; color:var(--ink-soft)}
+  .chip.bad{background:var(--pain-soft); border-color:#fca5a5; color:#991b1b}
+  .chip.good{background:var(--win-soft); border-color:#86efac; color:#166534}
+  .arrow{color:var(--muted); font-weight:700}
+  .req{border:1px solid var(--line); border-radius:10px; background:var(--card); margin:10px 0; padding:0}
+  .reqgroup{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); font-weight:700; margin:22px 0 6px}
+  table{width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin:10px 0; font-size:14px}
+  th,td{text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{background:#f1f5f9; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  td.id,th.id{width:62px; font-weight:700; color:var(--accent); white-space:nowrap}
+  .flow{margin:14px 0}
+  .flow h4{margin:14px 0 4px; font-size:15px; color:var(--ink)}
+  .lead{font-weight:700; color:var(--ink)}
+  .scopecols{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media(max-width:680px){.scopecols{grid-template-columns:1fr}}
+  code{background:#f1f5f9; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:13px; font-family:"SF Mono",Consolas,Menlo,monospace; color:#0f766e}
+  .mermaid{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin:16px 0; text-align:center}
+  ul.clean{padding-left:20px} ul.clean li{margin:8px 0; color:var(--ink-soft)}
+  .foot{margin-top:56px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <span class="eyebrow">Brainstorm · Requirements</span>
+  <h1>Beide editor-panes gemount houden lost het herscrollen én het stille edit-verlies op met één ingreep</h1>
+  <dl class="meta">
+    <div><dt>Datum</dt><dd>2026-06-08</dd></div>
+    <div><dt>Topic</dt><dd>raw-preview-scroll-position</dd></div>
+    <div><dt>Scope</dt><dd>Standard · markdown-only</dd></div>
+    <div><dt>Branch</dt><dd>feat/raw-preview-scroll-position</dd></div>
+  </dl>
+</header>
+
+<h2>Summary</h2>
+<div class="callout summary">
+  <span class="label">Wat we voorstellen</span>
+  <p>Voor markdown-docs blijven de raw-pane (Monaco) en preview-pane (Milkdown) allebei gemount in plaats van bij elke wissel te unmounten. Elke pane behoudt daardoor zijn eigen scroll-positie, en onopgeslagen edits overleven de wissel — de twee symptomen die nu uit één oorzaak voortkomen.</p>
+</div>
+
+<h2>Problem Frame</h2>
+<div class="at">Elke wissel unmount een editor, leest opnieuw van disk, en gooit zo scroll én onopgeslagen edits weg</div>
+<p>In <code>src/components/Editor/EditorContainer.tsx</code> wordt voor een <code>.md</code>-bestand óf de Milkdown-preview óf de Monaco-raw-editor gerenderd via een ternary. Bij elke wissel unmount React de inactieve editor; de nieuwe mount leest het bestand vers van disk (<code>MarkdownEditor.tsx</code>, <code>CodeEditor.tsx</code>). Gevolg: de scroll springt terug naar boven én alles wat in de verlaten pane in-memory stond — inclusief niet-opgeslagen edits — is weg.</p>
+<p>Het concrete moment van pijn: je bewerkt een doc halverwege, wil even de preview checken, en bent bij terugkeer je plek én potentieel je laatste edits kwijt. Beide symptomen delen exact dezelfde root cause: de unmount gooit in-memory state weg.</p>
+
+<div class="grid2">
+  <div class="panel now">
+    <div class="head">Nu — unmount / remount</div>
+    <div class="body">
+      <div class="step">
+        <span class="chip">Raw (scroll 50%)</span><span class="arrow">→</span><span class="chip">wissel</span>
+      </div>
+      <div class="step">
+        <span class="chip bad">unmount</span><span class="arrow">→</span><span class="chip bad">read disk</span><span class="arrow">→</span><span class="chip bad">scroll = 0</span>
+      </div>
+      <ul>
+        <li>Scroll terug naar boven bij elke wissel</li>
+        <li>Onopgeslagen edits stil verloren</li>
+        <li>Milkdown herbouwt z'n hele document</li>
+      </ul>
+    </div>
+  </div>
+  <div class="panel next">
+    <div class="head">Voorstel — beide gemount</div>
+    <div class="body">
+      <div class="step">
+        <span class="chip">Raw (scroll 50%)</span><span class="arrow">→</span><span class="chip">wissel</span>
+      </div>
+      <div class="step">
+        <span class="chip good">display-flip</span><span class="arrow">→</span><span class="chip good">content reconcile</span><span class="arrow">→</span><span class="chip good">scroll behouden</span>
+      </div>
+      <ul>
+        <li>Elke pane houdt eigen scroll-positie</li>
+        <li>Edits blijven behouden bij wisselen</li>
+        <li>Geen disk-reload, geen herbouw</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p>De HTML-editor (<code>HtmlEditor.tsx</code>) doet dit al: beide panes blijven gemount, zichtbaarheid via CSS <code>display</code>. Het verschil — en de reden dat we het niet 1-op-1 kunnen kopiëren — is dat de HTML-preview een <em>read-only</em> iframe is (één editable buffer, geen divergentie mogelijk), terwijl markdown <em>twee</em> editable panes heeft die we bij de wissel inhoudelijk moeten verzoenen.</p>
+
+<h2>Key Decisions</h2>
+<div class="at">Vier keuzes bepalen de vorm: één root-cause-fix, robuustheid boven precisie, markdown-only, en fidelity-risico bewust geaccepteerd</div>
+
+<div class="card">
+  <p><strong>KD1 · Beide panes gemount + content reconciliëren bij wissel.</strong> We mirroren het mount-model van <code>HtmlEditor.tsx</code>, maar uitgebreid voor twee editable panes: bij het wisselen wordt de laatste content van de verlaten pane in de andere gezet. Dit fixt scroll én edit-verlies vanuit dezelfde oorzaak, in plaats van twee losse patches op een architectuur die in-memory state blijft weggooien.</p>
+</div>
+<div class="card">
+  <p><strong>KD2 · Scroll per pane onthouden, geen cross-pane sync.</strong> Elke pane behoudt zijn eigen scroll-positie. We mappen bewust niet "raw-regel → exacte preview-plek": Monaco (regel-gebaseerd) en Milkdown (ProseMirror-document) delen geen positie-structuur, dus een mapping zou fragiel en duur zijn. Robuustheid wint van precisie.</p>
+</div>
+<div class="card">
+  <p><strong>KD3 · Alleen markdown.</strong> De HTML-editor houdt z'n raw-pane al gemount, dus per-pane scroll werkt daar al; z'n preview is read-only, dus er is geen edit-verlies. Geen wijziging nodig aan de HTML-flow.</p>
+</div>
+<div class="card">
+  <p><strong>KD4 · Round-trip fidelity voorlopig geaccepteerd.</strong> Milkdown live en editable houden betekent dat <code>raw → preview → raw</code> de markdown door Milkdown's parse/serialize haalt, wat ruwe opmaak kan normaliseren (witruimte, list-markers). Nu nog gemaskeerd doordat elke pane van disk herleest. Geaccepteerd als bekend risico; herzien als het in de praktijk bijt (zie Open vragen).</p>
+</div>
+
+<h2>Requirements</h2>
+<div class="at">Het doc moet drie dingen garanderen: scroll-geheugen, edit-behoud, en geen regressies op bestaand gedrag</div>
+
+<div class="reqgroup">Scroll-geheugen</div>
+<table>
+  <tr><th class="id">ID</th><th>Eis</th></tr>
+  <tr><td class="id">R1</td><td>Bij het wisselen tussen raw en preview op een markdown-doc herstelt elke pane de scroll-positie die hij had toen hij voor het laatst zichtbaar was.</td></tr>
+  <tr><td class="id">R2</td><td>Terugkeren naar een pane landt op de eerder bekeken positie zonder handmatig scrollen — de kern van de "peek-and-return"-workflow.</td></tr>
+</table>
+
+<div class="reqgroup">Edit-behoud</div>
+<table>
+  <tr><th class="id">ID</th><th>Eis</th></tr>
+  <tr><td class="id">R3</td><td>Onopgeslagen edits in de ene pane gaan niet verloren wanneer de gebruiker naar de andere pane en terug wisselt.</td></tr>
+  <tr><td class="id">R4</td><td>Edits gemaakt in raw verschijnen in preview na het wisselen, en omgekeerd — de actieve pane toont altijd de meest recente content.</td></tr>
+  <tr><td class="id">R5</td><td>Dirty-state is consistent over beide panes: één bron van waarheid per tab, en <code>Ctrl+S</code> bewaart de meest recente content ongeacht welke pane actief is.</td></tr>
+</table>
+
+<div class="reqgroup">Geen regressies</div>
+<table>
+  <tr><th class="id">ID</th><th>Eis</th></tr>
+  <tr><td class="id">R6</td><td>Externe bestandswijzigingen (file watcher) werken beide panes consistent bij; de bestaande bescherming "overschrijf geen onopgeslagen edits" blijft intact.</td></tr>
+  <tr><td class="id">R7</td><td>De eerste keer wisselen naar preview landt op preview's eigen beginpositie (bovenaan) — cross-pane positionering wordt expliciet niet geleverd en is geen bug.</td></tr>
+</table>
+
+<h2>Key Flows</h2>
+<div class="at">De peek-and-return-flow is de happy path; edit-in-preview en externe wijzigingen zijn de randen die mee moeten</div>
+
+<div class="mermaid">
+flowchart LR
+  A["Raw bewerken<br/>scroll 50%"] -->|klik Preview| B["Preview<br/>(eigen scroll)"]
+  B -->|klik Raw| C["Raw terug<br/>scroll 50% + edits intact"]
+  A -.->|reconcile content| B
+  B -.->|reconcile content| C
+  classDef raw fill:#dbeafe,stroke:#2563eb,color:#0f172a;
+  classDef prev fill:#ccfbf1,stroke:#0d9488,color:#0f172a;
+  class A,C raw; class B prev;
+</div>
+
+<div class="flow">
+  <h4>F1 · Peek and return (happy path)</h4>
+  <p><span class="lead">Trigger:</span> gebruiker bewerkt raw markdown, scrollt halverwege, klikt Preview. <span class="lead">Verloop:</span> preview toont de meest recente content (inclusief onopgeslagen raw-edits) op preview's onthouden scroll. Klik op Raw → de raw-editor staat op exact de scroll-positie en content waar hij verlaten werd, edits intact.</p>
+</div>
+<div class="flow">
+  <h4>F2 · Edit in preview, dan naar raw</h4>
+  <p><span class="lead">Trigger:</span> gebruiker bewerkt in de Milkdown-preview en wisselt naar raw. <span class="lead">Verloop:</span> raw toont de in preview bewerkte content (gereconcilieerd), scroll behouden.</p>
+</div>
+<div class="flow">
+  <h4>F3 · Externe wijziging tijdens het werken</h4>
+  <p><span class="lead">Trigger:</span> Claude of een ander proces wijzigt het bestand. <span class="lead">Verloop:</span> beide panes verversen consistent; is de buffer dirty én verschilt de disk-inhoud van de laatste save, dan blijven de edits van de gebruiker behouden (bestaand gedrag gerespecteerd).</p>
+</div>
+
+<h2>Acceptance Examples</h2>
+<table>
+  <tr><th class="id">ID</th><th>Scenario</th><th>Dekt</th></tr>
+  <tr><td class="id">AE1</td><td>Bewerk halverwege in raw, scroll omlaag, wissel naar preview en terug → scroll-positie hersteld, onopgeslagen edits aanwezig.</td><td>R2, R3</td></tr>
+  <tr><td class="id">AE2</td><td>Typ een nieuwe heading in raw (niet opgeslagen), wissel naar preview → de heading is gerenderd zichtbaar in preview.</td><td>R4</td></tr>
+  <tr><td class="id">AE3</td><td>Open een doc en wissel meteen naar preview → preview staat bovenaan (geen cross-mapping). Dit is verwacht gedrag.</td><td>R7</td></tr>
+  <tr><td class="id">AE4</td><td>Bewerk in raw (niet opslaan), wissel naar preview, bewerk verder, <code>Ctrl+S</code> → bestand bevat de gecombineerde laatste content; dirty-indicator verdwijnt.</td><td>R5</td></tr>
+  <tr><td class="id">AE5</td><td>Externe edit door Claude terwijl de buffer schoon is → beide panes tonen na de wissel de nieuwe content.</td><td>R6</td></tr>
+</table>
+
+<h2>Scope Boundaries</h2>
+<div class="scopecols">
+  <div class="card">
+    <div class="reqgroup" style="margin-top:0">Uitgesteld (later mogelijk)</div>
+    <ul class="clean">
+      <li><strong>Cross-pane scroll-sync</strong> — landen op exact dezelfde inhoudelijke plek in de andere view (proportioneel of regel-gemapt).</li>
+      <li><strong>Round-trip fidelity oplossen</strong> — raw als canoniek behandelen zodat Milkdown de opmaak niet kan normaliseren (KD4).</li>
+      <li><strong>State over restart</strong> — scroll/edit-state bewaren over app-herstart of tab sluiten/heropenen.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="reqgroup" style="margin-top:0">Buiten deze feature</div>
+    <ul class="clean">
+      <li><strong>HTML-editor</strong> — preserveert per-pane scroll al; read-only preview, dus geen edit-verlies. Geen wijziging.</li>
+      <li><strong>Nieuwe hotkey</strong> — deze feature introduceert geen nieuwe gebruikersactie (het verbetert de bestaande toggle), dus geen nieuwe sneltoets vereist. Een toggle-hotkey voor raw/preview is een mogelijke losse winst, niet hier.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Dependencies / Assumptions</h2>
+<ul class="clean">
+  <li>Bouwt voort op de bestaande Milkdown-integratie (<code>src/components/Editor/MarkdownEditor.tsx</code>, incl. <code>__milkdownReplace</code>/<code>replaceAll</code>) en Monaco-integratie (<code>src/components/Editor/CodeEditor.tsx</code>, incl. <code>setValue</code> / view-state).</li>
+  <li><strong>Aanname:</strong> Milkdown's <code>getMarkdown()</code> round-trip is "goed genoeg" — bewust geaccepteerd risico (KD4).</li>
+  <li><strong>Aanname:</strong> beide panes tegelijk gemount kost geen merkbare performance — de HTML-editor draait al Monaco + iframe samen.</li>
+</ul>
+
+<h2>Outstanding Questions</h2>
+<p class="lead" style="margin-bottom:4px">Doorgeschoven naar planning (geen blocker):</p>
+<ul class="clean">
+  <li>Reconciliatie-timing: alleen bij de wissel, of continu? (Bij de wissel volstaat — de panes zijn nooit tegelijk zichtbaar.)</li>
+  <li>Welke ref/state is de canonieke bron voor content + dirty-status met twee live editors.</li>
+  <li>Of Milkdown-scroll-herstel een "ready/render"-hook nodig heeft (Monaco heeft hiervoor <code>restoreViewState</code>).</li>
+  <li>Trigger voor KD4-herziening: wanneer beschouwen we de fidelity-normalisatie als "het bijt" (bv. lijst-markers of code-fences die hercodeerd worden)?</li>
+</ul>
+
+<h2>Sources / Research</h2>
+<ul class="clean">
+  <li><code>src/components/Editor/EditorContainer.tsx</code> — de ternary mount/unmount voor markdown; en het keep-both-mounted-model voor HTML (referentiepatroon).</li>
+  <li><code>src/components/Editor/MarkdownEditor.tsx</code> — Milkdown-integratie, file-read bij mount, <code>__milkdownReplace</code>.</li>
+  <li><code>src/components/Editor/CodeEditor.tsx</code> — Monaco-integratie, file-read bij mount, watcher-reload die positie bewaart.</li>
+  <li><code>src/components/Editor/HtmlEditor.tsx</code> — referentie: beide panes gemount, CSS display-toggle, debounced reconciliatie, onderdrukking van de eigen-save-echo.</li>
+</ul>
+
+<div class="foot">
+  Riverwise · brainstorm requirements · markdown raw/preview scroll &amp; edit-behoud · 2026-06-08
+</div>
+
+</div>
+<script>
+  mermaid.initialize({startOnLoad:true, theme:'neutral', flowchart:{curve:'basis'}});
+</script>
+</body>
+</html>

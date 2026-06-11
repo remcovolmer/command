@@ -129,23 +129,18 @@ export function EditorContainer({ tabId, filePath, isActive }: EditorContainerPr
         </div>
       </div>
 
-      {/* Editor area */}
+      {/* Editor area — both panes stay mounted inside MarkdownEditor; mode
+          toggles which is visible so scroll position and unsaved edits survive
+          a raw/preview switch. */}
       <div className="flex-1 min-h-0">
-        {useWysiwyg ? (
-          <Suspense fallback={<EditorSkeleton />}>
-            <MarkdownEditor
-              tabId={tabId}
-              filePath={filePath}
-              isActive={isActive}
-            />
-          </Suspense>
-        ) : (
-          <CodeEditor
+        <Suspense fallback={<EditorSkeleton />}>
+          <MarkdownEditor
             tabId={tabId}
             filePath={filePath}
             isActive={isActive}
+            mode={useWysiwyg ? 'preview' : 'raw'}
           />
-        )}
+        </Suspense>
       </div>
     </div>
   )
