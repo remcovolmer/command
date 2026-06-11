@@ -12,6 +12,7 @@ import { buildTerminalTheme, invalidateTerminalThemeCache } from '../utils/termi
 import { createFileLinkProvider } from '../utils/fileLinkProvider'
 import { classifyOsc8Uri } from '../utils/osc8LinkRouter'
 import { terminalPool } from '../utils/terminalPool'
+import { createSpaceKeyWatchdog } from '../utils/spaceKeyWatchdog'
 
 // Timing constants for terminal dimension calculations
 const FIT_RETRY_DELAY_MS = 50
@@ -273,8 +274,22 @@ export function useXtermInstance({
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
+    // Recover spaces that a Windows IME/text-suggestion layer eats: those
+    // keydowns arrive as keyCode 229 and xterm drops them by design (only
+    // textarea diffs are forwarded, and the layer inserts no space). The
+    // watchdog injects the space when no space data follows the keydown.
+    const spaceWatchdog = createSpaceKeyWatchdog({
+      writeSpace: () => {
+        if (!isDisposedRef.current) {
+          api.terminal.write(id, ' ')
+        }
+      },
+    })
+
     // Handle Ctrl+C (copy when selected, otherwise send SIGINT) and Ctrl+V (paste)
     terminal.attachCustomKeyEventHandler((event) => {
+      spaceWatchdog.handleKeyEvent(event)
+
       if (event.type !== 'keydown') return true
 
       if (event.ctrlKey && event.key === 'c') {
@@ -310,6 +325,7 @@ export function useXtermInstance({
     }, READY_DELAY_MS)
 
     terminal.onData((data) => {
+      spaceWatchdog.handleData(data)
       api.terminal.write(id, data)
     })
 
@@ -377,6 +393,7 @@ export function useXtermInstance({
       }
       resizeObserver.disconnect()
       mutationObserver.disconnect()
+      spaceWatchdog.dispose()
       terminalEvents.unsubscribe(id)
       terminalPool.unregisterCallbacks(id)
       // Dispose WebGL addon before terminal to avoid _isDisposed race
