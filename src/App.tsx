@@ -381,6 +381,12 @@ function App() {
     'sidebar.toggleInactive': () => {
       useProjectStore.getState().toggleInactiveSectionCollapsed()
     },
+    'sidebar.pinProject': () => {
+      const { activeProjectId, togglePinProject } = useProjectStore.getState()
+      if (activeProjectId) {
+        togglePinProject(activeProjectId)
+      }
+    },
 
     // UI & Settings
     'ui.openSettings': () => setSettingsDialogOpen(true),

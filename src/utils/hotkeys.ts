@@ -304,6 +304,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'sidebar',
     enabled: true,
   },
+  'sidebar.pinProject': {
+    key: 'p',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Pin or unpin the active project',
+    category: 'sidebar',
+    enabled: true,
+  },
 
   // UI & Settings
   'ui.openSettings': {
