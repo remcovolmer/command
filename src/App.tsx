@@ -385,6 +385,15 @@ function App() {
       useProjectStore.getState().toggleInactiveSectionCollapsed()
     },
 
+    // Toggle collapse of the active project. Binding resolution in useHotkeys
+    // falls back to DEFAULT_HOTKEY_CONFIG for persisted configs that predate
+    // this action (same fallback pattern as dialog.dismissTopmostToast).
+    'sidebar.toggleProjectCollapse': () => {
+      const { activeProjectId, toggleProjectCollapsed } = useProjectStore.getState()
+      if (!activeProjectId) return
+      toggleProjectCollapsed(activeProjectId)
+    },
+
     // UI & Settings
     'ui.openSettings': () => setSettingsDialogOpen(true),
     'ui.toggleTheme': toggleTheme,

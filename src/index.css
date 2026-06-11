@@ -42,6 +42,13 @@
   --sidebar-border: oklch(0.9401 0 0);
   --sidebar-ring: oklch(0.7731 0 0);
   --sidebar-highlight: oklch(0.88 0.06 40);
+  /* Status colors (urgency semantics) — slightly darker/more saturated than the
+     dark-theme equivalents for readability on the light sidebar (lesson from PR #89:
+     never share one value across themes) */
+  --status-attention: oklch(0.646 0.222 41.1); /* ~orange-600 */
+  --status-done: oklch(0.627 0.194 149.2); /* ~green-600 */
+  --status-busy: oklch(0.551 0.027 264.4); /* ~gray-500 */
+  --status-stopped: oklch(0.577 0.245 27.3); /* ~red-600 */
   --font-sans:
     'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
@@ -88,6 +95,11 @@
   --sidebar-border: oklch(0.9401 0 0);
   --sidebar-ring: oklch(0.7731 0 0);
   --sidebar-highlight: #572c1e;
+  /* Status colors (urgency semantics) — brighter values for contrast on the dark sidebar */
+  --status-attention: oklch(0.705 0.213 47.6); /* ~orange-500 */
+  --status-done: oklch(0.723 0.219 149.6); /* ~green-500 */
+  --status-busy: oklch(0.707 0.022 261.3); /* ~gray-400 */
+  --status-stopped: oklch(0.6368 0.2078 25.3); /* ~red-500 */
 
   color-scheme: dark;
 }
@@ -184,11 +196,6 @@ body {
   animation: blink-glow-green 1.5s ease-in-out infinite;
 }
 
-/* Ready state - green glow (Claude finished, waiting for input) */
-.needs-input-indicator.state-ready {
-  animation: blink-glow-green 1.5s ease-in-out infinite;
-}
-
 @keyframes blink-glow-green {
   0%,
   100% {
@@ -203,8 +210,10 @@ body {
   }
 }
 
-/* Permission state - orange fast blink (Claude needs permission - more urgent) */
-.needs-input-indicator.state-permission {
+/* Permission/question states - orange fast blink (Claude waits on the user - more urgent).
+   Treated identically per the attention-state contract (see isAttentionState). */
+.needs-input-indicator.state-permission,
+.needs-input-indicator.state-question {
   animation: blink-glow-orange 1s ease-in-out infinite;
 }
 
@@ -219,6 +228,26 @@ body {
   50% {
     opacity: 0.5;
     box-shadow: 0 0 4px oklch(0.75 0.18 55);
+  }
+}
+
+/* Attention pulse - shared by the rail (3px left-edge bar) and the collapsed
+   rollup dot on permission/question rows. The glow is static; only opacity
+   animates, which the compositor handles without per-frame main-thread
+   repaints (box-shadow animation forced continuous repaints while idle). */
+.attention-pulse {
+  box-shadow: 0 0 6px color-mix(in oklch, var(--status-attention) 60%, transparent);
+  animation: attention-pulse 1s ease-in-out infinite;
+}
+
+@keyframes attention-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
   }
 }
 

@@ -20,7 +20,7 @@ import type {
   AccountProfile,
 } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
-import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
+import { DEFAULT_HOTKEY_CONFIG, mergeMissingHotkeyDefaults } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
 import { terminalPool } from '../utils/terminalPool'
 
@@ -129,6 +129,10 @@ interface ProjectStore {
   // Inactive section collapse state
   inactiveSectionCollapsed: boolean
   toggleInactiveSectionCollapsed: () => void
+
+  // Per-project collapse state (persisted; keyed record for O(1) lookup)
+  collapsedProjects: Record<string, true>
+  toggleProjectCollapsed: (projectId: string) => void
 
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]> // contextKey -> terminalId[]
@@ -603,6 +607,24 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
           return { inactiveSectionCollapsed: newCollapsed }
+        }),
+
+      // Per-project collapse state. Click handler and hotkey both call this
+      // single action so the behavior cannot drift apart (KTD5).
+      collapsedProjects: {},
+      toggleProjectCollapsed: (projectId) =>
+        set((state) => {
+          // Workspaces render without a collapse affordance (see Sidebar.tsx);
+          // toggling one would write dead state that nothing ever reads.
+          const project = state.projects.find((p) => p.id === projectId)
+          if (project?.type === 'workspace') return state
+          const next = { ...state.collapsedProjects }
+          if (next[projectId]) {
+            delete next[projectId]
+          } else {
+            next[projectId] = true
+          }
+          return { collapsedProjects: next }
         }),
 
       // Sidecar terminal state
@@ -1154,6 +1176,8 @@ export const useProjectStore = create<ProjectStore>()(
           const newTasksData = { ...state.tasksData }
           const newTasksLoading = { ...state.tasksLoading }
           const newExpandedPaths = { ...state.expandedPaths }
+          const newCollapsedProjects = { ...state.collapsedProjects }
+          delete newCollapsedProjects[id]
           for (const key of cleanKeys) {
             delete newGitStatus[key]
             delete newGitStatusLoading[key]
@@ -1219,6 +1243,7 @@ export const useProjectStore = create<ProjectStore>()(
             tasksData: newTasksData,
             tasksLoading: newTasksLoading,
             expandedPaths: newExpandedPaths,
+            collapsedProjects: newCollapsedProjects,
             directoryCache: newDirectoryCache,
           }
         }),
@@ -1229,10 +1254,19 @@ export const useProjectStore = create<ProjectStore>()(
           const visible = getVisibleTerminals(state.terminals, state.sidecarTerminals, id ?? '')
           const newActiveTerminalId = visible.length > 0 ? visible[0].id : null
 
+          // Auto-expand: selecting a project clears its collapse entry in the
+          // same set-call, so the active project can never be hidden (KTD5)
+          let newCollapsedProjects = state.collapsedProjects
+          if (id && newCollapsedProjects[id]) {
+            newCollapsedProjects = { ...newCollapsedProjects }
+            delete newCollapsedProjects[id]
+          }
+
           // Clear directoryCache to prevent unbounded growth across project switches
           // File tree reloads lazily when the user browses
           return {
             activeProjectId: id,
+            collapsedProjects: newCollapsedProjects,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveTerminalId,
             directoryCache: {},
@@ -1719,6 +1753,8 @@ export const useProjectStore = create<ProjectStore>()(
         sidecarTerminalCollapsed: state.sidecarTerminalCollapsed,
         // Inactive section collapse state
         inactiveSectionCollapsed: state.inactiveSectionCollapsed,
+        // Per-project collapse state (additive field, hydrates safely without migration)
+        collapsedProjects: state.collapsedProjects,
         // Theme state
         theme: state.theme,
         // Hotkey configuration
@@ -1733,6 +1769,13 @@ export const useProjectStore = create<ProjectStore>()(
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error('Zustand hydration failed:', error)
+        }
+        // Backfill hotkey defaults for actions added after the user's config
+        // was persisted, so they show up in Settings, the Ctrl+/ overlay and
+        // conflict detection. The lookup fallback in useHotkeys stays as a
+        // safety net for the pre-hydration window.
+        if (state?.hotkeyConfig) {
+          state.hotkeyConfig = mergeMissingHotkeyDefaults(state.hotkeyConfig)
         }
         // Migrate expandedPaths from old string[] format to Record<string, true>
         if (state?.expandedPaths) {

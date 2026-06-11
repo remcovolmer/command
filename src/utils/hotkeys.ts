@@ -304,6 +304,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'sidebar',
     enabled: true,
   },
+  'sidebar.toggleProjectCollapse': {
+    key: 'p',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle collapse active project',
+    category: 'sidebar',
+    enabled: true,
+  },
 
   // UI & Settings
   'ui.openSettings': {
@@ -535,6 +542,27 @@ export function parseKeyEvent(
     key: e.key,
     modifiers,
   }
+}
+
+/**
+ * Backfill defaults for actions missing from a persisted hotkey config.
+ *
+ * Persisted configs from existing users predate newly added actions; without
+ * this, a new action is active (via the lookup fallback in useHotkeys) but
+ * invisible in Settings, the Ctrl+/ overlay and conflict detection — all of
+ * which iterate the persisted config. Called from onRehydrateStorage in
+ * projectStore.ts. Existing user customizations are left untouched.
+ */
+export function mergeMissingHotkeyDefaults(config: HotkeyConfig): HotkeyConfig {
+  let changed = false
+  const merged = { ...config }
+  for (const action of Object.keys(DEFAULT_HOTKEY_CONFIG) as HotkeyAction[]) {
+    if (!merged[action]) {
+      merged[action] = DEFAULT_HOTKEY_CONFIG[action]
+      changed = true
+    }
+  }
+  return changed ? merged : config
 }
 
 /**

@@ -72,6 +72,7 @@ export type HotkeyAction =
   | 'worktree.create'
   // Sidebar
   | 'sidebar.toggleInactive'
+  | 'sidebar.toggleProjectCollapse'
   // UI & Settings
   | 'ui.openSettings'
   | 'ui.toggleTheme'
