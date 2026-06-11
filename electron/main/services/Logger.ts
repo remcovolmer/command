@@ -90,11 +90,13 @@ export function getLogFilePath(): string | null {
 }
 
 // Pre-init fallback: matches the previous raw console.* behavior.
+// Late-bound (not `console.warn` references) so test spies installed after
+// this module loads still observe the calls.
 const CONSOLE_FALLBACK: Record<LogLevel, (...params: unknown[]) => void> = {
-  error: console.error,
-  warn: console.warn,
-  info: console.log,
-  debug: console.log,
+  error: (...params) => console.error(...params),
+  warn: (...params) => console.warn(...params),
+  info: (...params) => console.log(...params),
+  debug: (...params) => console.log(...params),
 }
 
 /**
