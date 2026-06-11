@@ -17,7 +17,7 @@ export class SpawnError extends Error {
           : `Failed to spawn shell in ${cwd}`
     super(
       options?.message ?? defaultMessage,
-      options?.cause !== undefined ? { cause: options.cause } : undefined,
+      options?.cause !== undefined ? { cause: options.cause } : undefined
     )
     this.name = 'SpawnError'
     this.code = code

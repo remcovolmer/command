@@ -26,7 +26,7 @@ function SidecarTerminalInstance({
   isActive: boolean
 }) {
   const removeTerminal = useProjectStore((s) => s.removeTerminal)
-  const terminalProjectId = useProjectStore(s => s.terminals[terminalId]?.projectId ?? '')
+  const terminalProjectId = useProjectStore((s) => s.terminals[terminalId]?.projectId ?? '')
 
   const handleExit = useCallback(() => {
     removeTerminal(terminalId)
@@ -66,7 +66,9 @@ export function SidecarTerminalPanel({
   const isExpanded = !isCollapsed && hasTerminals
 
   return (
-    <div className={`flex flex-col shrink-0 ${isExpanded ? 'flex-1 min-h-[120px] max-h-[50%]' : ''}`}>
+    <div
+      className={`flex flex-col shrink-0 ${isExpanded ? 'flex-1 min-h-[120px] max-h-[50%]' : ''}`}
+    >
       {/* Header - always visible */}
       <div
         className="flex items-center justify-between px-2 py-1 bg-sidebar-accent border-t border-border shrink-0 cursor-pointer"
@@ -105,13 +107,16 @@ export function SidecarTerminalPanel({
                 className={`
                   flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap shrink-0
                   transition-colors border-b-2
-                  ${isActive
-                    ? 'border-primary text-sidebar-foreground bg-sidebar-accent/50'
-                    : 'border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/30'
+                  ${
+                    isActive
+                      ? 'border-primary text-sidebar-foreground bg-sidebar-accent/50'
+                      : 'border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/30'
                   }
                 `}
               >
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStateColor(term.state)}`} />
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStateColor(term.state)}`}
+                />
                 <span className="truncate max-w-[80px]">{term.title || 'Terminal'}</span>
                 <button
                   onClick={(e) => {

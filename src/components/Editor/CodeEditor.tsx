@@ -22,7 +22,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
   const isDeletedExternally = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
-    return tab?.type === 'editor' ? tab.isDeletedExternally ?? false : false
+    return tab?.type === 'editor' ? (tab.isDeletedExternally ?? false) : false
   })
   const projectId = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
@@ -50,7 +50,8 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
       }
     }, 10000)
 
-    api.fs.readFile(filePath)
+    api.fs
+      .readFile(filePath)
       .then((text) => {
         clearTimeout(timeoutId)
         if (cancelled) return
@@ -76,21 +77,24 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
 
     const reloadFile = () => {
       const seq = ++readSeqRef.current
-      api.fs.readFile(filePath).then((text) => {
-        if (cancelled || seq !== readSeqRef.current) return  // stale or unmounted
-        const ed = editorRef.current
-        if (ed) {
-          const position = ed.getPosition()
-          ed.setValue(text)
-          if (position) ed.setPosition(position)
-        }
-        savedContentRef.current = text
-        lastDirtyRef.current = false
-        setEditorDirty(tabId, false)
-        setEditorTabDeletedExternally(tabId, false)
-      }).catch((err) => {
-        if (!cancelled) console.error('Failed to reload file:', err)
-      })
+      api.fs
+        .readFile(filePath)
+        .then((text) => {
+          if (cancelled || seq !== readSeqRef.current) return // stale or unmounted
+          const ed = editorRef.current
+          if (ed) {
+            const position = ed.getPosition()
+            ed.setValue(text)
+            if (position) ed.setPosition(position)
+          }
+          savedContentRef.current = text
+          lastDirtyRef.current = false
+          setEditorDirty(tabId, false)
+          setEditorTabDeletedExternally(tabId, false)
+        })
+        .catch((err) => {
+          if (!cancelled) console.error('Failed to reload file:', err)
+        })
     }
 
     const subscriberKey = `editor-${tabId}`
@@ -122,7 +126,15 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
       cancelled = true
       fileWatcherEvents.unsubscribe(projectId, subscriberKey)
     }
-  }, [projectId, tabId, filePath, normalizedPath, api, setEditorDirty, setEditorTabDeletedExternally])
+  }, [
+    projectId,
+    tabId,
+    filePath,
+    normalizedPath,
+    api,
+    setEditorDirty,
+    setEditorTabDeletedExternally,
+  ])
 
   const saveFile = useCallback(async () => {
     const editor = editorRef.current
@@ -165,15 +177,18 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
     editorRef.current = editor
   }, [])
 
-  const handleChange = useCallback((value: string | undefined) => {
-    if (value === undefined) return
-    const dirty = value !== savedContentRef.current
-    // Only update store when dirty state actually changes
-    if (dirty !== lastDirtyRef.current) {
-      lastDirtyRef.current = dirty
-      setEditorDirty(tabId, dirty)
-    }
-  }, [tabId, setEditorDirty])
+  const handleChange = useCallback(
+    (value: string | undefined) => {
+      if (value === undefined) return
+      const dirty = value !== savedContentRef.current
+      // Only update store when dirty state actually changes
+      if (dirty !== lastDirtyRef.current) {
+        lastDirtyRef.current = dirty
+        setEditorDirty(tabId, dirty)
+      }
+    },
+    [tabId, setEditorDirty]
+  )
 
   if (error) {
     return (

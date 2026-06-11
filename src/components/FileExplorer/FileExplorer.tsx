@@ -34,14 +34,16 @@ export function FileExplorer() {
   const gitContextId = activeWorktree?.id ?? activeProjectId
   const gitContextPath = activeWorktree?.path
 
-  const gitStatus = useProjectStore((s) => gitContextId ? s.gitStatus[gitContextId] : null)
-  const isGitLoading = useProjectStore((s) => gitContextId ? s.gitStatusLoading[gitContextId] : false)
+  const gitStatus = useProjectStore((s) => (gitContextId ? s.gitStatus[gitContextId] : null))
+  const isGitLoading = useProjectStore((s) =>
+    gitContextId ? s.gitStatusLoading[gitContextId] : false
+  )
 
   // Sidecar terminal state — select ID array with shallow equality to avoid re-renders
   // Use activeWorktree (derived from active terminal) instead of activeWorktreeId to match Files/Git
   const sidecarContextKey = activeWorktree?.id ?? activeProjectId
   const sidecarTerminalIds = useProjectStore(
-    useShallow((s) => sidecarContextKey ? (s.sidecarTerminals[sidecarContextKey] ?? []) : [])
+    useShallow((s) => (sidecarContextKey ? (s.sidecarTerminals[sidecarContextKey] ?? []) : []))
   )
   const terminals = useProjectStore((s) => s.terminals)
   const sidecarTerminals = useMemo(
@@ -49,7 +51,7 @@ export function FileExplorer() {
     [sidecarTerminalIds, terminals]
   )
   const activeSidecarTerminalId = useProjectStore((s) =>
-    sidecarContextKey ? s.activeSidecarTerminalId[sidecarContextKey] ?? null : null
+    sidecarContextKey ? (s.activeSidecarTerminalId[sidecarContextKey] ?? null) : null
   )
   const sidecarTerminalCollapsed = useProjectStore((s) => s.sidecarTerminalCollapsed)
 
@@ -90,14 +92,14 @@ export function FileExplorer() {
   const fileTreeRootPath = activeWorktree?.path ?? activeProject?.path
   const fileTreeContextKey = activeWorktree?.id ?? activeProjectId
   // 'project' type has limited functionality (no git, no sidecar)
-  const isLimitedProject = useMemo(
-    () => activeProject?.type === 'project',
-    [activeProject?.type]
-  )
+  const isLimitedProject = useMemo(() => activeProject?.type === 'project', [activeProject?.type])
 
   // Auto-select first sidecar terminal when context changes
   useEffect(() => {
-    if (sidecarTerminals.length > 0 && !sidecarTerminals.find((t) => t.id === activeSidecarTerminalId)) {
+    if (
+      sidecarTerminals.length > 0 &&
+      !sidecarTerminals.find((t) => t.id === activeSidecarTerminalId)
+    ) {
       if (sidecarContextKey) {
         setActiveSidecarTerminal(sidecarContextKey, sidecarTerminals[0].id)
       }
@@ -106,7 +108,11 @@ export function FileExplorer() {
 
   const handleCreateTerminal = async () => {
     if (activeProjectId && sidecarContextKey) {
-      await createSidecarTerminal(sidecarContextKey, activeProjectId, activeWorktree?.id ?? undefined)
+      await createSidecarTerminal(
+        sidecarContextKey,
+        activeProjectId,
+        activeWorktree?.id ?? undefined
+      )
     }
   }
 
@@ -147,7 +153,16 @@ export function FileExplorer() {
     } finally {
       setGitStatusLoading(gitContextId, false)
     }
-  }, [api, gitPath, gitContextId, setGitStatus, setGitStatusLoading, gitHeadHash, setGitHeadHash, setGitCommitLog])
+  }, [
+    api,
+    gitPath,
+    gitContextId,
+    setGitStatus,
+    setGitStatusLoading,
+    gitHeadHash,
+    setGitHeadHash,
+    setGitCommitLog,
+  ])
 
   const handleGitRefreshRef = useRef(handleGitRefresh)
   handleGitRefreshRef.current = handleGitRefresh
@@ -229,28 +244,38 @@ export function FileExplorer() {
       gitStatus.conflicted.length
     : 0
 
-  const tasksData = useProjectStore((s) => activeProjectId ? s.tasksData[activeProjectId] : null)
+  const tasksData = useProjectStore((s) => (activeProjectId ? s.tasksData[activeProjectId] : null))
   const taskNowCount = tasksData?.nowCount ?? 0
 
   // Automation state
   const [automationUnreadCount, setAutomationUnreadCount] = useState(0)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [editingAutomation, setEditingAutomation] = useState<import('../../types').Automation | null>(null)
+  const [editingAutomation, setEditingAutomation] = useState<
+    import('../../types').Automation | null
+  >(null)
 
   // Load unread count on mount and when runs change
   useEffect(() => {
     const loadUnread = async () => {
       try {
-        const runs = await api.automation.listRuns(undefined, 100) as import('../../types').AutomationRun[]
-        const unread = runs.filter(r => !r.read && r.status !== 'running').length
+        const runs = (await api.automation.listRuns(
+          undefined,
+          100
+        )) as import('../../types').AutomationRun[]
+        const unread = runs.filter((r) => !r.read && r.status !== 'running').length
         setAutomationUnreadCount(unread)
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     loadUnread()
 
     const unsubCompleted = api.automation.onRunCompleted(() => loadUnread())
     const unsubFailed = api.automation.onRunFailed(() => loadUnread())
-    return () => { unsubCompleted(); unsubFailed() }
+    return () => {
+      unsubCompleted()
+      unsubFailed()
+    }
   }, [api])
 
   const handleTasksRefresh = useCallback(async () => {
@@ -290,15 +315,29 @@ export function FileExplorer() {
         {activeTab === 'automations' ? (
           <AutomationsPanel
             onCreateClick={() => setShowCreateDialog(true)}
-            onEditClick={(automation) => { setEditingAutomation(automation); setShowCreateDialog(true) }}
+            onEditClick={(automation) => {
+              setEditingAutomation(automation)
+              setShowCreateDialog(true)
+            }}
           />
         ) : activeProject ? (
           activeTab === 'tasks' ? (
             <TasksPanel project={activeProject} />
-          ) : (isLimitedProject || activeTab === 'files') ? (
-            <FileTree project={activeProject} rootPath={fileTreeRootPath} contextKey={fileTreeContextKey} />
+          ) : isLimitedProject || activeTab === 'files' ? (
+            <FileTree
+              project={activeProject}
+              rootPath={fileTreeRootPath}
+              contextKey={fileTreeContextKey}
+            />
           ) : (
-            <GitStatusPanel project={activeProject} gitContextId={gitContextId} gitPath={gitPath} onRefresh={handleGitRefresh} onOperationStart={handleOperationStart} onOperationEnd={handleOperationEnd} />
+            <GitStatusPanel
+              project={activeProject}
+              gitContextId={gitContextId}
+              gitPath={gitPath}
+              onRefresh={handleGitRefresh}
+              onOperationStart={handleOperationStart}
+              onOperationEnd={handleOperationEnd}
+            />
           )
         ) : (
           <div className="px-3 py-4 text-sm text-muted-foreground">
@@ -340,7 +379,10 @@ export function FileExplorer() {
       {/* Automation Create/Edit Dialog */}
       <AutomationCreateDialog
         isOpen={showCreateDialog}
-        onClose={() => { setShowCreateDialog(false); setEditingAutomation(null) }}
+        onClose={() => {
+          setShowCreateDialog(false)
+          setEditingAutomation(null)
+        }}
         editAutomation={editingAutomation}
       />
     </div>

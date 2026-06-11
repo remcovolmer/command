@@ -293,7 +293,12 @@ interface SessionIndexEntry {
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: 'claude' | 'normal', resumeSessionId?: string): Promise<string | null> =>
+    create: (
+      projectId: string,
+      worktreeId?: string,
+      type?: 'claude' | 'normal',
+      resumeSessionId?: string
+    ): Promise<string | null> =>
       ipcRenderer.invoke('terminal:create', projectId, worktreeId, type, resumeSessionId),
 
     write: (terminalId: string, data: string): void =>
@@ -302,75 +307,126 @@ contextBridge.exposeInMainWorld('electronAPI', {
     resize: (terminalId: string, cols: number, rows: number): void =>
       ipcRenderer.send('terminal:resize', terminalId, cols, rows),
 
-    close: (terminalId: string): void =>
-      ipcRenderer.send('terminal:close', terminalId),
+    close: (terminalId: string): void => ipcRenderer.send('terminal:close', terminalId),
 
-    evict: (terminalId: string): void =>
-      ipcRenderer.send('terminal:evict', terminalId),
+    evict: (terminalId: string): void => ipcRenderer.send('terminal:evict', terminalId),
 
-    restore: (terminalId: string): void =>
-      ipcRenderer.send('terminal:restore', terminalId),
+    restore: (terminalId: string): void => ipcRenderer.send('terminal:restore', terminalId),
 
-    updateWorktree: (terminalId: string, worktreeId: string, newCwd: string): Promise<{ success: boolean }> =>
+    updateWorktree: (
+      terminalId: string,
+      worktreeId: string,
+      newCwd: string
+    ): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('terminal:update-worktree', terminalId, worktreeId, newCwd),
 
     // Events from main process - return unsubscribe functions for cleanup
     onData: (callback: (id: string, data: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, data: string) => callback(id, data)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, data: string) =>
+        callback(id, data)
       ipcRenderer.on('terminal:data', handler)
       return () => ipcRenderer.removeListener('terminal:data', handler)
     },
 
     onStateChange: (callback: (id: string, state: TerminalState) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, state: TerminalState) => callback(id, state)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, state: TerminalState) =>
+        callback(id, state)
       ipcRenderer.on('terminal:state', handler)
       return () => ipcRenderer.removeListener('terminal:state', handler)
     },
 
     onExit: (callback: (id: string, code: number) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, code: number) => callback(id, code)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, code: number) =>
+        callback(id, code)
       ipcRenderer.on('terminal:exit', handler)
       return () => ipcRenderer.removeListener('terminal:exit', handler)
     },
 
     onTitleChange: (callback: (id: string, title: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) => callback(id, title)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) =>
+        callback(id, title)
       ipcRenderer.on('terminal:title', handler)
       return () => ipcRenderer.removeListener('terminal:title', handler)
     },
 
     onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, worktreeId: string) => callback(id, worktreeId)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, worktreeId: string) =>
+        callback(id, worktreeId)
       ipcRenderer.on('terminal:worktree-updated', handler)
       return () => ipcRenderer.removeListener('terminal:worktree-updated', handler)
     },
 
     onStatusMessage: (callback: (id: string, message: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, message: string) => callback(id, message)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, message: string) =>
+        callback(id, message)
       ipcRenderer.on('terminal:status', handler)
       return () => ipcRenderer.removeListener('terminal:status', handler)
     },
 
-    onSessionRestored: (callback: (session: { terminalId: string; projectId: string; worktreeId: string | null; title: string; summary?: string }) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, session: { terminalId: string; projectId: string; worktreeId: string | null; title: string; summary?: string }) => callback(session)
+    onSessionRestored: (
+      callback: (session: {
+        terminalId: string
+        projectId: string
+        worktreeId: string | null
+        title: string
+        summary?: string
+      }) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        session: {
+          terminalId: string
+          projectId: string
+          worktreeId: string | null
+          title: string
+          summary?: string
+        }
+      ) => callback(session)
       ipcRenderer.on('session:restored', handler)
       return () => ipcRenderer.removeListener('session:restored', handler)
     },
 
-    onSidecarCreated: (callback: (contextKey: string, terminal: { id: string; projectId: string; worktreeId: string | null; state: TerminalState; lastActivity: number; title: string; type: TerminalType }) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, contextKey: string, terminal: { id: string; projectId: string; worktreeId: string | null; state: TerminalState; lastActivity: number; title: string; type: TerminalType }) => callback(contextKey, terminal)
+    onSidecarCreated: (
+      callback: (
+        contextKey: string,
+        terminal: {
+          id: string
+          projectId: string
+          worktreeId: string | null
+          state: TerminalState
+          lastActivity: number
+          title: string
+          type: TerminalType
+        }
+      ) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        contextKey: string,
+        terminal: {
+          id: string
+          projectId: string
+          worktreeId: string | null
+          state: TerminalState
+          lastActivity: number
+          title: string
+          type: TerminalType
+        }
+      ) => callback(contextKey, terminal)
       ipcRenderer.on('sidecar:created', handler)
       return () => ipcRenderer.removeListener('sidecar:created', handler)
     },
 
     onSummaryChange: (callback: (id: string, summary: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, summary: string) => callback(id, summary)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, summary: string) =>
+        callback(id, summary)
       ipcRenderer.on('terminal:summary', handler)
       return () => ipcRenderer.removeListener('terminal:summary', handler)
     },
 
     onGeneratedTitleChange: (callback: (id: string, title: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) => callback(id, title)
+      const handler = (_event: Electron.IpcRendererEvent, id: string, title: string) =>
+        callback(id, title)
       ipcRenderer.on('terminal:generated-title', handler)
       return () => ipcRenderer.removeListener('terminal:generated-title', handler)
     },
@@ -391,20 +447,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Project operations
   project: {
-    list: (): Promise<Project[]> =>
-      ipcRenderer.invoke('project:list'),
+    list: (): Promise<Project[]> => ipcRenderer.invoke('project:list'),
 
     add: (path: string, name?: string, type?: ProjectType): Promise<Project> =>
       ipcRenderer.invoke('project:add', path, name, type),
 
-    remove: (id: string): Promise<void> =>
-      ipcRenderer.invoke('project:remove', id),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke('project:remove', id),
 
-    update: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>): Promise<Project | null> =>
-      ipcRenderer.invoke('project:update', id, updates),
+    update: (
+      id: string,
+      updates: Partial<Pick<Project, 'name' | 'settings'>>
+    ): Promise<Project | null> => ipcRenderer.invoke('project:update', id, updates),
 
-    selectFolder: (): Promise<string | null> =>
-      ipcRenderer.invoke('project:select-folder'),
+    selectFolder: (): Promise<string | null> => ipcRenderer.invoke('project:select-folder'),
 
     reorder: (projectIds: string[]): Promise<Project[]> =>
       ipcRenderer.invoke('project:reorder', projectIds),
@@ -418,23 +473,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Profile operations
   profile: {
-    list: (): Promise<AccountProfile[]> =>
-      ipcRenderer.invoke('profile:list'),
+    list: (): Promise<AccountProfile[]> => ipcRenderer.invoke('profile:list'),
 
-    add: (name: string): Promise<AccountProfile> =>
-      ipcRenderer.invoke('profile:add', name),
+    add: (name: string): Promise<AccountProfile> => ipcRenderer.invoke('profile:add', name),
 
     update: (id: string, updates: { name: string }): Promise<AccountProfile | null> =>
       ipcRenderer.invoke('profile:update', id, updates),
 
-    remove: (id: string): Promise<void> =>
-      ipcRenderer.invoke('profile:remove', id),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke('profile:remove', id),
 
-    setActive: (id: string | null): Promise<void> =>
-      ipcRenderer.invoke('profile:setActive', id),
+    setActive: (id: string | null): Promise<void> => ipcRenderer.invoke('profile:setActive', id),
 
-    getActive: (): Promise<string | null> =>
-      ipcRenderer.invoke('profile:getActive'),
+    getActive: (): Promise<string | null> => ipcRenderer.invoke('profile:getActive'),
 
     setEnvVars: (profileId: string, vars: Record<string, string>): Promise<void> =>
       ipcRenderer.invoke('profile:setEnvVars', profileId, vars),
@@ -448,7 +498,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Worktree operations
   worktree: {
-    create: (projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string): Promise<Worktree> =>
+    create: (
+      projectId: string,
+      branchName: string,
+      worktreeName?: string,
+      sourceBranch?: string
+    ): Promise<Worktree> =>
       ipcRenderer.invoke('worktree:create', projectId, branchName, worktreeName, sourceBranch),
 
     list: (projectId: string): Promise<Worktree[]> =>
@@ -464,7 +519,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('worktree:has-changes', worktreeId),
 
     onWorktreeAdded: (callback: (projectId: string, worktree: unknown) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, projectId: string, worktree: unknown) => callback(projectId, worktree)
+      const handler = (_event: Electron.IpcRendererEvent, projectId: string, worktree: unknown) =>
+        callback(projectId, worktree)
       ipcRenderer.on('worktree:added', handler)
       return () => ipcRenderer.removeListener('worktree:added', handler)
     },
@@ -472,34 +528,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Shell operations
   shell: {
-    openPath: (path: string): Promise<string> =>
-      ipcRenderer.invoke('shell:open-path', path),
+    openPath: (path: string): Promise<string> => ipcRenderer.invoke('shell:open-path', path),
 
-    openInEditor: (path: string): Promise<void> =>
-      ipcRenderer.invoke('shell:open-in-editor', path),
+    openInEditor: (path: string): Promise<void> => ipcRenderer.invoke('shell:open-in-editor', path),
 
-    openExternal: (url: string): Promise<void> =>
-      ipcRenderer.invoke('shell:open-external', url),
+    openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
     showItemInFolder: (filePath: string): Promise<void> =>
       ipcRenderer.invoke('shell:show-item-in-folder', filePath),
   },
 
   // Notification operations
   notification: {
-    show: (title: string, body: string): void =>
-      ipcRenderer.send('notification:show', title, body),
+    show: (title: string, body: string): void => ipcRenderer.send('notification:show', title, body),
   },
 
   // Editor events from CommandServer
   editor: {
-    onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { filePath: string; fileName: string; projectId: string; line?: number }) => callback(data)
+    onOpenFile: (
+      callback: (data: {
+        filePath: string
+        fileName: string
+        projectId: string
+        line?: number
+      }) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: { filePath: string; fileName: string; projectId: string; line?: number }
+      ) => callback(data)
       ipcRenderer.on('editor:open-file', handler)
       return () => ipcRenderer.removeListener('editor:open-file', handler)
     },
 
-    onOpenDiff: (callback: (data: { filePath: string; fileName: string; projectId: string }) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { filePath: string; fileName: string; projectId: string }) => callback(data)
+    onOpenDiff: (
+      callback: (data: { filePath: string; fileName: string; projectId: string }) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: { filePath: string; fileName: string; projectId: string }
+      ) => callback(data)
       ipcRenderer.on('editor:open-diff', handler)
       return () => ipcRenderer.removeListener('editor:open-diff', handler)
     },
@@ -513,24 +580,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('app:close-request', handler)
     },
 
-    confirmClose: (): void =>
-      ipcRenderer.send('app:confirm-close'),
+    confirmClose: (): void => ipcRenderer.send('app:confirm-close'),
 
-    cancelClose: (): void =>
-      ipcRenderer.send('app:cancel-close'),
+    cancelClose: (): void => ipcRenderer.send('app:cancel-close'),
 
-    storeHydrated: (): void =>
-      ipcRenderer.send('store:hydrated'),
+    storeHydrated: (): void => ipcRenderer.send('store:hydrated'),
 
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),
 
     onUncaughtError: (
-      callback: (event: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string }) => void
+      callback: (event: {
+        source: 'uncaughtException' | 'unhandledRejection'
+        message: string
+        logPath: string
+      }) => void
     ): Unsubscribe => {
       const handler = (
         _event: Electron.IpcRendererEvent,
-        payload: { source: 'uncaughtException' | 'unhandledRejection'; message: string; logPath: string }
+        payload: {
+          source: 'uncaughtException' | 'unhandledRejection'
+          message: string
+          logPath: string
+        }
       ) => callback(payload)
       ipcRenderer.on('app:uncaught-error', handler)
       return () => ipcRenderer.removeListener('app:uncaught-error', handler)
@@ -544,49 +616,57 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fs: {
     readDirectory: (dirPath: string): Promise<FileSystemEntry[]> =>
       ipcRenderer.invoke('fs:readDirectory', dirPath),
-    readFile: (filePath: string): Promise<string> =>
-      ipcRenderer.invoke('fs:readFile', filePath),
+    readFile: (filePath: string): Promise<string> => ipcRenderer.invoke('fs:readFile', filePath),
     writeFile: (filePath: string, content: string): Promise<void> =>
       ipcRenderer.invoke('fs:writeFile', filePath, content),
-    onWatchChanges: (callback: (events: Array<{ type: string; projectId: string; path: string }>) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, events: Array<{ type: string; projectId: string; path: string }>) => callback(events)
+    onWatchChanges: (
+      callback: (events: Array<{ type: string; projectId: string; path: string }>) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        events: Array<{ type: string; projectId: string; path: string }>
+      ) => callback(events)
       ipcRenderer.on('fs:watch:changes', handler)
       return () => ipcRenderer.removeListener('fs:watch:changes', handler)
     },
-    onWatchError: (callback: (error: { projectId: string; error: string }) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, error: { projectId: string; error: string }) => callback(error)
+    onWatchError: (
+      callback: (error: { projectId: string; error: string }) => void
+    ): Unsubscribe => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        error: { projectId: string; error: string }
+      ) => callback(error)
       ipcRenderer.on('fs:watch:error', handler)
       return () => ipcRenderer.removeListener('fs:watch:error', handler)
     },
     stat: (filePath: string): Promise<{ exists: boolean; isFile: boolean; resolved: string }> =>
       ipcRenderer.invoke('fs:stat', filePath),
-    createFile: (filePath: string): Promise<void> =>
-      ipcRenderer.invoke('fs:createFile', filePath),
+    createFile: (filePath: string): Promise<void> => ipcRenderer.invoke('fs:createFile', filePath),
     createDirectory: (dirPath: string): Promise<void> =>
       ipcRenderer.invoke('fs:createDirectory', dirPath),
     rename: (oldPath: string, newPath: string): Promise<void> =>
       ipcRenderer.invoke('fs:rename', oldPath, newPath),
-    delete: (targetPath: string): Promise<void> =>
-      ipcRenderer.invoke('fs:delete', targetPath),
+    delete: (targetPath: string): Promise<void> => ipcRenderer.invoke('fs:delete', targetPath),
   },
 
   // Git operations
   git: {
     getStatus: (projectPath: string): Promise<GitStatus> =>
       ipcRenderer.invoke('git:status', projectPath),
-    fetch: (projectPath: string): Promise<string> =>
-      ipcRenderer.invoke('git:fetch', projectPath),
-    pull: (projectPath: string): Promise<string> =>
-      ipcRenderer.invoke('git:pull', projectPath),
-    push: (projectPath: string): Promise<string> =>
-      ipcRenderer.invoke('git:push', projectPath),
+    fetch: (projectPath: string): Promise<string> => ipcRenderer.invoke('git:fetch', projectPath),
+    pull: (projectPath: string): Promise<string> => ipcRenderer.invoke('git:pull', projectPath),
+    push: (projectPath: string): Promise<string> => ipcRenderer.invoke('git:push', projectPath),
     getRemoteUrl: (projectPath: string): Promise<string | null> =>
       ipcRenderer.invoke('git:get-remote-url', projectPath),
     getCommitLog: (projectPath: string, skip?: number, limit?: number): Promise<GitCommitLog> =>
       ipcRenderer.invoke('git:commit-log', projectPath, skip, limit),
     getCommitDetail: (projectPath: string, commitHash: string): Promise<GitCommitDetail | null> =>
       ipcRenderer.invoke('git:commit-detail', projectPath, commitHash),
-    getFileAtCommit: (projectPath: string, commitHash: string, filePath: string): Promise<string | null> =>
+    getFileAtCommit: (
+      projectPath: string,
+      commitHash: string,
+      filePath: string
+    ): Promise<string | null> =>
       ipcRenderer.invoke('git:file-at-commit', projectPath, commitHash, filePath),
     getHeadHash: (projectPath: string): Promise<string | null> =>
       ipcRenderer.invoke('git:head-hash', projectPath),
@@ -642,17 +722,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startPolling: (key: string, projectPath: string): Promise<void> =>
       ipcRenderer.invoke('github:start-polling', key, projectPath),
 
-    stopPolling: (key: string): Promise<void> =>
-      ipcRenderer.invoke('github:stop-polling', key),
+    stopPolling: (key: string): Promise<void> => ipcRenderer.invoke('github:stop-polling', key),
 
     onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, key: string, status: PRStatus) => callback(key, status)
+      const handler = (_event: Electron.IpcRendererEvent, key: string, status: PRStatus) =>
+        callback(key, status)
       ipcRenderer.on('github:pr-status-update', handler)
       return () => ipcRenderer.removeListener('github:pr-status-update', handler)
     },
 
     onPRStatusStale: (callback: (key: string, error: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, key: string, error: string) => callback(key, error)
+      const handler = (_event: Electron.IpcRendererEvent, key: string, error: string) =>
+        callback(key, error)
       ipcRenderer.on('github:pr-status-stale', handler)
       return () => ipcRenderer.removeListener('github:pr-status-stale', handler)
     },
@@ -660,17 +741,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Update operations
   update: {
-    check: (): Promise<UpdateCheckResult> =>
-      ipcRenderer.invoke('update:check'),
+    check: (): Promise<UpdateCheckResult> => ipcRenderer.invoke('update:check'),
 
     download: (): Promise<{ success: boolean; isDev?: boolean }> =>
       ipcRenderer.invoke('update:download'),
 
-    install: (): Promise<void> =>
-      ipcRenderer.invoke('update:install'),
+    install: (): Promise<void> => ipcRenderer.invoke('update:install'),
 
-    getVersion: (): Promise<string> =>
-      ipcRenderer.invoke('update:get-version'),
+    getVersion: (): Promise<string> => ipcRenderer.invoke('update:get-version'),
 
     // Events from main process
     onChecking: (callback: () => void): Unsubscribe => {
@@ -680,7 +758,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     onAvailable: (callback: (info: UpdateAvailableInfo) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, info: UpdateAvailableInfo) => callback(info)
+      const handler = (_event: Electron.IpcRendererEvent, info: UpdateAvailableInfo) =>
+        callback(info)
       ipcRenderer.on('update:available', handler)
       return () => ipcRenderer.removeListener('update:available', handler)
     },
@@ -692,13 +771,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     onProgress: (callback: (progress: UpdateProgressInfo) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, progress: UpdateProgressInfo) => callback(progress)
+      const handler = (_event: Electron.IpcRendererEvent, progress: UpdateProgressInfo) =>
+        callback(progress)
       ipcRenderer.on('update:progress', handler)
       return () => ipcRenderer.removeListener('update:progress', handler)
     },
 
     onDownloaded: (callback: (info: UpdateDownloadedInfo) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, info: UpdateDownloadedInfo) => callback(info)
+      const handler = (_event: Electron.IpcRendererEvent, info: UpdateDownloadedInfo) =>
+        callback(info)
       ipcRenderer.on('update:downloaded', handler)
       return () => ipcRenderer.removeListener('update:downloaded', handler)
     },
@@ -712,8 +793,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Automation operations
   automation: {
-    list: (): Promise<unknown[]> =>
-      ipcRenderer.invoke('automation:list'),
+    list: (): Promise<unknown[]> => ipcRenderer.invoke('automation:list'),
 
     create: (automation: Record<string, unknown>): Promise<unknown> =>
       ipcRenderer.invoke('automation:create', automation),
@@ -721,35 +801,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     update: (id: string, updates: Record<string, unknown>): Promise<unknown> =>
       ipcRenderer.invoke('automation:update', id, updates),
 
-    delete: (id: string): Promise<void> =>
-      ipcRenderer.invoke('automation:delete', id),
+    delete: (id: string): Promise<void> => ipcRenderer.invoke('automation:delete', id),
 
-    toggle: (id: string): Promise<unknown> =>
-      ipcRenderer.invoke('automation:toggle', id),
+    toggle: (id: string): Promise<unknown> => ipcRenderer.invoke('automation:toggle', id),
 
-    trigger: (id: string): Promise<void> =>
-      ipcRenderer.invoke('automation:trigger', id),
+    trigger: (id: string): Promise<void> => ipcRenderer.invoke('automation:trigger', id),
 
-    stopRun: (runId: string): Promise<void> =>
-      ipcRenderer.invoke('automation:stop-run', runId),
+    stopRun: (runId: string): Promise<void> => ipcRenderer.invoke('automation:stop-run', runId),
 
     listRuns: (automationId?: string, limit?: number): Promise<unknown[]> =>
       ipcRenderer.invoke('automation:list-runs', automationId, limit),
 
-    markRead: (runId: string): Promise<void> =>
-      ipcRenderer.invoke('automation:mark-read', runId),
+    markRead: (runId: string): Promise<void> => ipcRenderer.invoke('automation:mark-read', runId),
 
-    deleteRun: (runId: string): Promise<void> =>
-      ipcRenderer.invoke('automation:delete-run', runId),
+    deleteRun: (runId: string): Promise<void> => ipcRenderer.invoke('automation:delete-run', runId),
 
-    clearAllRuns: (): Promise<void> =>
-      ipcRenderer.invoke('automation:clear-all-runs'),
+    clearAllRuns: (): Promise<void> => ipcRenderer.invoke('automation:clear-all-runs'),
 
     getNextRun: (automationId: string): Promise<string | null> =>
       ipcRenderer.invoke('automation:get-next-run', automationId),
 
-    checkPR: (runId: string): Promise<unknown> =>
-      ipcRenderer.invoke('automation:check-pr', runId),
+    checkPR: (runId: string): Promise<unknown> => ipcRenderer.invoke('automation:check-pr', runId),
 
     onRunStarted: (callback: (run: unknown) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, run: unknown) => callback(run)
@@ -772,7 +844,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Cleanup helper - only allows whitelisted channels (#003 fix)
   removeAllListeners: (channel: string): void => {
-    if (ALLOWED_LISTENER_CHANNELS.includes(channel as typeof ALLOWED_LISTENER_CHANNELS[number])) {
+    if (ALLOWED_LISTENER_CHANNELS.includes(channel as (typeof ALLOWED_LISTENER_CHANNELS)[number])) {
       ipcRenderer.removeAllListeners(channel)
     }
   },
@@ -780,7 +852,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 // Loading indicator (from original template)
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     if (condition.includes(document.readyState)) {
       resolve(true)
     } else {
@@ -796,12 +868,12 @@ function domReady(condition: DocumentReadyState[] = ['complete', 'interactive'])
 
 const safeDOM = {
   append(parent: HTMLElement, child: HTMLElement) {
-    if (!Array.from(parent.children).find(e => e === child)) {
+    if (!Array.from(parent.children).find((e) => e === child)) {
       return parent.appendChild(child)
     }
   },
   remove(parent: HTMLElement, child: HTMLElement) {
-    if (Array.from(parent.children).find(e => e === child)) {
+    if (Array.from(parent.children).find((e) => e === child)) {
       return parent.removeChild(child)
     }
   },

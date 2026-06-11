@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, Monitor, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
+import {
+  Plus,
+  FolderOpen,
+  PanelRightOpen,
+  PanelRightClose,
+  Sun,
+  Moon,
+  Monitor,
+  RefreshCw,
+  Check,
+  AlertCircle,
+  Settings,
+  Star,
+  X,
+} from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
@@ -81,24 +95,27 @@ export function Sidebar() {
   const [appVersion, setAppVersion] = useState<string>('')
 
   // State for update check
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'up-to-date' | 'error'>('idle')
+  const [updateStatus, setUpdateStatus] = useState<
+    'idle' | 'checking' | 'available' | 'up-to-date' | 'error'
+  >('idle')
   const [latestVersion, setLatestVersion] = useState<string>('')
 
   // Scroll active project into view when it changes
   const projectScrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!activeProjectId || !projectScrollRef.current) return
-    const el = projectScrollRef.current.querySelector(
-      `[data-project-id="${activeProjectId}"]`
-    )
+    const el = projectScrollRef.current.querySelector(`[data-project-id="${activeProjectId}"]`)
     el?.scrollIntoView({ block: 'nearest' })
   }, [activeProjectId])
 
   // Load app version on mount
   useEffect(() => {
-    api.update.getVersion().then(setAppVersion).catch((error) => {
-      console.error('Failed to get app version:', error)
-    })
+    api.update
+      .getVersion()
+      .then(setAppVersion)
+      .catch((error) => {
+        console.error('Failed to get app version:', error)
+      })
   }, [api])
 
   // Load projects on mount, then load worktrees only for active project
@@ -109,7 +126,7 @@ export function Sidebar() {
   }, [loadProjects])
 
   // Check Vertex config for all projects (only re-run when projects added/removed)
-  const checkConfigProjectIds = projects.map(p => p.id).join(',')
+  const checkConfigProjectIds = projects.map((p) => p.id).join(',')
   useEffect(() => {
     for (const project of projects) {
       checkVertexConfig(project.id)
@@ -133,8 +150,8 @@ export function Sidebar() {
     for (const project of projects) {
       fileWatcherEvents.subscribe(project.id, 'worktree-sidebar', (events) => {
         const hasWorktreeChange = events.some(
-          (e) => (e.type === 'dir-added' || e.type === 'dir-removed') &&
-            e.path.includes('/.worktrees/')
+          (e) =>
+            (e.type === 'dir-added' || e.type === 'dir-removed') && e.path.includes('/.worktrees/')
         )
         if (!hasWorktreeChange) return
 
@@ -184,7 +201,9 @@ export function Sidebar() {
     const { registerSidecarTerminal } = useProjectStore.getState()
     const unsubscribe = terminalEvents.onSidecarCreated((contextKey, terminal) => {
       registerSidecarTerminal(contextKey, terminal)
-      console.log(`[Sidecar] Registered server-created sidecar ${terminal.id} in context ${contextKey}`)
+      console.log(
+        `[Sidecar] Registered server-created sidecar ${terminal.id} in context ${contextKey}`
+      )
     })
     return unsubscribe
   }, [])
@@ -319,288 +338,308 @@ export function Sidebar() {
     }
   }
 
-  const getProjectTerminals = useCallback((projectId: string): TerminalSession[] => {
-    return Object.values(terminals).filter((t) => t.projectId === projectId)
-  }, [terminals])
+  const getProjectTerminals = useCallback(
+    (projectId: string): TerminalSession[] => {
+      return Object.values(terminals).filter((t) => t.projectId === projectId)
+    },
+    [terminals]
+  )
 
-  const getProjectDirectTerminals = useCallback((projectId: string): TerminalSession[] => {
-    return Object.values(terminals).filter((t) => t.projectId === projectId && t.worktreeId === null)
-  }, [terminals])
+  const getProjectDirectTerminals = useCallback(
+    (projectId: string): TerminalSession[] => {
+      return Object.values(terminals).filter(
+        (t) => t.projectId === projectId && t.worktreeId === null
+      )
+    },
+    [terminals]
+  )
 
-  const getWorktreeTerminals = useCallback((worktreeId: string): TerminalSession[] => {
-    return Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
-  }, [terminals])
+  const getWorktreeTerminals = useCallback(
+    (worktreeId: string): TerminalSession[] => {
+      return Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
+    },
+    [terminals]
+  )
 
-  const getProjectWorktrees = useCallback((projectId: string): Worktree[] => {
-    return Object.values(worktrees).filter((w) => w.projectId === projectId)
-  }, [worktrees])
+  const getProjectWorktrees = useCallback(
+    (projectId: string): Worktree[] => {
+      return Object.values(worktrees).filter((w) => w.projectId === projectId)
+    },
+    [worktrees]
+  )
 
   // Split projects into workspaces (pinned at top) and regular projects
-  const workspaceProjects = useMemo(() => projects.filter(p => p.type === 'workspace'), [projects])
-  const regularProjects = useMemo(() => projects.filter(p => p.type !== 'workspace'), [projects])
+  const workspaceProjects = useMemo(
+    () => projects.filter((p) => p.type === 'workspace'),
+    [projects]
+  )
+  const regularProjects = useMemo(() => projects.filter((p) => p.type !== 'workspace'), [projects])
 
   return (
     <>
-    <div className="flex flex-col h-full bg-sidebar" data-sidebar>
-      {/* Logo Header */}
-      <div className="flex items-center gap-2 px-4 py-5">
-        <LogoIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
-        <button
-          onClick={handleAddProject}
-          title="Add project"
-          className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
+      <div className="flex flex-col h-full bg-sidebar" data-sidebar>
+        {/* Logo Header */}
+        <div className="flex items-center gap-2 px-4 py-5">
+          <LogoIcon className="w-6 h-6 text-primary" />
+          <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
+          <button
+            onClick={handleAddProject}
+            title="Add project"
+            className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
 
-      {/* Workspaces Section - Always visible at top
+        {/* Workspaces Section - Always visible at top
           NOTE: Workspaces use simplified rendering (not SortableProjectList) intentionally:
           - They are pinned at top and should not be reorderable via drag-and-drop
           - They have a distinct visual treatment (star icon, border) to emphasize importance
           - Future: Will gain dashboard functionality that differs from regular projects
       */}
-      {workspaceProjects.length > 0 && (
-        <div className="px-3 mb-2">
-          <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
-            Workspaces
-          </h2>
-          <ul className="space-y-1">
-            {workspaceProjects.map((workspace) => {
-              const workspaceTerminals = getProjectTerminals(workspace.id)
-              const isActive = activeProjectId === workspace.id
-              return (
-                <li key={workspace.id} data-project-id={workspace.id}>
-                  <div
-                    onClick={() => setActiveProject(workspace.id)}
-                    className={`
+        {workspaceProjects.length > 0 && (
+          <div className="px-3 mb-2">
+            <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
+              Workspaces
+            </h2>
+            <ul className="space-y-1">
+              {workspaceProjects.map((workspace) => {
+                const workspaceTerminals = getProjectTerminals(workspace.id)
+                const isActive = activeProjectId === workspace.id
+                return (
+                  <li key={workspace.id} data-project-id={workspace.id}>
+                    <div
+                      onClick={() => setActiveProject(workspace.id)}
+                      className={`
                       group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
                       transition-colors duration-150
-                      ${isActive
-                        ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
+                      ${
+                        isActive
+                          ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
+                          : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'
+                      }
                     `}
-                  >
-                    <Star
-                      className={`w-4 h-4 flex-shrink-0 ${
-                        isActive ? 'text-primary fill-primary' : 'text-muted-foreground'
-                      }`}
-                    />
-                    <span className="flex-1 text-sm font-medium truncate" title={workspace.path}>
-                      {workspace.name}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleCreateTerminal(workspace.id)
-                      }}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                      title="New Terminal"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleRemoveProject(e, workspace.id)}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                      title="Remove Workspace"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  {/* Show terminals for workspaces (always visible) */}
-                  {workspaceTerminals.length > 0 && (
-                    <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30 pl-3">
-                      {workspaceTerminals.map((terminal) => (
-                        <TerminalListItem
-                          key={terminal.id}
-                          terminal={terminal}
-                          isActive={activeTerminalId === terminal.id}
-                          onSelect={() => setActiveTerminal(terminal.id)}
-                          onClose={(e) => handleCloseTerminal(e, terminal.id)}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                  {isActive && workspaceTerminals.length === 0 && (
-                    <div className="ml-6 pl-3 py-2 border-l border-border/30">
+                      <Star
+                        className={`w-4 h-4 flex-shrink-0 ${
+                          isActive ? 'text-primary fill-primary' : 'text-muted-foreground'
+                        }`}
+                      />
+                      <span className="flex-1 text-sm font-medium truncate" title={workspace.path}>
+                        {workspace.name}
+                      </span>
                       <button
-                        onClick={() => handleCreateTerminal(workspace.id)}
-                        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCreateTerminal(workspace.id)
+                        }}
+                        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
+                        title="New Terminal"
                       >
-                        <Plus className="w-3 h-3" />
-                        New Chat
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleRemoveProject(e, workspace.id)}
+                        className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
+                        title="Remove Workspace"
+                      >
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
+                    {/* Show terminals for workspaces (always visible) */}
+                    {workspaceTerminals.length > 0 && (
+                      <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30 pl-3">
+                        {workspaceTerminals.map((terminal) => (
+                          <TerminalListItem
+                            key={terminal.id}
+                            terminal={terminal}
+                            isActive={activeTerminalId === terminal.id}
+                            onSelect={() => setActiveTerminal(terminal.id)}
+                            onClose={(e) => handleCloseTerminal(e, terminal.id)}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                    {isActive && workspaceTerminals.length === 0 && (
+                      <div className="ml-6 pl-3 py-2 border-l border-border/30">
+                        <button
+                          onClick={() => handleCreateTerminal(workspace.id)}
+                          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
+                          New Chat
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
+        {/* Projects Section */}
+        <div className="px-3 py-2">
+          <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
+            Projects
+          </h2>
         </div>
+
+        {/* Project List */}
+        <div ref={projectScrollRef} className="flex-1 overflow-y-auto sidebar-scroll px-3">
+          {regularProjects.length === 0 ? (
+            <div className="px-3 py-8 text-center">
+              <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
+              <p className="text-sm text-muted-foreground mb-2">No projects yet</p>
+              <button onClick={handleAddProject} className="text-sm text-primary hover:underline">
+                Add your first project
+              </button>
+            </div>
+          ) : (
+            <SortableProjectList
+              projects={regularProjects}
+              getProjectTerminals={getProjectTerminals}
+              getProjectDirectTerminals={getProjectDirectTerminals}
+              getProjectWorktrees={getProjectWorktrees}
+              getWorktreeTerminals={getWorktreeTerminals}
+              activeProjectId={activeProjectId}
+              activeTerminalId={activeTerminalId}
+              onSelect={(projectId) => {
+                if (projectId === activeProjectId) {
+                  // Clicking the already-active project toggles to overview
+                  setActiveCenterTab(null)
+                } else {
+                  setActiveProject(projectId)
+                }
+              }}
+              onRemove={handleRemoveProject}
+              onCreateTerminal={handleCreateTerminal}
+              onCreateWorktree={handleCreateWorktree}
+              onRemoveWorktree={handleRemoveWorktree}
+              onSelectTerminal={setActiveTerminal}
+              onCloseTerminal={handleCloseTerminal}
+              onReorder={reorderProjects}
+            />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-3 py-2 border-t border-border">
+          <div className="flex items-center">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xs text-muted-foreground shrink-0">
+                {appVersion ? `v${appVersion}` : ''}
+              </span>
+              {/* Active profile badge */}
+              <button
+                onClick={() => setSettingsDialogOpen(true, 'accounts')}
+                className={`truncate px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
+                  activeProfileId
+                    ? 'text-primary bg-primary/10 hover:bg-primary/20'
+                    : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted'
+                }`}
+                title={
+                  activeProfileId
+                    ? `Active: ${profiles.find((p) => p.id === activeProfileId)?.name}`
+                    : 'No active profile'
+                }
+              >
+                {activeProfileId
+                  ? (profiles.find((p) => p.id === activeProfileId)?.name ?? 'Unknown')
+                  : 'No account'}
+              </button>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={handleCheckForUpdate}
+                disabled={updateStatus === 'checking'}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  updateStatus === 'available'
+                    ? 'bg-green-500/20 text-green-500'
+                    : updateStatus === 'up-to-date'
+                      ? 'text-green-500'
+                      : updateStatus === 'error'
+                        ? 'text-red-500'
+                        : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
+                } disabled:opacity-50`}
+                title={
+                  updateStatus === 'checking'
+                    ? 'Checking for updates...'
+                    : updateStatus === 'available'
+                      ? `Update available: v${latestVersion}`
+                      : updateStatus === 'up-to-date'
+                        ? 'Up to date'
+                        : updateStatus === 'error'
+                          ? 'Failed to check for updates'
+                          : 'Check for updates'
+                }
+              >
+                {updateStatus === 'checking' ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : updateStatus === 'available' || updateStatus === 'up-to-date' ? (
+                  <Check className="w-4 h-4" />
+                ) : updateStatus === 'error' ? (
+                  <AlertCircle className="w-4 h-4" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+                title={`Theme: ${theme} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
+              >
+                {theme === 'light' ? (
+                  <Sun className="w-4 h-4" />
+                ) : theme === 'dark' ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Monitor className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={() => setSettingsDialogOpen(true)}
+                className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+                title={`Settings (${formatBinding(hotkeyConfig['ui.openSettings'])})`}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
+                onClick={toggleFileExplorer}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  fileExplorerVisible
+                    ? 'bg-sidebar-accent text-primary'
+                    : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
+                }`}
+                title={`${fileExplorerVisible ? 'Hide Files' : 'Show Files'} (${formatBinding(hotkeyConfig['fileExplorer.toggle'])})`}
+              >
+                {fileExplorerVisible ? (
+                  <PanelRightClose className="w-4 h-4" />
+                ) : (
+                  <PanelRightOpen className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Create Worktree Dialog */}
+      {worktreeDialogProjectId && (
+        <CreateWorktreeDialog
+          projectId={worktreeDialogProjectId}
+          isOpen={true}
+          onClose={() => setWorktreeDialogProjectId(null)}
+          onCreated={handleWorktreeCreated}
+        />
       )}
 
-      {/* Projects Section */}
-      <div className="px-3 py-2">
-        <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
-          Projects
-        </h2>
-      </div>
-
-      {/* Project List */}
-      <div ref={projectScrollRef} className="flex-1 overflow-y-auto sidebar-scroll px-3">
-        {regularProjects.length === 0 ? (
-          <div className="px-3 py-8 text-center">
-            <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
-            <p className="text-sm text-muted-foreground mb-2">No projects yet</p>
-            <button
-              onClick={handleAddProject}
-              className="text-sm text-primary hover:underline"
-            >
-              Add your first project
-            </button>
-          </div>
-        ) : (
-          <SortableProjectList
-            projects={regularProjects}
-            getProjectTerminals={getProjectTerminals}
-            getProjectDirectTerminals={getProjectDirectTerminals}
-            getProjectWorktrees={getProjectWorktrees}
-            getWorktreeTerminals={getWorktreeTerminals}
-            activeProjectId={activeProjectId}
-            activeTerminalId={activeTerminalId}
-            onSelect={(projectId) => {
-              if (projectId === activeProjectId) {
-                // Clicking the already-active project toggles to overview
-                setActiveCenterTab(null)
-              } else {
-                setActiveProject(projectId)
-              }
-            }}
-            onRemove={handleRemoveProject}
-            onCreateTerminal={handleCreateTerminal}
-            onCreateWorktree={handleCreateWorktree}
-            onRemoveWorktree={handleRemoveWorktree}
-            onSelectTerminal={setActiveTerminal}
-            onCloseTerminal={handleCloseTerminal}
-            onReorder={reorderProjects}
-          />
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="px-3 py-2 border-t border-border">
-        <div className="flex items-center">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-xs text-muted-foreground shrink-0">
-              {appVersion ? `v${appVersion}` : ''}
-            </span>
-            {/* Active profile badge */}
-            <button
-              onClick={() => setSettingsDialogOpen(true, 'accounts')}
-              className={`truncate px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
-                activeProfileId
-                  ? 'text-primary bg-primary/10 hover:bg-primary/20'
-                  : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted'
-              }`}
-              title={activeProfileId ? `Active: ${profiles.find(p => p.id === activeProfileId)?.name}` : 'No active profile'}
-            >
-              {activeProfileId
-                ? profiles.find(p => p.id === activeProfileId)?.name ?? 'Unknown'
-                : 'No account'}
-            </button>
-          </div>
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={handleCheckForUpdate}
-              disabled={updateStatus === 'checking'}
-              className={`p-1.5 rounded-lg transition-colors ${
-                updateStatus === 'available'
-                  ? 'bg-green-500/20 text-green-500'
-                  : updateStatus === 'up-to-date'
-                  ? 'text-green-500'
-                  : updateStatus === 'error'
-                  ? 'text-red-500'
-                  : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
-              } disabled:opacity-50`}
-              title={
-                updateStatus === 'checking'
-                  ? 'Checking for updates...'
-                  : updateStatus === 'available'
-                  ? `Update available: v${latestVersion}`
-                  : updateStatus === 'up-to-date'
-                  ? 'Up to date'
-                  : updateStatus === 'error'
-                  ? 'Failed to check for updates'
-                  : 'Check for updates'
-              }
-            >
-              {updateStatus === 'checking' ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : updateStatus === 'available' || updateStatus === 'up-to-date' ? (
-                <Check className="w-4 h-4" />
-              ) : updateStatus === 'error' ? (
-                <AlertCircle className="w-4 h-4" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-            </button>
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
-              title={`Theme: ${theme} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
-            >
-              {theme === 'light' ? (
-                <Sun className="w-4 h-4" />
-              ) : theme === 'dark' ? (
-                <Moon className="w-4 h-4" />
-              ) : (
-                <Monitor className="w-4 h-4" />
-              )}
-            </button>
-            <button
-              onClick={() => setSettingsDialogOpen(true)}
-              className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
-              title={`Settings (${formatBinding(hotkeyConfig['ui.openSettings'])})`}
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            <button
-              onClick={toggleFileExplorer}
-              className={`p-1.5 rounded-lg transition-colors ${
-                fileExplorerVisible
-                  ? 'bg-sidebar-accent text-primary'
-                  : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
-              }`}
-              title={`${fileExplorerVisible ? 'Hide Files' : 'Show Files'} (${formatBinding(hotkeyConfig['fileExplorer.toggle'])})`}
-            >
-              {fileExplorerVisible ? (
-                <PanelRightClose className="w-4 h-4" />
-              ) : (
-                <PanelRightOpen className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Create Worktree Dialog */}
-    {worktreeDialogProjectId && (
-      <CreateWorktreeDialog
-        projectId={worktreeDialogProjectId}
-        isOpen={true}
-        onClose={() => setWorktreeDialogProjectId(null)}
-        onCreated={handleWorktreeCreated}
+      {/* Add Project Dialog */}
+      <AddProjectDialog
+        isOpen={addProjectDialogOpen}
+        onClose={() => setAddProjectDialogOpen(false)}
+        onCreated={handleProjectCreated}
       />
-    )}
-
-    {/* Add Project Dialog */}
-    <AddProjectDialog
-      isOpen={addProjectDialogOpen}
-      onClose={() => setAddProjectDialogOpen(false)}
-      onCreated={handleProjectCreated}
-    />
     </>
   )
 }

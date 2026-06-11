@@ -77,7 +77,8 @@ export function AutomationCreateDialog({
     }
   }, [isOpen])
 
-  const canSubmit = !saving &&
+  const canSubmit =
+    !saving &&
     name.trim().length > 0 &&
     prompt.trim().length > 0 &&
     selectedProjectIds.length > 0 &&
@@ -86,14 +87,21 @@ export function AutomationCreateDialog({
 
   const buildTrigger = (): AutomationTrigger => {
     switch (triggerType) {
-      case 'schedule': return { type: 'schedule', cron: cron.trim() }
-      case 'claude-done': return { type: 'claude-done' }
-      case 'git-event': return { type: 'git-event', event: gitEvent }
-      case 'file-change': return {
-        type: 'file-change',
-        patterns: filePatterns.split('\n').map(p => p.trim()).filter(Boolean),
-        cooldownSeconds,
-      }
+      case 'schedule':
+        return { type: 'schedule', cron: cron.trim() }
+      case 'claude-done':
+        return { type: 'claude-done' }
+      case 'git-event':
+        return { type: 'git-event', event: gitEvent }
+      case 'file-change':
+        return {
+          type: 'file-change',
+          patterns: filePatterns
+            .split('\n')
+            .map((p) => p.trim())
+            .filter(Boolean),
+          cooldownSeconds,
+        }
     }
   }
 
@@ -124,15 +132,29 @@ export function AutomationCreateDialog({
       setSaving(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSubmit, name, prompt, selectedProjectIds, triggerType, cron, gitEvent, filePatterns, cooldownSeconds, timeoutMinutes, editAutomation, api, onClose])
+  }, [
+    canSubmit,
+    name,
+    prompt,
+    selectedProjectIds,
+    triggerType,
+    cron,
+    gitEvent,
+    filePatterns,
+    cooldownSeconds,
+    timeoutMinutes,
+    editAutomation,
+    api,
+    onClose,
+  ])
 
   useDialogHotkeys(onClose, handleSave, { enabled: isOpen, canConfirm: canSubmit })
 
   if (!isOpen) return null
 
   const toggleProject = (id: string) => {
-    setSelectedProjectIds(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    setSelectedProjectIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
     )
   }
 
@@ -158,7 +180,7 @@ export function AutomationCreateDialog({
             <input
               type="text"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
               maxLength={100}
               placeholder="e.g. Daily code review"
               className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
@@ -171,7 +193,7 @@ export function AutomationCreateDialog({
             <label className="block text-xs font-medium text-muted-foreground mb-1">Prompt</label>
             <textarea
               value={prompt}
-              onChange={e => setPrompt(e.target.value)}
+              onChange={(e) => setPrompt(e.target.value)}
               maxLength={50000}
               rows={4}
               placeholder="What should Claude do?"
@@ -183,7 +205,7 @@ export function AutomationCreateDialog({
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Projects</label>
             <div className="space-y-1 max-h-24 overflow-y-auto">
-              {projects.map(project => (
+              {projects.map((project) => (
                 <label key={project.id} className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
@@ -201,12 +223,14 @@ export function AutomationCreateDialog({
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Trigger</label>
             <div className="grid grid-cols-2 gap-1">
-              {([
-                { value: 'schedule', label: 'Schedule' },
-                { value: 'claude-done', label: 'Claude Done' },
-                { value: 'git-event', label: 'Git Event' },
-                { value: 'file-change', label: 'File Change' },
-              ] as const).map(opt => (
+              {(
+                [
+                  { value: 'schedule', label: 'Schedule' },
+                  { value: 'claude-done', label: 'Claude Done' },
+                  { value: 'git-event', label: 'Git Event' },
+                  { value: 'file-change', label: 'File Change' },
+                ] as const
+              ).map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setTriggerType(opt.value)}
@@ -225,11 +249,13 @@ export function AutomationCreateDialog({
           {/* Trigger-specific config */}
           {triggerType === 'schedule' && (
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Cron Expression</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Cron Expression
+              </label>
               <input
                 type="text"
                 value={cron}
-                onChange={e => setCron(e.target.value)}
+                onChange={(e) => setCron(e.target.value)}
                 placeholder="0 9 * * *"
                 className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring font-mono"
               />
@@ -241,10 +267,12 @@ export function AutomationCreateDialog({
 
           {triggerType === 'git-event' && (
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Event Type</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Event Type
+              </label>
               <select
                 value={gitEvent}
-                onChange={e => setGitEvent(e.target.value as typeof gitEvent)}
+                onChange={(e) => setGitEvent(e.target.value as typeof gitEvent)}
                 className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="pr-merged">PR Merged</option>
@@ -253,10 +281,14 @@ export function AutomationCreateDialog({
                 <option value="merge-conflict">Merge Conflict</option>
               </select>
               <p className="text-xs text-muted-foreground mt-1">
-                {'Variables: {{pr.number}}, {{pr.title}}, {{pr.branch}}, {{pr.url}}, {{pr.mergeable}}, {{pr.state}}'}
+                {
+                  'Variables: {{pr.number}}, {{pr.title}}, {{pr.branch}}, {{pr.url}}, {{pr.mergeable}}, {{pr.state}}'
+                }
               </p>
               <p className="text-xs text-yellow-500 mt-1">
-                {'Note: PR metadata (title, branch) is user-controlled. Use caution on public repos.'}
+                {
+                  'Note: PR metadata (title, branch) is user-controlled. Use caution on public repos.'
+                }
               </p>
             </div>
           )}
@@ -269,9 +301,9 @@ export function AutomationCreateDialog({
                 </label>
                 <textarea
                   value={filePatterns}
-                  onChange={e => setFilePatterns(e.target.value)}
+                  onChange={(e) => setFilePatterns(e.target.value)}
                   rows={3}
-                  placeholder={"**/*.ts\nsrc/**/*.tsx"}
+                  placeholder={'**/*.ts\nsrc/**/*.tsx'}
                   className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
                 />
               </div>
@@ -282,7 +314,7 @@ export function AutomationCreateDialog({
                 <input
                   type="number"
                   value={cooldownSeconds}
-                  onChange={e => setCooldownSeconds(Math.max(10, parseInt(e.target.value) || 60))}
+                  onChange={(e) => setCooldownSeconds(Math.max(10, parseInt(e.target.value) || 60))}
                   min={10}
                   className="w-20 px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
                 />
@@ -298,7 +330,9 @@ export function AutomationCreateDialog({
             <input
               type="number"
               value={timeoutMinutes}
-              onChange={e => setTimeoutMinutes(Math.max(1, Math.min(120, parseInt(e.target.value) || 30)))}
+              onChange={(e) =>
+                setTimeoutMinutes(Math.max(1, Math.min(120, parseInt(e.target.value) || 30)))
+              }
               min={1}
               max={120}
               className="w-20 px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
@@ -306,9 +340,7 @@ export function AutomationCreateDialog({
           </div>
 
           {error && (
-            <div className="text-xs text-red-400 bg-red-400/10 rounded px-2 py-1.5">
-              {error}
-            </div>
+            <div className="text-xs text-red-400 bg-red-400/10 rounded px-2 py-1.5">{error}</div>
           )}
         </div>
 

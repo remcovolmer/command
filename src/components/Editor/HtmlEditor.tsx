@@ -35,7 +35,7 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
   const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
   const isDeletedExternally = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
-    return tab?.type === 'editor' ? tab.isDeletedExternally ?? false : false
+    return tab?.type === 'editor' ? (tab.isDeletedExternally ?? false) : false
   })
   const projectId = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
@@ -82,7 +82,8 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
       }
     }, 10000)
 
-    api.fs.readFile(filePath)
+    api.fs
+      .readFile(filePath)
       .then((text) => {
         clearTimeout(timeoutId)
         if (cancelled) return
@@ -111,48 +112,47 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
 
     const reloadFile = () => {
       const seq = ++readSeqRef.current
-      api.fs.readFile(filePath).then((text) => {
-        if (cancelled || seq !== readSeqRef.current) return
+      api.fs
+        .readFile(filePath)
+        .then((text) => {
+          if (cancelled || seq !== readSeqRef.current) return
 
-        // Suppress the chokidar echo of our own save: disk matches what we
-        // just wrote and the event arrived within the watcher batch window.
-        if (
-          text === savedContentRef.current &&
-          Date.now() - pendingSelfWriteAtRef.current < 1000
-        ) {
-          return
-        }
+          // Suppress the chokidar echo of our own save: disk matches what we
+          // just wrote and the event arrived within the watcher batch window.
+          if (
+            text === savedContentRef.current &&
+            Date.now() - pendingSelfWriteAtRef.current < 1000
+          ) {
+            return
+          }
 
-        // Don't clobber unsaved user edits. If the buffer is dirty AND disk
-        // content actually differs from the last save, keep the user's work
-        // and surface a console warning so the divergence is diagnosable.
-        // (When disk matches savedContentRef, the watcher echo is harmless
-        // and falls through to a no-op-ish refresh.)
-        if (lastDirtyRef.current && text !== savedContentRef.current) {
-          console.warn(
-            'External change to',
-            filePath,
-            'ignored — buffer has unsaved edits',
-          )
-          return
-        }
+          // Don't clobber unsaved user edits. If the buffer is dirty AND disk
+          // content actually differs from the last save, keep the user's work
+          // and surface a console warning so the divergence is diagnosable.
+          // (When disk matches savedContentRef, the watcher echo is harmless
+          // and falls through to a no-op-ish refresh.)
+          if (lastDirtyRef.current && text !== savedContentRef.current) {
+            console.warn('External change to', filePath, 'ignored — buffer has unsaved edits')
+            return
+          }
 
-        cancelDebounce()
-        const ed = editorRef.current
-        if (ed) {
-          const position = ed.getPosition()
-          ed.setValue(text)
-          if (position) ed.setPosition(position)
-        }
-        setContent(text)
-        setDebouncedContent(text)
-        savedContentRef.current = text
-        lastDirtyRef.current = false
-        setEditorDirty(tabId, false)
-        setEditorTabDeletedExternally(tabId, false)
-      }).catch((err) => {
-        if (!cancelled) console.error('Failed to reload HTML file:', err)
-      })
+          cancelDebounce()
+          const ed = editorRef.current
+          if (ed) {
+            const position = ed.getPosition()
+            ed.setValue(text)
+            if (position) ed.setPosition(position)
+          }
+          setContent(text)
+          setDebouncedContent(text)
+          savedContentRef.current = text
+          lastDirtyRef.current = false
+          setEditorDirty(tabId, false)
+          setEditorTabDeletedExternally(tabId, false)
+        })
+        .catch((err) => {
+          if (!cancelled) console.error('Failed to reload HTML file:', err)
+        })
     }
 
     const subscriberKey = `html-editor-${tabId}`
@@ -183,7 +183,16 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
       cancelled = true
       fileWatcherEvents.unsubscribe(projectId, subscriberKey)
     }
-  }, [projectId, tabId, filePath, normalizedPath, api, setEditorDirty, setEditorTabDeletedExternally, cancelDebounce])
+  }, [
+    projectId,
+    tabId,
+    filePath,
+    normalizedPath,
+    api,
+    setEditorDirty,
+    setEditorTabDeletedExternally,
+    cancelDebounce,
+  ])
 
   const saveFile = useCallback(async () => {
     const ed = editorRef.current
@@ -229,19 +238,22 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
     editorRef.current = monacoEditor
   }, [])
 
-  const handleChange = useCallback((value: string | undefined) => {
-    if (value === undefined) return
-    const dirty = value !== savedContentRef.current
-    if (dirty !== lastDirtyRef.current) {
-      lastDirtyRef.current = dirty
-      setEditorDirty(tabId, dirty)
-    }
-    cancelDebounce()
-    debounceTimerRef.current = setTimeout(() => {
-      debounceTimerRef.current = null
-      setDebouncedContent(value)
-    }, PREVIEW_DEBOUNCE_MS)
-  }, [tabId, setEditorDirty, cancelDebounce])
+  const handleChange = useCallback(
+    (value: string | undefined) => {
+      if (value === undefined) return
+      const dirty = value !== savedContentRef.current
+      if (dirty !== lastDirtyRef.current) {
+        lastDirtyRef.current = dirty
+        setEditorDirty(tabId, dirty)
+      }
+      cancelDebounce()
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null
+        setDebouncedContent(value)
+      }, PREVIEW_DEBOUNCE_MS)
+    },
+    [tabId, setEditorDirty, cancelDebounce]
+  )
 
   if (error) {
     return (
@@ -266,7 +278,14 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
   }
 
   return (
-    <div style={{ display: isActive ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%' }}>
+    <div
+      style={{
+        display: isActive ? 'flex' : 'none',
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+      }}
+    >
       {isDeletedExternally && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -291,11 +310,7 @@ export function HtmlEditor({ tabId, filePath, isActive, mode }: HtmlEditorProps)
             }}
           />
         </div>
-        <HtmlPreview
-          content={debouncedContent}
-          fileDir={fileDir}
-          isActive={mode === 'preview'}
-        />
+        <HtmlPreview content={debouncedContent} fileDir={fileDir} isActive={mode === 'preview'} />
       </div>
     </div>
   )

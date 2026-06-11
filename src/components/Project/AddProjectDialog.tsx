@@ -15,11 +15,7 @@ interface AddProjectDialogProps {
   onCreated: (project: Project) => void
 }
 
-export function AddProjectDialog({
-  isOpen,
-  onClose,
-  onCreated,
-}: AddProjectDialogProps) {
+export function AddProjectDialog({ isOpen, onClose, onCreated }: AddProjectDialogProps) {
   const api = useMemo(() => getElectronAPI(), [])
 
   const [selectedType, setSelectedType] = useState<ProjectType>('project')
@@ -78,10 +74,7 @@ export function AddProjectDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={handleClose}
-      />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={handleClose} />
 
       {/* Dialog */}
       <div className="relative w-full max-w-md bg-sidebar rounded-xl shadow-2xl border border-border">
@@ -103,9 +96,7 @@ export function AddProjectDialog({
         <div className="px-5 py-4 space-y-4">
           {/* Project Type Selection */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Project Type
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-2">Project Type</label>
             <div className="flex gap-2">
               {PROJECT_TYPE_OPTIONS.map(({ type, icon: Icon, label, description }) => (
                 <button
@@ -117,14 +108,16 @@ export function AddProjectDialog({
                       : 'border-border hover:border-muted-foreground'
                   }`}
                 >
-                  <Icon className={`w-6 h-6 ${selectedType === type ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <Icon
+                    className={`w-6 h-6 ${selectedType === type ? 'text-primary' : 'text-muted-foreground'}`}
+                  />
                   <div className="text-center">
-                    <p className={`text-xs font-medium ${selectedType === type ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <p
+                      className={`text-xs font-medium ${selectedType === type ? 'text-foreground' : 'text-muted-foreground'}`}
+                    >
                       {label}
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {description}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
                   </div>
                 </button>
               ))}
@@ -133,9 +126,7 @@ export function AddProjectDialog({
 
           {/* Folder Selection */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Folder
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-2">Folder</label>
             <button
               onClick={handleSelectFolder}
               className="w-full px-4 py-3 rounded-lg border border-border bg-background text-left hover:bg-muted/50 transition-colors"

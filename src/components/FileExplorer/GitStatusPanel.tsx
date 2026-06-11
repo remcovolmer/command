@@ -35,7 +35,14 @@ interface GitStatusPanelProps {
   onOperationEnd?: () => void
 }
 
-export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh, onOperationStart, onOperationEnd }: GitStatusPanelProps) {
+export function GitStatusPanel({
+  project,
+  gitContextId,
+  gitPath,
+  onRefresh,
+  onOperationStart,
+  onOperationEnd,
+}: GitStatusPanelProps) {
   const contextKey = gitContextId ?? project.id
   const gitStatus = useProjectStore((s) => s.gitStatus[contextKey])
   const effectiveGitPath = gitPath ?? project.path
@@ -50,23 +57,26 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh, onOp
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
   }
 
-  const withOperation = useCallback(async (fn: () => Promise<void>): Promise<boolean> => {
-    const api = getElectronAPI()
-    onOperationStart?.()
-    try {
-      await fn()
-      onRefresh?.()
-      return true
-    } catch (err) {
-      api.notification.show(
-        'Git Operation Failed',
-        err instanceof Error ? err.message : 'Operation failed'
-      )
-      return false
-    } finally {
-      onOperationEnd?.()
-    }
-  }, [onRefresh, onOperationStart, onOperationEnd])
+  const withOperation = useCallback(
+    async (fn: () => Promise<void>): Promise<boolean> => {
+      const api = getElectronAPI()
+      onOperationStart?.()
+      try {
+        await fn()
+        onRefresh?.()
+        return true
+      } catch (err) {
+        api.notification.show(
+          'Git Operation Failed',
+          err instanceof Error ? err.message : 'Operation failed'
+        )
+        return false
+      } finally {
+        onOperationEnd?.()
+      }
+    },
+    [onRefresh, onOperationStart, onOperationEnd]
+  )
 
   return (
     <div className="h-full flex flex-col">
@@ -75,9 +85,7 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh, onOp
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         </div>
       ) : !gitStatus.isGitRepo ? (
-        <div className="px-3 py-2 text-sm text-muted-foreground">
-          Not a git repository
-        </div>
+        <div className="px-3 py-2 text-sm text-muted-foreground">Not a git repository</div>
       ) : (
         <>
           {/* Top section: branch info + working tree status (collapsible, scrollable) */}
@@ -185,10 +193,7 @@ export function GitStatusPanel({ project, gitContextId, gitPath, onRefresh, onOp
               </span>
             </div>
             <div className="flex-1 min-h-0">
-              <CommitHistory
-                gitPath={effectiveGitPath}
-                contextId={contextKey}
-              />
+              <CommitHistory gitPath={effectiveGitPath} contextId={contextKey} />
             </div>
           </div>
         </>
@@ -214,36 +219,42 @@ function BranchSection({
   const [showDropdown, setShowDropdown] = useState(false)
   const branchNameRef = useRef<HTMLButtonElement>(null)
 
-  const handleGitAction = useCallback(async (action: 'fetch' | 'pull' | 'push') => {
-    setLoading(action)
-    try {
-      await api.git[action](gitPath)
-      onRefresh?.()
-    } catch (err) {
-      api.notification.show(
-        'Git Operation Failed',
-        err instanceof Error ? err.message : `${action} failed`
-      )
-    } finally {
-      setLoading(null)
-    }
-  }, [api, gitPath, onRefresh])
+  const handleGitAction = useCallback(
+    async (action: 'fetch' | 'pull' | 'push') => {
+      setLoading(action)
+      try {
+        await api.git[action](gitPath)
+        onRefresh?.()
+      } catch (err) {
+        api.notification.show(
+          'Git Operation Failed',
+          err instanceof Error ? err.message : `${action} failed`
+        )
+      } finally {
+        setLoading(null)
+      }
+    },
+    [api, gitPath, onRefresh]
+  )
 
-  const handleBranchSwitch = useCallback(async (name: string) => {
-    setLoading('switch')
-    setShowDropdown(false)
-    try {
-      await api.git.switchBranch(gitPath, name)
-      onRefresh?.()
-    } catch (err) {
-      api.notification.show(
-        'Branch Switch Failed',
-        err instanceof Error ? err.message : 'Failed to switch branch'
-      )
-    } finally {
-      setLoading(null)
-    }
-  }, [api, gitPath, onRefresh])
+  const handleBranchSwitch = useCallback(
+    async (name: string) => {
+      setLoading('switch')
+      setShowDropdown(false)
+      try {
+        await api.git.switchBranch(gitPath, name)
+        onRefresh?.()
+      } catch (err) {
+        api.notification.show(
+          'Branch Switch Failed',
+          err instanceof Error ? err.message : 'Failed to switch branch'
+        )
+      } finally {
+        setLoading(null)
+      }
+    },
+    [api, gitPath, onRefresh]
+  )
 
   return (
     <div className="px-3 py-2">
@@ -282,24 +293,36 @@ function BranchSection({
             onClick={() => handleGitAction('pull')}
             disabled={loading !== null || !branch.upstream}
             className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={!branch.upstream ? 'No upstream branch configured' : `Pull${branch.behind > 0 ? ` (${branch.behind} behind)` : ''}`}
+            title={
+              !branch.upstream
+                ? 'No upstream branch configured'
+                : `Pull${branch.behind > 0 ? ` (${branch.behind} behind)` : ''}`
+            }
           >
             {loading === 'pull' ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             ) : (
-              <ArrowDown className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`} />
+              <ArrowDown
+                className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
+              />
             )}
           </button>
           <button
             onClick={() => handleGitAction('push')}
             disabled={loading !== null || !branch.upstream || branch.ahead === 0}
             className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={!branch.upstream ? 'No upstream branch configured' : `Push${branch.ahead > 0 ? ` (${branch.ahead} ahead)` : ''}`}
+            title={
+              !branch.upstream
+                ? 'No upstream branch configured'
+                : `Push${branch.ahead > 0 ? ` (${branch.ahead} ahead)` : ''}`
+            }
           >
             {loading === 'push' ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             ) : (
-              <ArrowUp className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`} />
+              <ArrowUp
+                className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
+              />
             )}
           </button>
         </div>
@@ -352,27 +375,36 @@ function FileChangeSection({
     muted: 'text-muted-foreground',
   }[variant]
 
-  const handleStageAll = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const filePaths = files.map((f) => f.path)
-    const ok = await withOperation(() => api.git.stageFiles(gitPath, filePaths))
-    if (ok) closeWorkingTreeDiffTabs(filePaths)
-  }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
+  const handleStageAll = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const filePaths = files.map((f) => f.path)
+      const ok = await withOperation(() => api.git.stageFiles(gitPath, filePaths))
+      if (ok) closeWorkingTreeDiffTabs(filePaths)
+    },
+    [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs]
+  )
 
-  const handleUnstageAll = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const filePaths = files.map((f) => f.path)
-    const ok = await withOperation(() => api.git.unstageFiles(gitPath, filePaths))
-    if (ok) closeWorkingTreeDiffTabs(filePaths)
-  }, [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs])
+  const handleUnstageAll = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const filePaths = files.map((f) => f.path)
+      const ok = await withOperation(() => api.git.unstageFiles(gitPath, filePaths))
+      if (ok) closeWorkingTreeDiffTabs(filePaths)
+    },
+    [api, gitPath, files, withOperation, closeWorkingTreeDiffTabs]
+  )
 
-  const handleDiscardAll = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    setDiscardingFiles({
-      files: files.map((f) => f.path),
-      isUntracked: sectionType === 'untracked',
-    })
-  }, [files, sectionType, setDiscardingFiles])
+  const handleDiscardAll = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      setDiscardingFiles({
+        files: files.map((f) => f.path),
+        isUntracked: sectionType === 'untracked',
+      })
+    },
+    [files, sectionType, setDiscardingFiles]
+  )
 
   return (
     <div className="border-t border-border/50">
@@ -410,7 +442,9 @@ function FileChangeSection({
             <button
               onClick={handleDiscardAll}
               className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title={sectionType === 'untracked' ? 'Delete All Untracked Files' : 'Discard All Changes'}
+              title={
+                sectionType === 'untracked' ? 'Delete All Untracked Files' : 'Discard All Changes'
+              }
             >
               <X className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
@@ -474,25 +508,34 @@ function FileChangeItem({
 
   const fileName = file.path.split(/[/\\]/).pop() || file.path
 
-  const handleStage = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const ok = await withOperation(() => api.git.stageFiles(gitPath, [file.path]))
-    if (ok) closeWorkingTreeDiffTabs([file.path])
-  }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
+  const handleStage = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const ok = await withOperation(() => api.git.stageFiles(gitPath, [file.path]))
+      if (ok) closeWorkingTreeDiffTabs([file.path])
+    },
+    [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs]
+  )
 
-  const handleUnstage = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const ok = await withOperation(() => api.git.unstageFiles(gitPath, [file.path]))
-    if (ok) closeWorkingTreeDiffTabs([file.path])
-  }, [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs])
+  const handleUnstage = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const ok = await withOperation(() => api.git.unstageFiles(gitPath, [file.path]))
+      if (ok) closeWorkingTreeDiffTabs([file.path])
+    },
+    [api, gitPath, file.path, withOperation, closeWorkingTreeDiffTabs]
+  )
 
-  const handleDiscard = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    setDiscardingFiles({
-      files: [file.path],
-      isUntracked: sectionType === 'untracked',
-    })
-  }, [file.path, sectionType, setDiscardingFiles])
+  const handleDiscard = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      setDiscardingFiles({
+        files: [file.path],
+        isUntracked: sectionType === 'untracked',
+      })
+    },
+    [file.path, sectionType, setDiscardingFiles]
+  )
 
   const handleClick = useCallback(() => {
     let diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted'

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 interface EncryptedStore {
-  [profileId: string]: { [key: string]: string }  // key -> base64-encrypted value
+  [profileId: string]: { [key: string]: string } // key -> base64-encrypted value
 }
 
 /**
@@ -55,7 +55,9 @@ export class SecureEnvStore {
     const encrypted: Record<string, string> = {}
     const useEncryption = safeStorage.isEncryptionAvailable()
     if (!useEncryption && !this.hasWarnedFallback) {
-      console.warn('[SecureEnvStore] WARNING: safeStorage encryption not available. Values stored as base64 encoding only (not encrypted).')
+      console.warn(
+        '[SecureEnvStore] WARNING: safeStorage encryption not available. Values stored as base64 encoding only (not encrypted).'
+      )
       this.hasWarnedFallback = true
     }
     for (const [key, value] of Object.entries(vars)) {

@@ -10,12 +10,10 @@ import { EditorSkeleton } from './EditorSkeleton'
 loader.config({ monaco })
 
 const MarkdownEditor = lazy(() =>
-  import('./MarkdownEditor').then(m => ({ default: m.MarkdownEditor }))
+  import('./MarkdownEditor').then((m) => ({ default: m.MarkdownEditor }))
 )
 
-const HtmlEditor = lazy(() =>
-  import('./HtmlEditor').then(m => ({ default: m.HtmlEditor }))
-)
+const HtmlEditor = lazy(() => import('./HtmlEditor').then((m) => ({ default: m.HtmlEditor })))
 
 interface EditorContainerProps {
   tabId: string
@@ -39,7 +37,14 @@ export function EditorContainer({ tabId, filePath, isActive }: EditorContainerPr
   // HTML files: Preview ⇄ Raw toggle, both panes mounted to preserve Monaco undo history.
   if (isHtml) {
     return (
-      <div style={{ display: isActive ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%' }}>
+      <div
+        style={{
+          display: isActive ? 'flex' : 'none',
+          flexDirection: 'column',
+          height: '100%',
+          width: '100%',
+        }}
+      >
         {/* Toggle button */}
         <div className="flex items-center justify-end px-2 py-1 border-b border-border bg-background">
           <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
@@ -87,18 +92,19 @@ export function EditorContainer({ tabId, filePath, isActive }: EditorContainerPr
 
   // Non-markdown, non-HTML files always use Monaco
   if (!isMarkdown) {
-    return (
-      <CodeEditor
-        tabId={tabId}
-        filePath={filePath}
-        isActive={isActive}
-      />
-    )
+    return <CodeEditor tabId={tabId} filePath={filePath} isActive={isActive} />
   }
 
   // Markdown files can toggle between editors
   return (
-    <div style={{ display: isActive ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%' }}>
+    <div
+      style={{
+        display: isActive ? 'flex' : 'none',
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+      }}
+    >
       {/* Toggle button */}
       <div className="flex items-center justify-end px-2 py-1 border-b border-border bg-background">
         <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">

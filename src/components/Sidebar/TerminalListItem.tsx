@@ -26,17 +26,16 @@ export const TerminalListItem = memo(function TerminalListItem({
   const defaultClassName = `
     group flex items-center gap-2 px-3 py-1.5 cursor-pointer
     transition-colors duration-150
-    ${isActive
-      ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-md'
-      : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
+    ${
+      isActive
+        ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-md'
+        : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'
+    }
   `
   const isClaude = terminal.type === 'claude'
 
   return (
-    <li
-      onClick={onSelect}
-      className={className ?? defaultClassName}
-    >
+    <li onClick={onSelect} className={className ?? defaultClassName}>
       <TerminalIcon
         className={`w-3 h-3 flex-shrink-0 ${isClaude ? 'mt-0.5' : ''} ${STATE_TEXT_COLORS[terminal.state]}`}
       />

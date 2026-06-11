@@ -1,5 +1,8 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { encodeProjectPath, SessionIndexService } from '../electron/main/services/SessionIndexService'
+import {
+  encodeProjectPath,
+  SessionIndexService,
+} from '../electron/main/services/SessionIndexService'
 
 // Mock fs modules
 vi.mock('fs/promises', () => ({
@@ -32,7 +35,7 @@ const mockCreateInterface = vi.mocked(createInterface)
 
 /** Build a fake readline interface that yields JSONL lines */
 function mockJsonlFile(lines: Record<string, unknown>[]) {
-  const jsonLines = lines.map(l => JSON.stringify(l))
+  const jsonLines = lines.map((l) => JSON.stringify(l))
   mockCreateReadStream.mockReturnValueOnce('stream' as never)
   mockCreateInterface.mockReturnValueOnce({
     [Symbol.asyncIterator]: async function* () {
@@ -70,7 +73,7 @@ function makeSessionLines(opts: {
     lines.push({
       type: 'user',
       timestamp: i === msgCount - 1 ? modified : created,
-      message: { content: i === 0 ? (opts.firstPrompt || 'Hello') : `Message ${i + 1}` },
+      message: { content: i === 0 ? opts.firstPrompt || 'Hello' : `Message ${i + 1}` },
       gitBranch: opts.gitBranch || 'main',
       sessionId: opts.sessionId || 'test-session',
     })
@@ -106,7 +109,9 @@ describe('encodeProjectPath', () => {
   test('replaces underscores with dashes (matches Claude Code)', () => {
     // Claude Code's dir naming on disk is `C--Users-X-Code-pascal-ai` for
     // `C:\Users\X\Code\pascal_ai` — the underscore becomes a dash.
-    expect(encodeProjectPath('C:\\Users\\test\\Code\\pascal_ai')).toBe('C--Users-test-Code-pascal-ai')
+    expect(encodeProjectPath('C:\\Users\\test\\Code\\pascal_ai')).toBe(
+      'C--Users-test-Code-pascal-ai'
+    )
   })
 
   test('replaces dots with dashes (matches Claude Code)', () => {
@@ -120,13 +125,13 @@ describe('encodeProjectPath', () => {
   })
 
   test('encodes path with .worktrees subdirectory', () => {
-    expect(encodeProjectPath('C:\\Users\\test\\command\\.worktrees\\fix-x'))
-      .toBe('C--Users-test-command--worktrees-fix-x')
+    expect(encodeProjectPath('C:\\Users\\test\\command\\.worktrees\\fix-x')).toBe(
+      'C--Users-test-command--worktrees-fix-x'
+    )
   })
 
   test('encodes path with spaces', () => {
-    expect(encodeProjectPath('C:\\Users\\test\\my project'))
-      .toBe('C--Users-test-my-project')
+    expect(encodeProjectPath('C:\\Users\\test\\my project')).toBe('C--Users-test-my-project')
   })
 })
 
@@ -152,7 +157,7 @@ describe('SessionIndexService', () => {
     // 1st readdir: projects root contains just this project dir
     mockReaddir.mockResolvedValueOnce([projectDir] as never)
     // 2nd readdir: list jsonls in the project dir
-    mockReaddir.mockResolvedValueOnce(files.map(f => f.name) as never)
+    mockReaddir.mockResolvedValueOnce(files.map((f) => f.name) as never)
     for (const f of files) {
       mockStat.mockResolvedValueOnce({ mtimeMs: f.mtimeMs } as never)
     }
@@ -174,13 +179,13 @@ describe('SessionIndexService', () => {
     extraProjectsRootDirs?: string[] // dirs in projects root that should NOT match
   }) {
     const projectRootListing = [
-      ...args.dirs.map(d => d.dirName),
+      ...args.dirs.map((d) => d.dirName),
       ...(args.extraProjectsRootDirs ?? []),
     ]
     mockReaddir.mockResolvedValueOnce(projectRootListing as never)
     // For each matching dir, a readdir + stats + jsonl mocks
     for (const dir of args.dirs) {
-      mockReaddir.mockResolvedValueOnce(dir.files.map(f => f.name) as never)
+      mockReaddir.mockResolvedValueOnce(dir.files.map((f) => f.name) as never)
       for (const f of dir.files) {
         mockStat.mockResolvedValueOnce({ mtimeMs: f.mtimeMs } as never)
       }
@@ -230,11 +235,13 @@ describe('SessionIndexService', () => {
     })
 
     test('extracts git branch from system line', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({ sessionId: 'session-1', gitBranch: 'feature/auth' }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({ sessionId: 'session-1', gitBranch: 'feature/auth' }),
+        },
+      ])
 
       await service.loadForProject('C:\\Users\\test\\project')
 
@@ -242,11 +249,13 @@ describe('SessionIndexService', () => {
     })
 
     test('counts user messages', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({ sessionId: 'session-1', userMessages: 5 }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({ sessionId: 'session-1', userMessages: 5 }),
+        },
+      ])
 
       await service.loadForProject('C:\\Users\\test\\project')
 
@@ -256,11 +265,13 @@ describe('SessionIndexService', () => {
 
   describe('getSessionSummary', () => {
     test('returns undefined for unknown session ID', async () => {
-      setupJsonlFiles([{
-        name: 'known.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({ sessionId: 'known' }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'known.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({ sessionId: 'known' }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
       expect(service.getSessionSummary('unknown')).toBeUndefined()
@@ -289,7 +300,7 @@ describe('SessionIndexService', () => {
       await service.loadForProject('C:\\Users\\test\\project')
 
       const result = service.getRecentSessions()
-      expect(result.map(e => e.sessionId)).toEqual(['recent', 'mid', 'old'])
+      expect(result.map((e) => e.sessionId)).toEqual(['recent', 'mid', 'old'])
     })
 
     test('respects limit parameter', async () => {
@@ -311,17 +322,21 @@ describe('SessionIndexService', () => {
 
   describe('pushSummaryToRenderer', () => {
     test('sends summary via IPC when available', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({ sessionId: 'session-1', firstPrompt: 'Fix login' }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({ sessionId: 'session-1', firstPrompt: 'Fix login' }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
       service.pushSummaryToRenderer('terminal-1', 'session-1')
 
       expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-        'terminal:summary', 'terminal-1', 'Fix login'
+        'terminal:summary',
+        'terminal-1',
+        'Fix login'
       )
     })
 
@@ -336,11 +351,13 @@ describe('SessionIndexService', () => {
 
     test('does not send when window is destroyed', async () => {
       mockWindow.isDestroyed.mockReturnValue(true)
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({ sessionId: 'session-1', firstPrompt: 'Fix login' }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({ sessionId: 'session-1', firstPrompt: 'Fix login' }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
       service.pushSummaryToRenderer('terminal-1', 'session-1')
@@ -351,72 +368,84 @@ describe('SessionIndexService', () => {
 
   describe('firstPrompt sanitization', () => {
     test('strips real ESC-prefixed CSI mouse-tracking sequences', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({
-          sessionId: 'session-1',
-          firstPrompt: '\x1b[<35;21;8MHello world',
-        }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({
+            sessionId: 'session-1',
+            firstPrompt: '\x1b[<35;21;8MHello world',
+          }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
       expect(service.getSessionSummary('session-1')?.firstPrompt).toBe('Hello world')
     })
 
     test('strips bare CSI sequences that begin with a private-marker byte', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({
-          sessionId: 'session-1',
-          firstPrompt: '[<35;21;8MHello world',
-        }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({
+            sessionId: 'session-1',
+            firstPrompt: '[<35;21;8MHello world',
+          }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
       expect(service.getSessionSummary('session-1')?.firstPrompt).toBe('Hello world')
     })
 
     test('preserves plain bracketed text in user prompts', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({
-          sessionId: 'session-1',
-          firstPrompt: '[wip] [TODO] fix the bug in [feature-x]',
-        }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({
+            sessionId: 'session-1',
+            firstPrompt: '[wip] [TODO] fix the bug in [feature-x]',
+          }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
-      expect(service.getSessionSummary('session-1')?.firstPrompt)
-        .toBe('[wip] [TODO] fix the bug in [feature-x]')
+      expect(service.getSessionSummary('session-1')?.firstPrompt).toBe(
+        '[wip] [TODO] fix the bug in [feature-x]'
+      )
     })
 
     test('preserves bracketed private-marker-like text that is not mouse tracking', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({
-          sessionId: 'session-1',
-          firstPrompt: 'soft reset [!p] and angle [<a] should survive',
-        }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({
+            sessionId: 'session-1',
+            firstPrompt: 'soft reset [!p] and angle [<a] should survive',
+          }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
-      expect(service.getSessionSummary('session-1')?.firstPrompt)
-        .toBe('soft reset [!p] and angle [<a] should survive')
+      expect(service.getSessionSummary('session-1')?.firstPrompt).toBe(
+        'soft reset [!p] and angle [<a] should survive'
+      )
     })
 
     test('strips CSI sequences in the middle of a prompt', async () => {
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines: makeSessionLines({
-          sessionId: 'session-1',
-          firstPrompt: 'before \x1b[<35;21;8Mafter',
-        }),
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines: makeSessionLines({
+            sessionId: 'session-1',
+            firstPrompt: 'before \x1b[<35;21;8Mafter',
+          }),
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
       expect(service.getSessionSummary('session-1')?.firstPrompt).toBe('before after')
@@ -431,27 +460,33 @@ describe('SessionIndexService', () => {
         dirs: [
           {
             dirName: 'C--Users-test-command',
-            files: [{
-              name: 'root-session.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'root-session', firstPrompt: 'Root work' }),
-            }],
+            files: [
+              {
+                name: 'root-session.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'root-session', firstPrompt: 'Root work' }),
+              },
+            ],
           },
           {
             dirName: 'C--Users-test-command--worktrees-feat-x',
-            files: [{
-              name: 'wt-x-session.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'wt-x-session', firstPrompt: 'Feature x' }),
-            }],
+            files: [
+              {
+                name: 'wt-x-session.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'wt-x-session', firstPrompt: 'Feature x' }),
+              },
+            ],
           },
           {
             dirName: 'C--Users-test-command--worktrees-fix-y',
-            files: [{
-              name: 'wt-y-session.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'wt-y-session', firstPrompt: 'Fix y' }),
-            }],
+            files: [
+              {
+                name: 'wt-y-session.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'wt-y-session', firstPrompt: 'Fix y' }),
+              },
+            ],
           },
         ],
       })
@@ -469,19 +504,23 @@ describe('SessionIndexService', () => {
         dirs: [
           {
             dirName: 'C--Users-test-command',
-            files: [{
-              name: 'root-session.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'root-session' }),
-            }],
+            files: [
+              {
+                name: 'root-session.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'root-session' }),
+              },
+            ],
           },
           {
             dirName: 'C--Users-test-command--worktrees-feat-x',
-            files: [{
-              name: 'wt-x-session.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'wt-x-session' }),
-            }],
+            files: [
+              {
+                name: 'wt-x-session.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'wt-x-session' }),
+              },
+            ],
           },
         ],
       })
@@ -489,8 +528,8 @@ describe('SessionIndexService', () => {
       await service.loadForProject('C:\\Users\\test\\command')
 
       const recent = service.getRecentSessions()
-      const root = recent.find(e => e.sessionId === 'root-session')
-      const worktree = recent.find(e => e.sessionId === 'wt-x-session')
+      const root = recent.find((e) => e.sessionId === 'root-session')
+      const worktree = recent.find((e) => e.sessionId === 'wt-x-session')
       expect(root?.worktreeName).toBeUndefined()
       expect(worktree?.worktreeName).toBe('feat-x')
     })
@@ -502,17 +541,19 @@ describe('SessionIndexService', () => {
         dirs: [
           {
             dirName: 'C--Users-test-command',
-            files: [{
-              name: 'cmd.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'cmd', firstPrompt: 'command work' }),
-            }],
+            files: [
+              {
+                name: 'cmd.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'cmd', firstPrompt: 'command work' }),
+              },
+            ],
           },
         ],
         extraProjectsRootDirs: [
-          'C--Users-test-command-mvp',                // different project
+          'C--Users-test-command-mvp', // different project
           'C--Users-test-command-mvp--worktrees-foo', // worktree of different project
-          'C--Users-test-other',                       // entirely different
+          'C--Users-test-other', // entirely different
         ],
       })
 
@@ -534,19 +575,23 @@ describe('SessionIndexService', () => {
         dirs: [
           {
             dirName: 'C--Users-test-proj--worktrees-dotted',
-            files: [{
-              name: 'a.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'a' }),
-            }],
+            files: [
+              {
+                name: 'a.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'a' }),
+              },
+            ],
           },
           {
             dirName: 'C--Users-test-proj--claude-worktrees-managed',
-            files: [{
-              name: 'c.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'c' }),
-            }],
+            files: [
+              {
+                name: 'c.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'c' }),
+              },
+            ],
           },
         ],
       })
@@ -554,8 +599,8 @@ describe('SessionIndexService', () => {
       await service.loadForProject('C:\\Users\\test\\proj')
 
       const recent = service.getRecentSessions()
-      expect(recent.find(e => e.sessionId === 'a')?.worktreeName).toBe('dotted')
-      expect(recent.find(e => e.sessionId === 'c')?.worktreeName).toBe('managed')
+      expect(recent.find((e) => e.sessionId === 'a')?.worktreeName).toBe('dotted')
+      expect(recent.find((e) => e.sessionId === 'c')?.worktreeName).toBe('managed')
     })
 
     test('does NOT misclassify sibling project literally named `<X>-worktrees-<Y>`', async () => {
@@ -570,11 +615,13 @@ describe('SessionIndexService', () => {
         dirs: [
           {
             dirName: 'C--Users-test-command',
-            files: [{
-              name: 'cmd.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'cmd', firstPrompt: 'command work' }),
-            }],
+            files: [
+              {
+                name: 'cmd.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'cmd', firstPrompt: 'command work' }),
+              },
+            ],
           },
         ],
         extraProjectsRootDirs: [
@@ -597,16 +644,18 @@ describe('SessionIndexService', () => {
         dirs: [
           {
             dirName: 'C--Users-test-proj',
-            files: [{
-              name: 'root.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'root' }),
-            }],
+            files: [
+              {
+                name: 'root.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'root' }),
+              },
+            ],
           },
         ],
         extraProjectsRootDirs: [
-          'C--Users-test-proj--worktrees--',   // worktree name == '-'
-          'C--Users-test-proj--worktrees---',  // worktree name == '--'
+          'C--Users-test-proj--worktrees--', // worktree name == '-'
+          'C--Users-test-proj--worktrees---', // worktree name == '--'
         ],
       })
 
@@ -634,11 +683,13 @@ describe('SessionIndexService', () => {
         dirs: [
           {
             dirName: 'C--Users-test-proj--worktrees-only',
-            files: [{
-              name: 'wt.jsonl',
-              mtimeMs: Date.now(),
-              lines: makeSessionLines({ sessionId: 'wt', firstPrompt: 'Worktree only' }),
-            }],
+            files: [
+              {
+                name: 'wt.jsonl',
+                mtimeMs: Date.now(),
+                lines: makeSessionLines({ sessionId: 'wt', firstPrompt: 'Worktree only' }),
+              },
+            ],
           },
         ],
       })
@@ -646,8 +697,8 @@ describe('SessionIndexService', () => {
       await service.loadForProject('C:\\Users\\test\\proj')
 
       const recent = service.getRecentSessions()
-      expect(recent.find(e => e.sessionId === 'wt')?.firstPrompt).toBe('Worktree only')
-      expect(recent.find(e => e.sessionId === 'wt')?.worktreeName).toBe('only')
+      expect(recent.find((e) => e.sessionId === 'wt')?.firstPrompt).toBe('Worktree only')
+      expect(recent.find((e) => e.sessionId === 'wt')?.worktreeName).toBe('only')
     })
   })
 
@@ -661,11 +712,13 @@ describe('SessionIndexService', () => {
         timestamp: '2026-04-10T10:30:00Z',
       })
 
-      setupJsonlFiles([{
-        name: 'session-1.jsonl',
-        mtimeMs: Date.now(),
-        lines,
-      }])
+      setupJsonlFiles([
+        {
+          name: 'session-1.jsonl',
+          mtimeMs: Date.now(),
+          lines,
+        },
+      ])
       await service.loadForProject('C:\\Users\\test\\project')
 
       const summary = service.getSessionSummary('session-1')

@@ -32,7 +32,7 @@ export function FileExplorerTabBar({
     { id: 'tasks' as const, label: 'Tasks', icon: ListTodo, badge: taskNowCount },
     { id: 'automations' as const, label: 'Auto', icon: Zap, badge: automationUnreadCount },
   ]
-  const tabs = showGitTab ? allTabs : allTabs.filter(t => t.id !== 'git')
+  const tabs = showGitTab ? allTabs : allTabs.filter((t) => t.id !== 'git')
 
   return (
     <div className="flex items-center justify-between px-2 py-1 bg-sidebar-accent border-b border-border shrink-0">
@@ -47,9 +47,10 @@ export function FileExplorerTabBar({
               className={`
                 flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium
                 transition-colors
-                ${isActive
-                  ? 'bg-sidebar text-sidebar-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
+                ${
+                  isActive
+                    ? 'bg-sidebar text-sidebar-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
                 }
               `}
             >
@@ -71,9 +72,11 @@ export function FileExplorerTabBar({
           className="p-1 rounded hover:bg-muted/50 transition-colors"
           title="Refresh"
         >
-          <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground ${
-            activeTab === 'git' && isGitLoading ? 'animate-spin' : ''
-          }`} />
+          <RefreshCw
+            className={`w-3.5 h-3.5 text-muted-foreground ${
+              activeTab === 'git' && isGitLoading ? 'animate-spin' : ''
+            }`}
+          />
         </button>
       </div>
     </div>

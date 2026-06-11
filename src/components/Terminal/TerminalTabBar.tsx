@@ -37,9 +37,7 @@ export function TerminalTabBar({
   // Scroll active tab into view when it changes
   useEffect(() => {
     if (!activeCenterTabId || !containerRef.current) return
-    const el = containerRef.current.querySelector(
-      `[data-tab-id="${activeCenterTabId}"]`
-    )
+    const el = containerRef.current.querySelector(`[data-tab-id="${activeCenterTabId}"]`)
     el?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
   }, [activeCenterTabId])
 
@@ -49,12 +47,14 @@ export function TerminalTabBar({
   }
 
   // Derive active tab type from the ID
-  const isEditorTabActive = (tabId: string) =>
-    editorTabs.some((t) => t.id === tabId)
+  const isEditorTabActive = (tabId: string) => editorTabs.some((t) => t.id === tabId)
   const activeIsEditor = activeCenterTabId != null && isEditorTabActive(activeCenterTabId)
 
   return (
-    <div ref={containerRef} className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto scroll-hidden">
+    <div
+      ref={containerRef}
+      className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto scroll-hidden"
+    >
       {/* Terminal tabs */}
       {terminals.map((terminal) => {
         const isActive = !activeIsEditor && terminal.id === (activeCenterTabId ?? activeTerminalId)
@@ -112,9 +112,7 @@ export function TerminalTabBar({
       })}
 
       {/* Separator between terminal and editor tabs */}
-      {terminals.length > 0 && editorTabs.length > 0 && (
-        <div className="w-px h-5 bg-border mx-1" />
-      )}
+      {terminals.length > 0 && editorTabs.length > 0 && <div className="w-px h-5 bg-border mx-1" />}
 
       {/* Editor tabs */}
       {editorTabs.map((tab) => {
@@ -135,15 +133,25 @@ export function TerminalTabBar({
               }
             `}
           >
-            {(tab.type === 'diff' || tab.type === 'working-tree-diff') ? (
+            {tab.type === 'diff' || tab.type === 'working-tree-diff' ? (
               <GitCompare className="w-3.5 h-3.5 flex-shrink-0 text-blue-400" />
             ) : (
               <FileText className="w-3.5 h-3.5 flex-shrink-0" />
             )}
             <span className="text-xs font-medium whitespace-nowrap">
-              {tab.type === 'diff' ? `${tab.fileName} (diff)` : tab.type === 'working-tree-diff' ? `${tab.fileName} (${
-                tab.diffKind === 'staged' ? 'Staged' : tab.diffKind === 'untracked' ? 'New File' : tab.diffKind === 'deleted' ? 'Deleted' : 'Working Tree'
-              })` : tab.fileName}
+              {tab.type === 'diff'
+                ? `${tab.fileName} (diff)`
+                : tab.type === 'working-tree-diff'
+                  ? `${tab.fileName} (${
+                      tab.diffKind === 'staged'
+                        ? 'Staged'
+                        : tab.diffKind === 'untracked'
+                          ? 'New File'
+                          : tab.diffKind === 'deleted'
+                            ? 'Deleted'
+                            : 'Working Tree'
+                    })`
+                  : tab.fileName}
             </span>
             {tab.type === 'editor' && tab.isDirty && (
               <Circle className="w-2 h-2 flex-shrink-0 fill-current text-orange-400" />

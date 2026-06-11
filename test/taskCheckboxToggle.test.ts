@@ -41,18 +41,17 @@ function makeClickEvent(opts: {
   paddingLeft?: string
   clientX?: number
 }) {
-  const {
-    isHTMLElement = true,
-    isTaskItem = true,
-    liLeft = 100,
-    paddingLeft = '24px',
-    clientX = 110,
-  } = opts
+  const { isHTMLElement = true, isTaskItem = true, liLeft = 100, clientX = 110 } = opts
 
   // Mock the <li> element returned by closest()
   const li = {
     getBoundingClientRect: () => ({
-      left: liLeft, top: 0, right: 300, bottom: 20, width: 200, height: 20,
+      left: liLeft,
+      top: 0,
+      right: 300,
+      bottom: 20,
+      width: 200,
+      height: 20,
     }),
   }
 
@@ -134,11 +133,10 @@ describe('handleTaskCheckboxClick', () => {
     const { view, dispatch, setNodeMarkup } = makeView(nodes, 2)
 
     expect(handleTaskCheckboxClick(view, 5, event)).toBe(true)
-    expect(setNodeMarkup).toHaveBeenCalledWith(
-      expect.any(Number),
-      undefined,
-      { checked: true, label: 'task' },
-    )
+    expect(setNodeMarkup).toHaveBeenCalledWith(expect.any(Number), undefined, {
+      checked: true,
+      label: 'task',
+    })
     expect(dispatch).toHaveBeenCalled()
   })
 
@@ -154,11 +152,7 @@ describe('handleTaskCheckboxClick', () => {
     const { view, dispatch, setNodeMarkup } = makeView(nodes, 2)
 
     expect(handleTaskCheckboxClick(view, 5, event)).toBe(true)
-    expect(setNodeMarkup).toHaveBeenCalledWith(
-      expect.any(Number),
-      undefined,
-      { checked: false },
-    )
+    expect(setNodeMarkup).toHaveBeenCalledWith(expect.any(Number), undefined, { checked: false })
     expect(dispatch).toHaveBeenCalled()
   })
 

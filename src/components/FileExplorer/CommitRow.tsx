@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { GitMerge, Copy, Tag } from 'lucide-react'
+import { GitMerge, Tag } from 'lucide-react'
 import type { GitCommit, GitCommitDetail } from '../../types'
 import { CommitDetail } from './CommitDetail'
 
@@ -60,17 +60,19 @@ export function CommitRow({
         {/* Indicators */}
         <div className="flex items-center gap-1 flex-shrink-0">
           {isFirst && (
-            <span title="HEAD"><Tag className="w-3 h-3 text-primary" /></span>
+            <span title="HEAD">
+              <Tag className="w-3 h-3 text-primary" />
+            </span>
           )}
           {isMerge && (
-            <span title="Merge commit"><GitMerge className="w-3 h-3 text-purple-500" /></span>
+            <span title="Merge commit">
+              <GitMerge className="w-3 h-3 text-purple-500" />
+            </span>
           )}
         </div>
 
         {/* Commit message */}
-        <span className="truncate flex-1 text-sidebar-foreground">
-          {commit.message}
-        </span>
+        <span className="truncate flex-1 text-sidebar-foreground">{commit.message}</span>
 
         {/* Short hash (clickable to copy) */}
         <button
@@ -91,13 +93,7 @@ export function CommitRow({
       </button>
 
       {/* Expanded detail */}
-      {isExpanded && (
-        <CommitDetail
-          commit={commit}
-          gitPath={gitPath}
-          detailCache={detailCache}
-        />
-      )}
+      {isExpanded && <CommitDetail commit={commit} gitPath={gitPath} detailCache={detailCache} />}
     </div>
   )
 }

@@ -37,12 +37,15 @@ export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFor
     }
   }, [api, gitPath, message, canCommit, withOperation])
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault()
-      handleCommit()
-    }
-  }, [handleCommit])
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        handleCommit()
+      }
+    },
+    [handleCommit]
+  )
 
   // Auto-resize textarea whenever message changes (including clear after commit)
   useEffect(() => {

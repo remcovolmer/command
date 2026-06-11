@@ -11,33 +11,39 @@ interface HotkeyRecorderProps {
 }
 
 export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyRecorderProps) {
-  const [recordedBinding, setRecordedBinding] = useState<Pick<HotkeyBinding, 'key' | 'modifiers'> | null>(null)
+  const [recordedBinding, setRecordedBinding] = useState<Pick<
+    HotkeyBinding,
+    'key' | 'modifiers'
+  > | null>(null)
   const [activeModifiers, setActiveModifiers] = useState<ModifierKey[]>([])
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
 
-    // Escape without modifiers cancels the recorder (consistent with all other dialogs)
-    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-      onCancel()
-      return
-    }
+      // Escape without modifiers cancels the recorder (consistent with all other dialogs)
+      if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+        onCancel()
+        return
+      }
 
-    // Update active modifiers for visual feedback
-    const modifiers: ModifierKey[] = []
-    if (e.ctrlKey) modifiers.push('ctrl')
-    if (e.altKey) modifiers.push('alt')
-    if (e.shiftKey) modifiers.push('shift')
-    if (e.metaKey) modifiers.push('meta')
-    setActiveModifiers(modifiers)
+      // Update active modifiers for visual feedback
+      const modifiers: ModifierKey[] = []
+      if (e.ctrlKey) modifiers.push('ctrl')
+      if (e.altKey) modifiers.push('alt')
+      if (e.shiftKey) modifiers.push('shift')
+      if (e.metaKey) modifiers.push('meta')
+      setActiveModifiers(modifiers)
 
-    // Try to parse the key event
-    const parsed = parseKeyEvent(e)
-    if (parsed) {
-      setRecordedBinding(parsed)
-    }
-  }, [onCancel])
+      // Try to parse the key event
+      const parsed = parseKeyEvent(e)
+      if (parsed) {
+        setRecordedBinding(parsed)
+      }
+    },
+    [onCancel]
+  )
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     // Update active modifiers
@@ -81,16 +87,11 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onCancel}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
 
       {/* Dialog */}
       <div className="relative bg-background rounded-lg shadow-xl border border-border p-6 min-w-[400px]">
-        <h3 className="text-lg font-semibold text-foreground mb-4">
-          Record Keyboard Shortcut
-        </h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">Record Keyboard Shortcut</h3>
 
         <p className="text-sm text-muted-foreground mb-6">
           Press the key combination you want to use for this action.
@@ -103,9 +104,7 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
               {formatBinding(displayBinding)}
             </span>
           ) : (
-            <span className="text-lg text-muted-foreground">
-              Press a key combination...
-            </span>
+            <span className="text-lg text-muted-foreground">Press a key combination...</span>
           )}
         </div>
 

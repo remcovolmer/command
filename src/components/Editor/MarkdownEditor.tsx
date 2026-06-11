@@ -47,7 +47,7 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
   const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
   const isDeletedExternally = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
-    return tab?.type === 'editor' ? tab.isDeletedExternally ?? false : false
+    return tab?.type === 'editor' ? (tab.isDeletedExternally ?? false) : false
   })
   const projectId = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
@@ -57,10 +57,10 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
   const [content, setContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const savedContentRef = useRef<string>('')      // last content written to / read from disk
-  const currentContentRef = useRef<string>('')    // canonical latest content (live)
-  const rawSyncedRef = useRef<string>('')         // content the Monaco pane last held
-  const previewSyncedRef = useRef<string>('')     // content the Milkdown pane last held
+  const savedContentRef = useRef<string>('') // last content written to / read from disk
+  const currentContentRef = useRef<string>('') // canonical latest content (live)
+  const rawSyncedRef = useRef<string>('') // content the Monaco pane last held
+  const previewSyncedRef = useRef<string>('') // content the Milkdown pane last held
   const lastDirtyRef = useRef<boolean>(false)
   // Boolean guard for Monaco: setValue fires onChange synchronously, so setting
   // this true→false around the call brackets the resulting event.
@@ -85,13 +85,16 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
 
   const normalizedPath = useMemo(() => normalizeFilePath(filePath), [filePath])
 
-  const updateDirty = useCallback((value: string) => {
-    const dirty = computeDirty(value, savedContentRef.current)
-    if (dirty !== lastDirtyRef.current) {
-      lastDirtyRef.current = dirty
-      setEditorDirty(tabId, dirty)
-    }
-  }, [tabId, setEditorDirty])
+  const updateDirty = useCallback(
+    (value: string) => {
+      const dirty = computeDirty(value, savedContentRef.current)
+      if (dirty !== lastDirtyRef.current) {
+        lastDirtyRef.current = dirty
+        setEditorDirty(tabId, dirty)
+      }
+    },
+    [tabId, setEditorDirty]
+  )
 
   // Push the canonical content into whichever pane is currently active, but only
   // when that pane has actually fallen behind and is ready. Updating the pane's
@@ -130,7 +133,8 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
       }
     }, 10000)
 
-    api.fs.readFile(filePath)
+    api.fs
+      .readFile(filePath)
       .then((text) => {
         clearTimeout(timeoutId)
         if (cancelled) return
@@ -166,33 +170,36 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
 
     const reloadFile = () => {
       const seq = ++readSeqRef.current
-      api.fs.readFile(filePath).then((text) => {
-        if (cancelled || seq !== readSeqRef.current) return
+      api.fs
+        .readFile(filePath)
+        .then((text) => {
+          if (cancelled || seq !== readSeqRef.current) return
 
-        const decision = decideExternalReload({
-          diskText: text,
-          savedContent: savedContentRef.current,
-          isDirty: lastDirtyRef.current,
-          msSinceSelfWrite: Date.now() - pendingSelfWriteAtRef.current,
+          const decision = decideExternalReload({
+            diskText: text,
+            savedContent: savedContentRef.current,
+            isDirty: lastDirtyRef.current,
+            msSinceSelfWrite: Date.now() - pendingSelfWriteAtRef.current,
+          })
+          if (decision === 'skip-echo') return
+          if (decision === 'skip-dirty') {
+            console.warn('External change to', filePath, 'ignored — buffer has unsaved edits')
+            return
+          }
+
+          // apply: adopt disk content as canonical and refresh the active pane.
+          // The inactive pane's synced marker is left stale so reconcileActivePane
+          // pushes into it (and only then) when the user toggles to it.
+          savedContentRef.current = text
+          currentContentRef.current = text
+          lastDirtyRef.current = false
+          setEditorDirty(tabId, false)
+          setEditorTabDeletedExternally(tabId, false)
+          reconcileActivePane()
         })
-        if (decision === 'skip-echo') return
-        if (decision === 'skip-dirty') {
-          console.warn('External change to', filePath, 'ignored — buffer has unsaved edits')
-          return
-        }
-
-        // apply: adopt disk content as canonical and refresh the active pane.
-        // The inactive pane's synced marker is left stale so reconcileActivePane
-        // pushes into it (and only then) when the user toggles to it.
-        savedContentRef.current = text
-        currentContentRef.current = text
-        lastDirtyRef.current = false
-        setEditorDirty(tabId, false)
-        setEditorTabDeletedExternally(tabId, false)
-        reconcileActivePane()
-      }).catch((err) => {
-        if (!cancelled) console.error('Failed to reload markdown file:', err)
-      })
+        .catch((err) => {
+          if (!cancelled) console.error('Failed to reload markdown file:', err)
+        })
     }
 
     const subscriberKey = `markdown-editor-${tabId}`
@@ -223,7 +230,16 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
       cancelled = true
       fileWatcherEvents.unsubscribe(projectId, subscriberKey)
     }
-  }, [projectId, tabId, filePath, normalizedPath, api, reconcileActivePane, setEditorDirty, setEditorTabDeletedExternally])
+  }, [
+    projectId,
+    tabId,
+    filePath,
+    normalizedPath,
+    api,
+    reconcileActivePane,
+    setEditorDirty,
+    setEditorTabDeletedExternally,
+  ])
 
   const saveFile = useCallback(async () => {
     // Read from the currently-active pane so the very latest keystroke is
@@ -270,32 +286,44 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isActive, saveFile])
 
-  const handleRawMount: OnMount = useCallback((monacoEditor) => {
-    monacoRef.current = monacoEditor
-    // Flush any sync that was requested before Monaco finished mounting.
-    reconcileActivePane()
-  }, [reconcileActivePane])
+  const handleRawMount: OnMount = useCallback(
+    (monacoEditor) => {
+      monacoRef.current = monacoEditor
+      // Flush any sync that was requested before Monaco finished mounting.
+      reconcileActivePane()
+    },
+    [reconcileActivePane]
+  )
 
-  const handleRawChange = useCallback((value: string | undefined) => {
-    if (syncingMonacoRef.current || value === undefined) return
-    currentContentRef.current = value
-    rawSyncedRef.current = value
-    updateDirty(value)
-  }, [updateDirty])
+  const handleRawChange = useCallback(
+    (value: string | undefined) => {
+      if (syncingMonacoRef.current || value === undefined) return
+      currentContentRef.current = value
+      rawSyncedRef.current = value
+      updateDirty(value)
+    },
+    [updateDirty]
+  )
 
-  const handlePreviewUpdated = useCallback((markdown: string) => {
-    // Ignore only the debounced bounce from a programmatic replace: it arrives
-    // within the suppress window AND its value matches what we just pushed. A
-    // genuine edit differs in value, so it is never suppressed — even one made
-    // inside the window — and a late bounce past the window falls through to a
-    // harmless no-op dirty check.
-    if (Date.now() < suppressPreviewUntilRef.current && markdown === lastPushedToPreviewRef.current) {
-      return
-    }
-    currentContentRef.current = markdown
-    previewSyncedRef.current = markdown
-    updateDirty(markdown)
-  }, [updateDirty])
+  const handlePreviewUpdated = useCallback(
+    (markdown: string) => {
+      // Ignore only the debounced bounce from a programmatic replace: it arrives
+      // within the suppress window AND its value matches what we just pushed. A
+      // genuine edit differs in value, so it is never suppressed — even one made
+      // inside the window — and a late bounce past the window falls through to a
+      // harmless no-op dirty check.
+      if (
+        Date.now() < suppressPreviewUntilRef.current &&
+        markdown === lastPushedToPreviewRef.current
+      ) {
+        return
+      }
+      currentContentRef.current = markdown
+      previewSyncedRef.current = markdown
+      updateDirty(markdown)
+    },
+    [updateDirty]
+  )
 
   if (error) {
     return (
@@ -320,7 +348,14 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
   }
 
   return (
-    <div style={{ display: isActive ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%' }}>
+    <div
+      style={{
+        display: isActive ? 'flex' : 'none',
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+      }}
+    >
       {isDeletedExternally && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -331,7 +366,13 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
         {/* Raw pane (Monaco) — both panes stay mounted; visibility toggles which
             one shows so each keeps its own scroll position (not display:none,
             which would zero layout and reset scroll geometry on reveal). */}
-        <div style={{ position: 'absolute', inset: 0, visibility: mode === 'raw' ? 'visible' : 'hidden' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: mode === 'raw' ? 'visible' : 'hidden',
+          }}
+        >
           <Editor
             defaultValue={content}
             language="markdown"
@@ -349,7 +390,13 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
           />
         </div>
         {/* Preview pane (Milkdown) */}
-        <div style={{ position: 'absolute', inset: 0, visibility: mode === 'preview' ? 'visible' : 'hidden' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: mode === 'preview' ? 'visible' : 'hidden',
+          }}
+        >
           <MarkdownPreviewPane
             ref={previewRef}
             defaultValue={content}

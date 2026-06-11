@@ -1,9 +1,10 @@
-import { BrowserWindow } from 'electron'
+import { type BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { accessSync, statSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import * as path from 'node:path'
 import * as pty from 'node-pty'
-import { ClaudeHookWatcher } from './ClaudeHookWatcher'
+import { type ClaudeHookWatcher } from './ClaudeHookWatcher'
 import { SpawnError } from './errors'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
 
@@ -73,7 +74,11 @@ export class TerminalManager {
   private readonly BRACKETED_PASTE_START = '\x1b[200~'
   private readonly BRACKETED_PASTE_END = '\x1b[201~'
 
-  constructor(window: BrowserWindow, hookWatcher?: ClaudeHookWatcher, options?: { commandServer?: CommandServerAccessor; cliDir?: string }) {
+  constructor(
+    window: BrowserWindow,
+    hookWatcher?: ClaudeHookWatcher,
+    options?: { commandServer?: CommandServerAccessor; cliDir?: string }
+  ) {
     this.window = window
     this.hookWatcher = hookWatcher || null
     this.commandServer = options?.commandServer || null
@@ -93,13 +98,7 @@ export class TerminalManager {
   }
 
   createTerminal(options: CreateTerminalOptions): string {
-    const {
-      cwd,
-      type = 'claude',
-      initialTitle,
-      projectId,
-      worktreeId,
-    } = options
+    const { cwd, type = 'claude', initialTitle, projectId, worktreeId } = options
     let { resumeSessionId } = options
 
     // Validate session ID to prevent command injection
@@ -155,9 +154,8 @@ export class TerminalManager {
       }
     } catch (err) {
       if (err instanceof SpawnError) throw err
-      const code = err instanceof Error && 'code' in err
-        ? (err as NodeJS.ErrnoException).code
-        : undefined
+      const code =
+        err instanceof Error && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined
       if (code === 'ENOENT') {
         throw new SpawnError('CWD_MISSING', cwd, { cause: err })
       }
@@ -225,8 +223,7 @@ export class TerminalManager {
       // node-pty's WindowsPtyAgent surfaces "Cannot create process, error 267"
       // from a worker thread for some races between statSync and CreateProcessW
       // — that escapes the pre-flight try/catch and lands here as a bare exit.
-      const orphanedSpawnFailure =
-        !terminal.dataReceived && !terminal.killedDeliberately
+      const orphanedSpawnFailure = !terminal.dataReceived && !terminal.killedDeliberately
 
       // Unregister from hook watcher (only for Claude terminals)
       if (terminal.type === 'claude' && this.hookWatcher) {
@@ -244,8 +241,7 @@ export class TerminalManager {
           worktreeId: terminal.worktreeId,
           code: 'SPAWN_FAILED',
           cwd: terminal.cwd,
-          message:
-            'PTY worker exited before any output (likely cwd or shell issue)',
+          message: 'PTY worker exited before any output (likely cwd or shell issue)',
         })
       } else {
         this.sendToRenderer('terminal:state', id, 'stopped')
@@ -350,7 +346,8 @@ export class TerminalManager {
     // Literal close markers inside user content must be treated as content, not block ends.
     return data.replace(
       /\x1b\[200~([\s\S]*)\x1b\[201~/,
-      (_match, body: string) => `${this.BRACKETED_PASTE_START}${body.replace(/\r/g, '')}${this.BRACKETED_PASTE_END}`,
+      (_match, body: string) =>
+        `${this.BRACKETED_PASTE_START}${body.replace(/\r/g, '')}${this.BRACKETED_PASTE_END}`
     )
   }
 
@@ -463,12 +460,8 @@ export class TerminalManager {
     }
 
     // Skip common non-task inputs
-    const skipPatterns = [
-      /^(hi|hello|hey|yo|sup)$/i,
-      /^(yes|no|y|n|ok|okay)$/i,
-      /^(exit|quit|q)$/i,
-    ]
-    if (skipPatterns.some(pattern => pattern.test(trimmed))) {
+    const skipPatterns = [/^(hi|hello|hey|yo|sup)$/i, /^(yes|no|y|n|ok|okay)$/i, /^(exit|quit|q)$/i]
+    if (skipPatterns.some((pattern) => pattern.test(trimmed))) {
       return null
     }
 
@@ -526,7 +519,7 @@ export class TerminalManager {
         if (process.platform === 'win32') {
           try {
             const pid = terminal.pty.pid
-            require('node:child_process').execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' })
+            execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' })
           } catch {
             // Process may already be dead
           }
@@ -561,7 +554,16 @@ export class TerminalManager {
   /**
    * Get terminal info for persistence (only Claude terminals)
    */
-  getTerminalInfo(terminalId: string): { projectId: string; worktreeId?: string; cwd: string; title?: string; type: TerminalType; state: TerminalState } | null {
+  getTerminalInfo(
+    terminalId: string
+  ): {
+    projectId: string
+    worktreeId?: string
+    cwd: string
+    title?: string
+    type: TerminalType
+    state: TerminalState
+  } | null {
     const terminal = this.terminals.get(terminalId)
     if (!terminal) return null
     return {
@@ -577,8 +579,15 @@ export class TerminalManager {
   /**
    * Get all terminals as a flat array (for query routes).
    */
-  getAllTerminals(): Array<{ id: string; projectId: string; worktreeId?: string; title?: string; state: TerminalState; type: TerminalType }> {
-    return Array.from(this.terminals.values()).map(t => ({
+  getAllTerminals(): Array<{
+    id: string
+    projectId: string
+    worktreeId?: string
+    title?: string
+    state: TerminalState
+    type: TerminalType
+  }> {
+    return Array.from(this.terminals.values()).map((t) => ({
       id: t.id,
       projectId: t.projectId,
       worktreeId: t.worktreeId,
@@ -604,15 +613,19 @@ export class TerminalManager {
    */
   getClaudeTerminalIds(): string[] {
     return Array.from(this.terminals.values())
-      .filter(t => t.type === 'claude')
-      .map(t => t.id)
+      .filter((t) => t.type === 'claude')
+      .map((t) => t.id)
   }
 
   /**
    * Update a terminal's worktree assignment (chat-to-worktree upgrade).
    * Enforces 1:1 constraint: no two terminals may share the same worktreeId.
    */
-  updateTerminalWorktree(terminalId: string, worktreeId: string, newCwd: string): { success: boolean; error?: string } {
+  updateTerminalWorktree(
+    terminalId: string,
+    worktreeId: string,
+    newCwd: string
+  ): { success: boolean; error?: string } {
     const terminal = this.terminals.get(terminalId)
     if (!terminal) {
       return { success: false, error: 'Terminal not found' }
@@ -621,7 +634,10 @@ export class TerminalManager {
     // Enforce 1:1 worktree-terminal constraint
     for (const [id, instance] of this.terminals) {
       if (id !== terminalId && instance.worktreeId === worktreeId) {
-        return { success: false, error: `Worktree ${worktreeId} is already assigned to terminal ${id}` }
+        return {
+          success: false,
+          error: `Worktree ${worktreeId} is already assigned to terminal ${id}`,
+        }
       }
     }
 
@@ -710,7 +726,11 @@ export class TerminalManager {
   /**
    * Get all terminals matching a given project and optional worktree, filtered by type.
    */
-  getTerminalsByContext(projectId: string, worktreeId: string | undefined, type: TerminalType): Array<{ id: string; title: string | undefined; lastActivity: number }> {
+  getTerminalsByContext(
+    projectId: string,
+    worktreeId: string | undefined,
+    type: TerminalType
+  ): Array<{ id: string; title: string | undefined; lastActivity: number }> {
     const results: Array<{ id: string; title: string | undefined; lastActivity: number }> = []
     for (const terminal of this.terminals.values()) {
       if (terminal.projectId !== projectId) continue

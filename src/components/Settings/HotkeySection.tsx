@@ -14,14 +14,17 @@ export function HotkeySection() {
   // Filter and group hotkeys
   const groupedHotkeys = useMemo(() => {
     const byCategory = getHotkeysByCategory(hotkeyConfig)
-    const filtered = new Map<string, Array<{ action: HotkeyAction; binding: typeof hotkeyConfig[HotkeyAction] }>>()
+    const filtered = new Map<
+      string,
+      Array<{ action: HotkeyAction; binding: (typeof hotkeyConfig)[HotkeyAction] }>
+    >()
 
     const query = searchQuery.toLowerCase().trim()
 
     for (const category of HOTKEY_CATEGORY_ORDER) {
       const items = byCategory.get(category) ?? []
-      const filteredItems = items.filter(({ binding }) =>
-        query === '' || binding.description.toLowerCase().includes(query)
+      const filteredItems = items.filter(
+        ({ binding }) => query === '' || binding.description.toLowerCase().includes(query)
       )
       if (filteredItems.length > 0) {
         filtered.set(category, filteredItems)
@@ -73,11 +76,7 @@ export function HotkeySection() {
             </h3>
             <div className="space-y-1">
               {items.map(({ action, binding }) => (
-                <HotkeyRow
-                  key={action}
-                  action={action}
-                  binding={binding}
-                />
+                <HotkeyRow key={action} action={action} binding={binding} />
               ))}
             </div>
           </div>

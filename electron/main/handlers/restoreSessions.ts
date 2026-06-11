@@ -18,11 +18,21 @@ export interface RestoreSessionsDeps {
   getWindow: () => BrowserWindow | null
   verifyClaudeSession: (cwd: string, sessionId: string) => Promise<boolean>
   pathExists: (p: string) => Promise<boolean>
-  resolveEnvOverrides: (project: { settings?: { authMode?: string; profileId?: string } } | undefined) => Record<string, string> | undefined
+  resolveEnvOverrides: (
+    project: { settings?: { authMode?: string; profileId?: string } } | undefined
+  ) => Record<string, string> | undefined
 }
 
 export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> {
-  const { projectPersistence, terminalManager, hookWatcher, getWindow, verifyClaudeSession, pathExists, resolveEnvOverrides } = deps
+  const {
+    projectPersistence,
+    terminalManager,
+    hookWatcher,
+    getWindow,
+    verifyClaudeSession,
+    pathExists,
+    resolveEnvOverrides,
+  } = deps
   const win = getWindow()
   if (!projectPersistence || !terminalManager || !win) {
     console.log('[Session] Cannot restore: services not initialized')
@@ -38,24 +48,36 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
   console.log(`[Session] Attempting to restore ${sessions.length} sessions`)
 
   const projects = projectPersistence.getProjects()
-  const projectMap = new Map(projects.map(p => [p.id, p]))
+  const projectMap = new Map(projects.map((p) => [p.id, p]))
 
   // Pre-validate all sessions in parallel for better performance
   const validationResults = await Promise.all(
     sessions.map(async (session) => {
       const project = projectMap.get(session.projectId)
       if (!project) {
-        return { session, valid: false as const, reason: `project ${session.projectId} no longer exists` }
+        return {
+          session,
+          valid: false as const,
+          reason: `project ${session.projectId} no longer exists`,
+        }
       }
 
       if (session.worktreeId) {
         const worktree = projectPersistence.getWorktreeById(session.worktreeId)
         if (!worktree) {
-          return { session, valid: false as const, reason: `worktree ${session.worktreeId} no longer exists` }
+          return {
+            session,
+            valid: false as const,
+            reason: `worktree ${session.worktreeId} no longer exists`,
+          }
         }
         const worktreeExists = await pathExists(worktree.path)
         if (!worktreeExists) {
-          return { session, valid: false as const, reason: `worktree path ${worktree.path} no longer exists` }
+          return {
+            session,
+            valid: false as const,
+            reason: `worktree path ${worktree.path} no longer exists`,
+          }
         }
       }
 
@@ -80,7 +102,9 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
 
     try {
       if (!sessionFileExists) {
-        console.log(`[Session] Session file not found for ${session.claudeSessionId}, starting fresh`)
+        console.log(
+          `[Session] Session file not found for ${session.claudeSessionId}, starting fresh`
+        )
       }
 
       const envOverrides = resolveEnvOverrides(project)
@@ -100,7 +124,9 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
         hookWatcher.preAssociateSession(session.claudeSessionId, terminalId)
       }
 
-      console.log(`[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`)
+      console.log(
+        `[Session] Restored terminal ${terminalId} for session ${session.claudeSessionId}`
+      )
 
       win.webContents.send('session:restored', {
         terminalId,

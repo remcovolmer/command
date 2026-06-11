@@ -7,7 +7,7 @@ interface TerminalProps {
 }
 
 export function Terminal({ id, isActive }: TerminalProps) {
-  const terminalProjectId = useProjectStore(s => s.terminals[id]?.projectId ?? '')
+  const terminalProjectId = useProjectStore((s) => s.terminals[id]?.projectId ?? '')
 
   const containerRef = useXtermInstance({
     id,

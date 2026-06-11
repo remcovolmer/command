@@ -49,17 +49,20 @@ export function TaskSection({
     setAdding(false)
   }, [newText, onAddTask])
 
-  const handleAddKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddSave()
-    } else if (e.key === 'Escape') {
-      setNewText('')
-      setAdding(false)
-    }
-  }, [handleAddSave])
+  const handleAddKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleAddSave()
+      } else if (e.key === 'Escape') {
+        setNewText('')
+        setAdding(false)
+      }
+    },
+    [handleAddSave]
+  )
 
-  const openCount = section.tasks.filter(t => !t.completed).length
+  const openCount = section.tasks.filter((t) => !t.completed).length
   const isDone = section.name === 'Done'
 
   return (
@@ -128,9 +131,7 @@ export function TaskSection({
           )}
 
           {section.tasks.length === 0 && !adding && (
-            <div className="px-6 py-1 text-[10px] text-muted-foreground/50 italic">
-              empty
-            </div>
+            <div className="px-6 py-1 text-[10px] text-muted-foreground/50 italic">empty</div>
           )}
 
           {section.tasks.map((task) => (
