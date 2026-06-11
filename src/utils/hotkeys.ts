@@ -334,6 +334,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'ui',
     enabled: true,
   },
+  'ui.toggleUsageIndicator': {
+    key: 'u',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle usage indicator',
+    category: 'ui',
+    enabled: true,
+  },
 
   // Dialogs
   'dialog.close': {
@@ -549,4 +556,15 @@ export function getHotkeysByCategory(config: HotkeyConfig): Map<string, Array<{ 
   }
 
   return grouped;
+}
+
+/**
+ * Merge a persisted hotkey config with the defaults so actions shipped after
+ * the user's config was first persisted become available. The persisted
+ * config wholesale replaces DEFAULT_HOTKEY_CONFIG during Zustand rehydration,
+ * so without this backfill a new action's hotkey is dead on existing installs
+ * and invisible in the settings UI.
+ */
+export function backfillHotkeyConfig(persisted: Partial<HotkeyConfig>): HotkeyConfig {
+  return { ...DEFAULT_HOTKEY_CONFIG, ...persisted };
 }

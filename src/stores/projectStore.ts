@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, UsageData, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, CenterTab, TasksData, AccountProfile } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
-import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
+import { DEFAULT_HOTKEY_CONFIG, backfillHotkeyConfig } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
 import { terminalPool } from '../utils/terminalPool'
 
@@ -1700,6 +1700,14 @@ export const useProjectStore = create<ProjectStore>()(
           api.app.storeHydrated()
         } catch {
           // Ignore if electronAPI not available (e.g., in tests)
+        }
+        // Backfill hotkey actions shipped after this install's config was
+        // first persisted — the persisted config replaces the defaults on
+        // merge, which would leave newer actions unbound and invisible.
+        const hydratedHotkeys = useProjectStore.getState().hotkeyConfig
+        const backfilled = backfillHotkeyConfig(hydratedHotkeys)
+        if (Object.keys(backfilled).length !== Object.keys(hydratedHotkeys).length) {
+          useProjectStore.setState({ hotkeyConfig: backfilled })
         }
         // Sync persisted terminal pool size to the pool singleton
         terminalPool.setMaxSize(useProjectStore.getState().terminalPoolSize)
