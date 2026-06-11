@@ -7,6 +7,9 @@ import * as pty from 'node-pty'
 import { type ClaudeHookWatcher } from './ClaudeHookWatcher'
 import { SpawnError } from './errors'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
+import { createLogger } from './Logger'
+
+const log = createLogger('TerminalManager')
 
 const SHELL_READY_DELAY_MS = 100
 
@@ -103,7 +106,7 @@ export class TerminalManager {
 
     // Validate session ID to prevent command injection
     if (resumeSessionId && !SESSION_ID_REGEX.test(resumeSessionId)) {
-      console.error(`[TerminalManager] Invalid session ID format: ${resumeSessionId}`)
+      log.error(`Invalid session ID format: ${resumeSessionId}`)
       resumeSessionId = undefined // Fall back to fresh session
     }
 
@@ -554,9 +557,7 @@ export class TerminalManager {
   /**
    * Get terminal info for persistence (only Claude terminals)
    */
-  getTerminalInfo(
-    terminalId: string
-  ): {
+  getTerminalInfo(terminalId: string): {
     projectId: string
     worktreeId?: string
     cwd: string
@@ -766,7 +767,7 @@ export class TerminalManager {
   private getShell(): string {
     // Allow override via environment variable
     if (process.env.COMMAND_CENTER_SHELL) {
-      console.log('Using shell from COMMAND_CENTER_SHELL:', process.env.COMMAND_CENTER_SHELL)
+      log.info('Using shell from COMMAND_CENTER_SHELL:', process.env.COMMAND_CENTER_SHELL)
       return process.env.COMMAND_CENTER_SHELL
     }
 
@@ -782,14 +783,14 @@ export class TerminalManager {
       for (const gitBash of gitBashPaths) {
         try {
           accessSync(gitBash)
-          console.log('Using Git Bash:', gitBash)
+          log.info('Using Git Bash:', gitBash)
           return gitBash
         } catch {
           // Try next path
         }
       }
 
-      console.log('Git Bash not found, using PowerShell')
+      log.info('Git Bash not found, using PowerShell')
       return 'powershell.exe'
     }
 

@@ -1,6 +1,9 @@
 import { app, safeStorage } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createLogger } from './Logger'
+
+const log = createLogger('SecureEnvStore')
 
 interface EncryptedStore {
   [profileId: string]: { [key: string]: string } // key -> base64-encrypted value
@@ -44,7 +47,7 @@ export class SecureEnvStore {
       fs.writeFileSync(tempPath, JSON.stringify(this.store, null, 2), 'utf-8')
       fs.renameSync(tempPath, this.filePath)
     } catch (error) {
-      console.error('[SecureEnvStore] Failed to save:', error)
+      log.error('Failed to save:', error)
     }
   }
 
@@ -55,8 +58,8 @@ export class SecureEnvStore {
     const encrypted: Record<string, string> = {}
     const useEncryption = safeStorage.isEncryptionAvailable()
     if (!useEncryption && !this.hasWarnedFallback) {
-      console.warn(
-        '[SecureEnvStore] WARNING: safeStorage encryption not available. Values stored as base64 encoding only (not encrypted).'
+      log.warn(
+        'WARNING: safeStorage encryption not available. Values stored as base64 encoding only (not encrypted).'
       )
       this.hasWarnedFallback = true
     }
@@ -88,7 +91,7 @@ export class SecureEnvStore {
           decrypted[key] = Buffer.from(encValue, 'base64').toString()
         }
       } catch (error) {
-        console.error(`[SecureEnvStore] Failed to decrypt ${key}:`, error)
+        log.error(`Failed to decrypt ${key}:`, error)
       }
     }
     return decrypted

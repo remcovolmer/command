@@ -4,8 +4,9 @@ import { createInterface } from 'readline'
 import { join } from 'path'
 import { homedir } from 'os'
 import { type BrowserWindow } from 'electron'
+import { createLogger } from './Logger'
 
-const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL
+const log = createLogger('SessionIndex')
 
 /**
  * Session metadata extracted from JSONL transcript files.
@@ -365,7 +366,7 @@ export class SessionIndexService {
         this.evictProjectFromCache(projectPath)
         return
       }
-      if (isDev) console.error('[SessionIndex] Failed to read projects root:', err)
+      log.warn('Failed to read projects root:', err)
       return
     }
 
@@ -408,7 +409,7 @@ export class SessionIndexService {
         // purge cached entries that may still be valid.
         if (isErrnoException(err) && err.code !== 'ENOENT') {
           allDirsRead = false
-          if (isDev) console.error(`[SessionIndex] Failed to read dir ${dirName}:`, err)
+          log.warn(`Failed to read dir ${dirName}:`, err)
         }
         // Continue with other dirs even if one fails
       }
@@ -452,13 +453,11 @@ export class SessionIndexService {
     this.summaryCache = await this.readSummaryCache()
     this.mergeSummaryCacheIntoEntries()
 
-    if (isDev) {
-      const worktreeCount = projectDirs.filter((d) => d.worktreeName).length
-      console.log(
-        `[SessionIndex] ${this.cache.size} sessions across ${projectDirs.length} dir(s)` +
-          ` (${worktreeCount} worktree, parsed ${filesToParse.length} new/updated) for ${projectPath}`
-      )
-    }
+    const worktreeCount = projectDirs.filter((d) => d.worktreeName).length
+    log.debug(
+      `${this.cache.size} sessions across ${projectDirs.length} dir(s)` +
+        ` (${worktreeCount} worktree, parsed ${filesToParse.length} new/updated) for ${projectPath}`
+    )
   }
 
   /**

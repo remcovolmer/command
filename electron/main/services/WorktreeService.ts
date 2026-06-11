@@ -2,6 +2,9 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs'
 import * as path from 'node:path'
+import { createLogger } from './Logger'
+
+const log = createLogger('WorktreeService')
 
 const execFileAsync = promisify(execFile)
 
@@ -193,13 +196,19 @@ export class WorktreeService {
   private async fetchAndFastForward(projectPath: string): Promise<void> {
     try {
       await this.execGit(projectPath, ['fetch', 'origin'])
-    } catch {
+    } catch (err) {
+      // Offline or no remote: worktrees are still created from local refs
+      log.debug(`git fetch failed for ${projectPath}; creating worktree from local refs:`, err)
       return
     }
 
     try {
       await this.execGit(projectPath, ['pull', '--ff-only'])
-    } catch {}
+    } catch (err) {
+      // Expected when the branch has no upstream or has diverged; the
+      // fetched refs are still used, only the local branch isn't advanced.
+      log.debug(`git pull --ff-only failed for ${projectPath}; continuing with fetched refs:`, err)
+    }
   }
 
   /**

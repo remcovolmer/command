@@ -20,6 +20,17 @@ vi.mock('node:child_process', () => ({
   },
 }))
 
+// Capture the service's scoped logger for warn assertions
+const loggerSpies = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}))
+vi.mock('../electron/main/services/Logger', () => ({
+  createLogger: () => loggerSpies,
+}))
+
 // Import after mock so promisify wraps the stub.
 import { GitHubService, TransientGhError } from '../electron/main/services/GitHubService'
 
@@ -118,5 +129,38 @@ describe('GitHubService.getPRStatus', () => {
     })
 
     await expect(service.getPRStatus('/project')).rejects.toBeInstanceOf(TransientGhError)
+  })
+})
+
+describe('GitHubService PR event listeners', () => {
+  test('a throwing listener logs a warning and does not stop other listeners', () => {
+    vi.clearAllMocks()
+    const service = new GitHubService()
+    const prContext = {
+      number: 42,
+      title: 'feat: thing',
+      branch: 'feature/thing',
+      url: 'https://example.test/pr/42',
+      mergeable: 'MERGEABLE',
+      state: 'OPEN',
+    }
+
+    const throwing = vi.fn(() => {
+      throw new Error('listener boom')
+    })
+    const healthy = vi.fn()
+    service.onPREvent(throwing)
+    service.onPREvent(healthy)
+
+    // Drive the private emitter directly (poll plumbing is not under test here)
+    ;(
+      service as unknown as {
+        emitPREvent(projectPath: string, event: string, ctx: typeof prContext): void
+      }
+    ).emitPREvent('/project', 'pr-merged', prContext)
+
+    expect(throwing).toHaveBeenCalled()
+    expect(healthy).toHaveBeenCalledWith('/project', 'pr-merged', prContext)
+    expect(loggerSpies.warn).toHaveBeenCalledWith('PR event listener threw:', expect.any(Error))
   })
 })

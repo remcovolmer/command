@@ -1,6 +1,9 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { type BrowserWindow } from 'electron'
+import { createLogger } from './Logger'
+
+const log = createLogger('GitHubService')
 
 const execFileAsync = promisify(execFile)
 
@@ -376,8 +379,10 @@ export class GitHubService {
     for (const cb of this.prEventCallbacks) {
       try {
         cb(projectPath, event, prContext)
-      } catch {
-        /* listener error */
+      } catch (err) {
+        // PR events surface once per poll-detected transition, so an
+        // unconditional warn cannot spam the log.
+        log.warn('PR event listener threw:', err)
       }
     }
   }
