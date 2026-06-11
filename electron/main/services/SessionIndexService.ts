@@ -4,36 +4,11 @@ import { createInterface } from 'readline'
 import { join } from 'path'
 import { homedir } from 'os'
 import { type BrowserWindow } from 'electron'
+import type { SessionIndexEntry } from '../../../shared/ipc-types'
+
+export type { SessionIndexEntry }
 
 const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL
-
-/**
- * Session metadata extracted from JSONL transcript files.
- * Canonical declaration; mirrored in `src/types/index.ts` for renderer use
- * because Electron process isolation prevents a shared import. When you add
- * or rename a field here, update the other declaration in the same commit.
- */
-export interface SessionIndexEntry {
-  sessionId: string
-  summary: string
-  firstPrompt: string
-  messageCount: number
-  gitBranch: string
-  modified: string
-  created: string
-  projectPath: string
-  isSidechain: boolean
-  filesModified: string[]
-  filesRead: string[]
-  toolCounts: Record<string, number>
-  errorCount: number
-  durationMs: number
-  assistantMessageCount: number
-  generatedTitle?: string
-  generatedSummary?: string
-  /** Name of the worktree this session was started in (undefined for root-cwd sessions) */
-  worktreeName?: string
-}
 
 /** Subset pushed to renderer for a terminal's summary */
 export interface SessionSummaryData {
