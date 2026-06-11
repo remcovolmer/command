@@ -30,20 +30,20 @@ export const TerminalListItem = memo(function TerminalListItem({
       : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
   `
   const isClaude = terminal.type === 'claude'
+  const showSummary = isClaude && isActive && Boolean(terminal.summary)
 
   return (
     <li
       onClick={onSelect}
       className={className ?? defaultClassName}
+      title={isClaude && !isActive && terminal.summary ? terminal.summary : undefined}
     >
-      <TerminalIcon
-        className={`w-3 h-3 flex-shrink-0 text-muted-foreground ${isClaude ? 'mt-0.5' : ''}`}
-      />
+      <TerminalIcon className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
       <div className="flex-1 min-w-0">
         <span className="text-xs truncate block">{terminal.generatedTitle || terminal.title}</span>
-        {isClaude && (
-          <span className="text-[10px] text-text-secondary truncate block leading-tight opacity-70">
-            {terminal.summary || '\u00A0'}
+        {showSummary && (
+          <span className="text-[10px] text-muted-foreground truncate block leading-tight opacity-70">
+            {terminal.summary}
           </span>
         )}
       </div>
