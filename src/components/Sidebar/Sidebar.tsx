@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, Monitor, RefreshCw, Check, AlertCircle, Settings, Star, X } from 'lucide-react'
+import { Plus, FolderOpen, PanelRightOpen, PanelRightClose, Sun, Moon, Monitor, RefreshCw, Check, AlertCircle, Settings } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
 import type { TerminalSession, Worktree, Project } from '../../types'
@@ -10,7 +10,6 @@ import { SortableProjectList } from './SortableProjectList'
 import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
 import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
-import { TerminalListItem } from './TerminalListItem'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
 import { LogoIcon } from '../LogoIcon'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
@@ -335,10 +334,6 @@ export function Sidebar() {
     return Object.values(worktrees).filter((w) => w.projectId === projectId)
   }, [worktrees])
 
-  // Split projects into workspaces (pinned at top) and regular projects
-  const workspaceProjects = useMemo(() => projects.filter(p => p.type === 'workspace'), [projects])
-  const regularProjects = useMemo(() => projects.filter(p => p.type !== 'workspace'), [projects])
-
   return (
     <>
     <div className="flex flex-col h-full bg-sidebar" data-sidebar>
@@ -355,91 +350,6 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Workspaces Section - Always visible at top
-          NOTE: Workspaces use simplified rendering (not SortableProjectList) intentionally:
-          - They are pinned at top and should not be reorderable via drag-and-drop
-          - They have a distinct visual treatment (star icon, border) to emphasize importance
-          - Future: Will gain dashboard functionality that differs from regular projects
-      */}
-      {workspaceProjects.length > 0 && (
-        <div className="px-3 mb-2">
-          <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
-            Workspaces
-          </h2>
-          <ul className="space-y-1">
-            {workspaceProjects.map((workspace) => {
-              const workspaceTerminals = getProjectTerminals(workspace.id)
-              const isActive = activeProjectId === workspace.id
-              return (
-                <li key={workspace.id} data-project-id={workspace.id}>
-                  <div
-                    onClick={() => setActiveProject(workspace.id)}
-                    className={`
-                      group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
-                      transition-colors duration-150
-                      ${isActive
-                        ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
-                    `}
-                  >
-                    <Star
-                      className={`w-4 h-4 flex-shrink-0 ${
-                        isActive ? 'text-primary fill-primary' : 'text-muted-foreground'
-                      }`}
-                    />
-                    <span className="flex-1 text-sm font-medium truncate" title={workspace.path}>
-                      {workspace.name}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleCreateTerminal(workspace.id)
-                      }}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                      title="New Terminal"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleRemoveProject(e, workspace.id)}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity"
-                      title="Remove Workspace"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  {/* Show terminals for workspaces (always visible) */}
-                  {workspaceTerminals.length > 0 && (
-                    <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30 pl-3">
-                      {workspaceTerminals.map((terminal) => (
-                        <TerminalListItem
-                          key={terminal.id}
-                          terminal={terminal}
-                          isActive={activeTerminalId === terminal.id}
-                          onSelect={() => setActiveTerminal(terminal.id)}
-                          onClose={(e) => handleCloseTerminal(e, terminal.id)}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                  {isActive && workspaceTerminals.length === 0 && (
-                    <div className="ml-6 pl-3 py-2 border-l border-border/30">
-                      <button
-                        onClick={() => handleCreateTerminal(workspace.id)}
-                        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <Plus className="w-3 h-3" />
-                        New Chat
-                      </button>
-                    </div>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
-
       {/* Projects Section */}
       <div className="px-3 py-2">
         <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
@@ -449,7 +359,7 @@ export function Sidebar() {
 
       {/* Project List */}
       <div ref={projectScrollRef} className="flex-1 overflow-y-auto sidebar-scroll px-3">
-        {regularProjects.length === 0 ? (
+        {projects.length === 0 ? (
           <div className="px-3 py-8 text-center">
             <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
             <p className="text-sm text-muted-foreground mb-2">No projects yet</p>
@@ -462,7 +372,7 @@ export function Sidebar() {
           </div>
         ) : (
           <SortableProjectList
-            projects={regularProjects}
+            projects={projects}
             getProjectTerminals={getProjectTerminals}
             getProjectDirectTerminals={getProjectDirectTerminals}
             getProjectWorktrees={getProjectWorktrees}

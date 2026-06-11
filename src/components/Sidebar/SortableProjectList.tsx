@@ -74,11 +74,18 @@ export function SortableProjectList({
     })
   )
 
-  // Split projects into active (has terminals) and inactive (no terminals)
+  // Split into pinned (always on top) and the rest. Pinning is orthogonal to
+  // terminal activity, so pinned projects form their own section and are
+  // excluded from the active/inactive split below.
+  const pinnedProjects = useMemo(
+    () => projects.filter((p) => p.pinned),
+    [projects]
+  )
+
   const activeProjects = useMemo(
     () =>
       projects.filter((p) =>
-        Object.values(terminals).some((t) => t.projectId === p.id)
+        !p.pinned && Object.values(terminals).some((t) => t.projectId === p.id)
       ),
     [projects, terminals]
   )
@@ -86,9 +93,14 @@ export function SortableProjectList({
   const inactiveProjects = useMemo(
     () =>
       projects.filter(
-        (p) => !Object.values(terminals).some((t) => t.projectId === p.id)
+        (p) => !p.pinned && !Object.values(terminals).some((t) => t.projectId === p.id)
       ),
     [projects, terminals]
+  )
+
+  const pinnedProjectIds = useMemo(
+    () => pinnedProjects.map((p) => p.id),
+    [pinnedProjects]
   )
 
   const activeProjectIds = useMemo(
@@ -110,8 +122,11 @@ export function SortableProjectList({
     setDraggedId(event.active.id as string)
   }
 
-  const createDragEndHandler =
-    (sourceIds: string[], otherIds: string[], sourceFirst: boolean) =>
+  // Reorder within one section, then rebuild the full id order. The global order
+  // is always pinned → active → inactive; `rebuild` re-inserts the reordered
+  // section in its slot so the other sections keep their relative order.
+  const makeDragEndHandler =
+    (sourceIds: string[], rebuild: (newOrder: string[]) => string[]) =>
     (event: DragEndEvent) => {
       const { active, over } = event
       setDraggedId(null)
@@ -120,23 +135,22 @@ export function SortableProjectList({
         const oldIndex = sourceIds.indexOf(active.id as string)
         const newIndex = sourceIds.indexOf(over.id as string)
         if (oldIndex !== -1 && newIndex !== -1) {
-          const newOrder = arrayMove(sourceIds, oldIndex, newIndex)
-          onReorder(
-            sourceFirst ? [...newOrder, ...otherIds] : [...otherIds, ...newOrder]
-          )
+          onReorder(rebuild(arrayMove(sourceIds, oldIndex, newIndex)))
         }
       }
     }
 
-  const handleDragEndActive = createDragEndHandler(
-    activeProjectIds,
-    inactiveProjectIds,
-    true
+  const handleDragEndPinned = makeDragEndHandler(
+    pinnedProjectIds,
+    (newOrder) => [...newOrder, ...activeProjectIds, ...inactiveProjectIds]
   )
-  const handleDragEndInactive = createDragEndHandler(
-    inactiveProjectIds,
+  const handleDragEndActive = makeDragEndHandler(
     activeProjectIds,
-    false
+    (newOrder) => [...pinnedProjectIds, ...newOrder, ...inactiveProjectIds]
+  )
+  const handleDragEndInactive = makeDragEndHandler(
+    inactiveProjectIds,
+    (newOrder) => [...pinnedProjectIds, ...activeProjectIds, ...newOrder]
   )
 
   const renderProjectItem = (project: Project, isDragging: boolean, isInactive = false) => (
@@ -168,6 +182,49 @@ export function SortableProjectList({
   // not by manual drag-and-drop. Each section has its own sortable context.
   return (
     <LayoutGroup>
+      {/* Pinned Projects Section — always on top, only shown when at least one
+          project is pinned. Renders via the same SortableProjectItem as every
+          other section so pinned projects keep their full type-specific UI. */}
+      {pinnedProjects.length > 0 && (
+        <section className="mb-2">
+          <h3 className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em]">
+            Pinned
+          </h3>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEndPinned}
+          >
+            <SortableContext
+              items={pinnedProjectIds}
+              strategy={verticalListSortingStrategy}
+            >
+              <AnimatePresence mode="popLayout">
+                <ul className="space-y-1">
+                  {pinnedProjects.map((project) =>
+                    renderProjectItem(project, project.id === draggedId)
+                  )}
+                </ul>
+              </AnimatePresence>
+            </SortableContext>
+
+            <DragOverlay>
+              {draggedProject && pinnedProjectIds.includes(draggedProject.id) ? (
+                <ProjectDragPreview
+                  project={draggedProject}
+                  terminalCount={
+                    Object.values(terminals).filter(
+                      (t) => t.projectId === draggedProject.id
+                    ).length
+                  }
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </section>
+      )}
+
       {/* Active Projects Section */}
       {activeProjects.length > 0 && (
         <section className="mb-2">

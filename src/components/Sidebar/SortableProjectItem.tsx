@@ -251,7 +251,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         />
       ))}
 
-      {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
+      {/* Empty state for active project (code projects show when no terminals/worktrees, non-code projects when no terminals) */}
       {showEmptyState && (
         <div className="ml-6 pl-3 py-2 border-l border-border/30">
           <button
