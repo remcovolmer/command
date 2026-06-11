@@ -534,6 +534,7 @@ export interface ElectronAPI {
     syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>
     onUncaughtError: (callback: (event: UncaughtErrorEvent) => void) => Unsubscribe
     openCrashLog: () => Promise<{ success: boolean; path?: string; error?: string }>
+    openLogFile: () => Promise<{ success: boolean; path?: string; error?: string }>
   }
   fs: {
     readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>

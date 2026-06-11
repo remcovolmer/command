@@ -610,6 +610,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     openCrashLog: (): Promise<{ success: boolean; path?: string; error?: string }> =>
       ipcRenderer.invoke('app:open-crash-log'),
+
+    openLogFile: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('app:open-log-file'),
   },
 
   // File system operations
