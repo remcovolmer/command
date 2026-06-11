@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan — Pinnable projects (vervangt workspace-type)</title>
+<style>
+  :root {
+    --ink:#1a1f2e; --muted:#5b6678; --faint:#8b95a7; --line:#e3e7ee; --bg:#f7f8fa; --card:#fff;
+    --accent:#4f46e5; --accent-soft:#eef0fe;
+    --green:#0f9d6e; --green-soft:#e6f6ef; --amber:#c2870b; --amber-soft:#fdf4e1;
+    --red:#d1453b; --red-soft:#fcebe9; --blue:#2563eb; --blue-soft:#e8f0fe;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:var(--bg); line-height:1.55; font-size:15px; }
+  .wrap { max-width:960px; margin:0 auto; padding:48px 28px 96px; }
+  header.doc { border-bottom:3px solid var(--accent); padding-bottom:20px; margin-bottom:8px; }
+  .eyebrow { font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin:0 0 10px; }
+  h1 { font-size:29px; line-height:1.2; margin:0 0 14px; letter-spacing:-.01em; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px 18px; font-size:13px; color:var(--muted); }
+  .meta b { color:var(--ink); font-weight:600; }
+  .meta a { color:var(--accent); text-decoration:none; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; background:var(--blue-soft); color:var(--blue); }
+
+  hr { border:0; border-top:1px solid var(--line); margin:40px 0; }
+  h2 { font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); margin:0 0 4px; }
+  .action-title { font-size:20px; font-weight:650; line-height:1.34; letter-spacing:-.01em; margin:6px 0 16px; }
+  p { margin:0 0 14px; } .lead { font-size:16px; }
+  code { font-family:"SF Mono",ui-monospace,Consolas,monospace; font-size:12.5px; background:#eef0f4; padding:1px 6px; border-radius:5px; color:#2d3550; }
+
+  .scr { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin:18px 0; }
+  .scr > div { border:1px solid var(--line); border-radius:10px; padding:16px; background:var(--card); }
+  .scr h4 { margin:0 0 8px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+  .scr .s h4{color:var(--faint);} .scr .c{border-color:#f0d4d1;background:var(--red-soft);} .scr .c h4{color:var(--red);}
+  .scr .r{border-color:#cdeede;background:var(--green-soft);} .scr .r h4{color:var(--green);} .scr p{margin:0;font-size:13.5px;}
+
+  table { border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); font-weight:700; }
+
+  ol.req { list-style:none; counter-reset:r; padding:0; margin:14px 0; }
+  ol.req > li { counter-increment:r; position:relative; padding:12px 16px 12px 56px; border:1px solid var(--line); border-radius:10px; margin-bottom:9px; background:var(--card); font-size:14px; }
+  ol.req > li::before { content:"R"counter(r); position:absolute; left:12px; top:11px; min-width:32px; height:24px; padding:0 6px; border-radius:7px; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center; }
+
+  .ktd { border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:10px; padding:14px 18px; margin:12px 0; background:var(--card); }
+  .ktd h4 { margin:0 0 6px; font-size:14.5px; } .ktd .why { color:var(--muted); font-size:13.5px; margin:6px 0 0; }
+  .ktd .why b { color:var(--ink); }
+
+  .unit { border:1px solid var(--line); border-radius:12px; padding:0; margin:16px 0; background:var(--card); overflow:hidden; }
+  .unit > .uh { display:flex; align-items:center; gap:12px; padding:14px 20px; background:var(--accent-soft); border-bottom:1px solid var(--line); }
+  .unit .uid { font-family:"SF Mono",ui-monospace,Consolas,monospace; font-weight:700; color:var(--accent); font-size:14px; background:#fff; border:1px solid #d8dbf5; border-radius:6px; padding:2px 8px; }
+  .unit .uh h3 { margin:0; font-size:16px; }
+  .unit .ub { padding:14px 20px 18px; }
+  .unit .row { margin:0 0 10px; font-size:13.7px; }
+  .unit .row > .k { display:inline-block; min-width:104px; font-weight:700; color:var(--faint); font-size:11px; letter-spacing:.05em; text-transform:uppercase; vertical-align:top; }
+  .unit .row > .v { display:inline-block; width:calc(100% - 112px); }
+  .unit ul { margin:4px 0 0; padding-left:18px; } .unit li { margin-bottom:4px; }
+  .unit .files code { display:inline-block; margin:2px 4px 2px 0; }
+  .dep { font-family:"SF Mono",ui-monospace,Consolas,monospace; color:var(--accent); font-size:12.5px; }
+  .ts { background:#f4fbf7; border:1px solid #cdeede; border-radius:8px; padding:10px 14px; margin-top:6px; }
+  .ts ul { padding-left:18px; margin:0; } .ts li { font-size:13px; margin-bottom:5px; }
+  .ts .cov { color:var(--green); font-weight:700; font-size:11px; }
+  .verify { color:var(--green); font-size:13.3px; } .verify::before { content:"✓ "; font-weight:700; }
+  .enote { background:var(--amber-soft); border-left:3px solid var(--amber); padding:6px 12px; border-radius:0 6px 6px 0; font-size:13px; margin-top:6px; }
+
+  /* flow diagram */
+  .flow { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin:16px 0; }
+  .flow .step { flex:1; min-width:120px; border:1px solid var(--line); border-radius:9px; padding:11px 12px; background:var(--card); text-align:center; font-size:12.5px; }
+  .flow .step b { display:block; font-size:12.5px; margin-bottom:2px; }
+  .flow .step .sub { color:var(--muted); font-size:11px; font-family:"SF Mono",ui-monospace,Consolas,monospace; }
+  .flow .arr { display:flex; align-items:center; color:var(--accent); font-weight:700; padding:0 7px; font-size:16px; }
+  .flow.alt .step { background:var(--blue-soft); border-color:#bcd3fb; }
+
+  .box { border:1px solid var(--line); border-radius:10px; padding:16px 18px; background:var(--card); }
+  .cols2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .box.in{border-left:3px solid var(--green);} .box.out{border-left:3px solid var(--faint);} .box h4{margin:0 0 9px; font-size:14px;}
+  .box ul{margin:0; padding-left:18px;} .box li{margin-bottom:6px; font-size:13.5px;}
+  .risk { display:grid; grid-template-columns:1fr; gap:10px; }
+  .risk .r { border:1px solid var(--line); border-left:3px solid var(--amber); border-radius:8px; padding:12px 16px; background:var(--card); font-size:13.7px; }
+  .risk .r b { color:var(--amber); }
+  .callout { border-left:3px solid var(--blue); background:var(--blue-soft); padding:12px 16px; border-radius:0 8px 8px 0; margin:14px 0; font-size:13.7px; }
+  footer.doc { margin-top:44px; padding-top:18px; border-top:1px solid var(--line); font-size:12.5px; color:var(--faint); }
+  @media (max-width:780px){ .scr,.cols2{grid-template-columns:1fr;} .unit .row>.v{width:100%; display:block;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <p class="eyebrow">Implementation Plan · Command</p>
+    <h1>feat: Pinnable projects vervangen het workspace-type</h1>
+    <div class="meta">
+      <span><b>Datum:</b> 2026-06-11</span>
+      <span><b>Type:</b> feat / refactor</span>
+      <span><b>Depth:</b> Standard</span>
+      <span><b>Origin:</b> <a href="../brainstorms/2026-06-10-pinnable-projects-requirements.html">docs/brainstorms/2026-06-10-pinnable-projects-requirements.html</a></span>
+      <span><b>Status:</b> <span class="pill">completed</span></span>
+    </div>
+  </header>
+
+  <!-- ── SUMMARY ── -->
+  <section>
+    <h2>Samenvatting</h2>
+    <p class="action-title">Splits "bovenaan staan" los van "feature-set": <code>pinned</code> wordt een vlag op elk project, het <code>workspace</code>-type verdwijnt.</p>
+    <p class="lead">Zes dependency-geordende units. Eerst additieve plumbing (pin-vlag, IPC, store-actie, migratie), dan de sidebar-render en de pin-affordances, en als laatste het verwijderen van het <code>workspace</code>-type-lid zodra geen enkele referentie er nog naar wijst. De aanpak leunt op drie bestaande patronen — het <code>project:reorder</code>-IPC-kanaal, de versie-voor-versie migratiechain in <code>ProjectPersistence</code>, en de drie-bestand hotkey-registratie — plus twee institutionele learnings die de migratie en de sidebar-refactor sturen.</p>
+  </section>
+
+  <hr>
+
+  <!-- ── PROBLEM FRAME ── -->
+  <section>
+    <h2>Probleemkader</h2>
+    <p class="action-title">Het type doet vandaag twee dingen tegelijk; we knippen die twee assen los.</p>
+    <div class="scr">
+      <div class="s"><h4>Situatie</h4><p><code>ProjectType = 'workspace' | 'project' | 'code'</code>. Het <code>workspace</code>-type wordt apart gerenderd: eigen blok bovenaan, ster, altijd-zichtbare chats (~80 regels in <code>Sidebar.tsx</code>).</p></div>
+      <div class="c"><h4>Complicatie</h4><p>Positie (bovenaan) zit vast aan feature-set. Een <code>code</code>-project bovenaan pinnen kan niet zonder worktrees/git te verliezen. Vier verspreide <code>type === 'workspace'</code>-checks dragen verborgen gedrag.</p></div>
+      <div class="r"><h4>Resolutie</h4><p>Een orthogonale <code>pinned: boolean</code>-vlag. Positie en feature-set worden onafhankelijk; gepinde projecten renderen via het bestaande <code>SortableProjectItem</code>; het type-lid <code>workspace</code> wordt verwijderd.</p></div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── REQUIREMENTS ── -->
+  <section>
+    <h2>Requirements <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint)">(traceability naar origin)</span></h2>
+    <ol class="req">
+      <li><b>Pin is orthogonaal aan type</b> — zowel <code>project</code> als <code>code</code> zijn pinbaar; een gepind <code>code</code>-project behoudt worktrees, git-tab, sidecar en GitHub-menu. <span class="dep">→ U1, U3</span></li>
+      <li><b>Eigen "Pinned"-sectie bovenaan</b>, alleen zichtbaar bij ≥1 pin. <span class="dep">→ U3</span></li>
+      <li><b>Gepinde projecten renderen via het bestaande <code>SortableProjectItem</code></b> — geen apart codepad. <span class="dep">→ U3</span></li>
+      <li><b>Drie (de)pin-paden:</b> hover-ster, context-menu "Pin to top"/"Unpin", en hotkey <code>Ctrl+Shift+P</code> voor het actieve project. <span class="dep">→ U4</span></li>
+      <li><b>Volgorde binnen de Pinned-sectie is drag-herordenbaar</b>, via dezelfde sorteer-infra als de bestaande lijst. <span class="dep">→ U3</span></li>
+      <li><b>Pin-status persisteert</b> over herstart (op disk in <code>projects.json</code>). <span class="dep">→ U1</span></li>
+      <li><b>Eenmalige migratie</b>: bestaand <code>type:'workspace'</code> → <code>type:'project'</code> + <code>pinned:true</code>, zonder verlies van naam/pad/settings. <span class="dep">→ U2</span></li>
+    </ol>
+    <div class="callout"><b>Bevestigde gedragsveranderingen uit de brainstorm (carry-forward):</b> (1) always-expanded terminals vervalt — gepinde projecten gedragen zich als normale projecten; (2) het special-case workspace-renderblok wordt verwijderd, niet behouden. Beide expliciet akkoord <span style="font-family:monospace;font-size:12px">(see origin)</span>.</p></div>
+  </section>
+
+  <hr>
+
+  <!-- ── KTD ── -->
+  <section>
+    <h2>Key Technical Decisions</h2>
+
+    <div class="ktd"><h4>KTD1 · Pin = <code>pinned: boolean</code>, volgorde via bestaande <code>sortOrder</code></h4>
+      <p class="why"><b>Waarom:</b> minimale schemawijziging. Within-section volgorde hergebruikt <code>reorderProjects</code> → <code>project:reorder</code> (sortOrder-gebaseerd), exact zoals de active/inactive-secties. Geen apart <code>pinnedAt</code>-veld nodig. <span style="font-family:monospace;font-size:12px">(open question uit origin — hierbij beslist)</span></p></div>
+
+    <div class="ktd"><h4>KTD2 · Dedicated <code>project:setPinned</code> IPC-kanaal (niet <code>project:update</code>)</h4>
+      <p class="why"><b>Waarom:</b> <code>project:update</code> + <code>ProjectPersistence.updateProject</code> whitelisten alleen <code>name</code>/<code>settings</code> en negeren stilletjes onbekende velden — een pin-toggle zou no-oppen. Een eigen kanaal spiegelt het bestaande <code>project:reorder</code>-patroon: main-handler + preload + <code>ProjectPersistence.setProjectPinned</code> + store-actie.</p></div>
+
+    <div class="ktd"><h4>KTD3 · Twee-oppervlak idempotente migratie; <code>ProjectPersistence</code> is source of truth</h4>
+      <p class="why"><b>Waarom:</b> de schijf (<code>projects.json</code>, <code>STATE_VERSION</code> 6→7) is de waarheid; <code>onRehydrateStorage</code> in de store is een defensieve fallback voor een persisted snapshot. Eén oppervlak migreren laat de ander stale (learning: <code>file-explorer-worktree-awareness.md</code>). Beide transforms zijn idempotent: <code>type==='workspace'</code> → transform, anders no-op.</p></div>
+
+    <div class="ktd"><h4>KTD4 · Pin-toggle + side-effects in één store-actie; UI-paden zijn dunne callers</h4>
+      <p class="why"><b>Waarom:</b> ster, context-menu én hotkey roepen dezelfde <code>projectStore</code>-actie aan. Divergente logica per invocatiepad is een gedocumenteerde bug (learning: <code>hotkey-handler-missing-auto-switch-behavior.md</code>). De actie bevat ook de fallback-selectie als het actieve project uit beeld raakt.</p></div>
+
+    <div class="ktd"><h4>KTD5 · Pinned rendert via <code>SortableProjectItem</code> (derde DndContext-sectie), geen parallel codepad</h4>
+      <p class="why"><b>Waarom:</b> de Pinned-sectie spiegelt de Active/Inactive-secties in <code>SortableProjectList</code> (eigen <code>DndContext</code> + <code>createDragEndHandler</code>). Een eigen render met eigen empty-state liet de twee paden eerder uit elkaar lopen (learning: <code>workspace-empty-state-visibility.md</code>). Bewaar de guard <code>isActive && terminals.length === 0</code>.</p></div>
+  </section>
+
+  <hr>
+
+  <!-- ── HTD ── -->
+  <section>
+    <h2>High-Level Technical Design</h2>
+    <p class="action-title">Twee dataflows dragen het ontwerp: de pin-mutatie en de eenmalige migratie.</p>
+
+    <p style="margin-bottom:4px;font-weight:600;font-size:14px">A · Pin-mutatie — één actie, drie triggers, schijf als waarheid</p>
+    <div class="flow">
+      <div class="step"><b>Trigger</b><span class="sub">ster · menu · ⌃⇧P</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>Store-actie</b><span class="sub">setPinned(id,v)</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>IPC</b><span class="sub">project:setPinned</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>Persistence</b><span class="sub">setProjectPinned → saveState</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>Re-fetch</b><span class="sub">list() → set({projects})</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>Re-render</b><span class="sub">Pinned-sectie</span></div>
+    </div>
+
+    <p style="margin:18px 0 4px;font-weight:600;font-size:14px">B · Migratie — twee oppervlakken, idempotent</p>
+    <div class="flow alt">
+      <div class="step"><b>Disk load</b><span class="sub">loadState v6</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>migrateState 6→7</b><span class="sub">workspace→project+pinned</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>STATE_VERSION=7</b><span class="sub">saveState</span></div>
+      <div class="arr">⇣</div>
+      <div class="step"><b>Store rehydrate</b><span class="sub">onRehydrateStorage guard</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>Defensief normaliseren</b><span class="sub">no-op indien al gemigreerd</span></div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-top:6px">Directional — de exacte stap-naamgeving en migratie-helpernamen worden tijdens implementatie bepaald.</p>
+  </section>
+
+  <hr>
+
+  <!-- ── IMPLEMENTATION UNITS ── -->
+  <section>
+    <h2>Implementation Units <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint)">(dependency-geordend)</span></h2>
+
+    <!-- U1 -->
+    <div class="unit">
+      <div class="uh"><span class="uid">U1</span><h3>Pin-vlag + IPC-kanaal + persistence + store-actie (additief)</h3></div>
+      <div class="ub">
+        <p class="row"><span class="k">Goal</span><span class="v">Voeg de <code>pinned</code>-vlag en de volledige mutatie-plumbing toe zonder bestaand gedrag te breken. <code>'workspace'</code> blijft voorlopig in de union.</span></p>
+        <p class="row"><span class="k">Requirements</span><span class="v">R1, R6 · KTD1, KTD2, KTD4</span></p>
+        <p class="row"><span class="k">Dependencies</span><span class="v">— (start)</span></p>
+        <p class="row files"><span class="k">Files</span><span class="v"><code>src/types/index.ts</code> <code>electron/preload/index.ts</code> <code>electron/main/index.ts</code> <code>electron/main/services/ProjectPersistence.ts</code> <code>src/stores/projectStore.ts</code></span></p>
+        <p class="row"><span class="k">Approach</span><span class="v">Voeg <code>pinned?: boolean</code> toe aan de <code>Project</code>-interface (alle 3 type-declaraties + canonical). Nieuw <code>project:setPinned(id, pinned)</code> handler in <code>electron/main/index.ts</code> met UUID-validatie, gespiegeld in <code>preload</code> (<code>project</code>-namespace) en de <code>electronAPI</code>-interface. <code>ProjectPersistence.setProjectPinned(id, pinned)</code> zet de vlag en roept <code>saveState()</code>. <code>addProject</code> default <code>pinned: false</code>. Store-actie <code>setPinned</code>/<code>togglePin</code> in de async stijl van <code>reorderProjects</code>: roep IPC, re-fetch <code>list()</code>, <code>set({projects})</code>. De actie bevat ook de fallback-selectie (zie U5-logica) — maar die logica leeft hier al in de actie, niet in callers.</span></p>
+        <p class="row"><span class="k">Patterns</span><span class="v"><code>project:reorder</code> handler + <code>reorderProjects</code> store-actie als template voor het hele kanaal.</span></p>
+        <div class="ts"><span class="cov">TEST SCENARIOS</span>
+          <ul>
+            <li><b>Happy:</b> <code>setPinned(id, true)</code> op een ongepind project → IPC aangeroepen met (id, true), store re-fetcht, project heeft <code>pinned:true</code>.</li>
+            <li><b>Toggle:</b> tweemaal togglen → terug naar uitgangsstaat.</li>
+            <li><b>Edge:</b> <code>setPinned</code> op onbekende id → geen crash, geen mutatie (handler valideert id).</li>
+            <li><b>Persistence:</b> <code>setProjectPinned</code> schrijft de vlag en bewaart; herladen geeft <code>pinned</code> terug.</li>
+          </ul>
+        </div>
+        <p class="row" style="margin-top:10px"><span class="verify">Pin-vlag is end-to-end zetbaar via de store-actie en overleeft een herstart; nog geen UI.</span></p>
+      </div>
+    </div>
+
+    <!-- U2 -->
+    <div class="unit">
+      <div class="uh"><span class="uid">U2</span><h3>Eenmalige workspace→pinned migratie (disk + defensieve store-guard)</h3></div>
+      <div class="ub">
+        <p class="row"><span class="k">Goal</span><span class="v">Bestaande <code>type:'workspace'</code>-projecten worden idempotent <code>type:'project'</code> + <code>pinned:true</code> — op schijf én in een persisted store-snapshot.</span></p>
+        <p class="row"><span class="k">Requirements</span><span class="v">R7 · KTD3</span></p>
+        <p class="row"><span class="k">Dependencies</span><span class="v"><span class="dep">U1</span> (pinned-veld bestaat)</span></p>
+        <p class="row files"><span class="k">Files</span><span class="v"><code>electron/main/services/ProjectPersistence.ts</code> <code>src/stores/projectStore.ts</code></span></p>
+        <p class="row"><span class="k">Approach</span><span class="v">Bump <code>STATE_VERSION</code> 6→7. Voeg een <code>version===6</code>-stap toe aan de <code>migrateState</code>-chain die elk project mapt: <code>p.type==='workspace' ? {...p, type:'project', pinned:true} : p</code>. Werk de default-fallthrough-tak bij zodat die het <code>pinned</code>-veld meeneemt. In <code>projectStore</code> <code>onRehydrateStorage</code>: defensieve guard die dezelfde transform toepast op een persisted snapshot (no-op als al gemigreerd). <code>ProjectPersistence</code> is de bron; de store-guard is vangnet.</span></p>
+        <p class="row"><span class="k">Patterns</span><span class="v">De bestaande v2→3-stap (mapt projecten naar <code>type:'code'</code> + defaults) als template. <code>onRehydrateStorage</code> <code>expandedPaths</code>-migratie als template voor de store-guard.</span></p>
+        <div class="ts"><span class="cov">TEST SCENARIOS</span>
+          <ul>
+            <li><span class="cov">Covers R7.</span> <b>Migratie:</b> v6-state met een <code>type:'workspace'</code>-project → na migratie <code>type:'project'</code>, <code>pinned:true</code>, naam/pad/settings ongewijzigd, <code>version===7</code>.</li>
+            <li><b>Idempotent:</b> al-gemigreerde state (geen workspace, <code>pinned</code> gezet) → transform laat alles ongemoeid; tweede run = no-op.</li>
+            <li><b>Niet-workspace:</b> <code>code</code>/<code>project</code> zonder pin → blijft ongepind, type ongewijzigd.</li>
+            <li><b>Store-guard:</b> persisted snapshot met workspace-vorm → na rehydrate genormaliseerd, identiek aan disk-resultaat.</li>
+          </ul>
+        </div>
+        <p class="row" style="margin-top:10px"><span class="verify">Een bestaande workspace verschijnt na opstarten als gepind <code>project</code>; herhaald opstarten verandert niets.</span></p>
+      </div>
+    </div>
+
+    <!-- U3 -->
+    <div class="unit">
+      <div class="uh"><span class="uid">U3</span><h3>Sidebar: Pinned-sectie via <code>SortableProjectItem</code>; verwijder het workspace-blok</h3></div>
+      <div class="ub">
+        <p class="row"><span class="k">Goal</span><span class="v">Render gepinde projecten in een eigen sectie bovenaan via het reguliere item-component, en verwijder het ~80-regel special-case workspace-renderblok.</span></p>
+        <p class="row"><span class="k">Requirements</span><span class="v">R1, R2, R3, R5 · KTD5</span></p>
+        <p class="row"><span class="k">Dependencies</span><span class="v"><span class="dep">U1</span> (pinned-veld), consumeert <span class="dep">U2</span></span></p>
+        <p class="row files"><span class="k">Files</span><span class="v"><code>src/components/Sidebar/Sidebar.tsx</code> <code>src/components/Sidebar/SortableProjectList.tsx</code> <code>src/components/Sidebar/SortableProjectItem.tsx</code></span></p>
+        <p class="row"><span class="k">Approach</span><span class="v">Vervang de split (regels ~338-340) door <code>pinnedProjects = filter(p => p.pinned)</code> / <code>unpinnedProjects</code>. Verwijder het workspace-blok (regels ~358-441) volledig. Voeg in <code>SortableProjectList</code> een derde sectie/<code>DndContext</code> voor de Pinned-projecten toe, gespiegeld op de bestaande Active/Inactive-secties, met <code>createDragEndHandler(pinnedIds, otherIds, true)</code> → bestaande <code>onReorder</code> → <code>reorderProjects</code>. Pinned-sectie alleen tonen bij ≥1 pin. Update de comment op <code>SortableProjectItem.tsx:254</code>. Bewaar de empty-state-guard <code>isActive && terminals.length===0</code> (pin-agnostisch, al correct).</span></p>
+        <p class="row"><span class="k">Patterns</span><span class="v">De Active/Inactive twee-<code>DndContext</code>-structuur in <code>SortableProjectList.tsx</code> (sensors, <code>verticalListSortingStrategy</code>, <code>createDragEndHandler</code> die de volledige id-volgorde reconstrueert).</span></p>
+        <div class="ts"><span class="cov">TEST SCENARIOS</span>
+          <ul>
+            <li><b>Test expectation:</b> primair visueel/structureel — gedekt door manuele verificatie + de store-tests in U6. Render-only herstructurering zonder nieuwe store-logica.</li>
+            <li><b>Manueel:</b> gepind <code>code</code>-project toont worktree-knop + git in de Pinned-sectie; gepind <code>project</code> blijft limited. Pinned-sectie verdwijnt bij 0 pins. Drag binnen de sectie herordent en persisteert.</li>
+          </ul>
+        </div>
+        <p class="row" style="margin-top:10px"><span class="verify">Gepinde projecten staan bovenaan met volledige type-functionaliteit; het workspace-blok bestaat niet meer; <code>isActive</code> empty-state werkt nog.</span></p>
+      </div>
+    </div>
+
+    <!-- U4 -->
+    <div class="unit">
+      <div class="uh"><span class="uid">U4</span><h3>Pin-affordances: hover-ster + context-menu-item + hotkey</h3></div>
+      <div class="ub">
+        <p class="row"><span class="k">Goal</span><span class="v">Drie invocatiepaden die alle dezelfde store-actie uit U1 aanroepen.</span></p>
+        <p class="row"><span class="k">Requirements</span><span class="v">R4 · KTD4</span></p>
+        <p class="row"><span class="k">Dependencies</span><span class="v"><span class="dep">U1</span> (store-actie), <span class="dep">U3</span> (Pinned-sectie rendert)</span></p>
+        <p class="row files"><span class="k">Files</span><span class="v"><code>src/components/Sidebar/SortableProjectItem.tsx</code> <code>src/types/hotkeys.ts</code> <code>src/utils/hotkeys.ts</code> <code>src/App.tsx</code> <code>CLAUDE.md</code></span></p>
+        <p class="row"><span class="k">Approach</span><span class="v"><b>Ster:</b> toggle-knop in het hover-actie-blok (regels ~188-222) met <code>onClick</code> <code>e.stopPropagation()</code> + <code>onPointerDown</code> <code>e.stopPropagation()</code> (anders triggert het drag). Gevulde ster = gepind. <b>Context-menu:</b> item via het spread-patroon in <code>contextMenuItems</code> (~87-109): "Pin to top"/"Unpin" met <code>shortcut: 'Ctrl+Shift+P'</code>. <b>Hotkey (4 punten):</b> <code>'sidebar.pinProject'</code> in de <code>HotkeyAction</code>-union; entry in <code>DEFAULT_HOTKEY_CONFIG</code> (<code>key:'p', modifiers:['ctrl','shift'], category:'sidebar', enabled:true</code>); handler in de <code>useHotkeys({})</code>-call in <code>App.tsx</code> (naast <code>sidebar.toggleInactive</code>) die <code>useProjectStore.getState().setPinned(activeProjectId, …)</code> toggelt; rij in de CLAUDE.md Keyboard-Shortcuts-tabel onder Sidebar.</span></p>
+        <p class="row"><span class="k">Patterns</span><span class="v"><code>sidebar.toggleInactive</code> als end-to-end hotkey-template (3 bestanden). Het <code>...(cond ? [item] : [])</code> context-menu-spreadpatroon. De Settings/Shortcuts-UI is data-driven (<code>getHotkeysByCategory</code>) — geen UI-werk.</span></p>
+        <div class="enote">Execution note: ster, menu en hotkey moeten aantoonbaar dezelfde store-actie aanroepen — geen pin-logica in de handlers zelf (KTD4 / learning).</div>
+        <div class="ts"><span class="cov">TEST SCENARIOS</span>
+          <ul>
+            <li><span class="cov">Covers R4.</span> <b>Pad-pariteit:</b> hotkey-pad en context-menu-pad op hetzelfde actieve project produceren identieke store-state (geparametriseerde test, learning-patroon).</li>
+            <li><b>Happy:</b> hotkey op ongepind actief project → <code>pinned:true</code>; nogmaals → <code>false</code>.</li>
+            <li><b>Edge:</b> hotkey zonder actief project → no-op, geen crash.</li>
+            <li><b>Binding:</b> <code>matchesBinding</code> matcht <code>Ctrl+Shift+P</code>; de hotkey vuurt niet terwijl focus in een tekst-input staat (geaccepteerd gedrag, learning #5).</li>
+          </ul>
+        </div>
+        <p class="row" style="margin-top:10px"><span class="verify">Pinnen/unpinnen werkt via ster, rechtsklik én <code>Ctrl+Shift+P</code>; de shortcut staat in Settings én CLAUDE.md.</span></p>
+      </div>
+    </div>
+
+    <!-- U5 -->
+    <div class="unit">
+      <div class="uh"><span class="uid">U5</span><h3>Elimineer het workspace-type: herschrijf fallback-logica, drop het union-lid</h3></div>
+      <div class="ub">
+        <p class="row"><span class="k">Goal</span><span class="v">Verwijder elke <code>'workspace'</code>-referentie en het union-lid, en herschrijf de twee type-gestuurde plekken naar <code>pinned</code>.</span></p>
+        <p class="row"><span class="k">Requirements</span><span class="v">R1 (sluit af) · dead-code hygiene</span></p>
+        <p class="row"><span class="k">Dependencies</span><span class="v"><span class="dep">U3</span> (sidebar zonder workspace-refs)</span></p>
+        <p class="row files"><span class="k">Files</span><span class="v"><code>src/stores/projectStore.ts</code> <code>src/App.tsx</code> <code>src/components/Project/AddProjectDialog.tsx</code> <code>src/types/index.ts</code> <code>electron/preload/index.ts</code> <code>electron/main/index.ts</code> <code>electron/main/services/ProjectPersistence.ts</code></span></p>
+        <p class="row"><span class="k">Approach</span><span class="v"><b>Fallback (projectStore ~552-556):</b> herschrijf <code>toggleInactiveSectionCollapsed</code> — vervang "altijd-zichtbaar = workspace" door "altijd-zichtbaar = pinned" (eerste gepind, anders eerste actieve met terminals). <b>Volgorde (App.tsx ~58-72):</b> <code>getProjectVisualOrder</code> → pinned → active regular → inactive regular, zodat keyboard-nav de sidebar volgt. <b>Dialog:</b> verwijder de Star/Workspace-optie uit <code>PROJECT_TYPE_OPTIONS</code> (default <code>'project'</code> blijft geldig). <b>Union-drop:</b> verwijder <code>'workspace'</code> uit <code>ProjectType</code> (alle 3 declaraties) en uit de <code>validTypes</code>-array in de <code>project:add</code>-handler. <b>Sweep:</b> grep <code>'workspace'</code> case-insensitive over <code>src/</code> + <code>electron/</code> → nul treffers; verifieer dat <code>FileExplorer</code>'s <code>isLimitedProject = type==='project'</code> ongewijzigd blijft (gepind <code>project</code> blijft terecht limited).</span></p>
+        <p class="row"><span class="k">Patterns</span><span class="v">De gedocumenteerde dead-code-sweep (<code>git-tab-multi-agent-review-findings.md</code>): wired-but-uncalled code glipt door review als niemand op callers grept.</span></p>
+        <div class="ts"><span class="cov">TEST SCENARIOS</span>
+          <ul>
+            <li><b>Fallback:</b> actief project zonder terminals dat uit beeld raakt bij collapse → selectie valt terug op eerste gepind, anders eerste actieve met terminals (geen "geselecteerd maar onzichtbaar").</li>
+            <li><b>Volgorde:</b> <code>getProjectVisualOrder</code> met een mix → pinned eerst, dan active regular, dan inactive; keyboard prev/next volgt die volgorde.</li>
+            <li><b>Compile/static:</b> nul <code>'workspace'</code>-treffers in <code>src/</code> + <code>electron/</code>; <code>ProjectType</code> heeft twee leden; <code>tsc</code> groen.</li>
+          </ul>
+        </div>
+        <p class="row" style="margin-top:10px"><span class="verify"><code>'workspace'</code> bestaat nergens meer; fallback-selectie en keyboard-volgorde kloppen met de Pinned-sectie; nieuwe projecten zijn alleen <code>project</code> of <code>code</code>.</span></p>
+      </div>
+    </div>
+
+    <!-- U6 -->
+    <div class="unit">
+      <div class="uh"><span class="uid">U6</span><h3>Tests: pin-actie, pad-pariteit, fallback en migratie</h3></div>
+      <div class="ub">
+        <p class="row"><span class="k">Goal</span><span class="v">Borg het nieuwe gedrag met unit-tests, inclusief de eerste test voor de <code>ProjectPersistence</code>-migratie.</span></p>
+        <p class="row"><span class="k">Requirements</span><span class="v">R4, R7 · borgt KTD3, KTD4</span></p>
+        <p class="row"><span class="k">Dependencies</span><span class="v"><span class="dep">U1, U2, U5</span></span></p>
+        <p class="row files"><span class="k">Files</span><span class="v"><code>test/projectStore.test.ts</code> <code>test/projectPersistence.test.ts</code> (nieuw)</span></p>
+        <p class="row"><span class="k">Approach</span><span class="v">In <code>projectStore.test.ts</code>: voeg de nieuwe IPC-mock (<code>setPinned</code>) toe naast <code>update</code>/<code>reorder</code>; test de pin-actie (pin/unpin/toggle), de pad-pariteit (hotkey vs context-menu → identieke state) en de herschreven <code>toggleInactiveSectionCollapsed</code>-fallback met inline Project-fixtures (<code>pinned:true/false</code>). Nieuw <code>projectPersistence.test.ts</code>: test <code>migrateState</code> 6→7 (workspace→pinned), idempotentie (tweede run = no-op) en niet-workspace ongewijzigd. Geen bestaande test breekt — huidige fixtures zetten geen <code>type</code>.</span></p>
+        <p class="row"><span class="k">Patterns</span><span class="v">Bestaande <code>projectStore.test.ts</code>-structuur: mock persist passthrough, mock <code>getElectronAPI</code>, <code>setState</code> → actie → assert op <code>getState().projects</code>.</span></p>
+        <div class="enote">Execution note: schrijf de migratie-test test-first — de migratiechain is vandaag ongetest en de eerste test legt de gewenste output vast vóór de implementatie verschuift.</div>
+        <div class="ts"><span class="cov">TEST SCENARIOS</span>
+          <ul>
+            <li>Alle scenario's uit U1, U2, U4, U5 zijn hier geïmplementeerd (geen dubbele opsomming).</li>
+            <li><b>Suite:</b> <code>npm test</code> groen; lint groen.</li>
+          </ul>
+        </div>
+        <p class="row" style="margin-top:10px"><span class="verify">De pin-actie, pad-pariteit, fallback en beide migratie-richtingen zijn gedekt en groen.</span></p>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── SCOPE ── -->
+  <section>
+    <h2>Scope-grenzen</h2>
+    <div class="cols2">
+      <div class="box out"><h4>○ Deferred to follow-up work</h4>
+        <ul>
+          <li>Type wijzigen via de UI (rechtsklik "Change type → code/project") — apart vraagstuk; ex-workspaces die git/worktrees terug willen, wachten hierop.</li>
+        </ul>
+      </div>
+      <div class="box out"><h4>○ Outside this product's identity (uit origin)</h4>
+        <ul>
+          <li>Dashboard / dagstart-overview (de oude workspace-ambitie) — komt níét terug.</li>
+          <li>Limiet/cap op aantal pins — ongelimiteerd.</li>
+          <li>Pin-sync over meerdere devices.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── RISKS ── -->
+  <section>
+    <h2>Risico's &amp; mitigatie</h2>
+    <div class="risk">
+      <div class="r"><b>Migratie-dataverlies / niet-idempotent.</b> Mitigatie: idempotente transform met expliciete <code>type==='workspace'</code>-guard; tests in beide richtingen (U6); atomic <code>saveState</code> (temp+rename) bestaat al.</div>
+      <div class="r"><b>Stale persisted store-cache (twee oppervlakken).</b> Mitigatie: <code>onRehydrateStorage</code>-guard naast de disk-migratie (KTD3); store-guard-test (U2).</div>
+      <div class="r"><b>Gemiste <code>'workspace'</code>-referentie → "geselecteerd maar onzichtbaar"-bug.</b> Mitigatie: volledige enumeratie (8 sites) + grep-sweep met nul-treffer-gate in U5; gesloten <code>ProjectType</code>-union dwingt compile-fouten af bij gemiste refs.</div>
+      <div class="r"><b>Hotkey vuurt niet in tekst-input.</b> Status: geaccepteerd — <code>useHotkeys</code> bailt op INPUT/TEXTAREA/contentEditable; voor een pin-actie prima (learning #5).</div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── DEFERRED / OPEN ── -->
+  <section>
+    <h2>Naar implementatie doorgeschoven</h2>
+    <ul style="font-size:14px;padding-left:20px">
+      <li>Exacte helper-/methodenamen voor de migratiestap en de store-actie (<code>setPinned</code> vs <code>togglePin</code>).</li>
+      <li>Of de fallback-selectie ook een actie-side-effect nodig heeft wanneer je het actieve project <em>unpinned</em> (waarschijnlijk niet — unpinnen verbergt niet, het verplaatst alleen) — bevestigen tijdens implementatie tegen de echte render.</li>
+      <li>Definitieve plek van de nieuwe IPC-mock-shape in de testharness.</li>
+    </ul>
+    <p style="font-size:13px;color:var(--muted)">Geen externe research uitgevoerd: sterke lokale patronen voor elk raakvlak (IPC-kanaal, migratiechain, hotkey-registratie), geen externe contracten geraakt.</p>
+  </section>
+
+  <hr>
+
+  <!-- ── SOURCES ── -->
+  <section>
+    <h2>Bronnen &amp; research</h2>
+    <ul style="font-size:13.5px;padding-left:20px">
+      <li><b>Origin:</b> <code>docs/brainstorms/2026-06-10-pinnable-projects-requirements.html</code></li>
+      <li><b>Learning (load-bearing):</b> <code>docs/solutions/logic-errors/hotkey-handler-missing-auto-switch-behavior.md</code> → KTD4, fallback-herschrijf in U5.</li>
+      <li><b>Learning (load-bearing):</b> <code>docs/solutions/ui-bugs/workspace-empty-state-visibility.md</code> → KTD5, geen parallel render-pad.</li>
+      <li><b>Learning:</b> <code>docs/solutions/ui-bugs/file-explorer-worktree-awareness.md</code> → KTD3, twee-oppervlak migratie.</li>
+      <li><b>Learning:</b> <code>docs/solutions/code-review/git-tab-multi-agent-review-findings.md</code> → 4-punts hotkey-registratie + dead-code sweep in U5.</li>
+    </ul>
+  </section>
+
+  <footer class="doc">
+    Implementation plan · Command · feat/pin-project · 2026-06-11 · 6 units · Volgende stap: <b>/ce-work</b> op dit plan.
+  </footer>
+
+</div>
+</body>
+</html>
