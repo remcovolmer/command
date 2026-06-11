@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Loader2, FilePlus, FileEdit, FileX, FileText, ArrowRight } from 'lucide-react'
+import { Loader2, FilePlus, FileEdit, FileX, ArrowRight } from 'lucide-react'
 import type { GitCommit, GitCommitDetail as GitCommitDetailType, GitCommitFile } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { useProjectStore } from '../../stores/projectStore'
@@ -26,17 +26,22 @@ export function CommitDetail({ commit, gitPath, detailCache }: CommitDetailProps
     let cancelled = false
     setLoading(true)
 
-    api.git.getCommitDetail(gitPath, commit.hash).then((result) => {
-      if (!cancelled && result) {
-        detailCache.current[commit.hash] = result
-        setDetail(result)
-      }
-      if (!cancelled) setLoading(false)
-    }).catch(() => {
-      if (!cancelled) setLoading(false)
-    })
+    api.git
+      .getCommitDetail(gitPath, commit.hash)
+      .then((result) => {
+        if (!cancelled && result) {
+          detailCache.current[commit.hash] = result
+          setDetail(result)
+        }
+        if (!cancelled) setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [api, gitPath, commit.hash, detail, detailCache])
 
   const handleFileClick = (file: GitCommitFile) => {
@@ -56,9 +61,7 @@ export function CommitDetail({ commit, gitPath, detailCache }: CommitDetailProps
 
   if (!detail) {
     return (
-      <div className="px-3 py-2 text-xs text-muted-foreground">
-        Failed to load commit details
-      </div>
+      <div className="px-3 py-2 text-xs text-muted-foreground">Failed to load commit details</div>
     )
   }
 
@@ -128,12 +131,21 @@ function FileStatusIcon({ status }: { status: GitCommitFile['status'] }) {
   const props = { className: 'w-3 h-3 flex-shrink-0' }
   switch (status) {
     case 'added':
-      return <FilePlus {...props} className={`${props.className} text-green-600 dark:text-green-400`} />
+      return (
+        <FilePlus {...props} className={`${props.className} text-green-600 dark:text-green-400`} />
+      )
     case 'deleted':
       return <FileX {...props} className={`${props.className} text-red-600 dark:text-red-400`} />
     case 'renamed':
-      return <ArrowRight {...props} className={`${props.className} text-blue-600 dark:text-blue-400`} />
+      return (
+        <ArrowRight {...props} className={`${props.className} text-blue-600 dark:text-blue-400`} />
+      )
     default:
-      return <FileEdit {...props} className={`${props.className} text-yellow-600 dark:text-yellow-400`} />
+      return (
+        <FileEdit
+          {...props}
+          className={`${props.className} text-yellow-600 dark:text-yellow-400`}
+        />
+      )
   }
 }

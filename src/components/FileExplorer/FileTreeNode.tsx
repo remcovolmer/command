@@ -17,7 +17,15 @@ interface FileTreeNodeProps {
   onContextMenu: (entry: FileSystemEntry, x: number, y: number) => void
 }
 
-export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, isCreating, onContextMenu }: FileTreeNodeProps) {
+export function FileTreeNode({
+  entry,
+  projectId,
+  contextKey,
+  depth,
+  isRenaming,
+  isCreating,
+  onContextMenu,
+}: FileTreeNodeProps) {
   const api = getElectronAPI()
   const [isLoading, setIsLoading] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -30,12 +38,8 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
   const createSubmittedRef = useRef(false)
 
   // Use specific selectors to avoid unnecessary re-renders
-  const isExpanded = useProjectStore(
-    (s) => !!(s.expandedPaths[contextKey]?.[entry.path])
-  )
-  const children = useProjectStore(
-    (s) => s.directoryCache[entry.path]
-  )
+  const isExpanded = useProjectStore((s) => !!s.expandedPaths[contextKey]?.[entry.path])
+  const children = useProjectStore((s) => s.directoryCache[entry.path])
   const toggleExpandedPath = useProjectStore((s) => s.toggleExpandedPath)
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
   const openEditorTab = useProjectStore((s) => s.openEditorTab)
@@ -92,7 +96,7 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
         createInputRef.current?.focus()
       })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreating])
 
   const handleExpand = async () => {
@@ -241,10 +245,7 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
         {!isDirectory && <span className="w-4 flex-shrink-0" />}
 
         {/* File/folder icon */}
-        <Icon
-          className="w-4 h-4 flex-shrink-0"
-          style={{ color: iconConfig.color }}
-        />
+        <Icon className="w-4 h-4 flex-shrink-0" style={{ color: iconConfig.color }} />
 
         {/* Name or rename input */}
         {isRenaming ? (
@@ -252,7 +253,10 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
             <input
               ref={renameInputRef}
               value={renameValue}
-              onChange={(e) => { setRenameValue(e.target.value); setRenameError(null) }}
+              onChange={(e) => {
+                setRenameValue(e.target.value)
+                setRenameError(null)
+              }}
               onKeyDown={(e) => {
                 e.stopPropagation()
                 if (e.key === 'Enter') handleRenameSubmit()
@@ -261,9 +265,7 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
               onBlur={handleRenameSubmit}
               className="w-full bg-input border border-border rounded px-1 py-0 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
             />
-            {renameError && (
-              <div className="text-xs text-destructive mt-0.5">{renameError}</div>
-            )}
+            {renameError && <div className="text-xs text-destructive mt-0.5">{renameError}</div>}
           </div>
         ) : (
           <span className="truncate">{entry.name}</span>
@@ -281,7 +283,8 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
             >
               <span className="w-4 flex-shrink-0" />
               {(() => {
-                const ic = isCreating.type === 'directory' ? getFolderIcon(false) : getFileIcon('new')
+                const ic =
+                  isCreating.type === 'directory' ? getFolderIcon(false) : getFileIcon('new')
                 const Ic = ic.icon
                 return <Ic className="w-4 h-4 flex-shrink-0" style={{ color: ic.color }} />
               })()}
@@ -289,7 +292,10 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
                 <input
                   ref={createInputRef}
                   value={createValue}
-                  onChange={(e) => { setCreateValue(e.target.value); setCreateError(null) }}
+                  onChange={(e) => {
+                    setCreateValue(e.target.value)
+                    setCreateError(null)
+                  }}
                   onKeyDown={(e) => {
                     e.stopPropagation()
                     if (e.key === 'Enter') handleCreateSubmit()
@@ -309,22 +315,23 @@ export function FileTreeNode({ entry, projectId, contextKey, depth, isRenaming, 
             </div>
           )}
 
-          {children && children.map((child) => (
-            <FileTreeNode
-              key={child.path}
-              entry={child}
-              projectId={projectId}
-              contextKey={contextKey}
-              depth={depth + 1}
-              isRenaming={fileExplorerRenamingPath === child.path}
-              isCreating={
-                fileExplorerCreating && fileExplorerCreating.parentPath === child.path
-                  ? { type: fileExplorerCreating.type }
-                  : null
-              }
-              onContextMenu={onContextMenu}
-            />
-          ))}
+          {children &&
+            children.map((child) => (
+              <FileTreeNode
+                key={child.path}
+                entry={child}
+                projectId={projectId}
+                contextKey={contextKey}
+                depth={depth + 1}
+                isRenaming={fileExplorerRenamingPath === child.path}
+                isCreating={
+                  fileExplorerCreating && fileExplorerCreating.parentPath === child.path
+                    ? { type: fileExplorerCreating.type }
+                    : null
+                }
+                onContextMenu={onContextMenu}
+              />
+            ))}
         </div>
       )}
     </div>

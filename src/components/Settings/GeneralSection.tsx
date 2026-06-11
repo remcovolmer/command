@@ -33,7 +33,9 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
     if (confirmDialog) {
       const project = projects.find((p) => p.id === confirmDialog.projectId)
       addConfirmedModeKey(`${confirmDialog.projectId}:${confirmDialog.mode}`)
-      updateProject(confirmDialog.projectId, { settings: { ...project?.settings, claudeMode: confirmDialog.mode } })
+      updateProject(confirmDialog.projectId, {
+        settings: { ...project?.settings, claudeMode: confirmDialog.mode },
+      })
       setConfirmDialog(null)
     }
   }
@@ -67,7 +69,11 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
     }
   }
 
-  const handleAuthModeChange = (projectId: string, project: typeof projects[0], authMode: AuthMode) => {
+  const handleAuthModeChange = (
+    projectId: string,
+    project: (typeof projects)[0],
+    authMode: AuthMode
+  ) => {
     updateProject(projectId, {
       settings: {
         ...project.settings,
@@ -78,7 +84,11 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
     })
   }
 
-  const handleProfileSelect = (projectId: string, project: typeof projects[0], profileId: string) => {
+  const handleProfileSelect = (
+    projectId: string,
+    project: (typeof projects)[0],
+    profileId: string
+  ) => {
     updateProject(projectId, {
       settings: {
         ...project.settings,
@@ -97,9 +107,12 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   const getModeColor = (mode: ClaudeMode, isActive: boolean) => {
     if (!isActive) return 'bg-muted text-muted-foreground hover:bg-accent'
     switch (mode) {
-      case 'chat': return 'bg-primary text-primary-foreground'
-      case 'auto': return 'bg-blue-500 text-white'
-      case 'full-auto': return 'bg-yellow-500 text-black'
+      case 'chat':
+        return 'bg-primary text-primary-foreground'
+      case 'auto':
+        return 'bg-blue-500 text-white'
+      case 'full-auto':
+        return 'bg-yellow-500 text-black'
     }
   }
 
@@ -140,7 +153,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 Active Terminal Limit
               </label>
               <p className="text-xs text-muted-foreground mt-1">
-                Maximum xterm instances kept in memory. Inactive terminals beyond this limit are serialized and restored on demand.
+                Maximum xterm instances kept in memory. Inactive terminals beyond this limit are
+                serialized and restored on demand.
               </p>
             </div>
             <input
@@ -159,10 +173,36 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
         </div>
       </div>
 
+      {/* Diagnostics section */}
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-1">Diagnostics</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Troubleshooting information for bug reports.
+        </p>
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <span className="text-sm font-medium text-foreground">Log file</span>
+              <p className="text-xs text-muted-foreground mt-1">
+                Rotating main-process log in the app data folder. Attach it when reporting an issue.
+              </p>
+            </div>
+            <button
+              onClick={() => void window.electronAPI?.app?.openLogFile?.()}
+              className="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted text-muted-foreground hover:bg-accent transition-colors shrink-0"
+            >
+              Open log file
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Project settings section */}
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-1">Project Settings</h3>
-        <p className="text-xs text-muted-foreground">Configure settings per project. Changes apply to new chats only.</p>
+        <p className="text-xs text-muted-foreground">
+          Configure settings per project. Changes apply to new chats only.
+        </p>
       </div>
 
       <div className="space-y-3">
@@ -173,10 +213,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
           const hasVertexConfig = projectVertexConfigs[project.id] ?? false
 
           return (
-            <div
-              key={project.id}
-              className="rounded-lg border border-border p-4"
-            >
+            <div key={project.id} className="rounded-lg border border-border p-4">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-foreground truncate">{project.name}</h4>
@@ -198,18 +235,22 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
               <div className="mt-3">
                 <label className="text-sm font-medium text-foreground">Claude Mode</label>
                 <p className="text-xs text-muted-foreground mt-1 mb-2">
-                  {currentMode === 'chat' && 'Normal mode — Claude asks for permission before every action.'}
-                  {currentMode === 'auto' && 'Auto mode — Claude auto-accepts safe actions, asks for risky ones.'}
-                  {currentMode === 'full-auto' && 'Full auto — Claude executes all actions without permission prompts.'}
+                  {currentMode === 'chat' &&
+                    'Normal mode — Claude asks for permission before every action.'}
+                  {currentMode === 'auto' &&
+                    'Auto mode — Claude auto-accepts safe actions, asks for risky ones.'}
+                  {currentMode === 'full-auto' &&
+                    'Full auto — Claude executes all actions without permission prompts.'}
                 </p>
                 <div className="flex items-center gap-1">
                   {modeOptions.map((option) => (
                     <button
                       key={option.value}
                       onClick={() => handleModeChange(project.id, option.value)}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                        getModeColor(option.value, currentMode === option.value)
-                      }`}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${getModeColor(
+                        option.value,
+                        currentMode === option.value
+                      )}`}
                     >
                       {option.label}
                     </button>
@@ -226,7 +267,9 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 <div className="flex items-center gap-3">
                   <select
                     value={authMode}
-                    onChange={(e) => handleAuthModeChange(project.id, project, e.target.value as AuthMode)}
+                    onChange={(e) =>
+                      handleAuthModeChange(project.id, project, e.target.value as AuthMode)
+                    }
                     className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="subscription">Subscription (default)</option>
@@ -240,9 +283,13 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                       className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                     >
                       <option value="">Select profile...</option>
-                      {profiles.filter(p => p.envVarCount > 0).map(profile => (
-                        <option key={profile.id} value={profile.id}>{profile.name}</option>
-                      ))}
+                      {profiles
+                        .filter((p) => p.envVarCount > 0)
+                        .map((profile) => (
+                          <option key={profile.id} value={profile.id}>
+                            {profile.name}
+                          </option>
+                        ))}
                     </select>
                   )}
                 </div>
@@ -266,10 +313,15 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
               <div>
                 {confirmDialog.mode === 'full-auto' ? (
                   <>
-                    <h3 className="text-sm font-semibold text-foreground">Enable Full Auto Mode?</h3>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Enable Full Auto Mode?
+                    </h3>
                     <p className="text-xs text-muted-foreground mt-2">
-                      This will run Claude Code with <code className="text-[11px] px-1 py-0.5 bg-muted rounded">--dangerously-skip-permissions</code>,
-                      allowing it to execute any command without approval prompts.
+                      This will run Claude Code with{' '}
+                      <code className="text-[11px] px-1 py-0.5 bg-muted rounded">
+                        --dangerously-skip-permissions
+                      </code>
+                      , allowing it to execute any command without approval prompts.
                     </p>
                     <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
                       Only enable this in isolated or sandboxed environments.
@@ -279,8 +331,12 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                   <>
                     <h3 className="text-sm font-semibold text-foreground">Enable Auto Mode?</h3>
                     <p className="text-xs text-muted-foreground mt-2">
-                      This will run Claude Code with <code className="text-[11px] px-1 py-0.5 bg-muted rounded">--enable-auto-mode</code>.
-                      Claude will auto-accept safe actions (file edits, reads) but still ask permission for risky operations.
+                      This will run Claude Code with{' '}
+                      <code className="text-[11px] px-1 py-0.5 bg-muted rounded">
+                        --enable-auto-mode
+                      </code>
+                      . Claude will auto-accept safe actions (file edits, reads) but still ask
+                      permission for risky operations.
                     </p>
                   </>
                 )}

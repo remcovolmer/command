@@ -1,11 +1,7 @@
 import { memo } from 'react'
 import { Terminal as TerminalIcon, X } from 'lucide-react'
 import type { TerminalSession } from '../../types'
-import {
-  STATE_DOT_COLORS,
-  isAttentionState,
-  isVisibleState,
-} from '../../utils/terminalState'
+import { STATE_DOT_COLORS, isAttentionState, isVisibleState } from '../../utils/terminalState'
 import { AttentionChip, AttentionRail, attentionRowBg } from './AttentionRail'
 
 interface TerminalListItemProps {

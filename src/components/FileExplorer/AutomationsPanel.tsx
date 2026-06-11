@@ -1,5 +1,21 @@
 import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react'
-import { Zap, Plus, Play, Square, ToggleLeft, ToggleRight, Trash2, ChevronDown, ChevronRight, Clock, CheckCircle2, XCircle, AlertTriangle, Loader2, Pencil, ExternalLink } from 'lucide-react'
+import {
+  Plus,
+  Play,
+  Square,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Loader2,
+  Pencil,
+  ExternalLink,
+} from 'lucide-react'
 import type { Automation, AutomationRun } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { useProjectStore } from '../../stores/projectStore'
@@ -25,10 +41,14 @@ function formatRelativeTime(iso: string): string {
 
 function triggerLabel(trigger: Automation['trigger']): string {
   switch (trigger.type) {
-    case 'schedule': return `Cron: ${trigger.cron}`
-    case 'claude-done': return 'On Claude done'
-    case 'git-event': return `Git: ${trigger.event}`
-    case 'file-change': return `Files: ${trigger.patterns.join(', ')}`
+    case 'schedule':
+      return `Cron: ${trigger.cron}`
+    case 'claude-done':
+      return 'On Claude done'
+    case 'git-event':
+      return `Git: ${trigger.event}`
+    case 'file-change':
+      return `Files: ${trigger.patterns.join(', ')}`
   }
 }
 
@@ -50,7 +70,10 @@ function renderInline(text: string): ReactNode[] {
       parts.push(
         <button
           key={match.index}
-          onClick={(e) => { e.stopPropagation(); window.electronAPI.shell.openExternal(match![1]) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            window.electronAPI.shell.openExternal(match![1])
+          }}
           className="text-primary hover:underline break-all"
         >
           {match[1]}
@@ -58,11 +81,20 @@ function renderInline(text: string): ReactNode[] {
       )
     } else if (match[2]) {
       // **bold**
-      parts.push(<strong key={match.index} className="text-foreground font-semibold">{match[3]}</strong>)
+      parts.push(
+        <strong key={match.index} className="text-foreground font-semibold">
+          {match[3]}
+        </strong>
+      )
     } else if (match[4]) {
       // `code`
       parts.push(
-        <code key={match.index} className="bg-muted/60 px-1 py-0.5 rounded text-[10px] font-mono text-foreground">{match[5]}</code>
+        <code
+          key={match.index}
+          className="bg-muted/60 px-1 py-0.5 rounded text-[10px] font-mono text-foreground"
+        >
+          {match[5]}
+        </code>
       )
     }
     lastIndex = match.index + match[0].length
@@ -94,7 +126,10 @@ function RunResultContent({ text }: { text: string }) {
       }
       i++ // skip closing ```
       elements.push(
-        <pre key={`code-${i}`} className="bg-muted/60 rounded px-2 py-1.5 overflow-x-auto font-mono text-[10px] text-foreground whitespace-pre">
+        <pre
+          key={`code-${i}`}
+          className="bg-muted/60 rounded px-2 py-1.5 overflow-x-auto font-mono text-[10px] text-foreground whitespace-pre"
+        >
           {codeLines.join('\n')}
         </pre>
       )
@@ -102,7 +137,10 @@ function RunResultContent({ text }: { text: string }) {
     }
 
     // Empty line
-    if (!stripped) { i++; continue }
+    if (!stripped) {
+      i++
+      continue
+    }
 
     // Bullet point
     if (/^[-•]\s/.test(stripped)) {
@@ -112,7 +150,8 @@ function RunResultContent({ text }: { text: string }) {
           <span>{renderInline(stripped.replace(/^[-•]\s+/, ''))}</span>
         </div>
       )
-      i++; continue
+      i++
+      continue
     }
 
     // Regular line
@@ -130,11 +169,16 @@ function RunResultContent({ text }: { text: string }) {
 
 function statusIcon(status: AutomationRun['status']) {
   switch (status) {
-    case 'running': return <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
-    case 'completed': return <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-    case 'failed': return <XCircle className="w-3.5 h-3.5 text-red-400" />
-    case 'timeout': return <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
-    case 'cancelled': return <Square className="w-3.5 h-3.5 text-muted-foreground" />
+    case 'running':
+      return <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+    case 'completed':
+      return <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+    case 'failed':
+      return <XCircle className="w-3.5 h-3.5 text-red-400" />
+    case 'timeout':
+      return <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
+    case 'cancelled':
+      return <Square className="w-3.5 h-3.5 text-muted-foreground" />
   }
 }
 
@@ -168,13 +212,17 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
   // Subscribe to run events
   useEffect(() => {
     const unsubStarted = api.automation.onRunStarted((run) => {
-      setRuns(prev => [run as AutomationRun, ...prev])
+      setRuns((prev) => [run as AutomationRun, ...prev])
     })
     const unsubCompleted = api.automation.onRunCompleted((run) => {
-      setRuns(prev => prev.map(r => r.id === (run as AutomationRun).id ? run as AutomationRun : r))
+      setRuns((prev) =>
+        prev.map((r) => (r.id === (run as AutomationRun).id ? (run as AutomationRun) : r))
+      )
     })
     const unsubFailed = api.automation.onRunFailed((run) => {
-      setRuns(prev => prev.map(r => r.id === (run as AutomationRun).id ? run as AutomationRun : r))
+      setRuns((prev) =>
+        prev.map((r) => (r.id === (run as AutomationRun).id ? (run as AutomationRun) : r))
+      )
     })
     return () => {
       unsubStarted()
@@ -184,16 +232,16 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
   }, [api])
 
   const handleToggle = async (id: string) => {
-    const result = await api.automation.toggle(id) as Automation | null
+    const result = (await api.automation.toggle(id)) as Automation | null
     if (result) {
-      setAutomations(prev => prev.map(a => a.id === id ? result : a))
+      setAutomations((prev) => prev.map((a) => (a.id === id ? result : a)))
     }
   }
 
   const handleDelete = async (id: string) => {
     await api.automation.delete(id)
-    setAutomations(prev => prev.filter(a => a.id !== id))
-    setRuns(prev => prev.filter(r => r.automationId !== id))
+    setAutomations((prev) => prev.filter((a) => a.id !== id))
+    setRuns((prev) => prev.filter((r) => r.automationId !== id))
   }
 
   const handleTrigger = async (id: string) => {
@@ -206,33 +254,31 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
 
   const handleMarkRead = async (runId: string) => {
     await api.automation.markRead(runId)
-    setRuns(prev => prev.map(r => r.id === runId ? { ...r, read: true } : r))
+    setRuns((prev) => prev.map((r) => (r.id === runId ? { ...r, read: true } : r)))
   }
 
   const handleDeleteRun = async (runId: string) => {
     await api.automation.deleteRun(runId)
-    setRuns(prev => prev.filter(r => r.id !== runId))
+    setRuns((prev) => prev.filter((r) => r.id !== runId))
     if (expandedRunId === runId) setExpandedRunId(null)
   }
 
   const handleClearAllRuns = async () => {
     if (!window.confirm('Clear all completed run history?')) return
     await api.automation.clearAllRuns()
-    setRuns(prev => prev.filter(r => r.status === 'running'))
+    setRuns((prev) => prev.filter((r) => r.status === 'running'))
     setExpandedRunId(null)
   }
 
-  const filteredRuns = filter === 'unread'
-    ? runs.filter(r => !r.read && r.status !== 'running')
-    : runs
+  const filteredRuns =
+    filter === 'unread' ? runs.filter((r) => !r.read && r.status !== 'running') : runs
 
-  const projects = useProjectStore(s => s.projects)
+  const projects = useProjectStore((s) => s.projects)
 
   const automationName = (automationId: string) =>
-    automations.find(a => a.id === automationId)?.name ?? 'Unknown'
+    automations.find((a) => a.id === automationId)?.name ?? 'Unknown'
 
-  const projectName = (projectId: string) =>
-    projects.find(p => p.id === projectId)?.name ?? null
+  const projectName = (projectId: string) => projects.find((p) => p.id === projectId)?.name ?? null
 
   if (loading) {
     return (
@@ -247,7 +293,9 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
       {/* Automations list */}
       <div className="border-b border-border">
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Automations</span>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Automations
+          </span>
           <button
             onClick={onCreateClick}
             className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
@@ -266,7 +314,7 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
           </div>
         ) : (
           <div className="max-h-48 overflow-y-auto">
-            {automations.map(automation => (
+            {automations.map((automation) => (
               <div
                 key={automation.id}
                 className="px-3 py-1.5 hover:bg-muted/30 flex items-center gap-2 group"
@@ -276,14 +324,17 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                   className="shrink-0"
                   title={automation.enabled ? 'Disable' : 'Enable'}
                 >
-                  {automation.enabled
-                    ? <ToggleRight className="w-4 h-4 text-primary" />
-                    : <ToggleLeft className="w-4 h-4 text-muted-foreground" />
-                  }
+                  {automation.enabled ? (
+                    <ToggleRight className="w-4 h-4 text-primary" />
+                  ) : (
+                    <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+                  )}
                 </button>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium truncate">{automation.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{triggerLabel(automation.trigger)}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {triggerLabel(automation.trigger)}
+                  </div>
                 </div>
                 <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
@@ -317,9 +368,11 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
       {/* Triage inbox */}
       <div className="flex-1 min-h-0 flex flex-col">
         <div className="flex items-center justify-between px-3 py-2 shrink-0">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Run History</span>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Run History
+          </span>
           <div className="flex items-center gap-1">
-            {runs.some(r => r.status !== 'running') && (
+            {runs.some((r) => r.status !== 'running') && (
               <button
                 onClick={handleClearAllRuns}
                 className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
@@ -349,7 +402,7 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
               {filter === 'unread' ? 'No unread runs' : 'No runs yet'}
             </div>
           ) : (
-            filteredRuns.map(run => (
+            filteredRuns.map((run) => (
               <div key={run.id}>
                 <div
                   onClick={() => {
@@ -359,15 +412,20 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                   }}
                   className={`w-full text-left px-3 py-1.5 hover:bg-muted/30 flex items-center gap-2 cursor-pointer group/run ${!run.read && run.status !== 'running' ? 'bg-primary/5' : ''}`}
                 >
-                  {expandedRunId === run.id
-                    ? <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
-                    : <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground" />
-                  }
+                  {expandedRunId === run.id ? (
+                    <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground" />
+                  )}
                   {statusIcon(run.status)}
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs truncate block">{automationName(run.automationId)}</span>
+                    <span className="text-xs truncate block">
+                      {automationName(run.automationId)}
+                    </span>
                     {projectName(run.projectId) && (
-                      <span className="text-[10px] text-muted-foreground truncate block">{projectName(run.projectId)}</span>
+                      <span className="text-[10px] text-muted-foreground truncate block">
+                        {projectName(run.projectId)}
+                      </span>
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0">
@@ -375,7 +433,10 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                   </span>
                   {run.status !== 'running' && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteRun(run.id) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteRun(run.id)
+                      }}
                       className="p-0.5 rounded hover:bg-muted/50 shrink-0 opacity-0 group-hover/run:opacity-100 transition-opacity"
                       title="Delete run"
                     >
@@ -390,7 +451,9 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
-                        <span>{run.durationMs ? formatDuration(run.durationMs) : 'Running...'}</span>
+                        <span>
+                          {run.durationMs ? formatDuration(run.durationMs) : 'Running...'}
+                        </span>
                         {run.exitCode !== undefined && <span>Exit: {run.exitCode}</span>}
                       </div>
 
@@ -408,10 +471,14 @@ export function AutomationsPanel({ onCreateClick, onEditClick }: AutomationsPane
 
                       {run.worktreeBranch && (
                         <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          Branch: <span className="font-mono text-foreground">{run.worktreeBranch}</span>
+                          Branch:{' '}
+                          <span className="font-mono text-foreground">{run.worktreeBranch}</span>
                           {run.prUrl && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); window.electronAPI.shell.openExternal(run.prUrl!) }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                window.electronAPI.shell.openExternal(run.prUrl!)
+                              }}
                               className="text-[10px] text-primary hover:underline inline-flex items-center gap-0.5"
                               title={`Open PR #${run.prNumber}`}
                             >

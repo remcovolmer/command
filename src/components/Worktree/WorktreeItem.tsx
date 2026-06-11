@@ -37,7 +37,9 @@ function PRStatusBadge({ status, badge }: { status: PRStatus; badge: PRBadge }) 
 
   const checks = status.statusCheckRollup ?? []
   const hasDiffstat = status.additions !== undefined || status.deletions !== undefined
-  const reviewLabel = status.reviewDecision ? REVIEW_DECISION_LABELS[status.reviewDecision] : undefined
+  const reviewLabel = status.reviewDecision
+    ? REVIEW_DECISION_LABELS[status.reviewDecision]
+    : undefined
   const hasPopover = checks.length > 0 || hasDiffstat || Boolean(reviewLabel)
 
   return (
@@ -46,9 +48,7 @@ function PRStatusBadge({ status, badge }: { status: PRStatus; badge: PRBadge }) 
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <span className={`${CHIP_BASE} ${BADGE_KIND_CLASSES[badge.kind]}`}>
-        {badge.label}
-      </span>
+      <span className={`${CHIP_BASE} ${BADGE_KIND_CLASSES[badge.kind]}`}>{badge.label}</span>
       {hovered && hasPopover && (
         <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg py-1.5 px-2 text-xs whitespace-nowrap">
           {hasDiffstat && (
@@ -64,7 +64,15 @@ function PRStatusBadge({ status, badge }: { status: PRStatus; badge: PRBadge }) 
           )}
           {checks.map((c, i) => (
             <div key={i} className="flex items-center gap-1.5 py-0.5">
-              <span className={c.bucket === 'pass' ? 'text-green-500' : c.bucket === 'fail' ? 'text-red-500' : 'text-yellow-500'}>
+              <span
+                className={
+                  c.bucket === 'pass'
+                    ? 'text-green-500'
+                    : c.bucket === 'fail'
+                      ? 'text-red-500'
+                      : 'text-yellow-500'
+                }
+              >
                 {c.bucket === 'pass' ? '\u2713' : c.bucket === 'fail' ? '\u2717' : '\u25cb'}
               </span>
               <span className="text-popover-foreground">{c.name}</span>
@@ -101,31 +109,35 @@ function MergeButton({ badgeKind, checks, onMerge, isMerging }: MergeButtonProps
     )
   }
 
-  const btnColor = badgeKind === 'ready'
-    ? 'bg-green-600 hover:bg-green-700'
-    : 'bg-gray-500 hover:bg-gray-600'
+  const btnColor =
+    badgeKind === 'ready' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
 
   // Check names only feed the tooltip detail; the decision lives in badgeKind
-  const failNames = checks.filter(c => c.bucket === 'fail').map(c => c.name)
-  const pendingNames = checks.filter(c => c.bucket === 'pending').map(c => c.name)
-  const title = badgeKind === 'ci-fail'
-    ? `Merge & Squash (checks failing: ${failNames.join(', ')})`
-    : badgeKind === 'pending'
-      ? `Merge & Squash (checks running: ${pendingNames.join(', ')})`
-      : badgeKind === 'review'
-        ? 'Merge & Squash (review outstanding)'
-        : 'Merge & Squash this PR'
+  const failNames = checks.filter((c) => c.bucket === 'fail').map((c) => c.name)
+  const pendingNames = checks.filter((c) => c.bucket === 'pending').map((c) => c.name)
+  const title =
+    badgeKind === 'ci-fail'
+      ? `Merge & Squash (checks failing: ${failNames.join(', ')})`
+      : badgeKind === 'pending'
+        ? `Merge & Squash (checks running: ${pendingNames.join(', ')})`
+        : badgeKind === 'review'
+          ? 'Merge & Squash (review outstanding)'
+          : 'Merge & Squash this PR'
 
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); onMerge() }}
+      onClick={(e) => {
+        e.stopPropagation()
+        onMerge()
+      }}
       className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-white transition-colors ml-auto ${btnColor}`}
       title={title}
     >
-      {badgeKind === 'pending'
-        ? <Loader2 className="w-3 h-3 animate-spin" />
-        : <GitMerge className="w-3 h-3" />
-      }
+      {badgeKind === 'pending' ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : (
+        <GitMerge className="w-3 h-3" />
+      )}
       Merge
     </button>
   )
@@ -157,7 +169,10 @@ export const WorktreeItem = memo(function WorktreeItem({
   useEffect(() => {
     if (ghAvailable !== null) return
     const api = getElectronAPI()
-    api.github.checkAvailable().then(setGhAvailable).catch(() => {})
+    api.github
+      .checkAvailable()
+      .then(setGhAvailable)
+      .catch(() => {})
   }, [ghAvailable, setGhAvailable])
 
   // Start/stop polling for this worktree (GitHubService applies its own jitter)
@@ -211,10 +226,12 @@ export const WorktreeItem = memo(function WorktreeItem({
       // Build warning message parts
       const warnings: string[] = []
       const currentChecks = prStatus?.statusCheckRollup ?? []
-      const failingChecks = currentChecks.filter(c => c.bucket === 'fail')
-      const pendingChecks = currentChecks.filter(c => c.bucket === 'pending')
+      const failingChecks = currentChecks.filter((c) => c.bucket === 'fail')
+      const pendingChecks = currentChecks.filter((c) => c.bucket === 'pending')
       if (failingChecks.length > 0) {
-        warnings.push(`WARNING: Some checks are failing (${failingChecks.map(c => c.name).join(', ')}).`)
+        warnings.push(
+          `WARNING: Some checks are failing (${failingChecks.map((c) => c.name).join(', ')}).`
+        )
       } else if (pendingChecks.length > 0) {
         warnings.push(`WARNING: Some checks are still running.`)
       }
@@ -241,7 +258,10 @@ export const WorktreeItem = memo(function WorktreeItem({
         } catch (err) {
           console.error('[WorktreeItem] Worktree removal failed after merge:', err)
           api.github.stopPolling(worktree.id)
-          api.notification.show('PR Merged', `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`)
+          api.notification.show(
+            'PR Merged',
+            `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`
+          )
           return
         }
 
@@ -276,7 +296,9 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   // Merge button visibility (show for any open, conflict-free PR with fresh data)
   // Hide while stale so the destructive merge can't fire against acknowledged-stale checks.
-  const showMergeButton = prStatus && !prStatus.noPR &&
+  const showMergeButton =
+    prStatus &&
+    !prStatus.noPR &&
     prStatus.state === 'OPEN' &&
     prStatus.mergeable === 'MERGEABLE' &&
     !prStatus.stale
@@ -329,7 +351,10 @@ export const WorktreeItem = memo(function WorktreeItem({
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {ghAvailable?.installed && ghAvailable?.authenticated && (
               <button
-                onClick={(e) => { e.stopPropagation(); handleRefresh() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleRefresh()
+                }}
                 className="p-0.5 rounded hover:bg-border"
                 title="Refresh PR status"
               >
@@ -358,11 +383,18 @@ export const WorktreeItem = memo(function WorktreeItem({
             ${isActive ? 'bg-[var(--sidebar-highlight)] rounded-b-md' : ''}
             ${prStatus.stale ? 'opacity-60' : ''}
           `}
-          title={prStatus.stale ? `PR status update failed — showing last known data. ${prStatus.error ?? ''}`.trim() : undefined}
+          title={
+            prStatus.stale
+              ? `PR status update failed — showing last known data. ${prStatus.error ?? ''}`.trim()
+              : undefined
+          }
         >
           {/* PR number - neutral clickable chip */}
           <button
-            onClick={(e) => { e.stopPropagation(); handleOpenPR() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleOpenPR()
+            }}
             className="flex items-center gap-0.5 text-[10px] leading-none px-1 py-0.5 rounded bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title={`Open PR #${prStatus.number} in browser`}
           >

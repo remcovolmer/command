@@ -1,6 +1,9 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
+import { createLogger } from './Logger'
+
+const log = createLogger('SkillInstaller')
 
 /**
  * Installs the ccli skill as a global Claude Code skill (~/.claude/skills/ccli/skill.md).
@@ -38,9 +41,9 @@ export class SkillInstaller {
       }
 
       writeFileSync(this.globalSkillPath, this.skillTemplate, 'utf-8')
-      console.log(`[SkillInstaller] ${currentVersion ? 'Updated' : 'Installed'} global ccli skill`)
+      log.info(`${currentVersion ? 'Updated' : 'Installed'} global ccli skill`)
     } catch (e) {
-      console.error('[SkillInstaller] Failed to install global skill:', e)
+      log.error('Failed to install global skill:', e)
     }
   }
 
@@ -53,11 +56,11 @@ export class SkillInstaller {
       const legacyPath = join(projectPath, '.claude', 'commands', 'ccli.md')
       if (existsSync(legacyPath)) {
         unlinkSync(legacyPath)
-        console.log(`[SkillInstaller] Removed legacy command from ${projectPath}`)
+        log.info(`Removed legacy command from ${projectPath}`)
       }
     } catch (e) {
       // Non-critical — log and move on
-      console.error(`[SkillInstaller] Failed to clean up legacy command in ${projectPath}:`, e)
+      log.error(`Failed to clean up legacy command in ${projectPath}:`, e)
     }
   }
 

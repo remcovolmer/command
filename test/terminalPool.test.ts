@@ -70,7 +70,7 @@ describe('TerminalPool', () => {
       // With maxSize=3 and 3 terminals, needsEviction is false
       // But let's add a 4th and check candidate
       pool.touch('d')
-      ;(terminals as any).d = makeTerminal()
+      terminals.d = makeTerminal()
 
       const candidate = pool.getEvictionCandidate(terminals, 'd', [])
       // b is least recently used (order: d, a, c, b)
@@ -227,7 +227,7 @@ describe('TerminalPool', () => {
       pool.touch('c')
 
       const terminals: Record<string, TerminalSession> = {
-        a: makeTerminal({ type: 'normal' }),  // sidecar
+        a: makeTerminal({ type: 'normal' }), // sidecar
         b: makeTerminal({ type: 'claude' }),
         c: makeTerminal({ type: 'claude' }),
       }

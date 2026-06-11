@@ -1,55 +1,24 @@
 import { readFile, writeFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
-// Types duplicated here due to Electron process isolation
-export interface TaskItem {
-  id: string
-  text: string
-  completed: boolean
-  section: string
-  filePath: string
-  lineNumber: number
-  dueDate?: string
-  personTags?: string[]
-  isOverdue?: boolean
-  isDueToday?: boolean
-}
+import type {
+  TaskAdd,
+  TaskItem,
+  TaskMove,
+  TaskSection,
+  TaskUpdate,
+  TasksData,
+} from '../../../shared/ipc-types'
 
-export interface TaskSection {
-  name: string
-  priority: number
-  tasks: TaskItem[]
-}
-
-export interface TasksData {
-  sections: TaskSection[]
-  files: string[]
-  totalOpen: number
-  nowCount: number
-}
-
-export interface TaskUpdate {
-  filePath: string
-  lineNumber: number
-  action: 'toggle' | 'edit' | 'delete'
-  newText?: string
-}
-
-export interface TaskMove {
-  filePath: string
-  lineNumber: number
-  targetSection: string
-}
-
-export interface TaskAdd {
-  filePath: string
-  section: string
-  text: string
-}
+export type { TaskAdd, TaskItem, TaskMove, TaskSection, TaskUpdate, TasksData }
 
 // Section priorities for the 5 canonical sections
 const SECTION_PRIORITIES: Record<string, number> = {
-  now: 0, next: 1, waiting: 2, later: 3, done: 4,
+  now: 0,
+  next: 1,
+  waiting: 2,
+  later: 3,
+  done: 4,
 }
 
 const TASKS_FILENAME = 'TASKS.md'
@@ -69,7 +38,10 @@ function mapSectionName(heading: string): { name: string; priority: number } {
   return { name: heading.trim(), priority: -1 }
 }
 
-function computeDateFlags(dueDate: string | undefined): { isOverdue: boolean; isDueToday: boolean } {
+function computeDateFlags(dueDate: string | undefined): {
+  isOverdue: boolean
+  isDueToday: boolean
+} {
   if (!dueDate) return { isOverdue: false, isDueToday: false }
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -82,7 +54,12 @@ function computeDateFlags(dueDate: string | undefined): { isOverdue: boolean; is
   }
 }
 
-function parseLine(line: string, filePath: string, lineNumber: number, section: string): TaskItem | null {
+function parseLine(
+  line: string,
+  filePath: string,
+  lineNumber: number,
+  section: string
+): TaskItem | null {
   const match = line.match(CHECKBOX_REGEX)
   if (!match) return null
 
@@ -137,7 +114,12 @@ export class TaskService {
       const entries = await readdir(dirPath, { withFileTypes: true })
       for (const entry of entries) {
         // Skip hidden dirs and common large dirs
-        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'build') {
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === 'node_modules' ||
+          entry.name === 'dist' ||
+          entry.name === 'build'
+        ) {
           continue
         }
         const fullPath = path.join(dirPath, entry.name)
@@ -173,7 +155,7 @@ export class TaskService {
         currentSection = mapped.name
 
         // Check if section already exists
-        const existing = sections.find(s => s.name === currentSection)
+        const existing = sections.find((s) => s.name === currentSection)
         if (!existing) {
           sections.push({
             name: currentSection,
@@ -187,7 +169,7 @@ export class TaskService {
       if (currentSection) {
         const task = parseLine(line, filePath, i + 1, currentSection) // 1-indexed line numbers
         if (task) {
-          const section = sections.find(s => s.name === currentSection)
+          const section = sections.find((s) => s.name === currentSection)
           section?.tasks.push(task)
         }
       }
@@ -226,9 +208,12 @@ export class TaskService {
     }
 
     const sections = Array.from(allSections.values()).sort((a, b) => a.priority - b.priority)
-    const totalOpen = sections.reduce((sum, s) => sum + s.tasks.filter(t => !t.completed).length, 0)
-    const nowSection = sections.find(s => s.name === 'Now')
-    const nowCount = nowSection ? nowSection.tasks.filter(t => !t.completed).length : 0
+    const totalOpen = sections.reduce(
+      (sum, s) => sum + s.tasks.filter((t) => !t.completed).length,
+      0
+    )
+    const nowSection = sections.find((s) => s.name === 'Now')
+    const nowCount = nowSection ? nowSection.tasks.filter((t) => !t.completed).length : 0
 
     return { sections, files, totalOpen, nowCount }
   }
@@ -254,7 +239,12 @@ export class TaskService {
     return this.applyUpdate(projectPath, update, lines, lineIndex)
   }
 
-  private async applyUpdate(projectPath: string, update: TaskUpdate, lines: string[], lineIndex: number): Promise<TasksData> {
+  private async applyUpdate(
+    projectPath: string,
+    update: TaskUpdate,
+    lines: string[],
+    lineIndex: number
+  ): Promise<TasksData> {
     const line = lines[lineIndex]
 
     switch (update.action) {
@@ -389,7 +379,10 @@ export class TaskService {
       const h2Match = lines[i].match(H2_REGEX)
       if (h2Match) {
         const mapped = mapSectionName(h2Match[1])
-        if (mapped.name === sectionName || h2Match[1].trim().toLowerCase() === sectionName.toLowerCase()) {
+        if (
+          mapped.name === sectionName ||
+          h2Match[1].trim().toLowerCase() === sectionName.toLowerCase()
+        ) {
           // Found the section. Insert after header (skip blank lines after header)
           let insertAt = i + 1
           while (insertAt < lines.length && lines[insertAt].trim() === '') {
@@ -401,5 +394,4 @@ export class TaskService {
     }
     return -1
   }
-
 }

@@ -3,43 +3,18 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import fsAsync from 'node:fs/promises'
 import path from 'node:path'
+import { createLogger } from './Logger'
 
-// NOTE: Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
-type ProjectType = 'workspace' | 'project' | 'code'
-type AuthMode = 'subscription' | 'profile'
-type ClaudeMode = 'chat' | 'auto' | 'full-auto'
+const log = createLogger('ProjectPersistence')
 
-interface AccountProfile {
-  id: string
-  name: string
-  envVarCount: number
-}
-
-interface ProjectSettings {
-  claudeMode?: ClaudeMode
-  authMode?: AuthMode
-  profileId?: string
-}
-
-interface Project {
-  id: string
-  name: string
-  path: string
-  type: ProjectType
-  createdAt: number
-  sortOrder: number
-  settings?: ProjectSettings
-}
-
-interface Worktree {
-  id: string
-  projectId: string
-  name: string
-  branch: string
-  path: string
-  createdAt: number
-  isLocked: boolean
-}
+import type {
+  AccountProfile,
+  AuthMode,
+  ClaudeMode,
+  Project,
+  ProjectType,
+  Worktree,
+} from '../../../shared/ipc-types'
 
 interface PersistedSession {
   terminalId: string
@@ -72,11 +47,16 @@ function isValidSession(session: unknown): session is PersistedSession {
   if (!session || typeof session !== 'object') return false
   const s = session as Record<string, unknown>
   return (
-    typeof s.terminalId === 'string' && UUID_REGEX.test(s.terminalId) &&
-    typeof s.projectId === 'string' && UUID_REGEX.test(s.projectId) &&
-    (s.worktreeId === null || (typeof s.worktreeId === 'string' && UUID_REGEX.test(s.worktreeId))) &&
-    typeof s.claudeSessionId === 'string' && SESSION_ID_REGEX.test(s.claudeSessionId) &&
-    typeof s.cwd === 'string' && s.cwd.length > 0 &&
+    typeof s.terminalId === 'string' &&
+    UUID_REGEX.test(s.terminalId) &&
+    typeof s.projectId === 'string' &&
+    UUID_REGEX.test(s.projectId) &&
+    (s.worktreeId === null ||
+      (typeof s.worktreeId === 'string' && UUID_REGEX.test(s.worktreeId))) &&
+    typeof s.claudeSessionId === 'string' &&
+    SESSION_ID_REGEX.test(s.claudeSessionId) &&
+    typeof s.cwd === 'string' &&
+    s.cwd.length > 0 &&
     typeof s.title === 'string' &&
     typeof s.closedAt === 'number'
   )
@@ -85,8 +65,8 @@ function isValidSession(session: unknown): session is PersistedSession {
 interface PersistedState {
   version: number
   projects: Project[]
-  worktrees: Record<string, Worktree[]>  // projectId -> worktrees
-  sessions: PersistedSession[]  // Sessions to restore on startup
+  worktrees: Record<string, Worktree[]> // projectId -> worktrees
+  sessions: PersistedSession[] // Sessions to restore on startup
   profiles: AccountProfile[]
   activeProfileId: string | null
 }
@@ -109,7 +89,14 @@ export class ProjectPersistence {
   }
 
   private defaultState(): PersistedState {
-    return { version: STATE_VERSION, projects: [], worktrees: {}, sessions: [], profiles: [], activeProfileId: null }
+    return {
+      version: STATE_VERSION,
+      projects: [],
+      worktrees: {},
+      sessions: [],
+      profiles: [],
+      activeProfileId: null,
+    }
   }
 
   private async loadState(): Promise<PersistedState> {
@@ -127,7 +114,9 @@ export class ProjectPersistence {
         // Filter out any invalid sessions to prevent runtime errors from corrupted data
         const validSessions = (parsed.sessions || []).filter(isValidSession)
         if (validSessions.length !== (parsed.sessions || []).length) {
-          console.warn(`Filtered out ${(parsed.sessions || []).length - validSessions.length} invalid session(s) from persisted state`)
+          log.warn(
+            `Filtered out ${(parsed.sessions || []).length - validSessions.length} invalid session(s) from persisted state`
+          )
         }
 
         return {
@@ -135,19 +124,26 @@ export class ProjectPersistence {
           sessions: validSessions,
         } as PersistedState
       } else {
-        console.warn('Invalid state file structure, using default state')
+        log.warn('Invalid state file structure, using default state')
       }
     } catch (error) {
       // File doesn't exist or is corrupted — use default state
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error('Failed to load state:', error)
+        log.error('Failed to load state:', error)
       }
     }
 
     return this.defaultState()
   }
 
-  private migrateState(oldState: { version: number; projects: Project[]; worktrees?: Record<string, Worktree[]>; sessions?: PersistedSession[]; profiles?: AccountProfile[]; activeProfileId?: string | null }): PersistedState {
+  private migrateState(oldState: {
+    version: number
+    projects: Project[]
+    worktrees?: Record<string, Worktree[]>
+    sessions?: PersistedSession[]
+    profiles?: AccountProfile[]
+    activeProfileId?: string | null
+  }): PersistedState {
     // Migrate from version 1 to current: add worktrees and sessions
     if (oldState.version === 1) {
       const v2State = {
@@ -161,12 +157,10 @@ export class ProjectPersistence {
 
     // Migrate from version 2 to current: add project type, sessions, settings
     if (oldState.version === 2) {
-      const validProjects = oldState.projects.filter(p =>
-        p && typeof p === 'object' &&
-        typeof p.id === 'string' &&
-        typeof p.path === 'string'
+      const validProjects = oldState.projects.filter(
+        (p) => p && typeof p === 'object' && typeof p.id === 'string' && typeof p.path === 'string'
       )
-      const migratedProjects = validProjects.map(p => ({
+      const migratedProjects = validProjects.map((p) => ({
         ...p,
         type: 'code' as const,
       }))
@@ -202,9 +196,12 @@ export class ProjectPersistence {
 
     // Migrate from version 5 to 6: replace dangerouslySkipPermissions boolean with claudeMode enum
     if (oldState.version === 5) {
-      const migratedProjects = oldState.projects.map(p => {
+      const migratedProjects = oldState.projects.map((p) => {
         if (!p.settings) return p
-        const { dangerouslySkipPermissions, ...restSettings } = p.settings as Record<string, unknown>
+        const { dangerouslySkipPermissions, ...restSettings } = p.settings as Record<
+          string,
+          unknown
+        >
         return {
           ...p,
           settings: dangerouslySkipPermissions
@@ -245,7 +242,7 @@ export class ProjectPersistence {
       fs.writeFileSync(tempPath, JSON.stringify(this.state, null, 2), 'utf-8')
       fs.renameSync(tempPath, this.stateFilePath)
     } catch (error) {
-      console.error('Failed to save state:', error)
+      log.error('Failed to save state:', error)
     }
   }
 
@@ -255,7 +252,7 @@ export class ProjectPersistence {
 
   addProject(projectPath: string, name?: string, type: ProjectType = 'code'): Project {
     // Check if project already exists
-    const existing = this.state.projects.find(p => p.path === projectPath)
+    const existing = this.state.projects.find((p) => p.path === projectPath)
     if (existing) {
       return existing
     }
@@ -279,7 +276,7 @@ export class ProjectPersistence {
   }
 
   removeProject(id: string): void {
-    const index = this.state.projects.findIndex(p => p.id === id)
+    const index = this.state.projects.findIndex((p) => p.id === id)
     if (index !== -1) {
       this.state.projects.splice(index, 1)
 
@@ -293,7 +290,7 @@ export class ProjectPersistence {
   }
 
   updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'createdAt'>>): Project | null {
-    const project = this.state.projects.find(p => p.id === id)
+    const project = this.state.projects.find((p) => p.id === id)
     if (project) {
       if ('name' in updates && typeof updates.name === 'string') project.name = updates.name
       if ('settings' in updates) project.settings = updates.settings
@@ -305,7 +302,7 @@ export class ProjectPersistence {
 
   reorderProjects(projectIds: string[]): void {
     // Create a map for quick lookup
-    const projectMap = new Map(this.state.projects.map(p => [p.id, p]))
+    const projectMap = new Map(this.state.projects.map((p) => [p.id, p]))
 
     // Update sort orders based on new order
     projectIds.forEach((id, index) => {
@@ -329,7 +326,7 @@ export class ProjectPersistence {
 
   getWorktreeById(worktreeId: string): Worktree | null {
     for (const projectWorktrees of Object.values(this.state.worktrees)) {
-      const worktree = projectWorktrees.find(w => w.id === worktreeId)
+      const worktree = projectWorktrees.find((w) => w.id === worktreeId)
       if (worktree) return worktree
     }
     return null
@@ -341,9 +338,7 @@ export class ProjectPersistence {
     }
 
     // Check for duplicate path
-    const existing = this.state.worktrees[worktree.projectId].find(
-      w => w.path === worktree.path
-    )
+    const existing = this.state.worktrees[worktree.projectId].find((w) => w.path === worktree.path)
     if (existing) {
       return existing
     }
@@ -356,7 +351,7 @@ export class ProjectPersistence {
 
   removeWorktree(worktreeId: string): void {
     for (const projectId of Object.keys(this.state.worktrees)) {
-      const index = this.state.worktrees[projectId].findIndex(w => w.id === worktreeId)
+      const index = this.state.worktrees[projectId].findIndex((w) => w.id === worktreeId)
       if (index !== -1) {
         this.state.worktrees[projectId].splice(index, 1)
         this.saveState()
@@ -365,9 +360,12 @@ export class ProjectPersistence {
     }
   }
 
-  updateWorktree(worktreeId: string, updates: Partial<Omit<Worktree, 'id' | 'projectId' | 'createdAt'>>): Worktree | null {
+  updateWorktree(
+    worktreeId: string,
+    updates: Partial<Omit<Worktree, 'id' | 'projectId' | 'createdAt'>>
+  ): Worktree | null {
     for (const projectWorktrees of Object.values(this.state.worktrees)) {
-      const worktree = projectWorktrees.find(w => w.id === worktreeId)
+      const worktree = projectWorktrees.find((w) => w.id === worktreeId)
       if (worktree) {
         Object.assign(worktree, updates)
         this.saveState()
@@ -416,8 +414,11 @@ export class ProjectPersistence {
     return profile
   }
 
-  updateProfile(id: string, updates: { name?: string; envVarCount?: number }): AccountProfile | null {
-    const profile = this.state.profiles.find(p => p.id === id)
+  updateProfile(
+    id: string,
+    updates: { name?: string; envVarCount?: number }
+  ): AccountProfile | null {
+    const profile = this.state.profiles.find((p) => p.id === id)
     if (!profile) return null
     if (updates.name !== undefined) profile.name = updates.name
     if (updates.envVarCount !== undefined) profile.envVarCount = updates.envVarCount
@@ -426,7 +427,7 @@ export class ProjectPersistence {
   }
 
   removeProfile(id: string): void {
-    const index = this.state.profiles.findIndex(p => p.id === id)
+    const index = this.state.profiles.findIndex((p) => p.id === id)
     if (index !== -1) {
       this.state.profiles.splice(index, 1)
       // Clear activeProfileId if it was pointing to the removed profile

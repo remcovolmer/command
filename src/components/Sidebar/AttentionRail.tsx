@@ -5,7 +5,8 @@
 // from drifting apart.
 
 /** Base classes for small status chips (attention chip, PR badge). */
-export const CHIP_BASE = 'text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap'
+export const CHIP_BASE =
+  'text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap'
 
 /** 3px left-edge bar for permission/question rows (.attention-pulse animates it). */
 export function AttentionRail() {
@@ -21,7 +22,9 @@ export function AttentionRail() {
 /** Chip telling the user a permission/question row needs them. */
 export function AttentionChip() {
   return (
-    <span className={`${CHIP_BASE} flex-shrink-0 bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[var(--status-attention)]`}>
+    <span
+      className={`${CHIP_BASE} flex-shrink-0 bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[var(--status-attention)]`}
+    >
       wacht op jou
     </span>
   )

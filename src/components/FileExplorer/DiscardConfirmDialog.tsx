@@ -57,7 +57,7 @@ export function DiscardConfirmDialog({ gitPath, onComplete }: DiscardConfirmDial
 
   const { files, isUntracked } = discardingFiles
   const isSingle = files.length === 1
-  const fileName = isSingle ? (files[0].split(/[/\\]/).pop() || files[0]) : ''
+  const fileName = isSingle ? files[0].split(/[/\\]/).pop() || files[0] : ''
 
   let title: string
   let description: string
@@ -79,9 +79,7 @@ export function DiscardConfirmDialog({ gitPath, onComplete }: DiscardConfirmDial
         <h3 className="text-base font-semibold text-card-foreground mb-2">{title}</h3>
         <p className="text-sm text-muted-foreground mb-4">{description}</p>
 
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>}
 
         <div className="flex items-center justify-end gap-2">
           <button

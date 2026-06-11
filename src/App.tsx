@@ -23,7 +23,6 @@ function App() {
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
   const addToSplit = useProjectStore((s) => s.addToSplit)
   const removeFromSplit = useProjectStore((s) => s.removeFromSplit)
-  const getLayout = useProjectStore((s) => s.getLayout)
   const closeEditorTab = useProjectStore((s) => s.closeEditorTab)
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
@@ -62,13 +61,13 @@ function App() {
     if (projects.length === 0) return []
 
     const terminalValues = Object.values(terminals)
-    const workspaces = projects.filter(p => p.type === 'workspace')
-    const regular = projects.filter(p => p.type !== 'workspace')
-    const activeRegular = regular.filter(p => terminalValues.some(t => t.projectId === p.id))
+    const workspaces = projects.filter((p) => p.type === 'workspace')
+    const regular = projects.filter((p) => p.type !== 'workspace')
+    const activeRegular = regular.filter((p) => terminalValues.some((t) => t.projectId === p.id))
     if (inactiveSectionCollapsed) {
       return [...workspaces, ...activeRegular]
     }
-    const inactiveRegular = regular.filter(p => !terminalValues.some(t => t.projectId === p.id))
+    const inactiveRegular = regular.filter((p) => !terminalValues.some((t) => t.projectId === p.id))
     return [...workspaces, ...activeRegular, ...inactiveRegular]
   }, [])
 
@@ -91,7 +90,7 @@ function App() {
       const visualOrder = getProjectVisualOrder()
       if (visualOrder.length === 0) return
 
-      const currentIndex = visualOrder.findIndex(p => p.id === activeProjectId)
+      const currentIndex = visualOrder.findIndex((p) => p.id === activeProjectId)
       const newIndex = (currentIndex - 1 + visualOrder.length) % visualOrder.length
       setActiveProject(visualOrder[newIndex].id)
     },
@@ -101,31 +100,33 @@ function App() {
       const visualOrder = getProjectVisualOrder()
       if (visualOrder.length === 0) return
 
-      const currentIndex = visualOrder.findIndex(p => p.id === activeProjectId)
+      const currentIndex = visualOrder.findIndex((p) => p.id === activeProjectId)
       const newIndex = (currentIndex + 1) % visualOrder.length
       setActiveProject(visualOrder[newIndex].id)
     },
 
     'nav.previousTerminal': () => {
-      const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
+      const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } =
+        useProjectStore.getState()
       if (!activeProjectId) return
 
       const projectTerminals = getProjectTerminals(activeProjectId)
       if (projectTerminals.length === 0) return
 
-      const currentIndex = projectTerminals.findIndex(t => t.id === activeTerminalId)
+      const currentIndex = projectTerminals.findIndex((t) => t.id === activeTerminalId)
       const newIndex = (currentIndex - 1 + projectTerminals.length) % projectTerminals.length
       setActiveTerminal(projectTerminals[newIndex].id)
     },
 
     'nav.nextTerminal': () => {
-      const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
+      const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } =
+        useProjectStore.getState()
       if (!activeProjectId) return
 
       const projectTerminals = getProjectTerminals(activeProjectId)
       if (projectTerminals.length === 0) return
 
-      const currentIndex = projectTerminals.findIndex(t => t.id === activeTerminalId)
+      const currentIndex = projectTerminals.findIndex((t) => t.id === activeTerminalId)
       const newIndex = (currentIndex + 1) % projectTerminals.length
       setActiveTerminal(projectTerminals[newIndex].id)
     },
@@ -224,10 +225,7 @@ function App() {
 
     // Terminal shortcuts Alt+1-9 (generated handlers)
     ...Object.fromEntries(
-      Array.from({ length: 9 }, (_, i) => [
-        `terminal.goTo${i + 1}`,
-        () => switchToTerminal(i)
-      ])
+      Array.from({ length: 9 }, (_, i) => [`terminal.goTo${i + 1}`, () => switchToTerminal(i)])
     ),
 
     // File explorer
@@ -249,18 +247,20 @@ function App() {
       setFileExplorerActiveTab('automations')
     },
     'fileExplorer.newFile': () => {
-      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } = useProjectStore.getState()
+      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } =
+        useProjectStore.getState()
       if (!activeProjectId || !fileExplorerVisible) return
-      const project = projects.find(p => p.id === activeProjectId)
+      const project = projects.find((p) => p.id === activeProjectId)
       if (!project) return
       // Determine parent: selected directory or project root
       const parentPath = fileExplorerSelectedPath ?? project.path
       useProjectStore.getState().startCreate(parentPath, 'file')
     },
     'fileExplorer.newFolder': () => {
-      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } = useProjectStore.getState()
+      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } =
+        useProjectStore.getState()
       if (!activeProjectId || !fileExplorerVisible) return
-      const project = projects.find(p => p.id === activeProjectId)
+      const project = projects.find((p) => p.id === activeProjectId)
       if (!project) return
       const parentPath = fileExplorerSelectedPath ?? project.path
       useProjectStore.getState().startCreate(parentPath, 'directory')
@@ -280,7 +280,7 @@ function App() {
       if (!fileExplorerSelectedPath) return
       // Find the entry in the cache
       for (const entries of Object.values(directoryCache)) {
-        const found = entries.find(e => e.path === fileExplorerSelectedPath)
+        const found = entries.find((e) => e.path === fileExplorerSelectedPath)
         if (found) {
           useProjectStore.getState().setDeletingEntry(found)
           break
@@ -298,13 +298,14 @@ function App() {
 
     // Git operations
     'git.stageAll': () => {
-      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } = useProjectStore.getState()
+      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } =
+        useProjectStore.getState()
       if (fileExplorerActiveTab !== 'git') return
-      const project = projects.find(p => p.id === activeProjectId)
+      const project = projects.find((p) => p.id === activeProjectId)
       if (!project) return
       const status = gitStatus[activeProjectId!]
       if (!status) return
-      const files = [...status.modified.map(f => f.path), ...status.untracked.map(f => f.path)]
+      const files = [...status.modified.map((f) => f.path), ...status.untracked.map((f) => f.path)]
       if (files.length > 0) {
         api.git.stageFiles(project.path, files).then(() => {
           // Trigger refresh via the git tab's existing refresh mechanism
@@ -312,13 +313,14 @@ function App() {
       }
     },
     'git.unstageAll': () => {
-      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } = useProjectStore.getState()
+      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } =
+        useProjectStore.getState()
       if (fileExplorerActiveTab !== 'git') return
-      const project = projects.find(p => p.id === activeProjectId)
+      const project = projects.find((p) => p.id === activeProjectId)
       if (!project) return
       const status = gitStatus[activeProjectId!]
       if (!status) return
-      const files = status.staged.map(f => f.path)
+      const files = status.staged.map((f) => f.path)
       if (files.length > 0) {
         api.git.unstageFiles(project.path, files).then(() => {
           // Refresh handled by file watcher
@@ -333,13 +335,14 @@ function App() {
       textarea?.focus()
     },
     'git.discardAll': () => {
-      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab, setDiscardingFiles } = useProjectStore.getState()
+      const { activeProjectId, projects, gitStatus, fileExplorerActiveTab, setDiscardingFiles } =
+        useProjectStore.getState()
       if (fileExplorerActiveTab !== 'git') return
-      const project = projects.find(p => p.id === activeProjectId)
+      const project = projects.find((p) => p.id === activeProjectId)
       if (!project) return
       const status = gitStatus[activeProjectId!]
       if (!status) return
-      const files = status.modified.map(f => f.path)
+      const files = status.modified.map((f) => f.path)
       if (files.length > 0) {
         setDiscardingFiles({ files, isUntracked: false })
       }
@@ -357,7 +360,7 @@ function App() {
       const tabs = Object.values(editorTabs)
       if (tabs.length === 0) return
 
-      const currentIndex = tabs.findIndex(t => t.id === activeCenterTabId)
+      const currentIndex = tabs.findIndex((t) => t.id === activeCenterTabId)
       const nextIndex = (currentIndex + 1) % tabs.length
       setActiveCenterTab(tabs[nextIndex].id)
     },
@@ -366,7 +369,7 @@ function App() {
       const tabs = Object.values(editorTabs)
       if (tabs.length === 0) return
 
-      const currentIndex = tabs.findIndex(t => t.id === activeCenterTabId)
+      const currentIndex = tabs.findIndex((t) => t.id === activeCenterTabId)
       const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
       setActiveCenterTab(tabs[prevIndex].id)
     },
@@ -398,7 +401,7 @@ function App() {
     'ui.cycleClaudeMode': () => {
       const { activeProjectId, projects, updateProject } = useProjectStore.getState()
       if (!activeProjectId) return
-      const project = projects.find(p => p.id === activeProjectId)
+      const project = projects.find((p) => p.id === activeProjectId)
       if (!project) return
       const currentMode = project.settings?.claudeMode ?? 'chat'
       const modeOrder = ['chat', 'auto', 'full-auto'] as const
@@ -421,8 +424,13 @@ function App() {
   // a toast actually existed; otherwise we let downstream listeners proceed.
   // Reads binding from the persisted hotkey config so user re-bindings apply.
   const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
-  const dismissBindingRef = useRef(hotkeyConfig['dialog.dismissTopmostToast'] ?? DEFAULT_HOTKEY_CONFIG['dialog.dismissTopmostToast'])
-  dismissBindingRef.current = hotkeyConfig['dialog.dismissTopmostToast'] ?? DEFAULT_HOTKEY_CONFIG['dialog.dismissTopmostToast']
+  const dismissBindingRef = useRef(
+    hotkeyConfig['dialog.dismissTopmostToast'] ??
+      DEFAULT_HOTKEY_CONFIG['dialog.dismissTopmostToast']
+  )
+  dismissBindingRef.current =
+    hotkeyConfig['dialog.dismissTopmostToast'] ??
+    DEFAULT_HOTKEY_CONFIG['dialog.dismissTopmostToast']
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -478,13 +486,19 @@ function App() {
       {/* Settings Dialog */}
       <SettingsDialog
         isOpen={settingsDialogOpen}
-        onClose={() => { setSettingsDialogOpen(false); refocusActiveTerminal() }}
+        onClose={() => {
+          setSettingsDialogOpen(false)
+          refocusActiveTerminal()
+        }}
       />
 
       {/* Shortcuts Overlay */}
       <ShortcutsOverlay
         isOpen={showShortcuts}
-        onClose={() => { setShowShortcuts(false); refocusActiveTerminal() }}
+        onClose={() => {
+          setShowShortcuts(false)
+          refocusActiveTerminal()
+        }}
       />
 
       {/* Close Confirmation Dialog */}
@@ -492,15 +506,13 @@ function App() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50">
           <div className="bg-sidebar border border-border rounded-xl max-w-md mx-4 shadow-2xl">
             <div className="px-5 py-3 border-b border-border/30 bg-sidebar-accent/30 rounded-t-xl">
-              <h2 className="text-sm font-semibold text-foreground">
-                Close Application?
-              </h2>
+              <h2 className="text-sm font-semibold text-foreground">Close Application?</h2>
             </div>
             <div className="px-5 py-4">
               <p className="text-xs text-muted-foreground">
                 You have {Object.keys(terminals).length} active terminal
-                {Object.keys(terminals).length > 1 ? 's' : ''}. Closing the
-                application will terminate all running sessions.
+                {Object.keys(terminals).length > 1 ? 's' : ''}. Closing the application will
+                terminate all running sessions.
               </p>
             </div>
             <div className="flex justify-end gap-3 px-5 py-3 border-t border-border/30">

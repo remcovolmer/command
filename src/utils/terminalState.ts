@@ -14,17 +14,17 @@ export const STATE_DOT_COLORS: Record<TerminalState, string> = {
 // States that require user input (show blinking indicator)
 export const INPUT_STATES = ['done', 'permission', 'question'] as const
 export const isInputState = (state: TerminalState): boolean =>
-  INPUT_STATES.includes(state as typeof INPUT_STATES[number])
+  INPUT_STATES.includes(state as (typeof INPUT_STATES)[number])
 
 // States that require urgent user attention (orange treatment in sidebar)
 export const ATTENTION_STATES = ['permission', 'question'] as const
 export const isAttentionState = (state: TerminalState): boolean =>
-  ATTENTION_STATES.includes(state as typeof ATTENTION_STATES[number])
+  ATTENTION_STATES.includes(state as (typeof ATTENTION_STATES)[number])
 
 // States that should show a visible indicator
 export const VISIBLE_STATES = ['busy', 'done', 'permission', 'question'] as const
 export const isVisibleState = (state: TerminalState): boolean =>
-  VISIBLE_STATES.includes(state as typeof VISIBLE_STATES[number])
+  VISIBLE_STATES.includes(state as (typeof VISIBLE_STATES)[number])
 
 // Helper function for state colors (used by SidecarTerminalPanel)
 export function getStateColor(state: TerminalState): string {

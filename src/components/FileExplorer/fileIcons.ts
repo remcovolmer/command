@@ -117,14 +117,14 @@ const SPECIAL_FILES: Record<string, IconConfig> = {
   '.eslintrc.json': { icon: Settings, color: '#4b32c3' },
   '.prettierrc': { icon: Settings, color: '#56b3b4' },
   '.prettierrc.json': { icon: Settings, color: '#56b3b4' },
-  'dockerfile': { icon: FileCode, color: '#2496ed' },
+  dockerfile: { icon: FileCode, color: '#2496ed' },
   'docker-compose.yml': { icon: FileCode, color: '#2496ed' },
   'docker-compose.yaml': { icon: FileCode, color: '#2496ed' },
   '.dockerignore': { icon: Settings, color: '#2496ed' },
   '.gitignore': { icon: Settings, color: '#f05032' },
   '.gitattributes': { icon: Settings, color: '#f05032' },
   'readme.md': { icon: FileText, color: '#519aba' },
-  'license': { icon: FileText, color: '#d9bf42' },
+  license: { icon: FileText, color: '#d9bf42' },
   'license.md': { icon: FileText, color: '#d9bf42' },
 }
 

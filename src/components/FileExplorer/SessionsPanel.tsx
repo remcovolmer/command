@@ -1,8 +1,6 @@
 import { GitBranch, Clock } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
-import {
-  STATE_DOT_COLORS,
-} from '../../utils/terminalState'
+import { STATE_DOT_COLORS } from '../../utils/terminalState'
 
 function formatRelativeTime(ts: number): string {
   const diffMs = Date.now() - ts
@@ -28,7 +26,9 @@ export function SessionsPanel() {
     <div className="px-2 py-2 border-b border-border bg-sidebar-accent/50 shrink-0">
       {/* State + title row */}
       <div className="flex items-center gap-1.5 mb-0.5">
-        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]}`} />
+        <span
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]}`}
+        />
         <span className="text-xs font-medium text-sidebar-foreground truncate flex-1">
           {terminal.generatedTitle || terminal.title}
         </span>

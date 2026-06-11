@@ -10,10 +10,7 @@ import { useProjectStore } from '../stores/projectStore'
  *
  * Terminal removal from pool is handled by useXtermInstance on unmount.
  */
-export function useTerminalPool(
-  activeTerminalId: string | null,
-  splitTerminalIds: string[]
-) {
+export function useTerminalPool(activeTerminalId: string | null, splitTerminalIds: string[]) {
   const api = useMemo(() => getElectronAPI(), [])
 
   // When active terminal changes, check if eviction is needed

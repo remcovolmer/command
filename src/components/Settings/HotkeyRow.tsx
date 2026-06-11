@@ -18,7 +18,7 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
   const isDefault =
     binding.key === DEFAULT_HOTKEY_CONFIG[action].key &&
     binding.modifiers.length === DEFAULT_HOTKEY_CONFIG[action].modifiers.length &&
-    binding.modifiers.every(m => DEFAULT_HOTKEY_CONFIG[action].modifiers.includes(m))
+    binding.modifiers.every((m) => DEFAULT_HOTKEY_CONFIG[action].modifiers.includes(m))
 
   const handleToggleEnabled = () => {
     updateHotkey(action, { enabled: !binding.enabled })
@@ -35,19 +35,19 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
       const currentConfig = useProjectStore.getState().hotkeyConfig ?? DEFAULT_HOTKEY_CONFIG
 
       // Check for conflicts
-      const conflicts = findConflicts(
-        { ...binding, ...newBinding },
-        currentConfig,
-        action
-      )
+      const conflicts = findConflicts({ ...binding, ...newBinding }, currentConfig, action)
 
       if (conflicts.length > 0) {
-        const conflictNames = conflicts.map(a => currentConfig[a].description).join(', ')
-        if (!window.confirm(`This shortcut conflicts with: ${conflictNames}\n\nDo you want to use it anyway? The conflicting shortcuts will be disabled.`)) {
+        const conflictNames = conflicts.map((a) => currentConfig[a].description).join(', ')
+        if (
+          !window.confirm(
+            `This shortcut conflicts with: ${conflictNames}\n\nDo you want to use it anyway? The conflicting shortcuts will be disabled.`
+          )
+        ) {
           return
         }
         // Disable conflicting shortcuts
-        conflicts.forEach(conflictAction => {
+        conflicts.forEach((conflictAction) => {
           updateHotkey(conflictAction, { enabled: false })
         })
       }
@@ -61,7 +61,9 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
       <div className="flex items-center gap-4 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
         {/* Description */}
         <div className="flex-1 min-w-0">
-          <span className={`text-sm ${binding.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+          <span
+            className={`text-sm ${binding.enabled ? 'text-foreground' : 'text-muted-foreground'}`}
+          >
             {binding.description}
           </span>
         </div>
@@ -97,9 +99,7 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
         <button
           onClick={handleToggleEnabled}
           className={`p-1 rounded-lg transition-colors ${
-            binding.enabled
-              ? 'text-primary'
-              : 'text-muted-foreground hover:text-foreground'
+            binding.enabled ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
           }`}
           title={binding.enabled ? 'Disable shortcut' : 'Enable shortcut'}
         >

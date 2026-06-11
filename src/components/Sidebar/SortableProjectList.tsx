@@ -76,30 +76,18 @@ export function SortableProjectList({
 
   // Split projects into active (has terminals) and inactive (no terminals)
   const activeProjects = useMemo(
-    () =>
-      projects.filter((p) =>
-        Object.values(terminals).some((t) => t.projectId === p.id)
-      ),
+    () => projects.filter((p) => Object.values(terminals).some((t) => t.projectId === p.id)),
     [projects, terminals]
   )
 
   const inactiveProjects = useMemo(
-    () =>
-      projects.filter(
-        (p) => !Object.values(terminals).some((t) => t.projectId === p.id)
-      ),
+    () => projects.filter((p) => !Object.values(terminals).some((t) => t.projectId === p.id)),
     [projects, terminals]
   )
 
-  const activeProjectIds = useMemo(
-    () => activeProjects.map((p) => p.id),
-    [activeProjects]
-  )
+  const activeProjectIds = useMemo(() => activeProjects.map((p) => p.id), [activeProjects])
 
-  const inactiveProjectIds = useMemo(
-    () => inactiveProjects.map((p) => p.id),
-    [inactiveProjects]
-  )
+  const inactiveProjectIds = useMemo(() => inactiveProjects.map((p) => p.id), [inactiveProjects])
 
   const draggedProject = useMemo(
     () => (draggedId ? projects.find((p) => p.id === draggedId) : null),
@@ -111,8 +99,7 @@ export function SortableProjectList({
   }
 
   const createDragEndHandler =
-    (sourceIds: string[], otherIds: string[], sourceFirst: boolean) =>
-    (event: DragEndEvent) => {
+    (sourceIds: string[], otherIds: string[], sourceFirst: boolean) => (event: DragEndEvent) => {
       const { active, over } = event
       setDraggedId(null)
 
@@ -121,23 +108,13 @@ export function SortableProjectList({
         const newIndex = sourceIds.indexOf(over.id as string)
         if (oldIndex !== -1 && newIndex !== -1) {
           const newOrder = arrayMove(sourceIds, oldIndex, newIndex)
-          onReorder(
-            sourceFirst ? [...newOrder, ...otherIds] : [...otherIds, ...newOrder]
-          )
+          onReorder(sourceFirst ? [...newOrder, ...otherIds] : [...otherIds, ...newOrder])
         }
       }
     }
 
-  const handleDragEndActive = createDragEndHandler(
-    activeProjectIds,
-    inactiveProjectIds,
-    true
-  )
-  const handleDragEndInactive = createDragEndHandler(
-    inactiveProjectIds,
-    activeProjectIds,
-    false
-  )
+  const handleDragEndActive = createDragEndHandler(activeProjectIds, inactiveProjectIds, true)
+  const handleDragEndInactive = createDragEndHandler(inactiveProjectIds, activeProjectIds, false)
 
   const renderProjectItem = (project: Project, isDragging: boolean, isInactive = false) => (
     <SortableProjectItem
@@ -180,10 +157,7 @@ export function SortableProjectList({
             onDragStart={handleDragStart}
             onDragEnd={handleDragEndActive}
           >
-            <SortableContext
-              items={activeProjectIds}
-              strategy={verticalListSortingStrategy}
-            >
+            <SortableContext items={activeProjectIds} strategy={verticalListSortingStrategy}>
               <AnimatePresence mode="popLayout">
                 <ul className="space-y-1">
                   {activeProjects.map((project) =>
@@ -198,9 +172,7 @@ export function SortableProjectList({
                 <ProjectDragPreview
                   project={draggedProject}
                   terminalCount={
-                    Object.values(terminals).filter(
-                      (t) => t.projectId === draggedProject.id
-                    ).length
+                    Object.values(terminals).filter((t) => t.projectId === draggedProject.id).length
                   }
                 />
               ) : null}
@@ -223,7 +195,9 @@ export function SortableProjectList({
             />
             <span>Inactive</span>
             {inactiveSectionCollapsed && (
-              <span className="normal-case tracking-normal font-normal">({inactiveProjects.length})</span>
+              <span className="normal-case tracking-normal font-normal">
+                ({inactiveProjects.length})
+              </span>
             )}
           </button>
           {!inactiveSectionCollapsed && (
@@ -233,10 +207,7 @@ export function SortableProjectList({
               onDragStart={handleDragStart}
               onDragEnd={handleDragEndInactive}
             >
-              <SortableContext
-                items={inactiveProjectIds}
-                strategy={verticalListSortingStrategy}
-              >
+              <SortableContext items={inactiveProjectIds} strategy={verticalListSortingStrategy}>
                 <AnimatePresence mode="popLayout">
                   <ul className="space-y-1">
                     {inactiveProjects.map((project) =>
@@ -248,10 +219,7 @@ export function SortableProjectList({
 
               <DragOverlay>
                 {draggedProject && inactiveProjectIds.includes(draggedProject.id) ? (
-                  <ProjectDragPreview
-                    project={draggedProject}
-                    terminalCount={0}
-                  />
+                  <ProjectDragPreview project={draggedProject} terminalCount={0} />
                 ) : null}
               </DragOverlay>
             </DndContext>

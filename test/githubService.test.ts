@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 
 type ExecFileCb = (
   err: (Error & { stderr?: string; code?: number }) | null,
-  result?: { stdout: string; stderr: string },
+  result?: { stdout: string; stderr: string }
 ) => void
 
 // Per-test stub that child_process.execFile delegates to.
@@ -12,17 +12,23 @@ let execFileStub: (args: string[]) => Promise<{ stdout: string; stderr: string }
 })
 
 vi.mock('node:child_process', () => ({
-  execFile: (
-    _cmd: string,
-    args: string[],
-    _opts: unknown,
-    cb: ExecFileCb,
-  ) => {
+  execFile: (_cmd: string, args: string[], _opts: unknown, cb: ExecFileCb) => {
     execFileStub(args).then(
       (result) => cb(null, result),
-      (err) => cb(err as Error & { stderr?: string }),
+      (err) => cb(err as Error & { stderr?: string })
     )
   },
+}))
+
+// Capture the service's scoped logger for warn assertions
+const loggerSpies = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}))
+vi.mock('../electron/main/services/Logger', () => ({
+  createLogger: () => loggerSpies,
 }))
 
 // Import after mock so promisify wraps the stub.
@@ -58,9 +64,7 @@ describe('GitHubService.getPRStatus', () => {
         mergeable: 'MERGEABLE',
         mergeStateStatus: 'CLEAN',
         reviewDecision: 'APPROVED',
-        statusCheckRollup: [
-          { name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
-        ],
+        statusCheckRollup: [{ name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' }],
         additions: 10,
         deletions: 2,
         changedFiles: 1,
@@ -73,7 +77,11 @@ describe('GitHubService.getPRStatus', () => {
     expect(status.noPR).toBe(false)
     expect(status.number).toBe(42)
     expect(status.state).toBe('OPEN')
-    expect(status.statusCheckRollup?.[0]).toEqual({ name: 'ci', state: 'COMPLETED', bucket: 'pass' })
+    expect(status.statusCheckRollup?.[0]).toEqual({
+      name: 'ci',
+      state: 'COMPLETED',
+      bucket: 'pass',
+    })
     expect(status.error).toBeUndefined()
   })
 
@@ -121,5 +129,38 @@ describe('GitHubService.getPRStatus', () => {
     })
 
     await expect(service.getPRStatus('/project')).rejects.toBeInstanceOf(TransientGhError)
+  })
+})
+
+describe('GitHubService PR event listeners', () => {
+  test('a throwing listener logs a warning and does not stop other listeners', () => {
+    vi.clearAllMocks()
+    const service = new GitHubService()
+    const prContext = {
+      number: 42,
+      title: 'feat: thing',
+      branch: 'feature/thing',
+      url: 'https://example.test/pr/42',
+      mergeable: 'MERGEABLE',
+      state: 'OPEN',
+    }
+
+    const throwing = vi.fn(() => {
+      throw new Error('listener boom')
+    })
+    const healthy = vi.fn()
+    service.onPREvent(throwing)
+    service.onPREvent(healthy)
+
+    // Drive the private emitter directly (poll plumbing is not under test here)
+    ;(
+      service as unknown as {
+        emitPREvent(projectPath: string, event: string, ctx: typeof prContext): void
+      }
+    ).emitPREvent('/project', 'pr-merged', prContext)
+
+    expect(throwing).toHaveBeenCalled()
+    expect(healthy).toHaveBeenCalledWith('/project', 'pr-merged', prContext)
+    expect(loggerSpies.warn).toHaveBeenCalledWith('PR event listener threw:', expect.any(Error))
   })
 })

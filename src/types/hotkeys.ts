@@ -1,5 +1,5 @@
 // Modifier keys
-export type ModifierKey = 'ctrl' | 'alt' | 'shift' | 'meta';
+export type ModifierKey = 'ctrl' | 'alt' | 'shift' | 'meta'
 
 // Hotkey categories for grouping in settings UI
 export type HotkeyCategory =
@@ -11,15 +11,15 @@ export type HotkeyCategory =
   | 'worktree'
   | 'sidebar'
   | 'ui'
-  | 'dialog';
+  | 'dialog'
 
 // Hotkey binding configuration
 export interface HotkeyBinding {
-  key: string;
-  modifiers: ModifierKey[];
-  description: string;
-  category: HotkeyCategory;
-  enabled: boolean;
+  key: string
+  modifiers: ModifierKey[]
+  description: string
+  category: HotkeyCategory
+  enabled: boolean
 }
 
 // All available hotkey actions
@@ -81,10 +81,10 @@ export type HotkeyAction =
   // Dialogs
   | 'dialog.close'
   | 'dialog.confirm'
-  | 'dialog.dismissTopmostToast';
+  | 'dialog.dismissTopmostToast'
 
 // Complete hotkey configuration
-export type HotkeyConfig = Record<HotkeyAction, HotkeyBinding>;
+export type HotkeyConfig = Record<HotkeyAction, HotkeyBinding>
 
 // Category display names
 export const HOTKEY_CATEGORY_NAMES: Record<HotkeyCategory, string> = {
@@ -97,7 +97,7 @@ export const HOTKEY_CATEGORY_NAMES: Record<HotkeyCategory, string> = {
   sidebar: 'Sidebar',
   ui: 'UI & Settings',
   dialog: 'Dialogs',
-};
+}
 
 // Category order for display
 export const HOTKEY_CATEGORY_ORDER: HotkeyCategory[] = [
@@ -110,4 +110,4 @@ export const HOTKEY_CATEGORY_ORDER: HotkeyCategory[] = [
   'sidebar',
   'ui',
   'dialog',
-];
+]

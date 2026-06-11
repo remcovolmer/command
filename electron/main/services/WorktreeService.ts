@@ -2,6 +2,9 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs'
 import * as path from 'node:path'
+import { createLogger } from './Logger'
+
+const log = createLogger('WorktreeService')
 
 const execFileAsync = promisify(execFile)
 
@@ -55,18 +58,19 @@ export class WorktreeService {
 
     if (existsSync(gitignorePath)) {
       const content = readFileSync(gitignorePath, 'utf-8')
-      const lines = content.split('\n').map(l => l.trim())
+      const lines = content.split('\n').map((l) => l.trim())
 
-      const alreadyIgnored = lines.some(l =>
-        l === ignoreEntry || l === `/${ignoreEntry}` ||
-        l === `${ignoreEntry}/` || l === `/${ignoreEntry}/`
+      const alreadyIgnored = lines.some(
+        (l) =>
+          l === ignoreEntry ||
+          l === `/${ignoreEntry}` ||
+          l === `${ignoreEntry}/` ||
+          l === `/${ignoreEntry}/`
       )
 
       if (!alreadyIgnored) {
         // Add to .gitignore with a newline before if file doesn't end with newline
-        const newContent = content.endsWith('\n')
-          ? `${ignoreEntry}\n`
-          : `\n${ignoreEntry}\n`
+        const newContent = content.endsWith('\n') ? `${ignoreEntry}\n` : `\n${ignoreEntry}\n`
         appendFileSync(gitignorePath, newContent)
       }
     } else {
@@ -80,10 +84,7 @@ export class WorktreeService {
    */
   async listBranches(projectPath: string): Promise<string[]> {
     try {
-      const output = await this.execGit(projectPath, [
-        'branch',
-        '--format=%(refname:short)',
-      ])
+      const output = await this.execGit(projectPath, ['branch', '--format=%(refname:short)'])
 
       if (!output) return []
 
@@ -105,19 +106,15 @@ export class WorktreeService {
         // Fetch failed, continue with what we have
       }
 
-      const output = await this.execGit(projectPath, [
-        'branch',
-        '-r',
-        '--format=%(refname:short)',
-      ])
+      const output = await this.execGit(projectPath, ['branch', '-r', '--format=%(refname:short)'])
 
       if (!output) return []
 
       return output
         .split('\n')
         .filter(Boolean)
-        .filter(b => !b.includes('HEAD'))
-        .map(b => b.replace(/^origin\//, ''))
+        .filter((b) => !b.includes('HEAD'))
+        .map((b) => b.replace(/^origin\//, ''))
     } catch {
       return []
     }
@@ -139,11 +136,7 @@ export class WorktreeService {
    */
   async listWorktrees(projectPath: string): Promise<WorktreeInfo[]> {
     try {
-      const output = await this.execGit(projectPath, [
-        'worktree',
-        'list',
-        '--porcelain',
-      ])
+      const output = await this.execGit(projectPath, ['worktree', 'list', '--porcelain'])
 
       if (!output) return []
 
@@ -196,20 +189,26 @@ export class WorktreeService {
    */
   async isBranchInUse(projectPath: string, branchName: string): Promise<boolean> {
     const worktrees = await this.listWorktrees(projectPath)
-    return worktrees.some(wt => wt.branch === branchName)
+    return worktrees.some((wt) => wt.branch === branchName)
   }
 
   /** Ensures worktrees are created from up-to-date refs. */
   private async fetchAndFastForward(projectPath: string): Promise<void> {
     try {
       await this.execGit(projectPath, ['fetch', 'origin'])
-    } catch {
+    } catch (err) {
+      // Offline or no remote: worktrees are still created from local refs
+      log.debug(`git fetch failed for ${projectPath}; creating worktree from local refs:`, err)
       return
     }
 
     try {
       await this.execGit(projectPath, ['pull', '--ff-only'])
-    } catch {}
+    } catch (err) {
+      // Expected when the branch has no upstream or has diverged; the
+      // fetched refs are still used, only the local branch isn't advanced.
+      log.debug(`git pull --ff-only failed for ${projectPath}; continuing with fetched refs:`, err)
+    }
   }
 
   /**
@@ -248,12 +247,7 @@ export class WorktreeService {
 
     if (branchExists) {
       // Checkout existing branch in new worktree
-      await this.execGit(projectPath, [
-        'worktree',
-        'add',
-        worktreePath,
-        branchName,
-      ])
+      await this.execGit(projectPath, ['worktree', 'add', worktreePath, branchName])
     } else {
       // Check if it exists on remote
       const remoteBranches = await this.listRemoteBranches(projectPath)
@@ -280,13 +274,7 @@ export class WorktreeService {
         ])
       } else {
         // Create new branch based on current HEAD (default behavior)
-        await this.execGit(projectPath, [
-          'worktree',
-          'add',
-          '-b',
-          branchName,
-          worktreePath,
-        ])
+        await this.execGit(projectPath, ['worktree', 'add', '-b', branchName, worktreePath])
       }
     }
 
@@ -314,9 +302,7 @@ export class WorktreeService {
     // Step 2: Check if worktree still exists in git's list
     const worktrees = await this.listWorktrees(projectPath)
     const normalizedTarget = this.normalizePath(worktreePath)
-    const worktree = worktrees.find(
-      wt => this.normalizePath(wt.path) === normalizedTarget
-    )
+    const worktree = worktrees.find((wt) => this.normalizePath(wt.path) === normalizedTarget)
 
     if (!worktree) {
       // Worktree was already pruned or doesn't exist in git
@@ -360,9 +346,7 @@ export class WorktreeService {
       try {
         await this.execGit(projectPath, ['worktree', 'prune'])
         const remaining = await this.listWorktrees(projectPath)
-        const stillExists = remaining.some(
-          wt => this.normalizePath(wt.path) === normalizedTarget
-        )
+        const stillExists = remaining.some((wt) => this.normalizePath(wt.path) === normalizedTarget)
         if (!stillExists) {
           return // Successfully removed via prune
         }
@@ -379,7 +363,10 @@ export class WorktreeService {
         userMessage += ': Has uncommitted changes (use force to override)'
       } else if (errorMessage.includes('is locked')) {
         userMessage += ': Worktree is locked'
-      } else if (errorMessage.includes('not a valid directory') || errorMessage.includes('does not exist')) {
+      } else if (
+        errorMessage.includes('not a valid directory') ||
+        errorMessage.includes('does not exist')
+      ) {
         userMessage += ': Directory not found (may have been manually deleted)'
       } else if (errorMessage.includes('Permission denied') || errorMessage.includes('EBUSY')) {
         userMessage += ': Directory is in use by another process'
@@ -396,10 +383,7 @@ export class WorktreeService {
    */
   async hasUncommittedChanges(worktreePath: string): Promise<boolean> {
     try {
-      const output = await this.execGit(worktreePath, [
-        'status',
-        '--porcelain',
-      ])
+      const output = await this.execGit(worktreePath, ['status', '--porcelain'])
       return output.length > 0
     } catch {
       // Assume dirty on error to avoid bypassing safety checks
@@ -435,7 +419,9 @@ export class WorktreeService {
     const worktreesDir = this.getWorktreesDir(projectPath)
     const normalizedCheck = this.normalizePath(checkPath)
     const normalizedWorktrees = this.normalizePath(worktreesDir)
-    return normalizedCheck === normalizedWorktrees ||
+    return (
+      normalizedCheck === normalizedWorktrees ||
       normalizedCheck.startsWith(normalizedWorktrees + path.sep)
+    )
   }
 }

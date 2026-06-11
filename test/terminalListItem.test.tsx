@@ -27,7 +27,7 @@ function renderItem(terminal: TerminalSession, isActive: boolean) {
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />
-    </ul>,
+    </ul>
   )
 }
 
@@ -95,8 +95,7 @@ describe('TerminalListItem attention rail (permission/question)', () => {
     cleanup()
   })
 
-  const queryStateDot = (li: HTMLElement) =>
-    li.querySelector('.w-1\\.5.h-1\\.5.rounded-full')
+  const queryStateDot = (li: HTMLElement) => li.querySelector('.w-1\\.5.h-1\\.5.rounded-full')
 
   test('permission state: rail + "wacht op jou" chip, no status dot', () => {
     renderItem(makeTerminal({ state: 'permission' }), false)

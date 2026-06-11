@@ -1,6 +1,10 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import http from 'node:http'
-import { CommandServer, type CommandResponse, type CommandServerDeps } from '../electron/main/services/CommandServer'
+import {
+  CommandServer,
+  type CommandResponse,
+  type CommandServerDeps,
+} from '../electron/main/services/CommandServer'
 import type { TerminalManager } from '../electron/main/services/TerminalManager'
 import type { ProjectPersistence } from '../electron/main/services/ProjectPersistence'
 import type { WorktreeService } from '../electron/main/services/WorktreeService'
@@ -47,7 +51,7 @@ function request(options: {
             reject(new Error(`Failed to parse response: ${raw}`))
           }
         })
-      },
+      }
     )
 
     req.on('error', reject)
@@ -60,12 +64,14 @@ const PROJECT_ID = '00000000-0000-0000-0000-000000000001'
 const TERMINAL_ID = '00000000-0000-0000-0000-000000000002'
 const WORKTREE_ID = '00000000-0000-0000-0000-000000000003'
 
-function createMockDeps(overrides?: Partial<{
-  terminalManager: Partial<TerminalManager>
-  projectPersistence: Partial<ProjectPersistence>
-  worktreeService: Partial<WorktreeService>
-  githubService: Partial<GitHubService>
-}>): CommandServerDeps {
+function createMockDeps(
+  overrides?: Partial<{
+    terminalManager: Partial<TerminalManager>
+    projectPersistence: Partial<ProjectPersistence>
+    worktreeService: Partial<WorktreeService>
+    githubService: Partial<GitHubService>
+  }>
+): CommandServerDeps {
   const mockProject = {
     id: PROJECT_ID,
     name: 'test-project',
@@ -194,11 +200,13 @@ describe('CommandServer worktree routes', () => {
     })
 
     test('returns 400 when terminal is not found', async () => {
-      server.setDeps(createMockDeps({
-        terminalManager: {
-          getTerminalInfo: vi.fn().mockReturnValue(null),
-        },
-      }))
+      server.setDeps(
+        createMockDeps({
+          terminalManager: {
+            getTerminalInfo: vi.fn().mockReturnValue(null),
+          },
+        })
+      )
 
       const res = await request({
         port: server.getPort()!,
@@ -240,14 +248,16 @@ describe('CommandServer worktree routes', () => {
         '/projects/test-project',
         'feat/my-feature',
         'my-feature',
-        undefined,
+        undefined
       )
       expect(deps.projectPersistence.addWorktree).toHaveBeenCalled()
       expect(deps.terminalManager.updateTerminalWorktree).toHaveBeenCalled()
-      expect((deps.mainWindow.webContents as unknown as { send: ReturnType<typeof vi.fn> }).send).toHaveBeenCalledWith(
+      expect(
+        (deps.mainWindow.webContents as unknown as { send: ReturnType<typeof vi.fn> }).send
+      ).toHaveBeenCalledWith(
         'worktree:added',
         PROJECT_ID,
-        expect.objectContaining({ name: 'my-feature', branch: 'feat/my-feature' }),
+        expect.objectContaining({ name: 'my-feature', branch: 'feat/my-feature' })
       )
     })
 
@@ -268,7 +278,7 @@ describe('CommandServer worktree routes', () => {
         '/projects/test-project',
         'my-feature', // name used as branch
         'my-feature',
-        undefined,
+        undefined
       )
     })
   })
@@ -310,11 +320,13 @@ describe('CommandServer worktree routes', () => {
     })
 
     test('returns 400 when path is not under .worktrees/', async () => {
-      server.setDeps(createMockDeps({
-        worktreeService: {
-          isWorktreePath: vi.fn().mockReturnValue(false),
-        },
-      }))
+      server.setDeps(
+        createMockDeps({
+          worktreeService: {
+            isWorktreePath: vi.fn().mockReturnValue(false),
+          },
+        })
+      )
 
       const res = await request({
         port: server.getPort()!,
@@ -351,17 +363,19 @@ describe('CommandServer worktree routes', () => {
     })
 
     test('returns 400 when terminal has no worktree', async () => {
-      server.setDeps(createMockDeps({
-        terminalManager: {
-          getTerminalInfo: vi.fn().mockReturnValue({
-            projectId: PROJECT_ID,
-            worktreeId: undefined,
-            cwd: '/projects/test-project',
-            title: 'test',
-            type: 'claude' as const,
-          }),
-        },
-      }))
+      server.setDeps(
+        createMockDeps({
+          terminalManager: {
+            getTerminalInfo: vi.fn().mockReturnValue({
+              projectId: PROJECT_ID,
+              worktreeId: undefined,
+              cwd: '/projects/test-project',
+              title: 'test',
+              type: 'claude' as const,
+            }),
+          },
+        })
+      )
 
       const res = await request({
         port: server.getPort()!,
@@ -378,31 +392,33 @@ describe('CommandServer worktree routes', () => {
     })
 
     test('returns 400 when no PR found for branch', async () => {
-      server.setDeps(createMockDeps({
-        terminalManager: {
-          getTerminalInfo: vi.fn().mockReturnValue({
-            projectId: PROJECT_ID,
-            worktreeId: WORKTREE_ID,
-            cwd: '/projects/test-project/.worktrees/feat',
-            title: 'test',
-            type: 'claude' as const,
-          }),
-        },
-        projectPersistence: {
-          getWorktreeById: vi.fn().mockReturnValue({
-            id: WORKTREE_ID,
-            projectId: PROJECT_ID,
-            name: 'feat',
-            branch: 'feat/my-feature',
-            path: '/projects/test-project/.worktrees/feat',
-            createdAt: Date.now(),
-            isLocked: false,
-          }),
-        },
-        githubService: {
-          getPRForBranch: vi.fn().mockResolvedValue(null),
-        },
-      }))
+      server.setDeps(
+        createMockDeps({
+          terminalManager: {
+            getTerminalInfo: vi.fn().mockReturnValue({
+              projectId: PROJECT_ID,
+              worktreeId: WORKTREE_ID,
+              cwd: '/projects/test-project/.worktrees/feat',
+              title: 'test',
+              type: 'claude' as const,
+            }),
+          },
+          projectPersistence: {
+            getWorktreeById: vi.fn().mockReturnValue({
+              id: WORKTREE_ID,
+              projectId: PROJECT_ID,
+              name: 'feat',
+              branch: 'feat/my-feature',
+              path: '/projects/test-project/.worktrees/feat',
+              createdAt: Date.now(),
+              isLocked: false,
+            }),
+          },
+          githubService: {
+            getPRForBranch: vi.fn().mockResolvedValue(null),
+          },
+        })
+      )
 
       const res = await request({
         port: server.getPort()!,
@@ -419,31 +435,33 @@ describe('CommandServer worktree routes', () => {
     })
 
     test('returns 400 when worktree has uncommitted changes', async () => {
-      server.setDeps(createMockDeps({
-        terminalManager: {
-          getTerminalInfo: vi.fn().mockReturnValue({
-            projectId: PROJECT_ID,
-            worktreeId: WORKTREE_ID,
-            cwd: '/projects/test-project/.worktrees/feat',
-            title: 'test',
-            type: 'claude' as const,
-          }),
-        },
-        projectPersistence: {
-          getWorktreeById: vi.fn().mockReturnValue({
-            id: WORKTREE_ID,
-            projectId: PROJECT_ID,
-            name: 'feat',
-            branch: 'feat/my-feature',
-            path: '/projects/test-project/.worktrees/feat',
-            createdAt: Date.now(),
-            isLocked: false,
-          }),
-        },
-        worktreeService: {
-          hasUncommittedChanges: vi.fn().mockResolvedValue(true),
-        },
-      }))
+      server.setDeps(
+        createMockDeps({
+          terminalManager: {
+            getTerminalInfo: vi.fn().mockReturnValue({
+              projectId: PROJECT_ID,
+              worktreeId: WORKTREE_ID,
+              cwd: '/projects/test-project/.worktrees/feat',
+              title: 'test',
+              type: 'claude' as const,
+            }),
+          },
+          projectPersistence: {
+            getWorktreeById: vi.fn().mockReturnValue({
+              id: WORKTREE_ID,
+              projectId: PROJECT_ID,
+              name: 'feat',
+              branch: 'feat/my-feature',
+              path: '/projects/test-project/.worktrees/feat',
+              createdAt: Date.now(),
+              isLocked: false,
+            }),
+          },
+          worktreeService: {
+            hasUncommittedChanges: vi.fn().mockResolvedValue(true),
+          },
+        })
+      )
 
       const res = await request({
         port: server.getPort()!,
@@ -496,7 +514,12 @@ describe('CommandServer worktree routes', () => {
       expect(res.statusCode).toBe(200)
       expect(res.body.ok).toBe(true)
 
-      const data = res.body.data as { merged: boolean; prNumber: number; prUrl: string; branch: string }
+      const data = res.body.data as {
+        merged: boolean
+        prNumber: number
+        prUrl: string
+        branch: string
+      }
       expect(data.merged).toBe(true)
       expect(data.prNumber).toBe(1)
       expect(data.prUrl).toBe('https://github.com/test/pr/1')

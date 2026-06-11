@@ -1,17 +1,26 @@
-import { watchFile, unwatchFile, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import {
+  watchFile,
+  unwatchFile,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  existsSync,
+  mkdirSync,
+} from 'fs'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
-import { BrowserWindow } from 'electron'
+import { type BrowserWindow } from 'electron'
 import { homedir } from 'os'
 import type { TerminalState } from '../../../src/types'
 import { isValidTerminalState } from '../../../src/types'
 import { normalizePath } from '../utils/paths'
+import { createLogger } from './Logger'
+
+const log = createLogger('HookWatcher')
 
 // Configuration constants
 const POLL_INTERVAL_MS = 250
 const MAX_PENDING_QUEUE_SIZE = 10
-
-const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL
 
 interface HookStateData {
   session_id: string
@@ -85,7 +94,8 @@ export class ClaudeHookWatcher {
   // Per-session composite state tracking for deduplication
   // Tracks timestamp + hookEvent + state to distinguish genuine state changes
   // from unchanged sessions being re-read during polling
-  private lastProcessedState: Map<string, { timestamp: number; hookEvent: string; state: string }> = new Map()
+  private lastProcessedState: Map<string, { timestamp: number; hookEvent: string; state: string }> =
+    new Map()
 
   // Guard to prevent concurrent async reads
   private isReading: boolean = false
@@ -142,7 +152,7 @@ export class ClaudeHookWatcher {
     })
     this.watching = true
 
-    console.log('[HookWatcher] Started watching:', this.stateFilePath)
+    log.info('Started watching:', this.stateFilePath)
   }
 
   /**
@@ -153,9 +163,7 @@ export class ClaudeHookWatcher {
    */
   preAssociateSession(sessionId: string, terminalId: string): void {
     this.setSessionMapping(sessionId, terminalId)
-    if (isDev) {
-      console.log(`[HookWatcher] Pre-associated session ${sessionId} with terminal ${terminalId}`)
-    }
+    log.debug(`Pre-associated session ${sessionId} with terminal ${terminalId}`)
   }
 
   /**
@@ -172,18 +180,14 @@ export class ClaudeHookWatcher {
     }
     terminals.add(terminalId)
 
-    if (isDev) {
-      console.log(`[HookWatcher] Registered terminal ${terminalId} for cwd: ${normalizedCwd}`)
-      console.log(`[HookWatcher]   Terminals in this cwd: ${Array.from(terminals).join(', ')}`)
-    }
+    log.debug(`Registered terminal ${terminalId} for cwd: ${normalizedCwd}`)
+    log.debug(`  Terminals in this cwd: ${Array.from(terminals).join(', ')}`)
 
     // Process any pending states for this cwd through normal session mapping
     // (not directly to this terminal — pending states may belong to different sessions)
     const pending = this.pendingStates.get(normalizedCwd)
     if (pending && pending.length > 0) {
-      if (isDev) {
-        console.log(`[HookWatcher] Processing ${pending.length} pending states for cwd: ${normalizedCwd}`)
-      }
+      log.debug(`Processing ${pending.length} pending states for cwd: ${normalizedCwd}`)
       this.pendingStates.delete(normalizedCwd)
       for (const state of pending) {
         this.processSessionState(state)
@@ -199,9 +203,7 @@ export class ClaudeHookWatcher {
     for (const [cwd, terminals] of this.cwdToTerminals) {
       if (terminals.has(terminalId)) {
         terminals.delete(terminalId)
-        if (isDev) {
-          console.log(`[HookWatcher] Unregistered terminal ${terminalId} from cwd: ${cwd}`)
-        }
+        log.debug(`Unregistered terminal ${terminalId} from cwd: ${cwd}`)
         // Cleanup empty Sets and associated pending state
         if (terminals.size === 0) {
           this.cwdToTerminals.delete(cwd)
@@ -213,8 +215,8 @@ export class ClaudeHookWatcher {
 
     // Remove from session mapping (both directions)
     const sessionId = this.terminalToSession.get(terminalId)
-    if (sessionId && isDev) {
-      console.log(`[HookWatcher] Unregistered session ${sessionId} for terminal ${terminalId}`)
+    if (sessionId) {
+      log.debug(`Unregistered session ${sessionId} for terminal ${terminalId}`)
     }
     this.clearSessionMappingByTerminal(terminalId)
   }
@@ -265,7 +267,7 @@ export class ClaudeHookWatcher {
         hookState.hook_event === last.hookEvent &&
         hookState.state === last.state
       ) {
-        return  // Duplicate re-read of unchanged session
+        return // Duplicate re-read of unchanged session
       }
       // Older-timestamp events are normally stale and dropped. Exception: input states
       // (question/permission) must still surface even when a racing 'busy'/'done' write
@@ -275,15 +277,13 @@ export class ClaudeHookWatcher {
       const isInputState = hookState.state === 'question' || hookState.state === 'permission'
       const surfacingNewInputState = isInputState && last.state !== hookState.state
       if (hookState.timestamp < last.timestamp && !surfacingNewInputState) {
-        return  // Stale event
+        return // Stale event
       }
     }
     const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
 
-    if (isDev) {
-      console.log(`[HookWatcher] State change: ${hookState.hook_event} -> ${hookState.state}`)
-      console.log(`[HookWatcher]   session: ${sessionId}, cwd: ${normalizedCwd}`)
-    }
+    log.debug(`State change: ${hookState.hook_event} -> ${hookState.state}`)
+    log.debug(`  session: ${sessionId}, cwd: ${normalizedCwd}`)
 
     // Try to find terminal for this session
     let terminalId = this.sessionToTerminal.get(sessionId)
@@ -298,9 +298,7 @@ export class ClaudeHookWatcher {
       terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
       if (terminalId) {
         this.setSessionMapping(sessionId, terminalId)
-        if (isDev) {
-          console.log(`[HookWatcher] Late association: session ${sessionId} with terminal ${terminalId}`)
-        }
+        log.debug(`Late association: session ${sessionId} with terminal ${terminalId}`)
       }
     }
 
@@ -315,8 +313,8 @@ export class ClaudeHookWatcher {
     } else if (normalizedCwd) {
       // Queue state for when terminal registers (don't mark as processed — replay must succeed)
       this.queuePendingState(normalizedCwd, hookState)
-    } else if (isDev) {
-      console.log(`[HookWatcher] No matching terminal found for session ${sessionId}`)
+    } else {
+      log.debug(`No matching terminal found for session ${sessionId}`)
     }
 
     // On SessionEnd: cleanup session mapping and remove stale entry from state file
@@ -333,7 +331,10 @@ export class ClaudeHookWatcher {
    * stealing the first assigned terminal (the old session likely crashed
    * without sending SessionEnd).
    */
-  private associateSessionWithTerminal(sessionId: string, normalizedCwd: string): string | undefined {
+  private associateSessionWithTerminal(
+    sessionId: string,
+    normalizedCwd: string
+  ): string | undefined {
     let terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
 
     // SessionStart fallback: steal from first terminal if none unassigned
@@ -343,8 +344,8 @@ export class ClaudeHookWatcher {
       if (terminals && terminals.size > 0) {
         const first = terminals.values().next()
         terminalId = first.done ? undefined : first.value
-        if (isDev && terminalId) {
-          console.warn(`[HookWatcher] SessionStart: stealing terminal ${terminalId} (old session likely dead)`)
+        if (terminalId) {
+          log.warn(`SessionStart: stealing terminal ${terminalId} (old session likely dead)`)
         }
       }
     }
@@ -355,9 +356,7 @@ export class ClaudeHookWatcher {
 
       // Associate new session with terminal using BiMap
       this.setSessionMapping(sessionId, terminalId)
-      if (isDev) {
-        console.log(`[HookWatcher] Associated session ${sessionId} with terminal ${terminalId}`)
-      }
+      log.debug(`Associated session ${sessionId} with terminal ${terminalId}`)
     }
 
     return terminalId
@@ -403,9 +402,7 @@ export class ClaudeHookWatcher {
     }
     pending.push(hookState)
 
-    if (isDev) {
-      console.log(`[HookWatcher] Queued pending state for cwd: ${normalizedCwd} (queue size: ${pending.length})`)
-    }
+    log.debug(`Queued pending state for cwd: ${normalizedCwd} (queue size: ${pending.length})`)
   }
 
   /**
@@ -418,7 +415,12 @@ export class ClaudeHookWatcher {
       const parsed = JSON.parse(content)
       if (parsed && typeof parsed === 'object' && sessionId in parsed) {
         delete parsed[sessionId]
-        writeFileSync(this.stateFilePath, JSON.stringify(parsed))
+        // Atomic write (temp + rename, same pattern as ProjectPersistence):
+        // Claude Code hooks poll/write this file concurrently, so a partial
+        // in-place write would be read back as corrupt JSON.
+        const tempPath = `${this.stateFilePath}.tmp`
+        writeFileSync(tempPath, JSON.stringify(parsed))
+        renameSync(tempPath, this.stateFilePath)
       }
     } catch {
       // Ignore errors — file may be mid-write or already cleaned
@@ -431,17 +433,21 @@ export class ClaudeHookWatcher {
   private processStateForTerminal(hookState: HookStateData, terminalId: string): void {
     // Validate state before emitting
     if (!isValidTerminalState(hookState.state)) {
-      if (isDev) {
-        console.warn(`[HookWatcher] Invalid state "${hookState.state}" for terminal ${terminalId}`)
-      }
+      log.warn(`Invalid state "${hookState.state}" for terminal ${terminalId}`)
       return
     }
-    console.log(`[HookWatcher] Emitting state ${hookState.state} for terminal ${terminalId}`)
+    log.debug(`Emitting state ${hookState.state} for terminal ${terminalId}`)
     this.sendToRenderer('terminal:state', terminalId, hookState.state)
 
     // Notify state change listeners (used by AutomationService for 'claude-done' triggers)
     for (const cb of this.stateChangeCallbacks) {
-      try { cb(terminalId, hookState.state) } catch { /* listener error */ }
+      try {
+        cb(terminalId, hookState.state)
+      } catch (err) {
+        // State changes arrive at human pace (hook events), so an
+        // unconditional warn cannot spam the log.
+        log.warn('State change listener threw:', err)
+      }
     }
   }
 
@@ -476,7 +482,7 @@ export class ClaudeHookWatcher {
     if (this.watching) {
       unwatchFile(this.stateFilePath)
       this.watching = false
-      console.log('[HookWatcher] Stopped watching')
+      log.info('Stopped watching')
     }
   }
 

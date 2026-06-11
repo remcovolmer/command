@@ -26,14 +26,19 @@ export function createFileLinkProvider(
   terminal: Terminal,
   projectPath: string,
   api: ElectronAPI,
-  openFile: (filePath: string, fileName: string) => void,
+  openFile: (filePath: string, fileName: string) => void
 ): ILinkProvider {
   // Cache stat results to avoid redundant IPC calls across provideLinks invocations.
   // Uses a max-size cap of 200 entries; oldest entries are evicted when the cap is reached.
-  const statCache = new Map<string, Promise<{ exists: boolean; isFile: boolean; resolved: string }>>()
+  const statCache = new Map<
+    string,
+    Promise<{ exists: boolean; isFile: boolean; resolved: string }>
+  >()
   const CACHE_MAX_SIZE = 200
 
-  function cachedStat(fullPath: string): Promise<{ exists: boolean; isFile: boolean; resolved: string }> {
+  function cachedStat(
+    fullPath: string
+  ): Promise<{ exists: boolean; isFile: boolean; resolved: string }> {
     const cached = statCache.get(fullPath)
     if (cached) return cached
     if (statCache.size >= CACHE_MAX_SIZE) {
@@ -91,11 +96,15 @@ export function createFileLinkProvider(
           } catch {
             return null
           }
-        }),
-      ).then((results) => {
-        const links = results.filter((r): r is ILink => r !== null)
-        callback(links.length > 0 ? links : undefined)
-      }).catch(() => { callback(undefined) })
+        })
+      )
+        .then((results) => {
+          const links = results.filter((r): r is ILink => r !== null)
+          callback(links.length > 0 ? links : undefined)
+        })
+        .catch(() => {
+          callback(undefined)
+        })
     },
   }
 }

@@ -34,24 +34,30 @@ describe('getPRBadge — no badge without an open PR', () => {
 
 describe('getPRBadge — priority chain', () => {
   test('conflict wins over failing checks', () => {
-    const badge = getPRBadge(makePRStatus({
-      mergeable: 'CONFLICTING',
-      statusCheckRollup: [makeCheck('fail'), makeCheck('pending')],
-    }))
+    const badge = getPRBadge(
+      makePRStatus({
+        mergeable: 'CONFLICTING',
+        statusCheckRollup: [makeCheck('fail'), makeCheck('pending')],
+      })
+    )
     expect(badge).toEqual({ kind: 'conflict', label: 'conflict' })
   })
 
   test('failing check without conflict yields ci-fail', () => {
-    const badge = getPRBadge(makePRStatus({
-      statusCheckRollup: [makeCheck('pass'), makeCheck('fail'), makeCheck('pending')],
-    }))
+    const badge = getPRBadge(
+      makePRStatus({
+        statusCheckRollup: [makeCheck('pass'), makeCheck('fail'), makeCheck('pending')],
+      })
+    )
     expect(badge).toEqual({ kind: 'ci-fail', label: 'CI ✗' })
   })
 
   test('only pending checks yields pending', () => {
-    const badge = getPRBadge(makePRStatus({
-      statusCheckRollup: [makeCheck('pass'), makeCheck('pending')],
-    }))
+    const badge = getPRBadge(
+      makePRStatus({
+        statusCheckRollup: [makeCheck('pass'), makeCheck('pending')],
+      })
+    )
     expect(badge).toEqual({ kind: 'pending', label: 'pending' })
   })
 
@@ -87,25 +93,35 @@ describe('getPRBadge — unknown mergeability (right after a push)', () => {
   })
 
   test('failing checks win over unknown mergeability', () => {
-    const badge = getPRBadge(makePRStatus({
-      mergeable: 'UNKNOWN',
-      statusCheckRollup: [makeCheck('fail')],
-    }))
+    const badge = getPRBadge(
+      makePRStatus({
+        mergeable: 'UNKNOWN',
+        statusCheckRollup: [makeCheck('fail')],
+      })
+    )
     expect(badge).toEqual({ kind: 'ci-fail', label: 'CI ✗' })
   })
 })
 
 describe('getPRBadge — empty or missing check list', () => {
   test('empty statusCheckRollup follows the ready path without crashing', () => {
-    expect(getPRBadge(makePRStatus({ statusCheckRollup: [] }))).toEqual({ kind: 'ready', label: '✓ klaar' })
+    expect(getPRBadge(makePRStatus({ statusCheckRollup: [] }))).toEqual({
+      kind: 'ready',
+      label: '✓ klaar',
+    })
   })
 
   test('undefined statusCheckRollup follows the ready path without crashing', () => {
-    expect(getPRBadge(makePRStatus({ statusCheckRollup: undefined }))).toEqual({ kind: 'ready', label: '✓ klaar' })
+    expect(getPRBadge(makePRStatus({ statusCheckRollup: undefined }))).toEqual({
+      kind: 'ready',
+      label: '✓ klaar',
+    })
   })
 
   test('empty checks with review blockade still yields review', () => {
-    const badge = getPRBadge(makePRStatus({ statusCheckRollup: [], reviewDecision: 'REVIEW_REQUIRED' }))
+    const badge = getPRBadge(
+      makePRStatus({ statusCheckRollup: [], reviewDecision: 'REVIEW_REQUIRED' })
+    )
     expect(badge).toEqual({ kind: 'review', label: 'review' })
   })
 })

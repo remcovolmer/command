@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan — Professionalisering Command Center (items 1–4)</title>
+<style>
+  :root {
+    --ink: #1a2332; --ink-soft: #4a5568;
+    --accent: #0b5fff; --accent-soft: #e8f0ff;
+    --green: #15803d; --green-soft: #e9f7ef;
+    --amber: #b45309; --amber-soft: #fef3e2;
+    --red: #b91c1c; --red-soft: #fdeaea;
+    --line: #e2e8f0; --bg: #f7f9fc; --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.55; font-size: 15px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 28px 80px; }
+  header { border-bottom: 3px solid var(--accent); padding-bottom: 20px; margin-bottom: 32px; }
+  .kicker { text-transform: uppercase; letter-spacing: 2px; font-size: 12px; color: var(--accent); font-weight: 700; }
+  h1 { font-size: 26px; line-height: 1.3; margin-top: 8px; }
+  .meta { color: var(--ink-soft); font-size: 13px; margin-top: 10px; }
+  h2 { font-size: 19px; margin: 42px 0 8px; line-height: 1.35; }
+  h2 .num { color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 24px; margin-top: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; background: var(--card); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); font-size: 13.5px; }
+  th { background: var(--ink); color: #fff; text-align: left; padding: 9px 13px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; }
+  td { padding: 10px 13px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: #fafcff; }
+  code { background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; font-size: 12.5px; font-family: 'Cascadia Code', Consolas, monospace; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .pill.acc { background: var(--accent-soft); color: var(--accent); }
+  .pill.ok { background: var(--green-soft); color: var(--green); }
+  .pill.warn { background: var(--amber-soft); color: var(--amber); }
+  .unit { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--accent); border-radius: 10px; padding: 22px 26px; margin-top: 18px; }
+  .unit h3 { font-size: 16.5px; margin-bottom: 4px; }
+  .unit h3 .uid { color: var(--accent); margin-right: 6px; }
+  .unit .goal { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 12px; }
+  .unit h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-soft); margin: 16px 0 6px; }
+  .unit ul { padding-left: 20px; }
+  .unit li { margin-bottom: 5px; font-size: 14px; }
+  .files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .files code { background: var(--bg); border: 1px solid var(--line); }
+  .note { background: var(--amber-soft); border-left: 4px solid var(--amber); border-radius: 6px; padding: 12px 16px; margin-top: 16px; font-size: 13.5px; }
+  .lede { color: var(--ink-soft); margin: 6px 0 4px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+  footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12.5px; }
+  @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Implementatieplan · Command Center</div>
+  <h1>Vier ingrepen verankeren kwaliteit in infrastructuur: CI-poort, lint-standaard, gestructureerde logging en één IPC-contract</h1>
+  <div class="meta">10 juni 2026 · Origin: <code>docs/brainstorm/2026-06-10-professionalisering-top-5.html</code> (items 1–4; item 5 coverage bewust uitgesteld) · Diepte: Standard · 4 implementation units, 3 PR's</div>
+</header>
+
+<!-- PROBLEM FRAME -->
+<section>
+  <h2>Probleemkader — niets dwingt de bestaande kwaliteit af</h2>
+  <div class="card">
+    <p>De codebase (33k regels, strict TypeScript, 25 testbestanden) heeft géén afdwingmechanisme: <strong>er bestaat geen PR-workflow</strong> — <code>.github/workflows/build.yml</code> triggert uitsluitend op push naar main en draait alleen een build. Tests, typecheck en lint draaien nergens automatisch. Er is geen ESLint-config (terwijl de eigen workflow-regel die vereist), 120 console-calls verdwijnen in productie in het niets, en het IPC-contract bestaat twee keer (30+ types gedupliceerd in de preload). Dit plan dicht die vier gaten in dependency-volgorde: eerst de standaard (U1), dan de poort die hem afdwingt (U2), daarna logging (U3) en het gedeelde contract (U4) — beide bewaakt door de poort uit U2.</p>
+  </div>
+</section>
+
+<!-- REQUIREMENTS -->
+<section>
+  <h2>Requirements — traceerbaar naar de brainstorm</h2>
+  <table>
+    <tr><th style="width:60px">ID</th><th>Requirement</th><th style="width:90px">Origin</th><th style="width:60px">Unit</th></tr>
+    <tr><td><strong>R1</strong></td><td>Een PR kan niet mergen als tests, typecheck of lint falen; de drie checks zijn los zichtbaar in de PR-status.</td><td>Item #1</td><td>U2</td></tr>
+    <tr><td><strong>R2</strong></td><td>ESLint (flat config, typescript-eslint, react-hooks) en Prettier zijn geconfigureerd; de hele codebase is lint-clean; <code>no-explicit-any</code> staat op error.</td><td>Item #2</td><td>U1</td></tr>
+    <tr><td><strong>R3</strong></td><td>Main-process logging gaat via een logger met niveaus, bestandsrotatie en een door de gebruiker vindbaar logbestand; de 5 stille catch-blokken loggen of zijn expliciet gemotiveerd; state-writes in ClaudeHookWatcher zijn atomair.</td><td>Item #3</td><td>U3</td></tr>
+    <tr><td><strong>R4</strong></td><td>IPC-contracttypes bestaan op exact één plek; preload en renderer importeren dezelfde definities; type-drift breekt de compile in plaats van runtime.</td><td>Item #4</td><td>U4</td></tr>
+  </table>
+</section>
+
+<!-- KTD -->
+<section>
+  <h2>Technische kernbeslissingen</h2>
+  <table>
+    <tr><th style="width:30%">Beslissing</th><th>Rationale</th></tr>
+    <tr><td><strong>ESLint 9 flat config met <code>typescript-eslint</code> recommended — niet type-checked als startpunt</strong></td><td>Type-checked linting op 33k regels geeft honderden meldingen en blokkeert de uitrol. Recommended + <code>no-explicit-any</code> (error) + <code>react-hooks</code> + <code>consistent-type-imports</code> borgt de huidige kwaliteit direct; aanscherpen naar type-checked is een latere, losse stap.</td></tr>
+    <tr><td><strong>Nieuwe, aparte <code>ci.yml</code> op <code>pull_request</code> — build.yml blijft ongemoeid</strong></td><td>build.yml doet release-artefacten op push naar main; dat is een ander doel dan een merge-poort. Drie parallelle jobs (lint, typecheck, test) geven losse, snelle PR-checks. Minimal impact: bestaand workflow-gedrag verandert niet.</td></tr>
+    <tr><td><strong>Typecheck als los script <code>tsc --noEmit</code></strong></td><td>Nu zit <code>tsc</code> alleen in het build-script gekoppeld aan vite + electron-builder; als losse check faalt hij apart, sneller en zonder artefact-bijwerkingen.</td></tr>
+    <tr><td><strong>electron-log (v5) voor main-process logging; Sentry uitgesteld</strong></td><td>Conform brainstorm: pragmatisch starten met lokale logs die een gebruiker kan opsturen. electron-log is drop-in, schrijft naar userData met rotatie, en vereist geen account/DSN/privacy-afweging. Sentry blijft een losse vervolgbeslissing.</td></tr>
+    <tr><td><strong>Gedeelde types in <code>shared/</code>, geïmporteerd met <code>import type</code></strong></td><td>De preload-comment ("cannot import from src/") geldt voor runtime-imports; type-only imports worden door de bundler volledig geërased, dus procesisolatie en de cjs-preload-bundle blijven intact. <code>consistent-type-imports</code> (U1) dwingt af dat het type-only blíjft.</td></tr>
+    <tr><td><strong>Unit-tests in CI op windows-latest + ubuntu-latest; e2e niet in deze fase</strong></td><td>Windows is het primaire platform; ubuntu is de snelle vangrail. build.yml bewijst dat node-pty op beide runners compileert. De Playwright-smoketest vereist een display en is flaky-gevoelig — uitgesteld naar item #5 (coverage-fase).</td></tr>
+  </table>
+</section>
+
+<!-- HTD -->
+<section>
+  <h2>Technisch ontwerp — volgorde en afhankelijkheden</h2>
+  <div class="two-col">
+    <div class="card">
+      <svg viewBox="0 0 480 250" width="100%" role="img" aria-label="Dependency-volgorde van de vier units">
+        <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#4a5568"/></marker></defs>
+        <rect x="20" y="30" width="180" height="58" rx="8" fill="#e8f0ff" stroke="#0b5fff"/>
+        <text x="110" y="54" text-anchor="middle" font-size="13" font-weight="700" fill="#0b5fff">U1 · Lint-standaard</text>
+        <text x="110" y="72" text-anchor="middle" font-size="11" fill="#4a5568">ESLint + Prettier + scripts</text>
+        <rect x="280" y="30" width="180" height="58" rx="8" fill="#e8f0ff" stroke="#0b5fff"/>
+        <text x="370" y="54" text-anchor="middle" font-size="13" font-weight="700" fill="#0b5fff">U2 · CI-poort</text>
+        <text x="370" y="72" text-anchor="middle" font-size="11" fill="#4a5568">ci.yml: lint / typecheck / test</text>
+        <rect x="20" y="160" width="180" height="58" rx="8" fill="#ffffff" stroke="#4a5568"/>
+        <text x="110" y="184" text-anchor="middle" font-size="13" font-weight="700" fill="#1a2332">U3 · Logging</text>
+        <text x="110" y="202" text-anchor="middle" font-size="11" fill="#4a5568">electron-log + catches + atomic</text>
+        <rect x="280" y="160" width="180" height="58" rx="8" fill="#ffffff" stroke="#4a5568"/>
+        <text x="370" y="184" text-anchor="middle" font-size="13" font-weight="700" fill="#1a2332">U4 · Gedeeld contract</text>
+        <text x="370" y="202" text-anchor="middle" font-size="11" fill="#4a5568">shared/ types, preload-dedup</text>
+        <line x1="200" y1="59" x2="272" y2="59" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="330" y1="88" x2="135" y2="155" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+        <line x1="395" y1="88" x2="380" y2="155" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+        <text x="240" y="135" text-anchor="middle" font-size="10.5" fill="#4a5568" font-style="italic">U3 en U4 onafhankelijk, beide bewaakt door U2</text>
+      </svg>
+    </div>
+    <div class="card">
+      <p style="font-size:13.5px"><strong>PR-indeling:</strong></p>
+      <ul style="padding-left:20px; font-size:13.5px; margin-top:8px">
+        <li style="margin-bottom:8px"><strong>PR 1 — U1 + U2 samen</strong> (conform brainstorm): de lint-job heeft de config nodig; samen voorkomt dit een tussenstand waarin CI een niet-bestaand script aanroept.</li>
+        <li style="margin-bottom:8px"><strong>PR 2 — U3</strong>: logging, los te reviewen (raakt 17 service-bestanden mechanisch).</li>
+        <li><strong>PR 3 — U4</strong>: gedeeld contract, los te reviewen (verplaatst types, geen gedragswijziging).</li>
+      </ul>
+      <p style="font-size:13px; color:var(--ink-soft); margin-top:12px">U3 en U4 kunnen parallel; ze raken verschillende bestanden (services vs. types/preload).</p>
+    </div>
+  </div>
+</section>
+
+<!-- UNITS -->
+<section>
+  <h2>Implementation units</h2>
+
+  <div class="unit">
+    <h3><span class="uid">U1.</span>Lint-standaard: ESLint flat config + Prettier + losse quality-scripts</h3>
+    <div class="goal">Codifieert de impliciete standaard zodat U2 hem kan afdwingen. Advances R2.</div>
+    <h4>Bestanden</h4>
+    <div class="files"><code>eslint.config.js</code> (nieuw)<code>.prettierrc</code> (nieuw)<code>.prettierignore</code> (nieuw)<code>package.json</code> (scripts + devDeps)</div>
+    <h4>Aanpak</h4>
+    <ul>
+      <li>DevDeps: <code>eslint</code>, <code>typescript-eslint</code>, <code>eslint-plugin-react-hooks</code>, <code>prettier</code>, <code>eslint-config-prettier</code>.</li>
+      <li>Flat config over <code>src/</code>, <code>electron/</code> en <code>test/</code>; ignores voor <code>dist*/</code>, <code>release/</code>, <code>docs/</code>, <code>node_modules/</code>.</li>
+      <li>Regels: typescript-eslint recommended; <code>no-explicit-any</code> op error met één gedocumenteerde disable-regel op de bestaande Milkdown-any in <code>src/components/Editor/MarkdownEditor.tsx</code>; <code>react-hooks</code> recommended; <code>consistent-type-imports</code> (nodig voor U4); <code>eslint-config-prettier</code> als laatste om conflicten uit te zetten.</li>
+      <li>Scripts: <code>lint</code>, <code>lint:fix</code>, <code>format</code>, <code>typecheck</code> (= <code>tsc --noEmit</code>).</li>
+      <li>Eenmalige pass: <code>lint:fix</code> + <code>format</code> over de hele codebase; resterende meldingen handmatig oplossen of per regel beargumenteerd op warn — de PR merget pas als <code>lint</code> exit 0 geeft.</li>
+    </ul>
+    <h4>Testscenario's</h4>
+    <ul>
+      <li><em>Test expectation: none</em> — pure tooling-config. Verificatie is gedragsmatig: (a) <code>npm run lint</code> exit 0 op de hele codebase; (b) een bewust toegevoegde <code>const x: any</code> in een scratch-bestand geeft een error; (c) <code>npm run typecheck</code> exit 0; (d) de bestaande testsuite draait ongewijzigd groen (autofix mag geen gedrag raken).</li>
+    </ul>
+  </div>
+
+  <div class="unit">
+    <h3><span class="uid">U2.</span>CI-kwaliteitspoort: PR-workflow met drie parallelle blocking checks</h3>
+    <div class="goal">Maakt falende tests, types of lint zichtbaar en blokkerend vóór merge. Advances R1. Depends: U1.</div>
+    <h4>Bestanden</h4>
+    <div class="files"><code>.github/workflows/ci.yml</code> (nieuw)</div>
+    <h4>Aanpak</h4>
+    <ul>
+      <li>Trigger: <code>pull_request</code> naar main + <code>push</code> naar main (de poort vangt ook directe pushes).</li>
+      <li>Drie parallelle jobs: <strong>lint</strong> (ubuntu, <code>npm run lint</code>), <strong>typecheck</strong> (ubuntu, <code>npm run typecheck</code>), <strong>test</strong> (matrix: windows-latest + ubuntu-latest, <code>npm test</code> — pretest draait de vite test-build automatisch mee).</li>
+      <li><code>npm ci</code> + Node 20 + npm-cache via <code>actions/setup-node</code>; concurrency-group per branch zodat verouderde runs gecanceld worden.</li>
+      <li>build.yml blijft ongewijzigd (release-artefacten op push main).</li>
+      <li><strong>Operationele stap (handmatig, eenmalig):</strong> branch protection op main aanzetten met de drie checks als required — kan niet vanuit de repo zelf.</li>
+    </ul>
+    <h4>Testscenario's</h4>
+    <ul>
+      <li><em>Test expectation: none</em> — workflow-config. Verificatie op de PR zelf: (a) de drie checks verschijnen los in de PR-status en zijn groen; (b) een bewust gebroken test in een fixup-commit maakt de test-job rood (daarna revert); (c) test-job slaagt op beide OS'en incl. node-pty-compilatie; (d) na merge: branch protection geactiveerd en zichtbaar op main.</li>
+    </ul>
+  </div>
+
+  <div class="unit">
+    <h3><span class="uid">U3.</span>Gestructureerde logging: electron-log vervangt 120 console-calls, stille fouten worden zichtbaar</h3>
+    <div class="goal">Maakt productieproblemen diagnosticeerbaar via een logbestand dat een gebruiker kan opsturen. Advances R3. Depends: U2 (CI bewaakt de refactor).</div>
+    <h4>Bestanden</h4>
+    <div class="files"><code>electron/main/services/Logger.ts</code> (nieuw, dunne wrapper)<code>electron/main/index.ts</code><code>electron/main/services/*.ts</code> (17 bestanden, mechanisch)<code>electron/main/services/ClaudeHookWatcher.ts</code><code>electron/main/services/CommandServer.ts</code><code>test/logger.test.ts</code> (nieuw)</div>
+    <h4>Aanpak</h4>
+    <ul>
+      <li><code>electron-log</code> v5 als devDep→dep; init in main: file-transport naar userData met rotatie (max ~5MB), console-transport alleen in dev; niveau via env overrulebaar.</li>
+      <li>Dunne <code>Logger.ts</code>-wrapper met scoped loggers (<code>log.scope('TerminalManager')</code>) — services importeren de wrapper, niet electron-log direct, zodat de transport-keuze één plek heeft en tests kunnen mocken.</li>
+      <li>Mechanische vervanging van console.* in <code>electron/main/</code> met behoud van de bestaande <code>[ServiceName]</code>-prefixes als scope. Renderer blijft buiten scope.</li>
+      <li>De 5 stille catches: <code>WorktreeService.ts:212</code> (git pull) en <code>AutomationRunner.ts:425</code> (kill) krijgen een debug/warn-log; de 3 listener-callback-catches (<code>ClaudeHookWatcher</code>, <code>FileWatcherService</code>, <code>GitHubService</code>) loggen op warn met throttling-overweging (callbacks vuren frequent).</li>
+      <li>ClaudeHookWatcher: state-write via temp+rename, identiek aan het bestaande patroon in <code>ProjectPersistence.ts</code>.</li>
+      <li>CommandServer: één request-log-regel (methode, pad, status, duur) op debug-niveau.</li>
+      <li>Bestaande IPC <code>app:open-crash-log</code> uitbreiden of spiegelen zodat ook het reguliere logbestand te openen is vanuit de UI (Settings).</li>
+      <li><em>Execution note:</em> vervang console-calls per service in kleine commits; de bestaande servicetests draaien na elke stap.</li>
+    </ul>
+    <h4>Testscenario's</h4>
+    <ul>
+      <li>Logger-wrapper: scoped logger schrijft regel met scope-prefix en niveau naar de file-transport (mock transport, assert formaat).</li>
+      <li>Logniveau-filtering: debug-call verschijnt niet wanneer niveau op info staat.</li>
+      <li>ClaudeHookWatcher atomic write: na een gesimuleerde crash tussen temp-write en rename is het oorspronkelijke statebestand intact (bestaande test in <code>claudeHookWatcher.test.ts</code> uitbreiden).</li>
+      <li>Stille-catch-fix: een listener-callback die throwt produceert een warn-log en stopt de overige listeners niet (uitbreiding bestaande watcher-tests).</li>
+      <li>CommandServer: een afgehandelde request produceert exact één debug-regel met status en duur (uitbreiding <code>commandServer.test.ts</code>).</li>
+      <li>Regressie: volledige bestaande suite groen — de vervanging is gedragsneutraal.</li>
+    </ul>
+  </div>
+
+  <div class="unit">
+    <h3><span class="uid">U4.</span>Eén IPC-contract: gedeelde types in <code>shared/</code>, preload-duplicatie verwijderd</h3>
+    <div class="goal">Type-drift tussen preload en renderer wordt een compile-fout in plaats van een runtime-bug. Advances R4. Depends: U2 (typecheck-poort vangt de refactor).</div>
+    <h4>Bestanden</h4>
+    <div class="files"><code>shared/ipc-types.ts</code> (nieuw)<code>src/types/index.ts</code><code>electron/preload/index.ts</code><code>electron/main/index.ts</code> + services (imports)<code>tsconfig.json</code> (include + path-alias)<code>eslint.config.js</code> (shared/ in scope)</div>
+    <h4>Aanpak</h4>
+    <ul>
+      <li>Verplaats de contract-types die de procesgrens kruisen (Project, ProjectSettings, Worktree, GitStatus, AccountProfile, TerminalState, SpawnFailedPayload, etc. — de ~30 nu gedupliceerde definities) naar <code>shared/ipc-types.ts</code>. Renderer-only types blijven in <code>src/types/index.ts</code>, dat re-exporteert vanuit shared zodat bestaande imports blijven werken.</li>
+      <li>Preload vervangt alle lokale definities door <code>import type</code> uit <code>shared/</code>; de bestaande sync-NOTE-comments (o.a. regel 8–9 en 52) vervallen.</li>
+      <li>Type-only is de harde randvoorwaarde: geen runtime-waarden in <code>shared/ipc-types.ts</code> (geen consts, geen functies), afgedwongen door <code>consistent-type-imports</code> uit U1.</li>
+      <li><code>tsconfig.json</code>: <code>"shared"</code> toevoegen aan include.</li>
+      <li>Patroon volgen: de bestaande <code>@/*</code>-alias in tsconfig + vite.config; voeg analoog een <code>@shared/*</code>-alias toe in beide.</li>
+    </ul>
+    <h4>Testscenario's</h4>
+    <ul>
+      <li>Drift-bewijs (kern van de unit): een veld toevoegen aan een shared type en alleen renderer-side gebruiken compileert; een veld hernoemen breekt zowel preload- als renderer-compile — handmatig geverifieerd vóór merge, daarna bewaakt door de typecheck-job.</li>
+      <li>Bundle-verificatie: <code>dist-electron/preload/index.cjs</code> bevat na build geen code uit <code>shared/</code> of <code>src/</code> (types volledig geërased) en de app start met werkende IPC.</li>
+      <li>Regressie: volledige bestaande suite groen; <code>npm run build</code> levert een startbare app (handmatige smoke: project openen, chat starten, git-panel).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- RISKS -->
+<section>
+  <h2>Risico's en mitigatie</h2>
+  <table>
+    <tr><th>Risico</th><th style="width:50%">Mitigatie</th></tr>
+    <tr><td>ESLint-uitrol produceert een grote, lastig reviewbare diff (autofix over 133 bestanden).</td><td>Autofix/format in één losse commit zonder handmatige wijzigingen; inhoudelijke fixes in aparte commits. Reviewer beoordeelt de config, niet de mechanische diff.</td></tr>
+    <tr><td>node-pty-compilatie faalt in de CI test-job.</td><td>Laag: build.yml bewijst al maanden dat <code>npm install</code> + node-pty werkt op windows/ubuntu runners. Bij falen: <code>npm ci</code>-cache check, zelfde Node 20.</td></tr>
+    <tr><td>Console-vervanging (U3) wijzigt onbedoeld gedrag in een service.</td><td>Per-service commits; vervanging is 1-op-1 (zelfde call sites, zelfde argumenten); volledige suite na elke service.</td></tr>
+    <tr><td>Preload-bundle trekt per ongeluk runtime-code uit shared/ binnen (U4).</td><td><code>consistent-type-imports</code> + afspraak "geen waarden in shared/" + bundle-inspectie als expliciet testscenario.</td></tr>
+    <tr><td>Branch protection vergeten → poort bestaat maar blokkeert niets.</td><td>Expliciete operationele stap in U2-verificatie; pas afvinken als een test-PR de blokkade aantoont.</td></tr>
+  </table>
+</section>
+
+<!-- SCOPE -->
+<section>
+  <h2>Scopegrenzen</h2>
+  <div class="two-col">
+    <div class="card">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px">Uitgesteld naar vervolgwerk</h4>
+      <ul style="padding-left:18px;font-size:13.5px">
+        <li>Item #5: coverage-tooling + tests voor de 6 onbeteste services (eigen plan).</li>
+        <li>E2E/Playwright in CI (hoort bij #5; display + flakiness-vraagstuk).</li>
+        <li>Sentry / remote error reporting (losse beslissing na electron-log).</li>
+        <li>Type-checked ESLint-regels (aanscherping na stabilisatie).</li>
+        <li>Opsplitsen <code>electron/main/index.ts</code> en <code>projectStore.ts</code> (kan nu veilig, mét vangnet).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--red);margin-bottom:8px">Buiten scope</h4>
+      <ul style="padding-left:18px;font-size:13.5px">
+        <li>Renderer-logging (console in de browser-devtools volstaat daar).</li>
+        <li>Wijzigingen aan build.yml of het release-proces.</li>
+        <li>Functionele wijzigingen van welke aard ook — alle vier de units zijn gedragsneutraal voor de eindgebruiker.</li>
+        <li>CHANGELOG-introductie.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note"><strong>Open punt (niet blokkerend):</strong> de PostToolUse lint-fix hook uit de persoonlijke workflow gaat vanzelf werken zodra ESLint bestaat — geen actie in dit plan, wel even verifiëren na PR 1.</div>
+</section>
+
+<footer>
+  Origin: <code>docs/brainstorm/2026-06-10-professionalisering-top-5.html</code> · Gebaseerd op repo-verificatie van build.yml, package.json, vite.config.ts, preload en de drie audit-rapporten van 10 juni 2026. Externe research overgeslagen: ESLint flat config en electron-log zijn settled keuzes met bekende patronen. Uitvoering: <code>/ce-work</code> per PR, te beginnen met PR 1 (U1+U2).
+</footer>
+
+</div>
+</body>
+</html>

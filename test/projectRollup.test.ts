@@ -2,7 +2,11 @@ import { describe, test, expect } from 'vitest'
 import { getProjectRollupState } from '../src/utils/projectRollup'
 import type { TerminalSession, TerminalState } from '../src/types'
 
-function makeTerminal(state: TerminalState, index: number, type: 'claude' | 'normal' = 'claude'): TerminalSession {
+function makeTerminal(
+  state: TerminalState,
+  index: number,
+  type: 'claude' | 'normal' = 'claude'
+): TerminalSession {
   return {
     id: `term-${index}`,
     projectId: 'proj-1',
@@ -51,10 +55,7 @@ describe('getProjectRollupState', () => {
     // keep the rollup permanently green.
     expect(getProjectRollupState([makeTerminal('done', 0, 'normal')])).toBeNull()
     expect(
-      getProjectRollupState([
-        makeTerminal('done', 0, 'normal'),
-        makeTerminal('busy', 1, 'claude'),
-      ])
+      getProjectRollupState([makeTerminal('done', 0, 'normal'), makeTerminal('busy', 1, 'claude')])
     ).toBe('busy')
     expect(
       getProjectRollupState([

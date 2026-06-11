@@ -1,0 +1,9 @@
+dist/
+dist-electron/
+.github/
+release/
+node_modules/
+docs/
+test/screenshots/
+package-lock.json
+*.md
