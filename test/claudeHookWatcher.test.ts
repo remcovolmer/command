@@ -1,4 +1,17 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
+
+// Capture the watcher's scoped logger so tests can assert on warn calls
+// (and dev-noise stays out of the test output).
+const loggerSpies = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}))
+vi.mock('../electron/main/services/Logger', () => ({
+  createLogger: () => loggerSpies,
+}))
+
 import {
   isHookStateData,
   normalizeStateFile,
@@ -160,7 +173,9 @@ describe('normalizeStateFile', () => {
 vi.mock('fs', () => ({
   existsSync: vi.fn(() => true),
   mkdirSync: vi.fn(),
+  readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
+  renameSync: vi.fn(),
   watchFile: vi.fn(),
   unwatchFile: vi.fn(),
 }))
@@ -168,6 +183,9 @@ vi.mock('fs', () => ({
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
 }))
+
+// Mocked fs functions (see vi.mock above) for atomic-write assertions
+import * as fs from 'fs'
 
 function createMockWindow() {
   return {
@@ -602,5 +620,122 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     watcher.unregisterTerminal('t1')
 
     expect(watcher.getTerminalSessions()).toHaveLength(0)
+  })
+})
+
+describe('ClaudeHookWatcher state file atomic write', () => {
+  let watcher: ClaudeHookWatcher
+
+  function processState(hookState: Record<string, unknown>) {
+    ;(
+      watcher as unknown as { processSessionState(s: Record<string, unknown>): void }
+    ).processSessionState(hookState)
+  }
+
+  function endSession(sessionId: string) {
+    // SessionStart to map the session, then SessionEnd to trigger the
+    // state-file cleanup write.
+    processState({
+      session_id: sessionId,
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+    processState({
+      session_id: sessionId,
+      cwd: 'C:\\projects\\foo',
+      state: 'done',
+      timestamp: 2000,
+      hook_event: 'SessionEnd',
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    watcher = new ClaudeHookWatcher(createMockWindow())
+    watcher.registerTerminal('t1', 'C:/projects/foo')
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ s1: makeHookState({ session_id: 's1' }) })
+    )
+  })
+
+  test('SessionEnd rewrites the state file via temp file + rename', () => {
+    endSession('s1')
+
+    // Write goes to the temp file, never directly to the state file
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    const [writePath, written] = vi.mocked(fs.writeFileSync).mock.calls[0]
+    expect(String(writePath)).toMatch(/command-center-state\.json\.tmp$/)
+    expect(JSON.parse(String(written))).toEqual({})
+
+    // Rename moves the temp file over the state file, after the write
+    expect(fs.renameSync).toHaveBeenCalledTimes(1)
+    const [from, to] = vi.mocked(fs.renameSync).mock.calls[0]
+    expect(from).toBe(writePath)
+    expect(String(to)).toMatch(/command-center-state\.json$/)
+    expect(vi.mocked(fs.renameSync).mock.invocationCallOrder[0]).toBeGreaterThan(
+      vi.mocked(fs.writeFileSync).mock.invocationCallOrder[0]
+    )
+  })
+
+  test('a crash during the temp write leaves the original state file untouched', () => {
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      throw new Error('disk full')
+    })
+
+    // Must not throw (errors are swallowed) and must not rename a broken temp file
+    expect(() => endSession('s1')).not.toThrow()
+    expect(fs.renameSync).not.toHaveBeenCalled()
+  })
+
+  test('no write happens when the session is not in the state file', () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ other: makeHookState() }))
+
+    endSession('s1')
+
+    expect(fs.writeFileSync).not.toHaveBeenCalled()
+    expect(fs.renameSync).not.toHaveBeenCalled()
+  })
+})
+
+describe('ClaudeHookWatcher state change listeners', () => {
+  let watcher: ClaudeHookWatcher
+  let mockWindow: ReturnType<typeof createMockWindow>
+
+  function processState(hookState: Record<string, unknown>) {
+    ;(
+      watcher as unknown as { processSessionState(s: Record<string, unknown>): void }
+    ).processSessionState(hookState)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockWindow = createMockWindow()
+    watcher = new ClaudeHookWatcher(mockWindow)
+    watcher.registerTerminal('t1', 'C:/projects/foo')
+  })
+
+  test('a throwing listener logs a warning and does not stop other listeners', () => {
+    const throwing = vi.fn(() => {
+      throw new Error('listener boom')
+    })
+    const healthy = vi.fn()
+    watcher.addStateChangeListener(throwing)
+    watcher.addStateChangeListener(healthy)
+
+    processState({
+      session_id: 's1',
+      cwd: 'C:\\projects\\foo',
+      state: 'busy',
+      timestamp: 1000,
+      hook_event: 'SessionStart',
+    })
+
+    expect(throwing).toHaveBeenCalled()
+    expect(healthy).toHaveBeenCalledWith('t1', 'busy')
+    expect(loggerSpies.warn).toHaveBeenCalledWith('State change listener threw:', expect.any(Error))
+    // The renderer emission still happened despite the throwing listener
+    expect(getSend(mockWindow)).toHaveBeenCalledWith('terminal:state', 't1', 'busy')
   })
 })
