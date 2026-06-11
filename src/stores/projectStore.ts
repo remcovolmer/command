@@ -204,6 +204,7 @@ interface ProjectStore {
   updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>) => Promise<void>
   setActiveProject: (id: string | null) => void
   reorderProjects: (projectIds: string[]) => Promise<void>
+  togglePinProject: (id: string) => Promise<void>
 
   // Terminal actions
   addTerminal: (terminal: TerminalSession) => void
@@ -1191,6 +1192,21 @@ export const useProjectStore = create<ProjectStore>()(
           set({ projects })
         } catch (error) {
           console.error('Failed to reorder projects:', error)
+        }
+      },
+
+      togglePinProject: async (id) => {
+        const api = getElectronAPI()
+        try {
+          const project = get().projects.find((p) => p.id === id)
+          if (!project) return
+          const result = await api.project.setPinned(id, !project.pinned)
+          if (result) {
+            const projects = await api.project.list()
+            set({ projects })
+          }
+        } catch (error) {
+          console.error('Failed to toggle project pin:', error)
         }
       },
 

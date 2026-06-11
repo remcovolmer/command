@@ -24,6 +24,7 @@ export interface Project {
   type: ProjectType;
   createdAt: number;
   sortOrder: number;
+  pinned?: boolean;
   settings?: ProjectSettings;
 }
 
@@ -459,6 +460,7 @@ export interface ElectronAPI {
     add: (path: string, name?: string, type?: ProjectType) => Promise<Project>;
     remove: (id: string) => Promise<void>;
     update: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>) => Promise<Project | null>;
+    setPinned: (id: string, pinned: boolean) => Promise<Project | null>;
     selectFolder: () => Promise<string | null>;
     reorder: (projectIds: string[]) => Promise<Project[]>;
     setActiveWatcher: (projectId: string) => Promise<void>;
