@@ -2,6 +2,9 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { WorktreeService } from './WorktreeService'
+import { createLogger } from './Logger'
+
+const log = createLogger('AutomationRunner')
 
 const execFileAsync = promisify(execFile)
 
@@ -84,8 +87,8 @@ export class AutomationRunner {
             startPoint
           )
         } catch (error) {
-          console.warn(
-            `[AutomationRunner] Failed to branch from "${startPoint}", falling back to HEAD: ${error instanceof Error ? error.message : String(error)}`
+          log.warn(
+            `Failed to branch from "${startPoint}", falling back to HEAD: ${error instanceof Error ? error.message : String(error)}`
           )
           worktreePath = await this.serializedWorktreeCreate(projectPath, worktreeDirName)
         }
@@ -325,21 +328,19 @@ export class AutomationRunner {
           // they may contain work from a crashed or killed automation run
           const hasChanges = await this.worktreeHasChanges(wt.path, null)
           if (hasChanges) {
-            console.log(
-              `[AutomationRunner] GC: skipping worktree ${wt.branch} — has uncommitted changes`
-            )
+            log.info(`GC: skipping worktree ${wt.branch} — has uncommitted changes`)
             continue
           }
 
-          console.log(
-            `[AutomationRunner] GC: removing orphaned worktree ${wt.branch} (age: ${Math.round(age / 3600000)}h)`
+          log.info(
+            `GC: removing orphaned worktree ${wt.branch} (age: ${Math.round(age / 3600000)}h)`
           )
           await this.cleanupWorktree(projectPath, wt.path, wt.branch)
           cleaned++
         }
       }
     } catch (error) {
-      console.error('[AutomationRunner] GC failed:', error)
+      log.error('GC failed:', error)
     }
     return cleaned
   }
@@ -423,7 +424,7 @@ export class AutomationRunner {
     try {
       await this.worktreeService.removeWorktree(projectPath, worktreePath, true)
     } catch (error) {
-      console.error(`[AutomationRunner] Failed to remove worktree: ${error}`)
+      log.error(`Failed to remove worktree: ${error}`)
     }
 
     if (branchName) {
@@ -453,13 +454,16 @@ export class AutomationRunner {
         setTimeout(() => {
           try {
             child.kill('SIGKILL')
-          } catch {
-            /* already dead */
+          } catch (err) {
+            // Expected when SIGTERM already finished the process
+            log.debug(`SIGKILL for pid ${child.pid} failed (process already dead):`, err)
           }
         }, 5000)
       }
-    } catch {
-      // Process already exited
+    } catch (err) {
+      // Usually the process already exited; a genuinely failed kill would
+      // leave an orphaned claude process behind, so keep this visible.
+      log.warn(`Failed to kill automation process pid ${child.pid}:`, err)
     }
   }
 }

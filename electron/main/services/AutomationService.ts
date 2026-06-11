@@ -9,6 +9,9 @@ import type { ProjectPersistence } from './ProjectPersistence'
 import type { ClaudeHookWatcher } from './ClaudeHookWatcher'
 import type { GitHubService, GitEvent, PREventContext } from './GitHubService'
 import type { FileWatcherService } from './FileWatcherService'
+import { createLogger } from './Logger'
+
+const log = createLogger('AutomationService')
 
 const MAX_CONCURRENT_RUNS = 3
 const MISSED_RUN_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 hours
@@ -41,7 +44,7 @@ export class AutomationService {
     // Mark any runs that were 'running' from a previous crash as failed
     const marked = this.persistence.markRunningAsFailed()
     if (marked > 0) {
-      console.log(`[AutomationService] Marked ${marked} interrupted run(s) as failed`)
+      log.info(`Marked ${marked} interrupted run(s) as failed`)
     }
   }
 
@@ -62,7 +65,7 @@ export class AutomationService {
         this.startScheduler(automation)
       }
     }
-    console.log(`[AutomationService] Started ${this.schedulerMap.size} scheduler(s)`)
+    log.info(`Started ${this.schedulerMap.size} scheduler(s)`)
   }
 
   checkMissedRuns(): void {
@@ -85,13 +88,11 @@ export class AutomationService {
 
         const prevRunTime = prevRun.getTime()
         if (prevRunTime > lastRunTime && now - prevRunTime < MISSED_RUN_MAX_AGE_MS) {
-          console.log(
-            `[AutomationService] Missed run detected for "${automation.name}", triggering`
-          )
+          log.info(`Missed run detected for "${automation.name}", triggering`)
           this.triggerForAllProjects(automation)
         }
       } catch (error) {
-        console.error(`[AutomationService] Error checking missed runs for ${automation.id}:`, error)
+        log.error(`Error checking missed runs for ${automation.id}:`, error)
       }
     }
   }
@@ -111,12 +112,12 @@ export class AutomationService {
 
     try {
       const cron = new Cron(automation.trigger.cron, () => {
-        console.log(`[AutomationService] Cron fired for "${automation.name}"`)
+        log.info(`Cron fired for "${automation.name}"`)
         this.triggerForAllProjects(automation)
       })
       this.schedulerMap.set(automation.id, cron)
     } catch (error) {
-      console.error(`[AutomationService] Invalid cron for ${automation.id}:`, error)
+      log.error(`Invalid cron for ${automation.id}:`, error)
     }
   }
 
@@ -143,7 +144,7 @@ export class AutomationService {
       const project = projects.find((p) => p.id === projectId)
       if (project) {
         this.triggerRun(automation.id, project.path, project.id).catch((err) => {
-          console.error(`[AutomationService] Trigger failed for project ${projectId}:`, err)
+          log.error(`Trigger failed for project ${projectId}:`, err)
         })
       }
     }
@@ -177,7 +178,7 @@ export class AutomationService {
     })
     this.eventUnsubscribers.push(unsubFile)
 
-    console.log('[AutomationService] Event triggers registered')
+    log.info('Event triggers registered')
   }
 
   private handleClaudeDoneTrigger(): void {
@@ -206,7 +207,7 @@ export class AutomationService {
       if (!automation.projectIds.includes(project.id)) continue
 
       this.triggerRun(automation.id, project.path, project.id, prContext).catch((err) => {
-        console.error(`[AutomationService] Git event trigger failed:`, err)
+        log.error(`Git event trigger failed:`, err)
       })
     }
   }
@@ -246,7 +247,7 @@ export class AutomationService {
           if (project) {
             this.fileChangeCooldowns.set(automation.id, now)
             this.triggerRun(automation.id, project.path, project.id).catch((err) => {
-              console.error(`[AutomationService] File change trigger failed:`, err)
+              log.error(`File change trigger failed:`, err)
             })
             break // Only trigger once per automation per batch
           }
@@ -379,19 +380,17 @@ export class AutomationService {
   ): Promise<void> {
     const automation = this.persistence.getAutomation(automationId)
     if (!automation) {
-      console.warn(`[AutomationService] Automation ${automationId} not found`)
+      log.warn(`Automation ${automationId} not found`)
       return
     }
 
     // Concurrency checks
     if (this.runningCount >= MAX_CONCURRENT_RUNS) {
-      console.warn(
-        `[AutomationService] Max concurrent runs (${MAX_CONCURRENT_RUNS}) reached, skipping`
-      )
+      log.warn(`Max concurrent runs (${MAX_CONCURRENT_RUNS}) reached, skipping`)
       return
     }
     if (this.runner.isRunning(automationId)) {
-      console.warn(`[AutomationService] Automation ${automationId} already running, skipping`)
+      log.warn(`Automation ${automationId} already running, skipping`)
       return
     }
 
@@ -418,7 +417,7 @@ export class AutomationService {
     const resolvedPrompt = automation.prompt.replace(/\{\{pr\.(\w+)\}\}/g, (match, key: string) => {
       if (key in templateVars) return templateVars[key]
       if (prContext) {
-        console.warn(`[AutomationService] Unresolved template variable: ${match}`)
+        log.warn(`Unresolved template variable: ${match}`)
       }
       return ''
     })
@@ -438,9 +437,7 @@ export class AutomationService {
     try {
       // Log when PR branch is empty (headRefName missing from API response)
       if (prContext && !prContext.branch && prContext.state !== 'MERGED') {
-        console.warn(
-          `[AutomationService] PR #${prContext.number} has no branch name, worktree will use HEAD`
-        )
+        log.warn(`PR #${prContext.number} has no branch name, worktree will use HEAD`)
       }
 
       const result = await this.runner.run(runId, automationId, resolvedPrompt, projectPath, {
