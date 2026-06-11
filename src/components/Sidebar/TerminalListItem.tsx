@@ -2,7 +2,6 @@ import { memo } from 'react'
 import { Terminal as TerminalIcon, X } from 'lucide-react'
 import type { TerminalSession } from '../../types'
 import {
-  STATE_TEXT_COLORS,
   STATE_DOT_COLORS,
   isInputState,
   isVisibleState,
@@ -38,7 +37,7 @@ export const TerminalListItem = memo(function TerminalListItem({
       className={className ?? defaultClassName}
     >
       <TerminalIcon
-        className={`w-3 h-3 flex-shrink-0 ${isClaude ? 'mt-0.5' : ''} ${STATE_TEXT_COLORS[terminal.state]}`}
+        className={`w-3 h-3 flex-shrink-0 text-muted-foreground ${isClaude ? 'mt-0.5' : ''}`}
       />
       <div className="flex-1 min-w-0">
         <span className="text-xs truncate block">{terminal.generatedTitle || terminal.title}</span>

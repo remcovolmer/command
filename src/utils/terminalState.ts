@@ -23,6 +23,11 @@ export const INPUT_STATES = ['done', 'permission', 'question'] as const
 export const isInputState = (state: TerminalState): boolean =>
   INPUT_STATES.includes(state as typeof INPUT_STATES[number])
 
+// States that require urgent user attention (orange treatment in sidebar)
+export const ATTENTION_STATES = ['permission', 'question'] as const
+export const isAttentionState = (state: TerminalState): boolean =>
+  ATTENTION_STATES.includes(state as typeof ATTENTION_STATES[number])
+
 // States that should show a visible indicator
 export const VISIBLE_STATES = ['busy', 'done', 'permission', 'question'] as const
 export const isVisibleState = (state: TerminalState): boolean =>

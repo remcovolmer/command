@@ -280,13 +280,13 @@ export const WorktreeItem = memo(function WorktreeItem({
           group flex items-center gap-2 px-3 py-1.5 cursor-pointer
           transition-colors duration-150
           ${isActive
-            ? 'bg-sidebar-accent text-sidebar-foreground rounded-t-md'
+            ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-t-md'
             : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-t-md'}
           ${!hasPR ? (isActive ? 'rounded-b-md' : 'rounded-b-md') : ''}
         `}
       >
         {/* Branch icon */}
-        <GitBranch className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+        <GitBranch className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
 
         {/* Branch name */}
         <span className="flex-1 text-xs font-medium truncate" title={worktree.branch}>
@@ -334,7 +334,7 @@ export const WorktreeItem = memo(function WorktreeItem({
         <div
           className={`
             flex items-center gap-1.5 pl-9 pr-3 py-1 text-muted-foreground
-            ${isActive ? 'bg-sidebar-accent rounded-b-md' : ''}
+            ${isActive ? 'bg-[var(--sidebar-highlight)] rounded-b-md' : ''}
             ${prStatus.stale ? 'opacity-60' : ''}
           `}
           title={prStatus.stale ? `PR status update failed — showing last known data. ${prStatus.error ?? ''}`.trim() : undefined}
