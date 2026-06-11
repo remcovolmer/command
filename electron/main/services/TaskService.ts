@@ -1,51 +1,16 @@
 import { readFile, writeFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
-// Types duplicated here due to Electron process isolation
-export interface TaskItem {
-  id: string
-  text: string
-  completed: boolean
-  section: string
-  filePath: string
-  lineNumber: number
-  dueDate?: string
-  personTags?: string[]
-  isOverdue?: boolean
-  isDueToday?: boolean
-}
+import type {
+  TaskAdd,
+  TaskItem,
+  TaskMove,
+  TaskSection,
+  TaskUpdate,
+  TasksData,
+} from '../../../shared/ipc-types'
 
-export interface TaskSection {
-  name: string
-  priority: number
-  tasks: TaskItem[]
-}
-
-export interface TasksData {
-  sections: TaskSection[]
-  files: string[]
-  totalOpen: number
-  nowCount: number
-}
-
-export interface TaskUpdate {
-  filePath: string
-  lineNumber: number
-  action: 'toggle' | 'edit' | 'delete'
-  newText?: string
-}
-
-export interface TaskMove {
-  filePath: string
-  lineNumber: number
-  targetSection: string
-}
-
-export interface TaskAdd {
-  filePath: string
-  section: string
-  text: string
-}
+export type { TaskAdd, TaskItem, TaskMove, TaskSection, TaskUpdate, TasksData }
 
 // Section priorities for the 5 canonical sections
 const SECTION_PRIORITIES: Record<string, number> = {

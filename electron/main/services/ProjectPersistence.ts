@@ -7,42 +7,14 @@ import { createLogger } from './Logger'
 
 const log = createLogger('ProjectPersistence')
 
-// NOTE: Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
-type ProjectType = 'workspace' | 'project' | 'code'
-type AuthMode = 'subscription' | 'profile'
-type ClaudeMode = 'chat' | 'auto' | 'full-auto'
-
-interface AccountProfile {
-  id: string
-  name: string
-  envVarCount: number
-}
-
-interface ProjectSettings {
-  claudeMode?: ClaudeMode
-  authMode?: AuthMode
-  profileId?: string
-}
-
-interface Project {
-  id: string
-  name: string
-  path: string
-  type: ProjectType
-  createdAt: number
-  sortOrder: number
-  settings?: ProjectSettings
-}
-
-interface Worktree {
-  id: string
-  projectId: string
-  name: string
-  branch: string
-  path: string
-  createdAt: number
-  isLocked: boolean
-}
+import type {
+  AccountProfile,
+  AuthMode,
+  ClaudeMode,
+  Project,
+  ProjectType,
+  Worktree,
+} from '../../../shared/ipc-types'
 
 interface PersistedSession {
   terminalId: string

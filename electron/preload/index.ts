@@ -1,20 +1,38 @@
 import { ipcRenderer, contextBridge } from 'electron'
+// Type-only import: fully erased by the bundler, so the preload stays a
+// self-contained cjs bundle while sharing one IPC contract with the renderer.
+import type {
+  AccountProfile,
+  BranchList,
+  FileSystemEntry,
+  GitBranchListItem,
+  GitCommitDetail,
+  GitCommitLog,
+  GitStatus,
+  PRStatus,
+  Project,
+  ProjectType,
+  RestoredSession,
+  SessionIndexEntry,
+  SpawnFailedEvent,
+  TaskAdd,
+  TaskMove,
+  TaskUpdate,
+  TasksData,
+  TerminalSession,
+  TerminalState,
+  TerminalType,
+  UncaughtErrorEvent,
+  Unsubscribe,
+  UpdateAvailableInfo,
+  UpdateCheckResult,
+  UpdateDownloadedInfo,
+  UpdateErrorInfo,
+  UpdateProgressInfo,
+  Worktree,
+} from '../../shared/ipc-types'
 
 console.log('[PRELOAD] Script starting...')
-
-// Type definitions for the exposed API - Claude Code states (5 states)
-type TerminalState = 'busy' | 'permission' | 'question' | 'done' | 'stopped'
-type TerminalType = 'claude' | 'normal'
-// Mirror of SpawnFailureCode in src/types — kept inline because the preload
-// is bundled separately and cannot import from src/.
-type SpawnFailureCode = 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED'
-interface SpawnFailedPayload {
-  projectId?: string
-  worktreeId?: string
-  code: SpawnFailureCode
-  cwd: string
-  message: string
-}
 
 // Whitelist of channels that can have listeners removed
 const ALLOWED_LISTENER_CHANNELS = [
@@ -49,246 +67,6 @@ const ALLOWED_LISTENER_CHANNELS = [
   'worktree:added',
 ] as const
 
-// NOTE: ProjectType duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
-type ProjectType = 'workspace' | 'project' | 'code'
-type AuthMode = 'subscription' | 'profile'
-type ClaudeMode = 'chat' | 'auto' | 'full-auto'
-
-interface AccountProfile {
-  id: string
-  name: string
-  envVarCount: number
-}
-
-interface ProjectSettings {
-  claudeMode?: ClaudeMode
-  authMode?: AuthMode
-  profileId?: string
-}
-
-interface Project {
-  id: string
-  name: string
-  path: string
-  type: ProjectType
-  createdAt: number
-  sortOrder: number
-  settings?: ProjectSettings
-}
-
-interface Worktree {
-  id: string
-  projectId: string
-  name: string
-  branch: string
-  path: string
-  createdAt: number
-  isLocked: boolean
-}
-
-interface BranchList {
-  local: string[]
-  remote: string[]
-  current: string | null
-}
-
-interface FileSystemEntry {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  extension?: string
-}
-
-interface GitFileChange {
-  path: string
-  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted'
-  staged: boolean
-}
-
-interface GitBranchInfo {
-  name: string
-  upstream: string | null
-  ahead: number
-  behind: number
-}
-
-interface GitStatus {
-  isGitRepo: boolean
-  branch: GitBranchInfo | null
-  staged: GitFileChange[]
-  modified: GitFileChange[]
-  untracked: GitFileChange[]
-  conflicted: GitFileChange[]
-  isClean: boolean
-  error?: string
-}
-
-interface GitCommit {
-  hash: string
-  shortHash: string
-  message: string
-  authorName: string
-  authorDate: string
-  parentHashes: string[]
-}
-
-interface GitCommitFile {
-  path: string
-  status: 'added' | 'modified' | 'deleted' | 'renamed'
-  additions: number
-  deletions: number
-  oldPath?: string
-}
-
-interface GitCommitDetail {
-  hash: string
-  fullMessage: string
-  authorName: string
-  authorEmail: string
-  authorDate: string
-  files: GitCommitFile[]
-  isMerge: boolean
-  parentHashes: string[]
-}
-
-interface GitCommitLog {
-  commits: GitCommit[]
-  hasMore: boolean
-}
-
-interface GitBranchListItem {
-  name: string
-  current: boolean
-  upstream: string | null
-}
-
-// Task types
-interface TaskItem {
-  id: string
-  text: string
-  completed: boolean
-  section: string
-  filePath: string
-  lineNumber: number
-  dueDate?: string
-  personTags?: string[]
-  isOverdue?: boolean
-  isDueToday?: boolean
-}
-
-interface TaskSection {
-  name: string
-  priority: number
-  tasks: TaskItem[]
-}
-
-interface TasksData {
-  sections: TaskSection[]
-  files: string[]
-  totalOpen: number
-  nowCount: number
-}
-
-interface TaskUpdate {
-  filePath: string
-  lineNumber: number
-  action: 'toggle' | 'edit' | 'delete'
-  newText?: string
-}
-
-interface TaskMove {
-  filePath: string
-  lineNumber: number
-  targetSection: string
-}
-
-interface TaskAdd {
-  filePath: string
-  section: string
-  text: string
-}
-
-// Update types
-interface PRCheckStatus {
-  name: string
-  state: string
-  bucket: string
-}
-
-interface PRStatus {
-  noPR: boolean
-  number?: number
-  title?: string
-  url?: string
-  headRefName?: string
-  state?: 'OPEN' | 'CLOSED' | 'MERGED'
-  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
-  mergeStateStatus?: 'CLEAN' | 'DIRTY' | 'BLOCKED' | 'UNSTABLE' | 'UNKNOWN'
-  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null
-  statusCheckRollup?: PRCheckStatus[]
-  additions?: number
-  deletions?: number
-  changedFiles?: number
-  loading?: boolean
-  error?: string
-  lastUpdated?: number
-  stale?: boolean
-}
-
-interface UpdateCheckResult {
-  updateAvailable: boolean
-  version?: string
-  currentVersion?: string
-  isDev?: boolean
-}
-
-interface UpdateAvailableInfo {
-  version: string
-  releaseDate?: string
-  releaseNotes?: string | null
-}
-
-interface UpdateProgressInfo {
-  percent: number
-  bytesPerSecond: number
-  transferred: number
-  total: number
-}
-
-interface UpdateDownloadedInfo {
-  version: string
-}
-
-interface UpdateErrorInfo {
-  message: string
-}
-
-// Unsubscribe function type
-type Unsubscribe = () => void
-
-// NOTE: SessionIndexEntry duplicated here due to Electron process isolation.
-// Keep in sync with src/types/index.ts and electron/main/services/SessionIndexService.ts.
-interface SessionIndexEntry {
-  sessionId: string
-  summary: string
-  firstPrompt: string
-  messageCount: number
-  gitBranch: string
-  modified: string
-  created: string
-  projectPath: string
-  isSidechain: boolean
-  filesModified: string[]
-  filesRead: string[]
-  toolCounts: Record<string, number>
-  errorCount: number
-  durationMs: number
-  assistantMessageCount: number
-  generatedTitle?: string
-  generatedSummary?: string
-  worktreeName?: string
-}
-
 // Expose secure API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
   // Terminal operations
@@ -296,7 +74,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (
       projectId: string,
       worktreeId?: string,
-      type?: 'claude' | 'normal',
+      type?: TerminalType,
       resumeSessionId?: string
     ): Promise<string | null> =>
       ipcRenderer.invoke('terminal:create', projectId, worktreeId, type, resumeSessionId),
@@ -363,55 +141,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('terminal:status', handler)
     },
 
-    onSessionRestored: (
-      callback: (session: {
-        terminalId: string
-        projectId: string
-        worktreeId: string | null
-        title: string
-        summary?: string
-      }) => void
-    ): Unsubscribe => {
-      const handler = (
-        _event: Electron.IpcRendererEvent,
-        session: {
-          terminalId: string
-          projectId: string
-          worktreeId: string | null
-          title: string
-          summary?: string
-        }
-      ) => callback(session)
+    onSessionRestored: (callback: (session: RestoredSession) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, session: RestoredSession) =>
+        callback(session)
       ipcRenderer.on('session:restored', handler)
       return () => ipcRenderer.removeListener('session:restored', handler)
     },
 
     onSidecarCreated: (
-      callback: (
-        contextKey: string,
-        terminal: {
-          id: string
-          projectId: string
-          worktreeId: string | null
-          state: TerminalState
-          lastActivity: number
-          title: string
-          type: TerminalType
-        }
-      ) => void
+      callback: (contextKey: string, terminal: TerminalSession) => void
     ): Unsubscribe => {
       const handler = (
         _event: Electron.IpcRendererEvent,
         contextKey: string,
-        terminal: {
-          id: string
-          projectId: string
-          worktreeId: string | null
-          state: TerminalState
-          lastActivity: number
-          title: string
-          type: TerminalType
-        }
+        terminal: TerminalSession
       ) => callback(contextKey, terminal)
       ipcRenderer.on('sidecar:created', handler)
       return () => ipcRenderer.removeListener('sidecar:created', handler)
@@ -431,8 +174,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('terminal:generated-title', handler)
     },
 
-    onSpawnFailed: (callback: (event: SpawnFailedPayload) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: SpawnFailedPayload) =>
+    onSpawnFailed: (callback: (event: SpawnFailedEvent) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: SpawnFailedEvent) =>
         callback(payload)
       ipcRenderer.on('terminal:spawn-failed', handler)
       return () => ipcRenderer.removeListener('terminal:spawn-failed', handler)
@@ -589,21 +332,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),
 
-    onUncaughtError: (
-      callback: (event: {
-        source: 'uncaughtException' | 'unhandledRejection'
-        message: string
-        logPath: string
-      }) => void
-    ): Unsubscribe => {
-      const handler = (
-        _event: Electron.IpcRendererEvent,
-        payload: {
-          source: 'uncaughtException' | 'unhandledRejection'
-          message: string
-          logPath: string
-        }
-      ) => callback(payload)
+    onUncaughtError: (callback: (event: UncaughtErrorEvent) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: UncaughtErrorEvent) =>
+        callback(payload)
       ipcRenderer.on('app:uncaught-error', handler)
       return () => ipcRenderer.removeListener('app:uncaught-error', handler)
     },
