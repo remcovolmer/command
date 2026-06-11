@@ -7,6 +7,7 @@ import { getElectronAPI } from '../../utils/electron'
 import { terminalEvents } from '../../utils/terminalEvents'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
 import { SortableProjectList } from './SortableProjectList'
+import { UsageIndicator } from './UsageIndicator'
 import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
 import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
@@ -490,6 +491,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="px-3 py-2 border-t border-border">
+        <UsageIndicator />
         <div className="flex items-center">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="text-xs text-muted-foreground shrink-0">
