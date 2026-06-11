@@ -192,11 +192,6 @@ body {
   animation: blink-glow-green 1.5s ease-in-out infinite;
 }
 
-/* Ready state - green glow (Claude finished, waiting for input) */
-.needs-input-indicator.state-ready {
-  animation: blink-glow-green 1.5s ease-in-out infinite;
-}
-
 @keyframes blink-glow-green {
 
   0%,
@@ -212,8 +207,10 @@ body {
   }
 }
 
-/* Permission state - orange fast blink (Claude needs permission - more urgent) */
-.needs-input-indicator.state-permission {
+/* Permission/question states - orange fast blink (Claude waits on the user - more urgent).
+   Treated identically per the attention-state contract (see isAttentionState). */
+.needs-input-indicator.state-permission,
+.needs-input-indicator.state-question {
   animation: blink-glow-orange 1s ease-in-out infinite;
 }
 
@@ -229,6 +226,26 @@ body {
   50% {
     opacity: 0.5;
     box-shadow: 0 0 4px oklch(0.75 0.18 55.0);
+  }
+}
+
+/* Attention rail - 3px left-edge bar for permission/question rows.
+   Own keyframes: the dot glow above is sized for a 6px dot, too heavy on a thin bar. */
+.attention-rail {
+  animation: rail-pulse 1s ease-in-out infinite;
+}
+
+@keyframes rail-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 6px color-mix(in oklch, var(--status-attention) 70%, transparent);
+  }
+
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 2px color-mix(in oklch, var(--status-attention) 40%, transparent);
   }
 }
 

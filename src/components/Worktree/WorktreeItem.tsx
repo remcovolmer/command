@@ -3,7 +3,7 @@ import { GitBranch, Trash2, ExternalLink, GitMerge, AlertTriangle, CheckCircle2,
 import type { Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
-import { STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
+import { STATE_DOT_COLORS, isAttentionState, isInputState, isVisibleState } from '../../utils/terminalState'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
 
 interface WorktreeItemProps {
@@ -271,20 +271,36 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   const isActive = terminal?.id === activeTerminalId
 
+  const isAttention = terminal ? isAttentionState(terminal.state) : false
+  const activeBg = isAttention
+    ? 'bg-[color-mix(in_oklch,var(--status-attention)_14%,var(--sidebar-highlight))]'
+    : 'bg-[var(--sidebar-highlight)]'
+  const inactiveBg = isAttention
+    ? 'bg-[color-mix(in_oklch,var(--status-attention)_8%,transparent)]'
+    : 'hover:bg-muted/50'
+
   return (
     <div className="mt-0.5 border-l border-primary/30 ml-6">
       {/* Row 1: Branch info + hover actions */}
       <div
         onClick={handleRowClick}
         className={`
-          group flex items-center gap-2 px-3 py-1.5 cursor-pointer
-          transition-colors duration-150
+          group relative flex items-center gap-2 px-3 py-1.5 cursor-pointer
+          transition-colors duration-150 rounded-t-md
           ${isActive
-            ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-t-md'
-            : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-t-md'}
-          ${!hasPR ? (isActive ? 'rounded-b-md' : 'rounded-b-md') : ''}
+            ? `${activeBg} text-sidebar-foreground`
+            : `${inactiveBg} text-muted-foreground hover:text-sidebar-foreground`}
+          ${!hasPR ? 'rounded-b-md' : ''}
         `}
       >
+        {/* Attention rail - 3px left-edge bar for permission/question (pulse lives on the rail) */}
+        {isAttention && (
+          <span
+            data-testid="attention-rail"
+            aria-hidden="true"
+            className="attention-rail absolute inset-y-0 left-0 w-[3px] rounded-full bg-[var(--status-attention)] pointer-events-none"
+          />
+        )}
         {/* Branch icon */}
         <GitBranch className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
 
@@ -295,8 +311,14 @@ export const WorktreeItem = memo(function WorktreeItem({
 
         {/* Right side: State dot + hover actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Terminal state dot - only show for visible states */}
-          {terminal && isVisibleState(terminal.state) && (
+          {/* Attention chip - permission/question rows say what they need */}
+          {isAttention && (
+            <span className="text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[var(--status-attention)]">
+              wacht op jou
+            </span>
+          )}
+          {/* Terminal state dot - only for visible non-attention states (busy/done) */}
+          {terminal && !isAttention && isVisibleState(terminal.state) && (
             <span
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
                 isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''

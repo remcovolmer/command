@@ -64,3 +64,40 @@ describe('TerminalListItem summary rendering', () => {
     expect(li.querySelectorAll('div > span').length).toBe(1)
   })
 })
+
+describe('TerminalListItem attention rail (permission/question)', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  const queryStateDot = (li: HTMLElement) =>
+    li.querySelector('.w-1\\.5.h-1\\.5.rounded-full')
+
+  test('permission state: rail + "wacht op jou" chip, no status dot', () => {
+    renderItem(makeTerminal({ state: 'permission' }), false)
+    expect(screen.getByTestId('attention-rail')).toBeTruthy()
+    expect(screen.getByText('wacht op jou')).toBeTruthy()
+    expect(queryStateDot(screen.getByRole('listitem'))).toBeNull()
+  })
+
+  test('question state: exact same treatment as permission', () => {
+    renderItem(makeTerminal({ state: 'question' }), false)
+    expect(screen.getByTestId('attention-rail')).toBeTruthy()
+    expect(screen.getByText('wacht op jou')).toBeTruthy()
+    expect(queryStateDot(screen.getByRole('listitem'))).toBeNull()
+  })
+
+  test('done state: no rail, status dot present', () => {
+    renderItem(makeTerminal({ state: 'done' }), false)
+    expect(screen.queryByTestId('attention-rail')).toBeNull()
+    expect(screen.queryByText('wacht op jou')).toBeNull()
+    expect(queryStateDot(screen.getByRole('listitem'))).toBeTruthy()
+  })
+
+  test('busy state: no rail, status dot present', () => {
+    renderItem(makeTerminal({ state: 'busy' }), false)
+    expect(screen.queryByTestId('attention-rail')).toBeNull()
+    expect(screen.queryByText('wacht op jou')).toBeNull()
+    expect(queryStateDot(screen.getByRole('listitem'))).toBeTruthy()
+  })
+})
