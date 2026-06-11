@@ -7,6 +7,9 @@ import type { TerminalManager } from './TerminalManager'
 import type { ProjectPersistence } from './ProjectPersistence'
 import type { WorktreeService } from './WorktreeService'
 import type { GitHubService } from './GitHubService'
+import { createLogger } from './Logger'
+
+const log = createLogger('CommandServer')
 
 /** JSON response shape returned by all routes */
 export interface CommandResponse {
@@ -868,14 +871,24 @@ export class CommandServer {
   async start(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.server = createServer((req, res) => {
+        // One debug line per handled request: method, path, status, duration.
+        // 'finish' fires exactly once when the response has been sent,
+        // regardless of which code path produced it.
+        const startTime = Date.now()
+        res.on('finish', () => {
+          const pathname = (req.url ?? '/').split('?')[0]
+          log.debug(
+            `${req.method ?? 'GET'} ${pathname} ${res.statusCode} ${Date.now() - startTime}ms`
+          )
+        })
         this.handleRequest(req, res).catch((err: unknown) => {
-          console.error('[CommandServer] Unhandled error:', err)
+          log.error('Unhandled error:', err)
           this.sendJson(res, 500, { ok: false, error: 'Internal server error' })
         })
       })
 
       this.server.on('error', (err: Error) => {
-        console.error('[CommandServer] Server error:', err.message)
+        log.error('Server error:', err.message)
         reject(err)
       })
 
@@ -884,13 +897,13 @@ export class CommandServer {
         // Replace startup error handler with runtime handler
         this.server!.removeAllListeners('error')
         this.server!.on('error', (err: Error) => {
-          console.error('[CommandServer] Runtime server error:', err.message)
+          log.error('Runtime server error:', err.message)
         })
 
         const address = this.server?.address()
         if (address && typeof address === 'object') {
           this.port = address.port
-          console.log(`[CommandServer] Listening on 127.0.0.1:${this.port}`)
+          log.info(`Listening on 127.0.0.1:${this.port}`)
         }
         resolve()
       })
@@ -1001,7 +1014,7 @@ export class CommandServer {
       const statusCode = result.ok ? 200 : (result.statusCode ?? 400)
       this.sendJson(res, statusCode, result)
     } catch (err: unknown) {
-      console.error('[CommandServer] Route handler error:', err)
+      log.error('Route handler error:', err)
       this.sendJson(res, 500, { ok: false, error: 'Internal server error' })
     }
   }

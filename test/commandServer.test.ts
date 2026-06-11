@@ -1,5 +1,17 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, test, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import http from 'node:http'
+
+// Capture the server's scoped logger for request-logging assertions
+const loggerSpies = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}))
+vi.mock('../electron/main/services/Logger', () => ({
+  createLogger: () => loggerSpies,
+}))
+
 import {
   CommandServer,
   type CommandResponse,
@@ -451,6 +463,53 @@ describe('CommandServer', () => {
       } finally {
         await temp.stop()
       }
+    })
+  })
+
+  // --- Request logging ---
+
+  describe('request logging', () => {
+    test('a handled request produces exactly one debug line with method, path, status and duration', async () => {
+      server.setDeps({
+        terminalManager: {} as never,
+        projectPersistence: {} as never,
+        worktreeService: {} as never,
+        githubService: {} as never,
+        mainWindow: {} as never,
+      })
+      server.route('GET', '/test/log-probe', async () => ({ ok: true }))
+      loggerSpies.debug.mockClear()
+
+      const res = await request({
+        port: server.getPort()!,
+        method: 'GET',
+        path: '/test/log-probe?with=query',
+        token: server.getToken(),
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(loggerSpies.debug).toHaveBeenCalledTimes(1)
+      // Method, path (query stripped), status, duration in ms
+      expect(loggerSpies.debug).toHaveBeenCalledWith(
+        expect.stringMatching(/^GET \/test\/log-probe 200 \d+ms$/)
+      )
+    })
+
+    test('failed requests are logged with their error status', async () => {
+      loggerSpies.debug.mockClear()
+
+      const res = await request({
+        port: server.getPort()!,
+        method: 'GET',
+        path: '/test/does-not-exist',
+        token: server.getToken(),
+      })
+
+      expect(res.statusCode).toBe(404)
+      expect(loggerSpies.debug).toHaveBeenCalledTimes(1)
+      expect(loggerSpies.debug).toHaveBeenCalledWith(
+        expect.stringMatching(/^GET \/test\/does-not-exist 404 \d+ms$/)
+      )
     })
   })
 })
