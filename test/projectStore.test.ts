@@ -5,18 +5,25 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: any) => fn,
 }))
 
+// Stable mock fns for the project IPC surface so pin tests can configure
+// return values (the factory below would otherwise hand out fresh fns per call).
+const { mockProjectList, mockSetPinned } = vi.hoisted(() => ({
+  mockProjectList: vi.fn(),
+  mockSetPinned: vi.fn(),
+}))
+
 // Mock electron API before importing store
 vi.mock('../src/utils/electron', () => ({
   getElectronAPI: () => ({
     terminal: { create: vi.fn(), close: vi.fn() },
-    project: { list: vi.fn(), update: vi.fn(), reorder: vi.fn(), setActiveWatcher: vi.fn().mockResolvedValue(undefined) },
+    project: { list: mockProjectList, update: vi.fn(), reorder: vi.fn(), setPinned: mockSetPinned, setActiveWatcher: vi.fn().mockResolvedValue(undefined) },
     worktree: { list: vi.fn() },
     fs: { readDirectory: vi.fn() },
   }),
 }))
 
 import { useProjectStore } from '../src/stores/projectStore'
-import type { TerminalSession } from '../src/types'
+import type { Project, TerminalSession } from '../src/types'
 
 function makeTerminal(overrides: Partial<TerminalSession> & { id: string; projectId: string }): TerminalSession {
   return {
@@ -25,6 +32,18 @@ function makeTerminal(overrides: Partial<TerminalSession> & { id: string; projec
     title: 'Chat',
     type: 'claude',
     worktreeId: null,
+    ...overrides,
+  }
+}
+
+function makeProject(overrides: Partial<Project> & { id: string }): Project {
+  return {
+    name: 'Project',
+    path: '/project',
+    type: 'project',
+    createdAt: 0,
+    sortOrder: 0,
+    pinned: false,
     ...overrides,
   }
 }
@@ -441,6 +460,118 @@ describe('projectStore activeCenterTabId', () => {
       const updated = useProjectStore.getState().prStatus['wt-1']
       expect(updated.stale).toBeUndefined()
       expect(updated.error).toBeUndefined()
+    })
+  })
+
+  describe('togglePinProject', () => {
+    beforeEach(() => {
+      mockSetPinned.mockReset()
+      mockProjectList.mockReset()
+    })
+
+    test('pins an unpinned project via setPinned(id, true) and refreshes from main', async () => {
+      const proj = makeProject({ id: 'proj-1', pinned: false })
+      useProjectStore.setState({ projects: [proj] })
+      mockSetPinned.mockResolvedValue({ ...proj, pinned: true })
+      mockProjectList.mockResolvedValue([{ ...proj, pinned: true }])
+
+      await useProjectStore.getState().togglePinProject('proj-1')
+
+      expect(mockSetPinned).toHaveBeenCalledWith('proj-1', true)
+      expect(useProjectStore.getState().projects[0].pinned).toBe(true)
+    })
+
+    test('unpins a pinned project via setPinned(id, false)', async () => {
+      const proj = makeProject({ id: 'proj-1', pinned: true })
+      useProjectStore.setState({ projects: [proj] })
+      mockSetPinned.mockResolvedValue({ ...proj, pinned: false })
+      mockProjectList.mockResolvedValue([{ ...proj, pinned: false }])
+
+      await useProjectStore.getState().togglePinProject('proj-1')
+
+      expect(mockSetPinned).toHaveBeenCalledWith('proj-1', false)
+      expect(useProjectStore.getState().projects[0].pinned).toBe(false)
+    })
+
+    test('is a no-op for an unknown project id', async () => {
+      useProjectStore.setState({ projects: [] })
+
+      await useProjectStore.getState().togglePinProject('nope')
+
+      expect(mockSetPinned).not.toHaveBeenCalled()
+    })
+
+    test('hotkey path (active project id) flips the same action as the context menu', async () => {
+      // The Ctrl+Shift+P handler resolves activeProjectId then calls
+      // togglePinProject(id); the context-menu item calls it with the row's id.
+      // Both funnel through this single action, so toggling the active id
+      // produces the same state mutation either path would.
+      const proj = makeProject({ id: 'proj-1', pinned: false })
+      useProjectStore.setState({ projects: [proj], activeProjectId: 'proj-1' })
+      mockSetPinned.mockResolvedValue({ ...proj, pinned: true })
+      mockProjectList.mockResolvedValue([{ ...proj, pinned: true }])
+
+      const { activeProjectId } = useProjectStore.getState()
+      await useProjectStore.getState().togglePinProject(activeProjectId!)
+
+      expect(mockSetPinned).toHaveBeenCalledWith('proj-1', true)
+      expect(useProjectStore.getState().projects[0].pinned).toBe(true)
+    })
+  })
+
+  describe('toggleInactiveSectionCollapsed pinned fallback', () => {
+    test('collapsing switches away from a non-pinned, terminal-less active project to one with terminals', () => {
+      useProjectStore.setState({
+        inactiveSectionCollapsed: false,
+        projects: [makeProject({ id: 'a' }), makeProject({ id: 'b' })],
+        activeProjectId: 'a',
+        terminals: { t1: makeTerminal({ id: 't1', projectId: 'b' }) },
+      })
+
+      useProjectStore.getState().toggleInactiveSectionCollapsed()
+
+      const state = useProjectStore.getState()
+      expect(state.inactiveSectionCollapsed).toBe(true)
+      expect(state.activeProjectId).toBe('b')
+    })
+
+    test('falls back to the first pinned project when none have terminals', () => {
+      useProjectStore.setState({
+        inactiveSectionCollapsed: false,
+        projects: [makeProject({ id: 'a' }), makeProject({ id: 'p', pinned: true })],
+        activeProjectId: 'a',
+        terminals: {},
+      })
+
+      useProjectStore.getState().toggleInactiveSectionCollapsed()
+
+      expect(useProjectStore.getState().activeProjectId).toBe('p')
+    })
+
+    test('does not switch when the active project is pinned (always visible)', () => {
+      useProjectStore.setState({
+        inactiveSectionCollapsed: false,
+        projects: [makeProject({ id: 'p', pinned: true })],
+        activeProjectId: 'p',
+        terminals: {},
+      })
+
+      useProjectStore.getState().toggleInactiveSectionCollapsed()
+
+      expect(useProjectStore.getState().activeProjectId).toBe('p')
+    })
+
+    test('does not switch when the active project has terminals', () => {
+      useProjectStore.setState({
+        inactiveSectionCollapsed: false,
+        projects: [makeProject({ id: 'a' })],
+        activeProjectId: 'a',
+        terminals: { t1: makeTerminal({ id: 't1', projectId: 'a' }) },
+      })
+
+      useProjectStore.getState().toggleInactiveSectionCollapsed()
+
+      expect(useProjectStore.getState().activeProjectId).toBe('a')
     })
   })
 })
