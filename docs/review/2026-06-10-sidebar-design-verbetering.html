@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sidebar design review — Top 5 verbeteringen</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --paper: #faf7f2;
+    --ink: #1f2430;
+    --ink-soft: #5a6072;
+    --ink-faint: #9aa0ae;
+    --accent: #d9603a;       /* Command-oranje */
+    --accent-soft: #fdeee7;
+    --green: #3a9e5f;
+    --green-soft: #e7f5ec;
+    --amber: #d99a3a;
+    --amber-soft: #fbf3e3;
+    --red: #c84a3a;
+    --line: #e8e3da;
+    --mock-bg: #f7f3ec;
+    --mock-line: #eae4d8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.55; font-size: 15px;
+  }
+  .page { max-width: 1080px; margin: 0 auto; padding: 48px 32px 80px; }
+
+  /* ---- header ---- */
+  .doc-kicker { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  h1 { font-size: 27px; font-weight: 700; line-height: 1.25; margin-bottom: 10px; }
+  .doc-meta { color: var(--ink-faint); font-size: 13px; margin-bottom: 28px; }
+
+  .scr {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 40px;
+  }
+  .scr .card { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .scr .label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; margin-bottom: 6px; }
+  .scr p { font-size: 13.5px; color: var(--ink-soft); }
+
+  /* ---- sections ---- */
+  section { margin-bottom: 52px; }
+  .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 14px;
+    margin-right: 10px; flex-shrink: 0;
+  }
+  h2 { font-size: 19px; font-weight: 700; line-height: 1.35; display: flex; align-items: flex-start; gap: 0; margin-bottom: 12px; }
+  h2 .num { margin-top: 1px; }
+  .why { color: var(--ink-soft); font-size: 14px; max-width: 760px; margin-bottom: 18px; }
+  .why strong { color: var(--ink); }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 16px; }
+  .pane { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .pane-head { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+  .pane-head.before { background: #faf0ee; color: var(--red); }
+  .pane-head.after { background: var(--green-soft); color: var(--green); }
+  .pane-body { background: var(--mock-bg); padding: 14px 12px; min-height: 120px; }
+
+  /* ---- sidebar mockup primitives ---- */
+  .mock { font-size: 12px; color: #44485a; width: 100%; max-width: 330px; }
+  .m-row { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px; position: relative; }
+  .m-row.active { background: #fbe2d6; }
+  .m-row .ico { width: 13px; text-align: center; flex-shrink: 0; font-size: 11px; }
+  .m-row .ttl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-row .ttl.proj { font-weight: 600; color: #2c3040; font-size: 12.5px; }
+  .m-sub { font-size: 10px; color: #b3ac9e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px 4px 28px; margin-top: -3px; }
+  .m-indent { margin-left: 14px; border-left: 1.5px solid var(--mock-line); padding-left: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot.sm { width: 5px; height: 5px; }
+  .dot.green { background: #4caf72; }
+  .dot.gray { background: #c9c4b8; }
+  .dot.orange { background: #e8853c; box-shadow: 0 0 0 3px rgba(232,133,60,.18); }
+  .bar { position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; }
+  .bar.orange { background: #e8853c; }
+  .bar.green { background: #4caf72; }
+  .chip { font-size: 9px; padding: 1px 6px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
+  .chip.red-loud { background: #d23b2e; color: #fff; }
+  .chip.green-loud { background: #2e9e57; color: #fff; }
+  .chip.neutral { background: #ede8de; color: #6d6a5e; }
+  .chip.green-quiet { background: #e1f2e7; color: #2e7d4d; }
+  .chip.amber-quiet { background: #f8eed8; color: #a4761f; }
+  .chip.red-quiet { background: #f9e6e2; color: #b6442f; }
+  .meta-noisy { display: flex; gap: 6px; align-items: center; padding: 2px 8px 4px 28px; font-size: 9.5px; font-family: Consolas, monospace; }
+  .meta-noisy .r { color: #d23b2e; } .meta-noisy .g { color: #2e9e57; }
+  .meta-quiet { display: flex; gap: 5px; align-items: center; padding: 2px 8px 4px 28px; }
+  .caret { color: #b3ac9e; font-size: 9px; width: 10px; flex-shrink: 0; }
+
+  .how { background: var(--paper); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--ink-soft); }
+  .how b { color: var(--ink); }
+  code { font-family: Consolas, "Cascadia Code", monospace; font-size: 12px; background: #f1ede4; padding: 1px 5px; border-radius: 4px; color: #8a4a2b; }
+
+  /* ---- prioriteringstabel ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 12px; border-bottom: 2px solid var(--line); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 10px; }
+  .pill.hi { background: var(--green-soft); color: var(--green); }
+  .pill.mid { background: var(--amber-soft); color: var(--amber); }
+  .pill.lo { background: #eee9df; color: var(--ink-faint); }
+
+  @media (max-width: 760px) { .compare, .scr { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="doc-kicker">Design review · Command sidebar · v0.19.1</div>
+  <h1>Vijf gerichte ingrepen maken de sidebar scanbaar: minder kleurruis, sterkere hiërarchie en status die je in één oogopslag leest</h1>
+  <div class="doc-meta">10 juni 2026 · gebaseerd op screenshot + code-analyse van <code>Sidebar.tsx</code>, <code>TerminalListItem.tsx</code>, <code>WorktreeItem.tsx</code></div>
+
+  <div class="scr">
+    <div class="card">
+      <div class="label">Situatie</div>
+      <p>De sidebar is het commandocentrum van de app: 5+ projecten, 15+ chats en worktrees, plus PR-status, CI-status en attention-states — allemaal tegelijk zichtbaar.</p>
+    </div>
+    <div class="card">
+      <div class="label">Complicatie</div>
+      <p>Alles schreeuwt even hard: rood wordt gebruikt voor iconen, diffstats, warnings én merge-knoppen. De kernfunctie — "welke chat heeft mij nú nodig?" — verdrinkt in een 7px puntje rechts.</p>
+    </div>
+    <div class="card">
+      <div class="label">Oplossing</div>
+      <p>Vijf ingrepen, oplopend in effort: kleur-discipline, één-regel-rijen, een attention-rail links, badge-gebaseerde PR-metadata en inklapbare projecten met status-rollup.</p>
+    </div>
+  </div>
+
+  <!-- ============ 1 ============ -->
+  <section>
+    <h2><span class="num">1</span>Reserveer rood en oranje exclusief voor "actie nodig" — nu gebruikt de sidebar rood op 6 plekken en betekent het niets meer</h2>
+    <p class="why">In de screenshot staat rood op: terminal-iconen, PR-nummers, diffstat-deleties, conflict-warnings, de merge-knop én chat-iconen. Het oog kan niet meer onderscheiden tussen <strong>"CI faalt"</strong> (urgent) en <strong>"-1264 regels verwijderd"</strong> (neutraal feit). Maak alle metadata neutraal grijs en laat alleen échte attention-states (permission/question) kleur dragen. Dat is geen smaakkwestie: het attention-systeem is de bestaansreden van deze app.</p>
+    <div class="compare">
+      <div class="pane">
+        <div class="pane-head before">Nu — 6 concurrerende kleursignalen</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico" style="color:#d23b2e">⎇</span><span class="ttl">feat-evals</span><span class="dot sm gray"></span></div>
+          <div class="meta-noisy"><span class="r">#260 ⧉</span><span class="r">⊗</span><span class="g">+5742</span><span class="r">/-1264</span><span class="r">⚠</span></div>
+          <div class="m-row"><span class="ico" style="color:#d23b2e">⎇</span><span class="ttl">chore-uitfaseren-juris…</span><span class="chip red-loud">⑂ Merge</span></div>
+          <div class="meta-noisy"><span class="r">#530 ⧉</span><span class="r">⊗</span><span class="g">+1182</span><span class="r">/-3258</span></div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head after">Voorstel — metadata grijs, kleur = urgentie</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-evals</span><span class="chip red-quiet">CI ✗</span></div>
+          <div class="meta-quiet"><span class="chip neutral">#260</span><span class="chip neutral">+5.7k −1.3k</span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">chore-uitfaseren-juris…</span><span class="chip green-quiet">✓ Mergeable</span></div>
+          <div class="meta-quiet"><span class="chip neutral">#530</span><span class="chip neutral">+1.2k −3.3k</span></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="how"><b>Waar:</b> <code>WorktreeItem.tsx:355-369</code> (diffstat: vervang <code>text-green-500</code>/<code>text-red-500</code> door <code>text-muted-foreground</code>), <code>WorktreeItem.tsx:92-96</code> (merge-knop: nooit rood — een falende check is een reden om <i>niet</i> te mergen, dus toon dan een grijze disabled state of verberg de knop), en de icon-kleuren in <code>STATE_TEXT_COLORS</code>. Vuistregel: <b>maximaal één kleuraccent per rij</b>.</div>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section>
+    <h2><span class="num">2</span>Maak chat-rijen één regel hoog — de summary-subtitel kost 45% verticale ruimte en is na truncatie onleesbaar</h2>
+    <p class="why">Elke Claude-chat rendert nu twee regels (<code>TerminalListItem.tsx:44-49</code>), maar de subtitel wordt na ~45 tekens afgekapt: <em>"ik wil uptime gaan monitoren via sentry op onze 99,5%/maand…"</em> voegt niets toe wat de titel niet al zegt. Eén regel per chat betekent <strong>~80% meer items zichtbaar zonder scrollen</strong>. Toon de summary alleen voor de actieve chat (waar context er wél toe doet) of als tooltip.</p>
+    <div class="compare">
+      <div class="pane">
+        <div class="pane-head before">Nu — 2 regels per chat, 4 chats zichtbaar</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico" style="color:#d9603a">›_</span><span class="ttl">Kun je een architectuur plaat opstellen</span><span class="dot sm green"></span></div>
+          <div class="m-sub">ik wil uptime gaan monitoren via sentry op onze 99,5%/maand…</div>
+          <div class="m-row"><span class="ico" style="color:#d9603a">›_</span><span class="ttl">Hoeveel lines of code bevat deze repo</span><span class="dot sm green"></span></div>
+          <div class="m-sub">hoeveel lines of code bevat deze repo nu (per taal)</div>
+          <div class="m-row"><span class="ico" style="color:#d9603a">›_</span><span class="ttl">Ik probeer nu in te loggen op</span><span class="dot sm green"></span></div>
+          <div class="m-sub">ik probeer nu in te loggen op acceptatie maar krijg: rigin 'ht…</div>
+          <div class="m-row"><span class="ico" style="color:#d9603a">›_</span><span class="ttl">Ik wil uptime gaan monitoren via sentry</span><span class="dot sm green"></span></div>
+          <div class="m-sub">This session is being continued from a previous conversa…</div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head after">Voorstel — 1 regel, summary alleen bij actief item</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Kun je een architectuur plaat opstellen</span><span class="dot sm green"></span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Hoeveel lines of code bevat deze repo</span><span class="dot sm green"></span></div>
+          <div class="m-row active"><span class="ico" style="color:#d9603a">›_</span><span class="ttl">Ik probeer nu in te loggen op</span><span class="dot sm green"></span></div>
+          <div class="m-sub" style="color:#9a8d7a">ik probeer in te loggen op acceptatie maar krijg een fout</div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Ik wil uptime gaan monitoren via sentry</span><span class="dot sm green"></span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Sentry alerting inrichten voor pascal</span><span class="dot sm gray"></span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Evals draaien op productie-dataset</span><span class="dot sm gray"></span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Refactor van de queue-worker</span><span class="dot sm gray"></span></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="how"><b>Waar:</b> <code>TerminalListItem.tsx:45-49</code> — render de summary-regel alleen als <code>isActive</code>, en zet <code>title={terminal.summary}</code> op de rij voor hover. Scheelt direct ~14px per chat × 15 chats = één volledig project extra in beeld.</div>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section>
+    <h2><span class="num">3</span>Vervang het 7px-puntje rechts door een attention-rail aan de linkerrand — status hoort op de plek waar het oog scant</h2>
+    <p class="why">Het oog scant een sidebar verticaal langs de <strong>linkerrand</strong> (F-patroon); de status-dot staat nu helemaal rechts, los van de rij-inhoud, en is 6×6px. Bij de kernvraag van deze app — "welke chat wacht op mij?" — moet je nu elke rij van links naar rechts aflezen. Een 3px kleurbalk op de linkerrand van de rij (oranje = wacht op input, groen = klaar) is in de periferie zichtbaar zónder te lezen. De dot rechts kan blijven voor busy/done-nuance.</p>
+    <div class="compare">
+      <div class="pane">
+        <div class="pane-head before">Nu — status als puntje rechts, ver van de scanlijn</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Bekijk het claude dashboard in grafana</span><span class="dot sm green"></span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Ik wil beleid dat men hun scherm niet</span><span class="dot sm gray"></span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-pin-project</span><span class="dot sm orange" style="box-shadow:none"></span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Claude update</span><span class="dot sm gray"></span></div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head after">Voorstel — kleurbalk links voor input-states</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="bar green"></span><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Bekijk het claude dashboard in grafana</span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Ik wil beleid dat men hun scherm niet</span></div>
+          <div class="m-row" style="background:#fdf2e6"><span class="bar orange"></span><span class="ico" style="color:#8a8475">⎇</span><span class="ttl" style="font-weight:600;color:#2c3040">feat-pin-project</span><span class="chip amber-quiet">wacht op jou</span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Claude update</span></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="how"><b>Waar:</b> <code>TerminalListItem.tsx:52-58</code> en <code>WorktreeItem.tsx:299-305</code> — voeg voor <code>isInputState</code> een absolute-positioned linkerbalk + subtiele rij-tint toe; hergebruik de bestaande <code>needs-input-indicator</code> pulse-animatie op de balk. Busy/done blijft een dot rechts: die zijn informatief, niet urgent.</div>
+  </section>
+
+  <!-- ============ 4 ============ -->
+  <section>
+    <h2><span class="num">4</span>Comprimeer de PR-regel tot twee badges met hover-detail — zeven losse micro-elementen op 10px zijn niet te parsen</h2>
+    <p class="why">De PR-regel toont nu zeven elementen naast elkaar: nummer, external-link-icoon, CI-icoon, diffstat (mono, tweekleurig), conflict-warning, review-badge en merge-knop — allemaal op 10px. Dat is een dashboard in 220px breedte. Reduceer tot <strong>één samengestelde status-badge</strong> (de slechtste van CI/conflicts/review bepaalt de kleur) plus het PR-nummer; diffstat en losse checks verhuizen naar de bestaande hover-tooltip. De merge-knop verschijnt alleen als alles groen is — precies het moment dat je hem nodig hebt.</p>
+    <div class="compare">
+      <div class="pane">
+        <div class="pane-head before">Nu — 7 elementen per PR-regel</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-raw-preview-scroll-position</span><span class="dot sm gray"></span></div>
+          <div class="meta-noisy"><span class="r">#130 ⧉</span><span class="g">✓</span><span class="g">+1744</span><span class="r">/-201</span><span style="margin-left:auto" class="chip green-loud">⑂ Merge</span></div>
+          <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-agent-beta</span></div>
+          <div class="meta-noisy"><span class="r">#458 ⧉</span><span class="r">⊗</span><span class="g">+4426</span><span class="r">/-61</span><span class="r">⚠</span></div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head after">Voorstel — PR-nummer + één statusbadge</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-raw-preview-scroll-position</span><span class="chip neutral">#130</span><span class="chip green-quiet">✓ Klaar</span></div>
+          <div class="meta-quiet" style="padding-left:28px"><span class="chip green-loud" style="background:#2e9e57">⑂ Merge & squash</span></div>
+          <div class="m-row" style="margin-top:6px"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-agent-beta</span><span class="chip neutral">#458</span><span class="chip red-quiet">CI ✗ · conflict</span></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="how"><b>Waar:</b> <code>WorktreeItem.tsx:333-379</code> — vouw <code>CIStatusIcon</code>, conflict-warning en <code>ReviewBadge</code> samen tot één <code>PRStatusBadge</code> met prioriteit conflict &gt; CI-fail &gt; pending &gt; review &gt; klaar. De tooltip (regel 41-52) bestaat al en kan diffstat + check-namen tonen. Merge-knop alleen renderen bij all-green (de huidige rode/gele variant nodigt uit tot een actie die je wilt ontmoedigen).</div>
+  </section>
+
+  <!-- ============ 5 ============ -->
+  <section>
+    <h2><span class="num">5</span>Maak projecten inklapbaar met status-rollup — bij 5+ projecten is scrollen nu de enige navigatie</h2>
+    <p class="why">pascal_ai toont permanent 10 rijen (5 chats + 5 worktrees + PR-regels); de hele sidebar is ~3 schermen hoog. Een chevron per project, waarbij ingeklapte projecten hun belangrijkste kindstatus tonen (oranje dot = ergens wacht een chat op input, badge met aantal), maakt de sidebar een <strong>overzicht</strong> in plaats van een lange lijst. Gecombineerd met ingreep 2 past alles op één scherm. Auto-expand het actieve project, klap de rest in.</p>
+    <div class="compare">
+      <div class="pane">
+        <div class="pane-head before">Nu — alles altijd open, ~3 schermen scrollen</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="ico">&lt;/&gt;</span><span class="ttl proj">pascal_ai</span></div>
+          <div class="m-indent">
+            <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Kun je een architectuur plaat…</span><span class="dot sm green"></span></div>
+            <div class="m-row"><span class="ico" style="color:#8a8475">›_</span><span class="ttl">Hoeveel lines of code bevat…</span><span class="dot sm green"></span></div>
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-evals</span></div>
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-search-naar-supabase</span></div>
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-agent-beta</span></div>
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">chore-uitfaseren-jurispr…</span></div>
+          </div>
+          <div class="m-row"><span class="ico">&lt;/&gt;</span><span class="ttl proj">command</span></div>
+          <div class="m-indent">
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-raw-preview-scroll-pos…</span></div>
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-pin-project</span><span class="dot sm orange" style="box-shadow:none"></span></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="pane-head after">Voorstel — actief project open, rest ingeklapt met rollup</div>
+        <div class="pane-body"><div class="mock">
+          <div class="m-row"><span class="caret">▸</span><span class="ico">&lt;/&gt;</span><span class="ttl proj">pascal_ai</span><span class="chip neutral">5 · 5</span><span class="dot green"></span></div>
+          <div class="m-row active"><span class="caret">▾</span><span class="ico">&lt;/&gt;</span><span class="ttl proj">command</span></div>
+          <div class="m-indent">
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">feat-raw-preview-scroll-pos…</span><span class="chip green-quiet">✓</span></div>
+            <div class="m-row" style="background:#fdf2e6"><span class="bar orange"></span><span class="ico" style="color:#8a8475">⎇</span><span class="ttl" style="font-weight:600;color:#2c3040">feat-pin-project</span></div>
+            <div class="m-row"><span class="ico" style="color:#8a8475">⎇</span><span class="ttl">refactor-fable-test</span></div>
+          </div>
+          <div class="m-row"><span class="caret">▸</span><span class="ico">&lt;/&gt;</span><span class="ttl proj">portfolio_tracker</span><span class="chip neutral">1</span></div>
+          <div class="m-row"><span class="caret">▸</span><span class="ico">&lt;/&gt;</span><span class="ttl proj">intern_transcriptie</span><span class="chip neutral">2</span><span class="dot orange"></span></div>
+          <div class="m-row"><span class="caret">▸</span><span class="ico">&lt;/&gt;</span><span class="ttl proj">kpi_dashboard</span><span class="chip neutral">1</span></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="how"><b>Waar:</b> <code>SortableProjectItem.tsx</code> — voeg <code>collapsed</code> per project toe aan de store (persist). Rollup-logica: hoogste-prioriteit kindstatus (<code>question/permission</code> &gt; <code>done</code> &gt; <code>busy</code>) als dot op de projectrij. Kritisch: een ingeklapt project met een wachtende chat <b>moet</b> de oranje indicator tonen, anders ondermijnt inklappen het attention-systeem. Vergeet de hotkey niet (CLAUDE.md-vereiste): bijv. <code>Ctrl+Shift+[</code> voor collapse/expand.</div>
+  </section>
+
+  <!-- ============ prioritering ============ -->
+  <section>
+    <h2 style="margin-bottom:16px">Start met ingreep 1 + 2: grootste effect, kleinste diff, geen nieuwe state</h2>
+    <table>
+      <thead><tr><th>#</th><th>Ingreep</th><th>Impact</th><th>Effort</th><th>Raakt</th></tr></thead>
+      <tbody>
+        <tr><td><b>1</b></td><td>Kleur-discipline: rood/oranje alleen voor urgentie</td><td><span class="pill hi">Hoog</span></td><td><span class="pill hi">Laag</span> — alleen classNames</td><td><code>WorktreeItem</code>, <code>terminalState</code></td></tr>
+        <tr><td><b>2</b></td><td>Eén-regel chat-rijen, summary alleen bij actief</td><td><span class="pill hi">Hoog</span></td><td><span class="pill hi">Laag</span> — 1 conditional</td><td><code>TerminalListItem</code></td></tr>
+        <tr><td><b>3</b></td><td>Attention-rail aan de linkerrand</td><td><span class="pill hi">Hoog</span></td><td><span class="pill mid">Middel</span> — CSS + 2 componenten</td><td><code>TerminalListItem</code>, <code>WorktreeItem</code></td></tr>
+        <tr><td><b>4</b></td><td>PR-metadata als samengestelde badge</td><td><span class="pill mid">Middel</span></td><td><span class="pill mid">Middel</span> — nieuwe sub-component</td><td><code>WorktreeItem</code></td></tr>
+        <tr><td><b>5</b></td><td>Inklapbare projecten met status-rollup</td><td><span class="pill hi">Hoog</span></td><td><span class="pill lo">Hoger</span> — store + persist + hotkey</td><td><code>SortableProjectItem</code>, <code>projectStore</code></td></tr>
+      </tbody>
+    </table>
+    <p class="why" style="margin-top:14px">Ingreep 1 en 2 zijn samen een middag werk en veranderen de eerste indruk van de app fundamenteel. Ingreep 5 is de grootste structurele winst maar raakt store, persistence en het attention-systeem — die verdient een eigen plan en zorgvuldige tests rond de rollup-logica.</p>
+  </section>
+
+</div>
+</body>
+</html>
