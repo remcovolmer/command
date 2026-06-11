@@ -105,9 +105,10 @@ describe('restoreSessions handler', () => {
       projectId: '22222222-2222-2222-2222-222222222222',
     })
 
-    // The SpawnError surfaced as a warning that mentions the code
+    // The SpawnError surfaced as a warning that mentions the code.
+    // The logger emits '[scope]' as a separate first argument, so join all args.
     expect(consoleWarnSpy).toHaveBeenCalled()
-    const warnings = consoleWarnSpy.mock.calls.map((c) => String(c[0]))
+    const warnings = consoleWarnSpy.mock.calls.map((c) => c.map(String).join(' '))
     expect(warnings.some((w) => w.includes('CWD_MISSING'))).toBe(true)
 
     // No unhandled errors / rejections from the handler itself

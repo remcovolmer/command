@@ -2,6 +2,9 @@ import pkg from 'electron-updater'
 const { autoUpdater } = pkg
 import type { UpdateInfo, ProgressInfo } from 'electron-updater'
 import { type BrowserWindow, app } from 'electron'
+import { createLogger } from './Logger'
+
+const log = createLogger('UpdateService')
 
 export class UpdateService {
   private mainWindow: BrowserWindow | null = null
@@ -78,7 +81,7 @@ export class UpdateService {
         currentVersion: app.getVersion(),
       }
     } catch (error) {
-      console.error('Error checking for updates:', error)
+      log.error('Error checking for updates:', error)
       throw error
     }
   }
@@ -92,7 +95,7 @@ export class UpdateService {
       await autoUpdater.downloadUpdate()
       return { success: true }
     } catch (error) {
-      console.error('Error downloading update:', error)
+      log.error('Error downloading update:', error)
       throw error
     }
   }

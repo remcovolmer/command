@@ -4,6 +4,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import type { GitEvent } from './GitHubService'
+import { createLogger } from './Logger'
+
+const log = createLogger('AutomationPersistence')
 
 // Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled'
@@ -178,7 +181,7 @@ export class AutomationPersistence {
       // A missing id here means the record was lost between addRun() and the
       // owning updateRun() — most likely a pruning bug. Surface it so the
       // silent-failure mode this guard was added against is debuggable.
-      console.warn(`[AutomationPersistence] updateRun: no run with id ${id}; update dropped`)
+      log.warn(`updateRun: no run with id ${id}; update dropped`)
       return null
     }
 
@@ -253,7 +256,7 @@ export class AutomationPersistence {
         }
       }
     } catch (error) {
-      console.error('Failed to load automations:', error)
+      log.error('Failed to load automations:', error)
     }
     return { version: STATE_VERSION, automations: [] }
   }
@@ -271,7 +274,7 @@ export class AutomationPersistence {
         }
       }
     } catch (error) {
-      console.error('Failed to load automation runs:', error)
+      log.error('Failed to load automation runs:', error)
     }
     return { version: STATE_VERSION, runs: [] }
   }
@@ -309,7 +312,7 @@ export class AutomationPersistence {
       fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf-8')
       fs.renameSync(tempPath, filePath)
     } catch (error) {
-      console.error(`Failed to save ${filePath}:`, error)
+      log.error(`Failed to save ${filePath}:`, error)
     }
   }
 }

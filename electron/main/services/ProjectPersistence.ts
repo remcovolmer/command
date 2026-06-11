@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import fsAsync from 'node:fs/promises'
 import path from 'node:path'
+import { createLogger } from './Logger'
+
+const log = createLogger('ProjectPersistence')
 
 import type {
   AccountProfile,
@@ -111,7 +114,7 @@ export class ProjectPersistence {
         // Filter out any invalid sessions to prevent runtime errors from corrupted data
         const validSessions = (parsed.sessions || []).filter(isValidSession)
         if (validSessions.length !== (parsed.sessions || []).length) {
-          console.warn(
+          log.warn(
             `Filtered out ${(parsed.sessions || []).length - validSessions.length} invalid session(s) from persisted state`
           )
         }
@@ -121,12 +124,12 @@ export class ProjectPersistence {
           sessions: validSessions,
         } as PersistedState
       } else {
-        console.warn('Invalid state file structure, using default state')
+        log.warn('Invalid state file structure, using default state')
       }
     } catch (error) {
       // File doesn't exist or is corrupted — use default state
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error('Failed to load state:', error)
+        log.error('Failed to load state:', error)
       }
     }
 
@@ -239,7 +242,7 @@ export class ProjectPersistence {
       fs.writeFileSync(tempPath, JSON.stringify(this.state, null, 2), 'utf-8')
       fs.renameSync(tempPath, this.stateFilePath)
     } catch (error) {
-      console.error('Failed to save state:', error)
+      log.error('Failed to save state:', error)
     }
   }
 

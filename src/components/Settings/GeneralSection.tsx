@@ -173,6 +173,30 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
         </div>
       </div>
 
+      {/* Diagnostics section */}
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-1">Diagnostics</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Troubleshooting information for bug reports.
+        </p>
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <span className="text-sm font-medium text-foreground">Log file</span>
+              <p className="text-xs text-muted-foreground mt-1">
+                Rotating main-process log in the app data folder. Attach it when reporting an issue.
+              </p>
+            </div>
+            <button
+              onClick={() => void window.electronAPI?.app?.openLogFile?.()}
+              className="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted text-muted-foreground hover:bg-accent transition-colors shrink-0"
+            >
+              Open log file
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Project settings section */}
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-1">Project Settings</h3>

@@ -2,6 +2,9 @@ import { watch, type FSWatcher } from 'chokidar'
 import { type BrowserWindow } from 'electron'
 import path from 'node:path'
 import { existsSync, watch as fsWatch, type FSWatcher as NodeFSWatcher } from 'node:fs'
+import { createLogger } from './Logger'
+
+const log = createLogger('FileWatcher')
 
 // Event type mapping from chokidar events to our event types
 type FileWatchEventType =
@@ -84,7 +87,7 @@ export class FileWatcherService {
         this.startWatching(projectId, projectPath)
       })
       .catch((err) => {
-        console.error('[FileWatcher] switchTo failed:', err)
+        log.error('switchTo failed:', err)
       })
     return this.switchLock
   }
@@ -93,7 +96,7 @@ export class FileWatcherService {
     if (this.watchers.has(projectId)) return
 
     if (!isValidWatchPath(projectPath)) {
-      console.warn(`[FileWatcher] Invalid watch path, skipping: ${projectPath}`)
+      log.warn(`Invalid watch path, skipping: ${projectPath}`)
       return
     }
 
@@ -122,14 +125,14 @@ export class FileWatcherService {
 
       watcher.on('error', (error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
-        console.error(`[FileWatcher] Error for project ${projectId}:`, message)
+        log.error(`Error for project ${projectId}:`, message)
         this.sendToRenderer('fs:watch:error', { projectId, error: message })
 
         // Attempt restart with exponential backoff
         const attempts = this.restartCounts.get(projectId) ?? 0
         if (attempts >= MAX_RESTART_ATTEMPTS) {
-          console.error(
-            `[FileWatcher] Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for project ${projectId}`
+          log.error(
+            `Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for project ${projectId}`
           )
           return
         }
@@ -138,8 +141,8 @@ export class FileWatcherService {
 
         setTimeout(() => {
           if (this.watchers.has(projectId)) {
-            console.log(
-              `[FileWatcher] Restart attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS} for project ${projectId}`
+            log.info(
+              `Restart attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS} for project ${projectId}`
             )
             this.stopWatching(projectId)
               .then(() => {
@@ -149,7 +152,7 @@ export class FileWatcherService {
                 }
               })
               .catch((err) => {
-                console.error(`[FileWatcher] Restart failed for project ${projectId}:`, err)
+                log.error(`Restart failed for project ${projectId}:`, err)
               })
           }
         }, delay)
@@ -158,9 +161,9 @@ export class FileWatcherService {
       this.watchers.set(projectId, watcher)
       this.restartCounts.delete(projectId) // Reset retry count on successful start
       this.startHeadWatcher(projectId, projectPath)
-      console.log(`[FileWatcher] Started watching: ${projectPath} (project: ${projectId})`)
+      log.info(`Started watching: ${projectPath} (project: ${projectId})`)
     } catch (error) {
-      console.error(`[FileWatcher] Failed to start watching ${projectPath}:`, error)
+      log.error(`Failed to start watching ${projectPath}:`, error)
     }
   }
 
@@ -250,8 +253,10 @@ export class FileWatcherService {
       for (const cb of this.fileChangeCallbacks) {
         try {
           cb(events)
-        } catch {
-          /* listener error */
+        } catch (err) {
+          // Batches flush at most once per debounce window, so an
+          // unconditional warn cannot spam the log.
+          log.warn('File change listener threw:', err)
         }
       }
 
