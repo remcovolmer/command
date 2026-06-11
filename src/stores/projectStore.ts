@@ -243,6 +243,11 @@ interface ProjectStore {
 // Set to true inside onRehydrateStorage once hydration completes.
 let isRendererReady = false
 
+// Unsubscribe handle for the global usage:update subscription. Held so a
+// re-run of onRehydrateStorage (dev HMR) replaces the listener instead of
+// stacking a second one.
+let unsubUsageUpdate: (() => void) | null = null
+
 export const useProjectStore = create<ProjectStore>()(
   persist(
     (set, get) => ({
@@ -1718,7 +1723,8 @@ export const useProjectStore = create<ProjectStore>()(
         try {
           const api = getElectronAPI()
           api.usage.setEnabled(useProjectStore.getState().showUsageIndicator).catch(() => {})
-          api.usage.onUpdate((data) => {
+          unsubUsageUpdate?.()
+          unsubUsageUpdate = api.usage.onUpdate((data) => {
             useProjectStore.getState().setUsageData(data)
           })
         } catch {

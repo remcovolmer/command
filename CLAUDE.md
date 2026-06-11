@@ -89,6 +89,7 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | `SessionIndexService.ts` | Reads Claude Code's `sessions-index.json` per project, caches summaries, pushes to renderer |
 | `TaskService.ts` | Scans project files for TODO/FIXME markers |
 | `UpdateService.ts` | Auto-updates via electron-updater |
+| `UsageService.ts` | Polls Anthropic's OAuth usage endpoint every 60s (5min blurred), classifies failures, pushes plan-usage data via `usage:update` |
 
 ### Claude State Detection (Hook System)
 
@@ -120,7 +121,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 
 ### Key Patterns
 
-- **IPC Communication**: All main↔renderer communication uses typed IPC via `window.electronAPI` (defined in `src/types/index.ts`). IPC channels are namespaced: `terminal:*`, `project:*`, `worktree:*`, `fs:*`, `git:*`, `github:*`, `automation:*`, `update:*`, `session-index:*`
+- **IPC Communication**: All main↔renderer communication uses typed IPC via `window.electronAPI` (defined in `src/types/index.ts`). IPC channels are namespaced: `terminal:*`, `project:*`, `worktree:*`, `fs:*`, `git:*`, `github:*`, `automation:*`, `update:*`, `session-index:*`, `usage:*`
 - **State Management**: Single Zustand store (`projectStore.ts`) with persist middleware. Key limits: `MAX_TERMINALS_PER_PROJECT = 10`, `MAX_EDITOR_TABS = 15`
 - **Center Tab System**: `activeCenterTabId` can point to either a terminal or an editor/diff tab. `removeTerminal` has a fallback chain (next terminal → last editor tab → null)
 - **Event Dispatchers**: `terminalEvents.ts` and `fileWatcherEvents.ts` register IPC listeners ONCE globally, then dispatch to per-terminal/per-project callback maps. This prevents listener memory leaks.
@@ -134,7 +135,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 - Tailwind CSS for styling (all colors via CSS variables for runtime theming)
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
-- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG with 42 actions), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
+- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG with 43 actions), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
 
 ## Windows Development
 

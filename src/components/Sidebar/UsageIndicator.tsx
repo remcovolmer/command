@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useProjectStore } from '../../stores/projectStore'
 import { formatResetTime, formatCredits, usageLevel, type UsageLevel } from '../../utils/usageFormat'
 
 const LEVEL_BAR: Record<UsageLevel, string> = {
   normal: 'bg-primary',
-  warning: 'bg-orange-500',
-  danger: 'bg-red-500',
+  warning: 'bg-warning',
+  danger: 'bg-danger',
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -26,6 +26,14 @@ export function UsageIndicator() {
   const usageData = useProjectStore((s) => s.usageData)
   const showUsageIndicator = useProjectStore((s) => s.showUsageIndicator)
   const [hovered, setHovered] = useState(false)
+
+  // Reset hover when the indicator hides: the div unmounts before
+  // onMouseLeave can fire, so without this the popover would reappear
+  // open when the indicator returns.
+  const hidden = !showUsageIndicator || !usageData || usageData.status !== 'ok'
+  useEffect(() => {
+    if (hidden) setHovered(false)
+  }, [hidden])
 
   if (!showUsageIndicator || !usageData || usageData.status !== 'ok') return null
 

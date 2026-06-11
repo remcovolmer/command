@@ -241,34 +241,40 @@ export class UsageService {
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
-    let res: Response
     try {
-      res = await fetch(USAGE_URL, {
-        headers: {
-          Authorization: `Bearer ${creds.accessToken}`,
-          'anthropic-beta': OAUTH_BETA_HEADER,
-        },
-        signal: controller.signal,
-      })
-    } catch {
-      return 'transient'
+      let res: Response
+      try {
+        res = await fetch(USAGE_URL, {
+          headers: {
+            Authorization: `Bearer ${creds.accessToken}`,
+            'anthropic-beta': OAUTH_BETA_HEADER,
+          },
+          signal: controller.signal,
+        })
+      } catch {
+        return 'transient'
+      }
+
+      if (!res.ok) {
+        const tokenExpiredLocally = creds.expiresAt !== undefined && creds.expiresAt <= Date.now()
+        const cls = classifyHttpFailure(res.status, tokenExpiredLocally)
+        return cls === 'transient' ? 'transient' : UNAVAILABLE
+      }
+
+      // The body read stays inside the abort window: a connection drop
+      // mid-body rejects json() with a network error (transient, keep
+      // last-good), while malformed JSON from a real 200 is a SyntaxError
+      // (shape drift — definitive unavailable).
+      let body: unknown
+      try {
+        body = await res.json()
+      } catch (err) {
+        return err instanceof SyntaxError ? UNAVAILABLE : 'transient'
+      }
+      return mapUsageResponse(body) ?? UNAVAILABLE
     } finally {
       clearTimeout(timeout)
     }
-
-    if (!res.ok) {
-      const tokenExpiredLocally = creds.expiresAt !== undefined && creds.expiresAt <= Date.now()
-      const cls = classifyHttpFailure(res.status, tokenExpiredLocally)
-      return cls === 'transient' ? 'transient' : UNAVAILABLE
-    }
-
-    let body: unknown
-    try {
-      body = await res.json()
-    } catch {
-      return UNAVAILABLE
-    }
-    return mapUsageResponse(body) ?? UNAVAILABLE
   }
 
   private emitIfChanged(data: UsageData) {

@@ -247,16 +247,46 @@ describe('UsageService.pollOnce', () => {
     expect(send).toHaveBeenCalledWith('usage:update', { status: 'unavailable' })
   })
 
-  test('200 with unparseable JSON emits unavailable', async () => {
+  test('200 with malformed JSON (SyntaxError) emits unavailable', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => {
-        throw new Error('bad json')
+        throw new SyntaxError('Unexpected token')
       },
     })
     await service.pollOnce()
     expect(send).toHaveBeenCalledWith('usage:update', { status: 'unavailable' })
+  })
+
+  test('connection drop during body read is transient, keeps last-good', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse(fullBody()))
+    await service.pollOnce()
+    expect(send).toHaveBeenCalledTimes(1)
+
+    // undici surfaces a mid-body network failure as a non-SyntaxError
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new TypeError('terminated')
+      },
+    })
+    await service.pollOnce()
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  test('repeated setEnabled(true) forces a fresh emit for a reloaded renderer', async () => {
+    fetchMock.mockResolvedValue(okResponse(fullBody()))
+    service.setEnabled(true)
+    await service.pollOnce()
+    expect(send).toHaveBeenCalledTimes(1)
+
+    // Same data again would normally be deduped; a repeated enable signals a
+    // reloaded renderer with empty state and must re-emit.
+    service.setEnabled(true)
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2))
+    service.setEnabled(false)
   })
 })
 
