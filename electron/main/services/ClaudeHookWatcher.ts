@@ -1,7 +1,7 @@
 import { watchFile, unwatchFile, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
-import { BrowserWindow } from 'electron'
+import { type BrowserWindow } from 'electron'
 import { homedir } from 'os'
 import type { TerminalState } from '../../../src/types'
 import { isValidTerminalState } from '../../../src/types'
@@ -85,7 +85,8 @@ export class ClaudeHookWatcher {
   // Per-session composite state tracking for deduplication
   // Tracks timestamp + hookEvent + state to distinguish genuine state changes
   // from unchanged sessions being re-read during polling
-  private lastProcessedState: Map<string, { timestamp: number; hookEvent: string; state: string }> = new Map()
+  private lastProcessedState: Map<string, { timestamp: number; hookEvent: string; state: string }> =
+    new Map()
 
   // Guard to prevent concurrent async reads
   private isReading: boolean = false
@@ -182,7 +183,9 @@ export class ClaudeHookWatcher {
     const pending = this.pendingStates.get(normalizedCwd)
     if (pending && pending.length > 0) {
       if (isDev) {
-        console.log(`[HookWatcher] Processing ${pending.length} pending states for cwd: ${normalizedCwd}`)
+        console.log(
+          `[HookWatcher] Processing ${pending.length} pending states for cwd: ${normalizedCwd}`
+        )
       }
       this.pendingStates.delete(normalizedCwd)
       for (const state of pending) {
@@ -265,7 +268,7 @@ export class ClaudeHookWatcher {
         hookState.hook_event === last.hookEvent &&
         hookState.state === last.state
       ) {
-        return  // Duplicate re-read of unchanged session
+        return // Duplicate re-read of unchanged session
       }
       // Older-timestamp events are normally stale and dropped. Exception: input states
       // (question/permission) must still surface even when a racing 'busy'/'done' write
@@ -275,7 +278,7 @@ export class ClaudeHookWatcher {
       const isInputState = hookState.state === 'question' || hookState.state === 'permission'
       const surfacingNewInputState = isInputState && last.state !== hookState.state
       if (hookState.timestamp < last.timestamp && !surfacingNewInputState) {
-        return  // Stale event
+        return // Stale event
       }
     }
     const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
@@ -299,7 +302,9 @@ export class ClaudeHookWatcher {
       if (terminalId) {
         this.setSessionMapping(sessionId, terminalId)
         if (isDev) {
-          console.log(`[HookWatcher] Late association: session ${sessionId} with terminal ${terminalId}`)
+          console.log(
+            `[HookWatcher] Late association: session ${sessionId} with terminal ${terminalId}`
+          )
         }
       }
     }
@@ -333,7 +338,10 @@ export class ClaudeHookWatcher {
    * stealing the first assigned terminal (the old session likely crashed
    * without sending SessionEnd).
    */
-  private associateSessionWithTerminal(sessionId: string, normalizedCwd: string): string | undefined {
+  private associateSessionWithTerminal(
+    sessionId: string,
+    normalizedCwd: string
+  ): string | undefined {
     let terminalId = this.findUnassignedTerminalInCwd(normalizedCwd)
 
     // SessionStart fallback: steal from first terminal if none unassigned
@@ -344,7 +352,9 @@ export class ClaudeHookWatcher {
         const first = terminals.values().next()
         terminalId = first.done ? undefined : first.value
         if (isDev && terminalId) {
-          console.warn(`[HookWatcher] SessionStart: stealing terminal ${terminalId} (old session likely dead)`)
+          console.warn(
+            `[HookWatcher] SessionStart: stealing terminal ${terminalId} (old session likely dead)`
+          )
         }
       }
     }
@@ -404,7 +414,9 @@ export class ClaudeHookWatcher {
     pending.push(hookState)
 
     if (isDev) {
-      console.log(`[HookWatcher] Queued pending state for cwd: ${normalizedCwd} (queue size: ${pending.length})`)
+      console.log(
+        `[HookWatcher] Queued pending state for cwd: ${normalizedCwd} (queue size: ${pending.length})`
+      )
     }
   }
 
@@ -441,7 +453,11 @@ export class ClaudeHookWatcher {
 
     // Notify state change listeners (used by AutomationService for 'claude-done' triggers)
     for (const cb of this.stateChangeCallbacks) {
-      try { cb(terminalId, hookState.state) } catch { /* listener error */ }
+      try {
+        cb(terminalId, hookState.state)
+      } catch {
+        /* listener error */
+      }
     }
   }
 

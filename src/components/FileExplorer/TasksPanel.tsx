@@ -67,84 +67,107 @@ export function TasksPanel({ project }: TasksPanelProps) {
     }
   }, [project.id])
 
-  const handleToggle = useCallback(async (task: TaskItemType) => {
-    try {
-      const data = await api.tasks.update(project.path, {
-        filePath: task.filePath,
-        lineNumber: task.lineNumber,
-        action: 'toggle',
-      })
-      setTasksData(project.id, data)
-    } catch (error) {
-      console.error('Failed to toggle task:', error)
-    }
-  }, [api, project, setTasksData])
+  const handleToggle = useCallback(
+    async (task: TaskItemType) => {
+      try {
+        const data = await api.tasks.update(project.path, {
+          filePath: task.filePath,
+          lineNumber: task.lineNumber,
+          action: 'toggle',
+        })
+        setTasksData(project.id, data)
+      } catch (error) {
+        console.error('Failed to toggle task:', error)
+      }
+    },
+    [api, project, setTasksData]
+  )
 
-  const handleEdit = useCallback(async (task: TaskItemType, newText: string) => {
-    try {
-      const data = await api.tasks.update(project.path, {
-        filePath: task.filePath,
-        lineNumber: task.lineNumber,
-        action: 'edit',
-        newText,
-      })
-      setTasksData(project.id, data)
-    } catch (error) {
-      console.error('Failed to edit task:', error)
-    }
-  }, [api, project, setTasksData])
+  const handleEdit = useCallback(
+    async (task: TaskItemType, newText: string) => {
+      try {
+        const data = await api.tasks.update(project.path, {
+          filePath: task.filePath,
+          lineNumber: task.lineNumber,
+          action: 'edit',
+          newText,
+        })
+        setTasksData(project.id, data)
+      } catch (error) {
+        console.error('Failed to edit task:', error)
+      }
+    },
+    [api, project, setTasksData]
+  )
 
-  const handleDelete = useCallback(async (task: TaskItemType) => {
-    try {
-      const data = await api.tasks.delete(project.path, task.filePath, task.lineNumber)
-      setTasksData(project.id, data)
-    } catch (error) {
-      console.error('Failed to delete task:', error)
-    }
-  }, [api, project, setTasksData])
+  const handleDelete = useCallback(
+    async (task: TaskItemType) => {
+      try {
+        const data = await api.tasks.delete(project.path, task.filePath, task.lineNumber)
+        setTasksData(project.id, data)
+      } catch (error) {
+        console.error('Failed to delete task:', error)
+      }
+    },
+    [api, project, setTasksData]
+  )
 
-  const handleAdd = useCallback(async (section: string, text: string) => {
-    if (!tasksData?.files.length) return
-    try {
-      const data = await api.tasks.add(project.path, {
-        filePath: tasksData.files[0], // Add to first (root) file
-        section,
-        text,
-      })
-      setTasksData(project.id, data)
-    } catch (error) {
-      console.error('Failed to add task:', error)
-    }
-  }, [api, project, tasksData, setTasksData])
+  const handleAdd = useCallback(
+    async (section: string, text: string) => {
+      if (!tasksData?.files.length) return
+      try {
+        const data = await api.tasks.add(project.path, {
+          filePath: tasksData.files[0], // Add to first (root) file
+          section,
+          text,
+        })
+        setTasksData(project.id, data)
+      } catch (error) {
+        console.error('Failed to add task:', error)
+      }
+    },
+    [api, project, tasksData, setTasksData]
+  )
 
   const handleDragStart = useCallback((e: React.DragEvent, task: TaskItemType) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({
-      filePath: task.filePath,
-      lineNumber: task.lineNumber,
-      section: task.section,
-    }))
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        filePath: task.filePath,
+        lineNumber: task.lineNumber,
+        section: task.section,
+      })
+    )
     e.dataTransfer.effectAllowed = 'move'
   }, [])
 
-  const handleDrop = useCallback(async (e: React.DragEvent, targetSection: string) => {
-    try {
-      const raw = e.dataTransfer.getData('application/json')
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      const { filePath, lineNumber, section: sourceSection } = parsed
-      if (typeof filePath !== 'string' || typeof lineNumber !== 'number' || typeof sourceSection !== 'string') return
-      if (sourceSection === targetSection) return // Same section, no-op
+  const handleDrop = useCallback(
+    async (e: React.DragEvent, targetSection: string) => {
+      try {
+        const raw = e.dataTransfer.getData('application/json')
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        const { filePath, lineNumber, section: sourceSection } = parsed
+        if (
+          typeof filePath !== 'string' ||
+          typeof lineNumber !== 'number' ||
+          typeof sourceSection !== 'string'
+        )
+          return
+        if (sourceSection === targetSection) return // Same section, no-op
 
-      const data = await api.tasks.move(project.path, {
-        filePath,
-        lineNumber,
-        targetSection,
-      })
-      setTasksData(project.id, data)
-    } catch (error) {
-      console.error('Failed to move task:', error)
-    }
-  }, [api, project, setTasksData])
+        const data = await api.tasks.move(project.path, {
+          filePath,
+          lineNumber,
+          targetSection,
+        })
+        setTasksData(project.id, data)
+      } catch (error) {
+        console.error('Failed to move task:', error)
+      }
+    },
+    [api, project, setTasksData]
+  )
 
   const handleCreateFile = useCallback(async () => {
     try {
@@ -171,9 +194,7 @@ export function TasksPanel({ project }: TasksPanelProps) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 px-4">
         <ListTodo className="w-8 h-8 text-muted-foreground/40" />
-        <p className="text-sm text-muted-foreground text-center">
-          No TASKS.md found
-        </p>
+        <p className="text-sm text-muted-foreground text-center">No TASKS.md found</p>
         <button
           onClick={handleCreateFile}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -188,7 +209,7 @@ export function TasksPanel({ project }: TasksPanelProps) {
   return (
     <div className="h-full flex flex-col">
       {tasksData.sections
-        .filter(s => s.name !== 'Done' || s.tasks.length > 0)
+        .filter((s) => s.name !== 'Done' || s.tasks.length > 0)
         .map((section) => (
           <TaskSection
             key={section.name}

@@ -54,7 +54,16 @@ export function CommitHistory({ gitPath, contextId }: CommitHistoryProps) {
     } finally {
       setGitCommitLogLoading(contextId, false)
     }
-  }, [api, gitPath, contextId, isLoading, hasMore, commitLog?.cursor, appendGitCommitLog, setGitCommitLogLoading])
+  }, [
+    api,
+    gitPath,
+    contextId,
+    isLoading,
+    hasMore,
+    commitLog?.cursor,
+    appendGitCommitLog,
+    setGitCommitLogLoading,
+  ])
 
   // Initial load
   useEffect(() => {
@@ -84,9 +93,12 @@ export function CommitHistory({ gitPath, contextId }: CommitHistoryProps) {
     }
   }, [virtualizer.getVirtualItems(), commits.length, hasMore, isLoading, loadMore])
 
-  const handleToggleExpand = useCallback((hash: string) => {
-    setExpandedCommit(contextId, expandedHash === hash ? null : hash)
-  }, [contextId, expandedHash, setExpandedCommit])
+  const handleToggleExpand = useCallback(
+    (hash: string) => {
+      setExpandedCommit(contextId, expandedHash === hash ? null : hash)
+    },
+    [contextId, expandedHash, setExpandedCommit]
+  )
 
   const handleCopyHash = useCallback((fullHash: string) => {
     navigator.clipboard.writeText(fullHash)

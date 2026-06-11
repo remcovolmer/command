@@ -74,10 +74,17 @@ export class GitService {
     const prev = this.operationQueue.get(projectPath) ?? Promise.resolve()
     let result!: T
     const next = prev.then(
-      async () => { result = await fn() },
-      async () => { result = await fn() },
+      async () => {
+        result = await fn()
+      },
+      async () => {
+        result = await fn()
+      }
     )
-    const settled = next.then(() => {}, () => {})
+    const settled = next.then(
+      () => {},
+      () => {}
+    )
     this.operationQueue.set(projectPath, settled)
     await next
     // Clean up if no further operations were queued
@@ -99,15 +106,20 @@ export class GitService {
 
   private async execGitWithStdin(cwd: string, args: string[], stdin: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const proc = execFile('git', args, {
-        cwd,
-        maxBuffer: 10 * 1024 * 1024,
-        windowsHide: true,
-        timeout: 30000,
-      }, (error, stdout) => {
-        if (error) reject(error)
-        else resolve(stdout.trim())
-      })
+      const proc = execFile(
+        'git',
+        args,
+        {
+          cwd,
+          maxBuffer: 10 * 1024 * 1024,
+          windowsHide: true,
+          timeout: 30000,
+        },
+        (error, stdout) => {
+          if (error) reject(error)
+          else resolve(stdout.trim())
+        }
+      )
       proc.stdin?.write(stdin)
       proc.stdin?.end()
     })
@@ -131,15 +143,9 @@ export class GitService {
 
     try {
       // Single command for branch info + file changes
-      const output = await this.execGit(projectPath, [
-        'status',
-        '--porcelain=v2',
-        '--branch',
-        '-z',
-      ])
+      const output = await this.execGit(projectPath, ['status', '--porcelain=v2', '--branch', '-z'])
 
-      const { branch, staged, modified, untracked, conflicted } =
-        this.parseStatusV2Output(output)
+      const { branch, staged, modified, untracked, conflicted } = this.parseStatusV2Output(output)
 
       return {
         isGitRepo: true,
@@ -256,7 +262,11 @@ export class GitService {
         const workTreeStatus = xy[1]
 
         if (indexStatus !== '.') {
-          staged.push({ path: filePath, status: indexStatus === 'R' ? 'renamed' : this.mapStatus(indexStatus), staged: true })
+          staged.push({
+            path: filePath,
+            status: indexStatus === 'R' ? 'renamed' : this.mapStatus(indexStatus),
+            staged: true,
+          })
         }
         if (workTreeStatus !== '.') {
           modified.push({ path: filePath, status: this.mapStatus(workTreeStatus), staged: false })
@@ -476,7 +486,11 @@ export class GitService {
     }
   }
 
-  async getFileAtCommit(projectPath: string, commitHash: string, filePath: string): Promise<string | null> {
+  async getFileAtCommit(
+    projectPath: string,
+    commitHash: string,
+    filePath: string
+  ): Promise<string | null> {
     try {
       return await this.execGit(projectPath, ['show', `${commitHash}:${filePath}`])
     } catch {
@@ -527,7 +541,11 @@ export class GitService {
 
   async unstageFiles(projectPath: string, files: string[]): Promise<void> {
     return this.serialized(projectPath, async () => {
-      await this.execGitWithStdin(projectPath, ['reset', 'HEAD', '--pathspec-from-file=-'], files.join('\n'))
+      await this.execGitWithStdin(
+        projectPath,
+        ['reset', 'HEAD', '--pathspec-from-file=-'],
+        files.join('\n')
+      )
     })
   }
 
@@ -584,14 +602,17 @@ export class GitService {
 
       if (!output) return []
 
-      return output.split('\n').filter(Boolean).map((line) => {
-        const [name, head, upstream] = line.split('\0')
-        return {
-          name: name || '',
-          current: head === '*',
-          upstream: upstream || null,
-        }
-      })
+      return output
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [name, head, upstream] = line.split('\0')
+          return {
+            name: name || '',
+            current: head === '*',
+            upstream: upstream || null,
+          }
+        })
     } catch {
       return []
     }

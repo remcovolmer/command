@@ -16,7 +16,7 @@ export default defineConfig(({ command }) => {
   return {
     resolve: {
       alias: {
-        '@': path.join(__dirname, 'src')
+        '@': path.join(__dirname, 'src'),
       },
     },
     plugins: [
@@ -27,7 +27,7 @@ export default defineConfig(({ command }) => {
           entry: 'electron/main/index.ts',
           onstart(args) {
             if (process.env.VSCODE_DEBUG) {
-              console.log(/* For `.vscode/.debug.script.mjs` */'[startup] Electron App')
+              console.log(/* For `.vscode/.debug.script.mjs` */ '[startup] Electron App')
             } else {
               args.startup()
             }
@@ -69,17 +69,19 @@ export default defineConfig(({ command }) => {
       }),
     ],
     server: {
-      ...(process.env.VSCODE_DEBUG ? (() => {
-        const url = new URL(pkg.debug.env.VITE_DEV_SERVER_URL)
-        return {
-          host: url.hostname,
-          port: +url.port,
-        }
-      })() : {}),
+      ...(process.env.VSCODE_DEBUG
+        ? (() => {
+            const url = new URL(pkg.debug.env.VITE_DEV_SERVER_URL)
+            return {
+              host: url.hostname,
+              port: +url.port,
+            }
+          })()
+        : {}),
       fs: {
         allow: [
           path.join(__dirname),
-          path.join(__dirname, '..', '..'),  // Allow access to main repo (node_modules in worktrees)
+          path.join(__dirname, '..', '..'), // Allow access to main repo (node_modules in worktrees)
         ],
       },
     },

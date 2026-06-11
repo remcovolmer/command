@@ -7,7 +7,15 @@ interface CreateWorktreeDialogProps {
   projectId: string
   isOpen: boolean
   onClose: () => void
-  onCreated: (worktree: { id: string; projectId: string; name: string; branch: string; path: string; createdAt: number; isLocked: boolean }) => void
+  onCreated: (worktree: {
+    id: string
+    projectId: string
+    name: string
+    branch: string
+    path: string
+    createdAt: number
+    isLocked: boolean
+  }) => void
 }
 
 export function CreateWorktreeDialog({
@@ -32,10 +40,10 @@ export function CreateWorktreeDialog({
   const [sourceBranch, setSourceBranch] = useState('main')
 
   // Determine if form is valid for submission
-  const canSubmit = !loading && !creating && (
-    (isNewBranch && newBranchName.trim()) ||
-    (!isNewBranch && selectedBranch)
-  )
+  const canSubmit =
+    !loading &&
+    !creating &&
+    ((isNewBranch && newBranchName.trim()) || (!isNewBranch && selectedBranch))
 
   // Load branches when dialog opens
   useEffect(() => {
@@ -44,18 +52,19 @@ export function CreateWorktreeDialog({
     setLoading(true)
     setError(null)
 
-    api.worktree.listBranches(projectId)
+    api.worktree
+      .listBranches(projectId)
       .then(({ local, remote, current }) => {
         setLocalBranches(local)
         setRemoteBranches(remote)
         setCurrentBranch(current)
         // Pre-select first non-current branch if available
-        const available = local.filter(b => b !== current)
+        const available = local.filter((b) => b !== current)
         if (available.length > 0) {
           setSelectedBranch(available[0])
         }
         // Default source branch: prefer main (local first, then remote), else current
-        const remoteOnly = remote.filter(b => !local.includes(b))
+        const remoteOnly = remote.filter((b) => !local.includes(b))
         if (local.includes('main')) {
           setSourceBranch('main')
         } else if (remoteOnly.includes('main')) {
@@ -113,25 +122,34 @@ export function CreateWorktreeDialog({
     } finally {
       setCreating(false)
     }
-  }, [api, projectId, isNewBranch, newBranchName, selectedBranch, customName, sourceBranch, onCreated, onClose])
+  }, [
+    api,
+    projectId,
+    isNewBranch,
+    newBranchName,
+    selectedBranch,
+    customName,
+    sourceBranch,
+    onCreated,
+    onClose,
+  ])
 
   // Keyboard shortcuts: Escape to close, Enter to confirm
-  useDialogHotkeys(
-    onClose,
-    canSubmit ? handleCreate : undefined,
-    { enabled: isOpen, canConfirm: !!canSubmit }
-  )
+  useDialogHotkeys(onClose, canSubmit ? handleCreate : undefined, {
+    enabled: isOpen,
+    canConfirm: !!canSubmit,
+  })
 
   // Remote branches not already in local
-  const remoteOnlyBranches = useMemo(() =>
-    remoteBranches.filter(b => !localBranches.includes(b)),
+  const remoteOnlyBranches = useMemo(
+    () => remoteBranches.filter((b) => !localBranches.includes(b)),
     [localBranches, remoteBranches]
   )
 
   // Filter out current branch and already used branches
   const availableBranches = useMemo(() => {
-    const local = localBranches.filter(b => b !== currentBranch)
-    const remote = remoteOnlyBranches.filter(b => b !== currentBranch)
+    const local = localBranches.filter((b) => b !== currentBranch)
+    const remote = remoteOnlyBranches.filter((b) => b !== currentBranch)
     return { local, remote }
   }, [localBranches, remoteOnlyBranches, currentBranch])
 
@@ -140,10 +158,7 @@ export function CreateWorktreeDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
 
       {/* Dialog */}
       <div className="relative w-full max-w-md bg-sidebar rounded-xl shadow-2xl border border-border">
@@ -153,10 +168,7 @@ export function CreateWorktreeDialog({
             <GitBranch className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold text-foreground">New Worktree</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-          >
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
@@ -225,11 +237,12 @@ export function CreateWorktreeDialog({
                       </optgroup>
                     )}
                   </select>
-                  {availableBranches.local.length === 0 && availableBranches.remote.length === 0 && (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      No available branches. Create a new branch instead.
-                    </p>
-                  )}
+                  {availableBranches.local.length === 0 &&
+                    availableBranches.remote.length === 0 && (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        No available branches. Create a new branch instead.
+                      </p>
+                    )}
                 </div>
               )}
 
@@ -289,7 +302,11 @@ export function CreateWorktreeDialog({
                   type="text"
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
-                  placeholder={isNewBranch ? newBranchName.replace(/\//g, '-') : selectedBranch.replace(/\//g, '-')}
+                  placeholder={
+                    isNewBranch
+                      ? newBranchName.replace(/\//g, '-')
+                      : selectedBranch.replace(/\//g, '-')
+                  }
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <p className="mt-1.5 text-xs text-muted-foreground">
@@ -318,7 +335,12 @@ export function CreateWorktreeDialog({
           </button>
           <button
             onClick={handleCreate}
-            disabled={loading || creating || (!isNewBranch && !selectedBranch) || (isNewBranch && !newBranchName.trim())}
+            disabled={
+              loading ||
+              creating ||
+              (!isNewBranch && !selectedBranch) ||
+              (isNewBranch && !newBranchName.trim())
+            }
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}

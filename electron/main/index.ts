@@ -1,5 +1,13 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, Notification, Menu, powerMonitor } from 'electron'
-import { createRequire } from 'node:module'
+import {
+  app,
+  BrowserWindow,
+  shell,
+  ipcMain,
+  dialog,
+  Notification,
+  Menu,
+  powerMonitor,
+} from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
@@ -56,7 +64,11 @@ let handlingCrash = false
 function safeHandleCrash(err: unknown, source: 'uncaughtException' | 'unhandledRejection'): void {
   if (handlingCrash) {
     // Last-resort visibility; cannot use the logger or IPC without risking recursion.
-    try { console.error(`[${source}] (re-entrant, suppressed)`, err) } catch { /* nothing */ }
+    try {
+      console.error(`[${source}] (re-entrant, suppressed)`, err)
+    } catch {
+      /* nothing */
+    }
     return
   }
   handlingCrash = true
@@ -65,7 +77,11 @@ function safeHandleCrash(err: unknown, source: 'uncaughtException' | 'unhandledR
     console.error(`[${source}]`, err)
     notifyUncaughtError(entry)
   } catch (innerErr) {
-    try { console.error(`[${source}] handler failed:`, innerErr) } catch { /* nothing */ }
+    try {
+      console.error(`[${source}] handler failed:`, innerErr)
+    } catch {
+      /* nothing */
+    }
   } finally {
     handlingCrash = false
   }
@@ -76,18 +92,29 @@ process.on('unhandledRejection', (reason) => safeHandleCrash(reason, 'unhandledR
 
 // Validation helpers
 const isValidUUID = (id: string): boolean =>
-  typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  typeof id === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
 const clamp = (val: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, Math.floor(val)))
 
 const BLOCKED_ENV_KEYS = new Set([
-  'PATH', 'HOME', 'USER', 'SHELL', 'COMSPEC', 'SYSTEMROOT', 'WINDIR',
-  'NODE_OPTIONS', 'ELECTRON_RUN_AS_NODE',
-  'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES',
+  'PATH',
+  'HOME',
+  'USER',
+  'SHELL',
+  'COMSPEC',
+  'SYSTEMROOT',
+  'WINDIR',
+  'NODE_OPTIONS',
+  'ELECTRON_RUN_AS_NODE',
+  'LD_PRELOAD',
+  'DYLD_INSERT_LIBRARIES',
 ])
 
-function resolveEnvOverrides(project: { settings?: { authMode?: string; profileId?: string } } | undefined): Record<string, string> | undefined {
+function resolveEnvOverrides(
+  project: { settings?: { authMode?: string; profileId?: string } } | undefined
+): Record<string, string> | undefined {
   if (project?.settings?.authMode === 'profile' && project.settings.profileId && secureEnvStore) {
     return secureEnvStore.getEnvVars(project.settings.profileId)
   }
@@ -128,19 +155,26 @@ function validateTrigger(raw: unknown): AutomationTrigger {
   const obj = raw as Record<string, unknown>
   switch (obj.type) {
     case 'schedule':
-      if (typeof obj.cron !== 'string' || obj.cron.length === 0 || obj.cron.length > 100) throw new Error('Invalid cron expression')
+      if (typeof obj.cron !== 'string' || obj.cron.length === 0 || obj.cron.length > 100)
+        throw new Error('Invalid cron expression')
       return { type: 'schedule', cron: obj.cron }
     case 'claude-done':
       return { type: 'claude-done' }
     case 'git-event':
-      if (!VALID_GIT_EVENTS.includes(obj.event as GitEvent)) throw new Error('Invalid git event type')
+      if (!VALID_GIT_EVENTS.includes(obj.event as GitEvent))
+        throw new Error('Invalid git event type')
       return { type: 'git-event', event: obj.event as GitEvent }
     case 'file-change': {
       if (!Array.isArray(obj.patterns)) throw new Error('Invalid file patterns')
-      const patterns = obj.patterns.filter((p: unknown): p is string => typeof p === 'string').map(p => p.slice(0, 500))
+      const patterns = obj.patterns
+        .filter((p: unknown): p is string => typeof p === 'string')
+        .map((p) => p.slice(0, 500))
       if (patterns.length === 0) throw new Error('At least one file pattern required')
       if (patterns.length > 50) throw new Error('Too many file patterns (max 50)')
-      const cooldown = typeof obj.cooldownSeconds === 'number' ? clamp(obj.cooldownSeconds as number, 10, 3600) : 60
+      const cooldown =
+        typeof obj.cooldownSeconds === 'number'
+          ? clamp(obj.cooldownSeconds as number, 10, 3600)
+          : 60
       return { type: 'file-change', patterns, cooldownSeconds: cooldown }
     }
     default:
@@ -148,7 +182,6 @@ function validateTrigger(raw: unknown): AutomationTrigger {
   }
 }
 
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 process.env.APP_ROOT = path.join(__dirname, '../..')
@@ -198,7 +231,6 @@ let unsubSessionIndex: (() => void) | null = null
 let secureEnvStore: SecureEnvStore | null = null
 let commandServer: CommandServer | null = null
 let skillInstaller: SkillInstaller | null = null
-
 
 /**
  * Verify that a Claude session file exists (async version)
@@ -293,13 +325,12 @@ async function createWindow() {
     if (!info || info.type !== 'claude') return
 
     const normalizedCwd = normalizePath(info.cwd)
-    const terminalSessions = hookWatcher.getTerminalSessions()
-      .filter(ts => {
-        const tsInfo = terminalManager!.getTerminalInfo(ts.terminalId)
-        return tsInfo && normalizePath(tsInfo.cwd) === normalizedCwd
-      })
+    const terminalSessions = hookWatcher.getTerminalSessions().filter((ts) => {
+      const tsInfo = terminalManager!.getTerminalInfo(ts.terminalId)
+      return tsInfo && normalizePath(tsInfo.cwd) === normalizedCwd
+    })
 
-    sessionIndexService.refreshAndPush(info.cwd, terminalSessions).catch(err => {
+    sessionIndexService.refreshAndPush(info.cwd, terminalSessions).catch((err) => {
       console.error('[SessionIndex] Refresh failed:', err)
     })
   })
@@ -337,14 +368,16 @@ async function createWindow() {
 
   // Install ccli as a global skill and clean up legacy per-project command files
   skillInstaller = new SkillInstaller()
-  skillInstaller.install().catch(err =>
-    console.error('[SkillInstaller] Global install failed:', err)
-  )
+  skillInstaller
+    .install()
+    .catch((err) => console.error('[SkillInstaller] Global install failed:', err))
   const allProjectsForSkills = projectPersistence.getProjects()
   for (const project of allProjectsForSkills) {
-    skillInstaller.cleanupLegacyCommand(project.path).catch(err =>
-      console.error(`[SkillInstaller] Legacy cleanup failed for ${project.path}:`, err)
-    )
+    skillInstaller
+      .cleanupLegacyCommand(project.path)
+      .catch((err) =>
+        console.error(`[SkillInstaller] Legacy cleanup failed for ${project.path}:`, err)
+      )
   }
 
   updateService = new UpdateService()
@@ -367,9 +400,9 @@ async function createWindow() {
     automationService?.startAllSchedulers()
     automationService?.checkMissedRuns()
     const allProjects = projectPersistence?.getProjects() ?? []
-    automationService?.garbageCollectWorktrees(allProjects.map(p => p.path)).catch(err =>
-      console.error('[Automation] Worktree GC failed:', err)
-    )
+    automationService
+      ?.garbageCollectWorktrees(allProjects.map((p) => p.path))
+      .catch((err) => console.error('[Automation] Worktree GC failed:', err))
   })
 
   // Pause/resume GitHub polling on focus/blur
@@ -384,7 +417,11 @@ async function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsed = new URL(url)
-      if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && !parsed.username && !parsed.password) {
+      if (
+        (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+        !parsed.username &&
+        !parsed.password
+      ) {
         shell.openExternal(url)
       }
     } catch {
@@ -403,19 +440,28 @@ async function createWindow() {
 }
 
 // IPC Handlers for Terminal operations
-ipcMain.handle('terminal:create', async (_event, projectId: string, worktreeId?: string, type: 'claude' | 'normal' = 'claude', resumeSessionId?: string) => {
-  return handleTerminalCreate(
-    {
-      terminalManager,
-      projectPersistence,
-      crashLogger,
-      getWindow: () => win,
-      resolveEnvOverrides,
-      isValidUUID,
-    },
-    { projectId, worktreeId, type, resumeSessionId },
-  )
-})
+ipcMain.handle(
+  'terminal:create',
+  async (
+    _event,
+    projectId: string,
+    worktreeId?: string,
+    type: 'claude' | 'normal' = 'claude',
+    resumeSessionId?: string
+  ) => {
+    return handleTerminalCreate(
+      {
+        terminalManager,
+        projectPersistence,
+        crashLogger,
+        getWindow: () => win,
+        resolveEnvOverrides,
+        isValidUUID,
+      },
+      { projectId, worktreeId, type, resumeSessionId }
+    )
+  }
+)
 
 ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
   if (!isValidUUID(terminalId)) return
@@ -423,7 +469,9 @@ ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
   if (!result.ok) {
     if (result.reason === 'too-large') {
       const { title, body } = formatOversizeMessage(result.size, result.limit)
-      console.warn(`[terminal:write] Rejected ${result.size}B payload for ${terminalId}: exceeds ${result.limit}B limit`)
+      console.warn(
+        `[terminal:write] Rejected ${result.size}B payload for ${terminalId}: exceeds ${result.limit}B limit`
+      )
       new Notification({ title, body }).show()
     }
     return
@@ -445,31 +493,34 @@ ipcMain.on('terminal:close', (_event, terminalId: string) => {
   terminalManager?.closeTerminal(terminalId)
 })
 
-ipcMain.handle('terminal:update-worktree', async (_event, terminalId: string, worktreeId: string, newCwd: string) => {
-  if (!isValidUUID(terminalId)) throw new Error('Invalid terminal ID')
-  if (!isValidUUID(worktreeId)) throw new Error('Invalid worktree ID')
-  if (typeof newCwd !== 'string' || newCwd.length === 0 || newCwd.length > 1024) {
-    throw new Error('Invalid cwd')
-  }
-
-  const result = terminalManager?.updateTerminalWorktree(terminalId, worktreeId, newCwd)
-  if (!result || !result.success) {
-    throw new Error(result?.error ?? 'Failed to update terminal worktree')
-  }
-
-  // Notify renderer of the worktree update
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('terminal:worktree-updated', terminalId, worktreeId)
-
-    // Also update the terminal title to the worktree name
-    const worktree = projectPersistence?.getWorktreeById(worktreeId)
-    if (worktree) {
-      win.webContents.send('terminal:title', terminalId, worktree.name)
+ipcMain.handle(
+  'terminal:update-worktree',
+  async (_event, terminalId: string, worktreeId: string, newCwd: string) => {
+    if (!isValidUUID(terminalId)) throw new Error('Invalid terminal ID')
+    if (!isValidUUID(worktreeId)) throw new Error('Invalid worktree ID')
+    if (typeof newCwd !== 'string' || newCwd.length === 0 || newCwd.length > 1024) {
+      throw new Error('Invalid cwd')
     }
-  }
 
-  return { success: true }
-})
+    const result = terminalManager?.updateTerminalWorktree(terminalId, worktreeId, newCwd)
+    if (!result || !result.success) {
+      throw new Error(result?.error ?? 'Failed to update terminal worktree')
+    }
+
+    // Notify renderer of the worktree update
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('terminal:worktree-updated', terminalId, worktreeId)
+
+      // Also update the terminal title to the worktree name
+      const worktree = projectPersistence?.getWorktreeById(worktreeId)
+      if (worktree) {
+        win.webContents.send('terminal:title', terminalId, worktree.name)
+      }
+    }
+
+    return { success: true }
+  }
+)
 
 ipcMain.on('terminal:evict', (_event, terminalId: string) => {
   if (!isValidUUID(terminalId)) return
@@ -486,24 +537,27 @@ ipcMain.handle('project:list', async () => {
   return projectPersistence?.getProjects() ?? []
 })
 
-ipcMain.handle('project:add', async (_event, projectPath: string, name?: string, type?: 'workspace' | 'project' | 'code') => {
-  const validTypes = ['workspace', 'project', 'code'] as const
-  if (type !== undefined && !validTypes.includes(type)) {
-    throw new Error('Invalid project type')
+ipcMain.handle(
+  'project:add',
+  async (_event, projectPath: string, name?: string, type?: 'workspace' | 'project' | 'code') => {
+    const validTypes = ['workspace', 'project', 'code'] as const
+    if (type !== undefined && !validTypes.includes(type)) {
+      throw new Error('Invalid project type')
+    }
+    const result = projectPersistence?.addProject(projectPath, name, type)
+    // Clean up legacy ccli command file if present in the new project
+    skillInstaller
+      ?.cleanupLegacyCommand(projectPath)
+      .catch((err) => console.error(`[SkillInstaller] Legacy cleanup failed on project add:`, err))
+    return result
   }
-  const result = projectPersistence?.addProject(projectPath, name, type)
-  // Clean up legacy ccli command file if present in the new project
-  skillInstaller?.cleanupLegacyCommand(projectPath).catch(err =>
-    console.error(`[SkillInstaller] Legacy cleanup failed on project add:`, err)
-  )
-  return result
-})
+)
 
 ipcMain.handle('project:remove', async (_event, id: string) => {
   // Close all PTY terminals for this project BEFORE cleanup
   terminalManager?.closeTerminalsForProject(id)
   // Stop GitHub polling for all worktrees under this project
-  const project = projectPersistence?.getProjects().find(p => p.id === id)
+  const project = projectPersistence?.getProjects().find((p) => p.id === id)
   if (project?.path) {
     githubService?.stopPollingByPathPrefix(project.path)
   }
@@ -515,7 +569,11 @@ ipcMain.handle('project:remove', async (_event, id: string) => {
 ipcMain.handle('project:update', async (_event, id: string, updates: Record<string, unknown>) => {
   if (!isValidUUID(id)) throw new Error('Invalid project ID')
   const allowedUpdates: Record<string, unknown> = {}
-  if (updates.settings && typeof updates.settings === 'object' && !Array.isArray(updates.settings)) {
+  if (
+    updates.settings &&
+    typeof updates.settings === 'object' &&
+    !Array.isArray(updates.settings)
+  ) {
     const s = updates.settings as Record<string, unknown>
     const VALID_CLAUDE_MODES = ['chat', 'auto', 'full-auto']
     const settings: Record<string, unknown> = {
@@ -559,7 +617,7 @@ ipcMain.handle('project:setActiveWatcher', async (_event, projectId: string) => 
     throw new Error('Invalid project ID')
   }
   const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
+  const project = projects.find((p) => p.id === projectId)
   if (!project) return
 
   await fileWatcherService?.switchTo(project.id, project.path)
@@ -568,7 +626,7 @@ ipcMain.handle('project:setActiveWatcher', async (_event, projectId: string) => 
 ipcMain.handle('project:hasVertexConfig', async (_event, projectId: string) => {
   if (!isValidUUID(projectId)) throw new Error('Invalid project ID')
   const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
+  const project = projects.find((p) => p.id === projectId)
   if (!project) return false
   try {
     const filePath = path.join(project.path, '.claude', 'settings.local.json')
@@ -584,7 +642,7 @@ ipcMain.handle('project:hasVertexConfig', async (_event, projectId: string) => {
 ipcMain.handle('profile:list', async () => {
   const profiles = projectPersistence?.getProfiles() ?? []
   // Derive envVarCount at read time from SecureEnvStore (not from persisted state)
-  return profiles.map(p => ({
+  return profiles.map((p) => ({
     ...p,
     envVarCount: secureEnvStore?.getEnvVarKeys(p.id).length ?? 0,
   }))
@@ -622,19 +680,27 @@ ipcMain.handle('profile:getActive', async () => {
   return projectPersistence?.getActiveProfileId() ?? null
 })
 
-ipcMain.handle('profile:setEnvVars', async (_event, profileId: string, vars: Record<string, string>) => {
-  if (!isValidUUID(profileId)) throw new Error('Invalid profile ID')
-  if (!vars || typeof vars !== 'object' || Array.isArray(vars)) throw new Error('Invalid env vars')
-  // Validate all keys and values are strings
-  for (const [key, value] of Object.entries(vars)) {
-    if (typeof key !== 'string' || key.length === 0 || key.length > 200) throw new Error('Invalid env var key')
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`Invalid env var key format: ${key}`)
-    if (BLOCKED_ENV_KEYS.has(key.toUpperCase())) throw new Error(`Cannot override system env var: ${key}`)
-    if (typeof value !== 'string' || value.length > 10000) throw new Error('Invalid env var value')
+ipcMain.handle(
+  'profile:setEnvVars',
+  async (_event, profileId: string, vars: Record<string, string>) => {
+    if (!isValidUUID(profileId)) throw new Error('Invalid profile ID')
+    if (!vars || typeof vars !== 'object' || Array.isArray(vars))
+      throw new Error('Invalid env vars')
+    // Validate all keys and values are strings
+    for (const [key, value] of Object.entries(vars)) {
+      if (typeof key !== 'string' || key.length === 0 || key.length > 200)
+        throw new Error('Invalid env var key')
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key))
+        throw new Error(`Invalid env var key format: ${key}`)
+      if (BLOCKED_ENV_KEYS.has(key.toUpperCase()))
+        throw new Error(`Cannot override system env var: ${key}`)
+      if (typeof value !== 'string' || value.length > 10000)
+        throw new Error('Invalid env var value')
+    }
+    secureEnvStore?.setEnvVars(profileId, vars)
+    // envVarCount is derived at read time in profile:list, no need to persist it
   }
-  secureEnvStore?.setEnvVars(profileId, vars)
-  // envVarCount is derived at read time in profile:list, no need to persist it
-})
+)
 
 ipcMain.handle('profile:getEnvVarKeys', async (_event, profileId: string) => {
   if (!isValidUUID(profileId)) throw new Error('Invalid profile ID')
@@ -658,10 +724,13 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
   const projects = projectPersistence?.getProjects() ?? []
   const isWin = process.platform === 'win32'
   const normalizedResolved = isWin ? resolved.toLowerCase() : resolved
-  const isInProject = projects.some(p => {
+  const isInProject = projects.some((p) => {
     const projectPath = path.resolve(p.path)
     const normalizedProject = isWin ? projectPath.toLowerCase() : projectPath
-    return normalizedResolved.startsWith(normalizedProject + path.sep) || normalizedResolved === normalizedProject
+    return (
+      normalizedResolved.startsWith(normalizedProject + path.sep) ||
+      normalizedResolved === normalizedProject
+    )
   })
   if (!isInProject) {
     throw new Error('Directory is outside of any registered project')
@@ -671,7 +740,7 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
     const entries = await fs.readdir(resolved, { withFileTypes: true })
 
     const result = entries
-      .map(entry => ({
+      .map((entry) => ({
         name: entry.name,
         path: path.join(resolved, entry.name),
         type: entry.isDirectory() ? 'directory' : 'file',
@@ -702,10 +771,13 @@ function validateFilePathInProject(filePath: string): string {
   const isWin = process.platform === 'win32'
   const normalizedResolved = isWin ? resolved.toLowerCase() : resolved
 
-  const isInProject = projects.some(p => {
+  const isInProject = projects.some((p) => {
     const projectPath = path.resolve(p.path)
     const normalizedProject = isWin ? projectPath.toLowerCase() : projectPath
-    return normalizedResolved.startsWith(normalizedProject + path.sep) || normalizedResolved === normalizedProject
+    return (
+      normalizedResolved.startsWith(normalizedProject + path.sep) ||
+      normalizedResolved === normalizedProject
+    )
   })
 
   if (!isInProject) {
@@ -791,7 +863,7 @@ ipcMain.handle('fs:delete', async (_event, targetPath: string) => {
   const projects = projectPersistence?.getProjects() ?? []
   const isWin = process.platform === 'win32'
   const normalizedResolved = isWin ? resolved.toLowerCase() : resolved
-  const isProjectRoot = projects.some(p => {
+  const isProjectRoot = projects.some((p) => {
     const projectPath = path.resolve(p.path)
     return (isWin ? projectPath.toLowerCase() : projectPath) === normalizedResolved
   })
@@ -838,12 +910,17 @@ ipcMain.handle('git:get-remote-url', async (_event, projectPath: string) => {
   return gitService?.getRemoteUrl(projectPath) ?? null
 })
 
-ipcMain.handle('git:commit-log', async (_event, projectPath: string, skip?: number, limit?: number) => {
-  validateProjectPath(projectPath)
-  const safeSkip = typeof skip === 'number' && skip >= 0 ? skip : 0
-  const safeLimit = typeof limit === 'number' && limit >= 1 && limit <= 500 ? limit : 100
-  return gitService?.getCommitLog(projectPath, safeSkip, safeLimit) ?? { commits: [], hasMore: false }
-})
+ipcMain.handle(
+  'git:commit-log',
+  async (_event, projectPath: string, skip?: number, limit?: number) => {
+    validateProjectPath(projectPath)
+    const safeSkip = typeof skip === 'number' && skip >= 0 ? skip : 0
+    const safeLimit = typeof limit === 'number' && limit >= 1 && limit <= 500 ? limit : 100
+    return (
+      gitService?.getCommitLog(projectPath, safeSkip, safeLimit) ?? { commits: [], hasMore: false }
+    )
+  }
+)
 
 ipcMain.handle('git:commit-detail', async (_event, projectPath: string, commitHash: string) => {
   validateProjectPath(projectPath)
@@ -853,19 +930,25 @@ ipcMain.handle('git:commit-detail', async (_event, projectPath: string, commitHa
   return gitService?.getCommitDetail(projectPath, commitHash) ?? null
 })
 
-ipcMain.handle('git:file-at-commit', async (_event, projectPath: string, commitHash: string, filePath: string) => {
-  validateProjectPath(projectPath)
-  if (typeof commitHash !== 'string' || !/^([0-9a-f]{7,40}|HEAD(~\d+)?|HEAD\^?)$/i.test(commitHash)) {
-    throw new Error('Invalid commit hash')
+ipcMain.handle(
+  'git:file-at-commit',
+  async (_event, projectPath: string, commitHash: string, filePath: string) => {
+    validateProjectPath(projectPath)
+    if (
+      typeof commitHash !== 'string' ||
+      !/^([0-9a-f]{7,40}|HEAD(~\d+)?|HEAD\^?)$/i.test(commitHash)
+    ) {
+      throw new Error('Invalid commit hash')
+    }
+    if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+      throw new Error('Invalid file path')
+    }
+    if (filePath.includes('..') || path.isAbsolute(filePath)) {
+      throw new Error('Invalid file path')
+    }
+    return gitService?.getFileAtCommit(projectPath, commitHash, filePath) ?? null
   }
-  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
-    throw new Error('Invalid file path')
-  }
-  if (filePath.includes('..') || path.isAbsolute(filePath)) {
-    throw new Error('Invalid file path')
-  }
-  return gitService?.getFileAtCommit(projectPath, commitHash, filePath) ?? null
-})
+)
 
 ipcMain.handle('git:head-hash', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)
@@ -900,22 +983,28 @@ ipcMain.handle('git:discard-files', async (_event, projectPath: string, files: u
   return gitService?.discardFiles(projectPath, files)
 })
 
-ipcMain.handle('git:delete-untracked-files', async (_event, projectPath: string, files: unknown) => {
-  validateProjectPath(projectPath)
-  validateRelativeFilePaths(files)
-  return gitService?.deleteUntrackedFiles(projectPath, files)
-})
+ipcMain.handle(
+  'git:delete-untracked-files',
+  async (_event, projectPath: string, files: unknown) => {
+    validateProjectPath(projectPath)
+    validateRelativeFilePaths(files)
+    return gitService?.deleteUntrackedFiles(projectPath, files)
+  }
+)
 
-ipcMain.handle('git:get-index-file-content', async (_event, projectPath: string, filePath: string) => {
-  validateProjectPath(projectPath)
-  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
-    throw new Error('Invalid file path')
+ipcMain.handle(
+  'git:get-index-file-content',
+  async (_event, projectPath: string, filePath: string) => {
+    validateProjectPath(projectPath)
+    if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
+      throw new Error('Invalid file path')
+    }
+    if (filePath.includes('..') || filePath.startsWith(':')) {
+      throw new Error('Invalid file path')
+    }
+    return gitService?.getIndexFileContent(projectPath, filePath) ?? null
   }
-  if (filePath.includes('..') || filePath.startsWith(':')) {
-    throw new Error('Invalid file path')
-  }
-  return gitService?.getIndexFileContent(projectPath, filePath) ?? null
-})
+)
 
 ipcMain.handle('git:list-branches', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)
@@ -934,12 +1023,15 @@ ipcMain.handle('git:switch-branch', async (_event, projectPath: string, name: st
   return gitService?.switchBranch(projectPath, name)
 })
 
-ipcMain.handle('git:delete-branch', async (_event, projectPath: string, name: string, force: unknown) => {
-  validateProjectPath(projectPath)
-  validateBranchName(name)
-  const forceDelete = typeof force === 'boolean' ? force : false
-  return gitService?.deleteBranch(projectPath, name, forceDelete)
-})
+ipcMain.handle(
+  'git:delete-branch',
+  async (_event, projectPath: string, name: string, force: unknown) => {
+    validateProjectPath(projectPath)
+    validateBranchName(name)
+    const forceDelete = typeof force === 'boolean' ? force : false
+    return gitService?.deleteBranch(projectPath, name, forceDelete)
+  }
+)
 
 // IPC Handlers for Session Index operations
 ipcMain.handle('session-index:getForProject', async (_event, projectPath: string) => {
@@ -953,53 +1045,99 @@ ipcMain.handle('tasks:scan', async (_event, projectPath: string) => {
   return taskService?.parseAllTasks(projectPath) ?? null
 })
 
-ipcMain.handle('tasks:update', async (_event, projectPath: string, update: { filePath: string; lineNumber: number; action: 'toggle' | 'edit' | 'delete'; newText?: string }) => {
-  validateProjectPath(projectPath)
-  update.filePath = validateFilePathInProject(update.filePath)
-  if (typeof update.lineNumber !== 'number' || update.lineNumber < 1 || update.lineNumber > 100000) {
-    throw new Error('Invalid line number')
+ipcMain.handle(
+  'tasks:update',
+  async (
+    _event,
+    projectPath: string,
+    update: {
+      filePath: string
+      lineNumber: number
+      action: 'toggle' | 'edit' | 'delete'
+      newText?: string
+    }
+  ) => {
+    validateProjectPath(projectPath)
+    update.filePath = validateFilePathInProject(update.filePath)
+    if (
+      typeof update.lineNumber !== 'number' ||
+      update.lineNumber < 1 ||
+      update.lineNumber > 100000
+    ) {
+      throw new Error('Invalid line number')
+    }
+    if (!['toggle', 'edit', 'delete'].includes(update.action)) {
+      throw new Error('Invalid action')
+    }
+    if (
+      update.action === 'edit' &&
+      (typeof update.newText !== 'string' ||
+        update.newText.length === 0 ||
+        update.newText.length > 10000)
+    ) {
+      throw new Error('Invalid newText')
+    }
+    return taskService?.updateTask(projectPath, update) ?? null
   }
-  if (!['toggle', 'edit', 'delete'].includes(update.action)) {
-    throw new Error('Invalid action')
-  }
-  if (update.action === 'edit' && (typeof update.newText !== 'string' || update.newText.length === 0 || update.newText.length > 10000)) {
-    throw new Error('Invalid newText')
-  }
-  return taskService?.updateTask(projectPath, update) ?? null
-})
+)
 
-ipcMain.handle('tasks:add', async (_event, projectPath: string, task: { filePath: string; section: string; text: string }) => {
-  validateProjectPath(projectPath)
-  task.filePath = validateFilePathInProject(task.filePath)
-  if (typeof task.section !== 'string' || task.section.length === 0 || task.section.length > 200) {
-    throw new Error('Invalid section name')
+ipcMain.handle(
+  'tasks:add',
+  async (
+    _event,
+    projectPath: string,
+    task: { filePath: string; section: string; text: string }
+  ) => {
+    validateProjectPath(projectPath)
+    task.filePath = validateFilePathInProject(task.filePath)
+    if (
+      typeof task.section !== 'string' ||
+      task.section.length === 0 ||
+      task.section.length > 200
+    ) {
+      throw new Error('Invalid section name')
+    }
+    if (typeof task.text !== 'string' || task.text.length === 0 || task.text.length > 10000) {
+      throw new Error('Invalid task text')
+    }
+    return taskService?.addTask(projectPath, task) ?? null
   }
-  if (typeof task.text !== 'string' || task.text.length === 0 || task.text.length > 10000) {
-    throw new Error('Invalid task text')
-  }
-  return taskService?.addTask(projectPath, task) ?? null
-})
+)
 
-ipcMain.handle('tasks:delete', async (_event, projectPath: string, filePath: string, lineNumber: number) => {
-  validateProjectPath(projectPath)
-  filePath = validateFilePathInProject(filePath)
-  if (typeof lineNumber !== 'number' || lineNumber < 1 || lineNumber > 100000) {
-    throw new Error('Invalid line number')
+ipcMain.handle(
+  'tasks:delete',
+  async (_event, projectPath: string, filePath: string, lineNumber: number) => {
+    validateProjectPath(projectPath)
+    filePath = validateFilePathInProject(filePath)
+    if (typeof lineNumber !== 'number' || lineNumber < 1 || lineNumber > 100000) {
+      throw new Error('Invalid line number')
+    }
+    return taskService?.deleteTask(projectPath, filePath, lineNumber) ?? null
   }
-  return taskService?.deleteTask(projectPath, filePath, lineNumber) ?? null
-})
+)
 
-ipcMain.handle('tasks:move', async (_event, projectPath: string, move: { filePath: string; lineNumber: number; targetSection: string }) => {
-  validateProjectPath(projectPath)
-  move.filePath = validateFilePathInProject(move.filePath)
-  if (typeof move.lineNumber !== 'number' || move.lineNumber < 1 || move.lineNumber > 100000) {
-    throw new Error('Invalid line number')
+ipcMain.handle(
+  'tasks:move',
+  async (
+    _event,
+    projectPath: string,
+    move: { filePath: string; lineNumber: number; targetSection: string }
+  ) => {
+    validateProjectPath(projectPath)
+    move.filePath = validateFilePathInProject(move.filePath)
+    if (typeof move.lineNumber !== 'number' || move.lineNumber < 1 || move.lineNumber > 100000) {
+      throw new Error('Invalid line number')
+    }
+    if (
+      typeof move.targetSection !== 'string' ||
+      move.targetSection.length === 0 ||
+      move.targetSection.length > 200
+    ) {
+      throw new Error('Invalid target section')
+    }
+    return taskService?.moveTask(projectPath, move) ?? null
   }
-  if (typeof move.targetSection !== 'string' || move.targetSection.length === 0 || move.targetSection.length > 200) {
-    throw new Error('Invalid target section')
-  }
-  return taskService?.moveTask(projectPath, move) ?? null
-})
+)
 
 ipcMain.handle('tasks:create-file', async (_event, projectPath: string) => {
   validateProjectPath(projectPath)
@@ -1042,56 +1180,78 @@ ipcMain.handle('github:stop-polling', async (_event, key: string) => {
 })
 
 // IPC Handlers for Worktree operations
-ipcMain.handle('worktree:create', async (_event, projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string) => {
-  if (!isValidUUID(projectId)) {
-    throw new Error('Invalid project ID')
-  }
-  if (typeof branchName !== 'string' || branchName.length === 0 || branchName.length > 200) {
-    throw new Error('Invalid branch name')
-  }
-  if (branchName.startsWith('-')) {
-    throw new Error('Branch name must not start with "-"')
-  }
-  if (worktreeName !== undefined) {
-    if (typeof worktreeName !== 'string' || worktreeName.length === 0 || worktreeName.length > 200) {
-      throw new Error('Invalid worktree name')
+ipcMain.handle(
+  'worktree:create',
+  async (
+    _event,
+    projectId: string,
+    branchName: string,
+    worktreeName?: string,
+    sourceBranch?: string
+  ) => {
+    if (!isValidUUID(projectId)) {
+      throw new Error('Invalid project ID')
     }
-    if (/[/\\]|\.\./.test(worktreeName)) {
-      throw new Error('Worktree name must not contain path separators or ".."')
+    if (typeof branchName !== 'string' || branchName.length === 0 || branchName.length > 200) {
+      throw new Error('Invalid branch name')
     }
-  }
-  if (sourceBranch !== undefined) {
-    if (typeof sourceBranch !== 'string' || sourceBranch.length === 0 || sourceBranch.length > 200) {
-      throw new Error('Invalid source branch name')
+    if (branchName.startsWith('-')) {
+      throw new Error('Branch name must not start with "-"')
     }
-    if (sourceBranch.startsWith('-')) {
-      throw new Error('Source branch name must not start with "-"')
+    if (worktreeName !== undefined) {
+      if (
+        typeof worktreeName !== 'string' ||
+        worktreeName.length === 0 ||
+        worktreeName.length > 200
+      ) {
+        throw new Error('Invalid worktree name')
+      }
+      if (/[/\\]|\.\./.test(worktreeName)) {
+        throw new Error('Worktree name must not contain path separators or ".."')
+      }
     }
+    if (sourceBranch !== undefined) {
+      if (
+        typeof sourceBranch !== 'string' ||
+        sourceBranch.length === 0 ||
+        sourceBranch.length > 200
+      ) {
+        throw new Error('Invalid source branch name')
+      }
+      if (sourceBranch.startsWith('-')) {
+        throw new Error('Source branch name must not start with "-"')
+      }
+    }
+
+    const projects = projectPersistence?.getProjects() ?? []
+    const project = projects.find((p) => p.id === projectId)
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`)
+    }
+
+    // Create the worktree using git
+    const result = await worktreeService!.createWorktree(
+      project.path,
+      branchName,
+      worktreeName,
+      sourceBranch
+    )
+
+    // Save worktree to persistence
+    const name = worktreeName || branchName.replace(/\//g, '-')
+    const worktree = projectPersistence!.addWorktree({
+      id: randomUUID(),
+      projectId,
+      name,
+      branch: result.branch,
+      path: result.path,
+      createdAt: Date.now(),
+      isLocked: false,
+    })
+
+    return worktree
   }
-
-  const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
-  if (!project) {
-    throw new Error(`Project not found: ${projectId}`)
-  }
-
-  // Create the worktree using git
-  const result = await worktreeService!.createWorktree(project.path, branchName, worktreeName, sourceBranch)
-
-  // Save worktree to persistence
-  const name = worktreeName || branchName.replace(/\//g, '-')
-  const worktree = projectPersistence!.addWorktree({
-    id: randomUUID(),
-    projectId,
-    name,
-    branch: result.branch,
-    path: result.path,
-    createdAt: Date.now(),
-    isLocked: false,
-  })
-
-  return worktree
-})
+)
 
 ipcMain.handle('worktree:list', async (_event, projectId: string) => {
   if (!isValidUUID(projectId)) {
@@ -1099,7 +1259,7 @@ ipcMain.handle('worktree:list', async (_event, projectId: string) => {
   }
 
   const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
+  const project = projects.find((p) => p.id === projectId)
 
   if (!project || !projectPersistence || !worktreeService) {
     return projectPersistence?.getWorktrees(projectId) ?? []
@@ -1115,12 +1275,12 @@ ipcMain.handle('worktree:list', async (_event, projectId: string) => {
     // Build lookup maps for comparison (normalize paths for Windows compatibility)
     const gitPathSet = new Set(
       gitWorktrees
-        .filter(wt => !wt.isMain) // Skip main worktree (project root)
-        .map(wt => path.normalize(wt.path).toLowerCase())
+        .filter((wt) => !wt.isMain) // Skip main worktree (project root)
+        .map((wt) => path.normalize(wt.path).toLowerCase())
     )
 
     const persistedPathMap = new Map(
-      persistedWorktrees.map(wt => [path.normalize(wt.path).toLowerCase(), wt])
+      persistedWorktrees.map((wt) => [path.normalize(wt.path).toLowerCase(), wt])
     )
 
     // Add worktrees that exist in git but not in persistence
@@ -1131,9 +1291,10 @@ ipcMain.handle('worktree:list', async (_event, projectId: string) => {
       if (!persistedPathMap.has(normalizedPath)) {
         // Derive name from directory basename, fallback to branch name
         const dirName = path.basename(gitWorktree.path)
-        const name = dirName && dirName.length > 1 && !/^[A-Z]:$/i.test(dirName)
-          ? dirName
-          : gitWorktree.branch.replace(/\//g, '-')
+        const name =
+          dirName && dirName.length > 1 && !/^[A-Z]:$/i.test(dirName)
+            ? dirName
+            : gitWorktree.branch.replace(/\//g, '-')
 
         projectPersistence.addWorktree({
           id: randomUUID(),
@@ -1180,7 +1341,7 @@ ipcMain.handle('worktree:list-branches', async (_event, projectId: string) => {
   }
 
   const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
+  const project = projects.find((p) => p.id === projectId)
   if (!project) {
     throw new Error(`Project not found: ${projectId}`)
   }
@@ -1205,7 +1366,7 @@ ipcMain.handle('worktree:remove', async (_event, worktreeId: string, force: bool
   }
 
   const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === worktree.projectId)
+  const project = projects.find((p) => p.id === worktree.projectId)
   if (!project) {
     throw new Error(`Project not found: ${worktree.projectId}`)
   }
@@ -1222,9 +1383,15 @@ ipcMain.handle('worktree:remove', async (_event, worktreeId: string, force: bool
   if (worktree.branch) {
     try {
       await new Promise<void>((resolve, reject) => {
-        execFile('git', ['branch', '-D', '--', worktree.branch], { cwd: project.path, timeout: 10_000 }, (err) => {
-          if (err) reject(err); else resolve()
-        })
+        execFile(
+          'git',
+          ['branch', '-D', '--', worktree.branch],
+          { cwd: project.path, timeout: 10_000 },
+          (err) => {
+            if (err) reject(err)
+            else resolve()
+          }
+        )
       })
     } catch {
       // Branch may already be deleted or is the current branch — fine
@@ -1259,7 +1426,7 @@ function validateShellPath(targetPath: unknown): string {
     throw new Error('Invalid path')
   }
   const projects = projectPersistence?.getProjects() ?? []
-  const isKnownProject = projects.some(p => p.path === targetPath)
+  const isKnownProject = projects.some((p) => p.path === targetPath)
   if (!isKnownProject) {
     throw new Error('Path is not a registered project')
   }
@@ -1369,7 +1536,7 @@ ipcMain.handle('update:install', async () => {
 
   // Let OS fully reap child processes before spawning installer
   const PROCESS_CLEANUP_DELAY_MS = 500
-  await new Promise(resolve => setTimeout(resolve, PROCESS_CLEANUP_DELAY_MS))
+  await new Promise((resolve) => setTimeout(resolve, PROCESS_CLEANUP_DELAY_MS))
 
   updateService.quitAndInstall()
 })
@@ -1390,7 +1557,9 @@ ipcMain.handle('automation:create', async (_event, data: Record<string, unknown>
   const prompt = typeof data.prompt === 'string' ? data.prompt.slice(0, 50000) : ''
   if (!name || !prompt) throw new Error('Name and prompt are required')
 
-  const projectIds = Array.isArray(data.projectIds) ? data.projectIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id as string)) : []
+  const projectIds = Array.isArray(data.projectIds)
+    ? data.projectIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id as string))
+    : []
   if (projectIds.length === 0) throw new Error('At least one project is required')
 
   return automationService.createAutomation({
@@ -1400,23 +1569,31 @@ ipcMain.handle('automation:create', async (_event, data: Record<string, unknown>
     trigger: validateTrigger(data.trigger),
     enabled: data.enabled !== false,
     baseBranch: typeof data.baseBranch === 'string' ? data.baseBranch : undefined,
-    timeoutMinutes: typeof data.timeoutMinutes === 'number' ? clamp(data.timeoutMinutes, 1, 120) : 30,
+    timeoutMinutes:
+      typeof data.timeoutMinutes === 'number' ? clamp(data.timeoutMinutes, 1, 120) : 30,
   })
 })
 
-ipcMain.handle('automation:update', async (_event, id: string, updates: Record<string, unknown>) => {
-  if (!isValidUUID(id)) throw new Error('Invalid automation ID')
-  if (!automationService) throw new Error('AutomationService not initialized')
-  const allowedUpdates: Record<string, unknown> = {}
-  if (typeof updates.name === 'string') allowedUpdates.name = updates.name.slice(0, 100)
-  if (typeof updates.prompt === 'string') allowedUpdates.prompt = updates.prompt.slice(0, 50000)
-  if (Array.isArray(updates.projectIds)) allowedUpdates.projectIds = updates.projectIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id as string))
-  if (updates.trigger) allowedUpdates.trigger = validateTrigger(updates.trigger)
-  if (typeof updates.enabled === 'boolean') allowedUpdates.enabled = updates.enabled
-  if (typeof updates.baseBranch === 'string') allowedUpdates.baseBranch = updates.baseBranch
-  if (typeof updates.timeoutMinutes === 'number') allowedUpdates.timeoutMinutes = clamp(updates.timeoutMinutes as number, 1, 120)
-  return automationService.updateAutomation(id, allowedUpdates)
-})
+ipcMain.handle(
+  'automation:update',
+  async (_event, id: string, updates: Record<string, unknown>) => {
+    if (!isValidUUID(id)) throw new Error('Invalid automation ID')
+    if (!automationService) throw new Error('AutomationService not initialized')
+    const allowedUpdates: Record<string, unknown> = {}
+    if (typeof updates.name === 'string') allowedUpdates.name = updates.name.slice(0, 100)
+    if (typeof updates.prompt === 'string') allowedUpdates.prompt = updates.prompt.slice(0, 50000)
+    if (Array.isArray(updates.projectIds))
+      allowedUpdates.projectIds = updates.projectIds.filter(
+        (id: unknown) => typeof id === 'string' && isValidUUID(id as string)
+      )
+    if (updates.trigger) allowedUpdates.trigger = validateTrigger(updates.trigger)
+    if (typeof updates.enabled === 'boolean') allowedUpdates.enabled = updates.enabled
+    if (typeof updates.baseBranch === 'string') allowedUpdates.baseBranch = updates.baseBranch
+    if (typeof updates.timeoutMinutes === 'number')
+      allowedUpdates.timeoutMinutes = clamp(updates.timeoutMinutes as number, 1, 120)
+    return automationService.updateAutomation(id, allowedUpdates)
+  }
+)
 
 ipcMain.handle('automation:delete', async (_event, id: string) => {
   if (!isValidUUID(id)) throw new Error('Invalid automation ID')
@@ -1438,10 +1615,10 @@ ipcMain.handle('automation:trigger', async (_event, id: string) => {
   // Trigger for each assigned project
   const projects = projectPersistence.getProjects()
   for (const projectId of automation.projectIds) {
-    const project = projects.find(p => p.id === projectId)
+    const project = projects.find((p) => p.id === projectId)
     if (project) {
       // Fire and forget - don't await, let it run in background
-      automationService.triggerRun(id, project.path, projectId).catch(err => {
+      automationService.triggerRun(id, project.path, projectId).catch((err) => {
         console.error(`[Automation] Run failed for ${id}:`, err)
       })
     }
@@ -1547,16 +1724,16 @@ app.on('before-quit', () => {
   }
 
   // Stop automations (kills running processes, marks runs as failed)
-  automationService?.destroy().catch(err => {
+  automationService?.destroy().catch((err) => {
     console.error('[AutomationService] Cleanup error:', err)
   })
 
   // Stop file watchers before terminal cleanup to avoid EBUSY
-  fileWatcherService?.stopAll().catch(err => {
+  fileWatcherService?.stopAll().catch((err) => {
     console.error('[FileWatcher] Cleanup error:', err)
   })
   // Stop CommandServer
-  commandServer?.stop().catch(err => {
+  commandServer?.stop().catch((err) => {
     console.error('[CommandServer] Cleanup error:', err)
   })
   unsubSessionIndex?.()

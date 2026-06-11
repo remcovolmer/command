@@ -33,10 +33,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
 
       {/* Dialog */}
       <div className="relative w-full max-w-3xl max-h-[85vh] bg-sidebar rounded-xl shadow-2xl border border-border flex flex-col">
@@ -46,10 +43,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             <Settings className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold text-foreground">Settings</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-          >
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>

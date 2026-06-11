@@ -91,7 +91,7 @@ export class TerminalPool {
 
   /** Get the number of currently active (non-evicted) terminals tracked */
   getActiveCount(): number {
-    return this.lruOrder.filter(id => !this.evictedSet.has(id)).length
+    return this.lruOrder.filter((id) => !this.evictedSet.has(id)).length
   }
 
   /** Check if the pool needs eviction */
@@ -110,7 +110,7 @@ export class TerminalPool {
   ): string | null {
     const splitSet = new Set(splitTerminalIds)
 
-    const candidates = this.lruOrder.filter(id => {
+    const candidates = this.lruOrder.filter((id) => {
       if (this.evictedSet.has(id)) return false
       if (id === activeTerminalId) return false
       if (splitSet.has(id)) return false

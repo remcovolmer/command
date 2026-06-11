@@ -67,12 +67,13 @@ export function WorkingTreeDiffView({ tab, isActive }: WorkingTreeDiffViewProps)
           case 'untracked': {
             // Left: empty, Right: working tree
             origContent = ''
-            modContent = await api.fs.readFile(gitPath + '\\' + tab.filePath.replace(/\//g, '\\')) ?? ''
+            modContent =
+              (await api.fs.readFile(gitPath + '\\' + tab.filePath.replace(/\//g, '\\'))) ?? ''
             break
           }
           case 'deleted': {
             // Left: HEAD content, Right: empty
-            origContent = await api.git.getFileAtCommit(gitPath, 'HEAD', tab.filePath) ?? ''
+            origContent = (await api.git.getFileAtCommit(gitPath, 'HEAD', tab.filePath)) ?? ''
             modContent = ''
             break
           }
@@ -81,7 +82,10 @@ export function WorkingTreeDiffView({ tab, isActive }: WorkingTreeDiffViewProps)
         if (cancelled) return
 
         // File size guard
-        if ((origContent?.length ?? 0) > MAX_DIFF_SIZE || (modContent?.length ?? 0) > MAX_DIFF_SIZE) {
+        if (
+          (origContent?.length ?? 0) > MAX_DIFF_SIZE ||
+          (modContent?.length ?? 0) > MAX_DIFF_SIZE
+        ) {
           setError('File too large for inline diff')
           setLoading(false)
           return
@@ -99,7 +103,9 @@ export function WorkingTreeDiffView({ tab, isActive }: WorkingTreeDiffViewProps)
     }
 
     fetchContent()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [api, gitPath, tab.filePath, tab.diffKind])
 
   if (!isActive) {

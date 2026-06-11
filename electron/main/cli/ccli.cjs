@@ -34,7 +34,9 @@ function getEnv() {
   if (missing.length > 0) {
     process.stderr.write(
       'Error: ccli must be run inside a Command terminal.\n' +
-      'Missing environment variables: ' + missing.join(', ') + '\n'
+        'Missing environment variables: ' +
+        missing.join(', ') +
+        '\n'
     )
     process.exit(1)
   }
@@ -49,7 +51,7 @@ function getEnv() {
 function httpRequest(method, urlPath, body, env) {
   return new Promise((resolve, reject) => {
     const headers = {
-      'Authorization': 'Bearer ' + env.token,
+      Authorization: 'Bearer ' + env.token,
       'X-Terminal-ID': env.terminalId,
       'Content-Type': 'application/json',
     }
@@ -125,15 +127,17 @@ function formatPretty(data) {
   if (data == null) return ''
 
   if (Array.isArray(data)) {
-    return data.map((item, i) => {
-      if (typeof item === 'object' && item !== null) {
-        const lines = Object.entries(item)
-          .map(([k, v]) => '  ' + k + ': ' + String(v))
-          .join('\n')
-        return (i + 1) + '.\n' + lines
-      }
-      return '  ' + String(item)
-    }).join('\n\n')
+    return data
+      .map((item, i) => {
+        if (typeof item === 'object' && item !== null) {
+          const lines = Object.entries(item)
+            .map(([k, v]) => '  ' + k + ': ' + String(v))
+            .join('\n')
+          return i + 1 + '.\n' + lines
+        }
+        return '  ' + String(item)
+      })
+      .join('\n\n')
   }
 
   if (typeof data === 'object') {
@@ -177,7 +181,11 @@ function buildRoute(positional, flags) {
       switch (action) {
         case 'create': {
           const name = positional[2]
-          if (!name) return { error: 'Usage: ccli worktree create <name> [--branch <branch>] [--source <sourceBranch>]' }
+          if (!name)
+            return {
+              error:
+                'Usage: ccli worktree create <name> [--branch <branch>] [--source <sourceBranch>]',
+            }
           const body = { name }
           if (flags.branch) body.branch = flags.branch
           if (flags.source) body.sourceBranch = flags.source
@@ -191,7 +199,9 @@ function buildRoute(positional, flags) {
         case 'merge':
           return { method: 'POST', path: '/worktree/merge', body: {} }
         default:
-          return { error: 'Unknown worktree action: ' + action + '\nAvailable: create, link, merge' }
+          return {
+            error: 'Unknown worktree action: ' + action + '\nAvailable: create, link, merge',
+          }
       }
     }
 
@@ -256,7 +266,10 @@ function buildRoute(positional, flags) {
         case 'read': {
           const id = positional[2]
           if (!id) return { error: 'Usage: ccli sidecar read <id> [--lines <n>]' }
-          const qp = '?id=' + encodeURIComponent(id) + (flags.lines ? '&lines=' + encodeURIComponent(flags.lines) : '')
+          const qp =
+            '?id=' +
+            encodeURIComponent(id) +
+            (flags.lines ? '&lines=' + encodeURIComponent(flags.lines) : '')
           return { method: 'GET', path: '/sidecar/read' + qp }
         }
         case 'exec': {
@@ -266,7 +279,9 @@ function buildRoute(positional, flags) {
           return { method: 'POST', path: '/sidecar/exec', body: { id, command } }
         }
         default:
-          return { error: 'Unknown sidecar action: ' + action + '\nAvailable: create, list, read, exec' }
+          return {
+            error: 'Unknown sidecar action: ' + action + '\nAvailable: create, list, read, exec',
+          }
       }
     }
 

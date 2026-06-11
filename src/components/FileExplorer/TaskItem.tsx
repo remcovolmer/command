@@ -47,14 +47,17 @@ export function TaskItem({
     setEditing(false)
   }, [editText, task, onEdit])
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleSave()
-    } else if (e.key === 'Escape') {
-      setEditing(false)
-    }
-  }, [handleSave])
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleSave()
+      } else if (e.key === 'Escape') {
+        setEditing(false)
+      }
+    },
+    [handleSave]
+  )
 
   const displayText = task.text
   const sourceLabel = task.filePath.split(/[/\\]/).slice(-2).join('/')
@@ -100,9 +103,7 @@ export function TaskItem({
           <span
             onClick={() => setExpanded(!expanded)}
             className={`cursor-pointer block ${expanded ? 'whitespace-pre-wrap break-words' : 'truncate'} ${
-              task.completed
-                ? 'line-through text-muted-foreground'
-                : 'text-sidebar-foreground'
+              task.completed ? 'line-through text-muted-foreground' : 'text-sidebar-foreground'
             }`}
             title={expanded ? undefined : displayText}
           >
@@ -119,8 +120,8 @@ export function TaskItem({
                 task.isOverdue
                   ? 'bg-red-500/15 text-red-600 dark:text-red-400'
                   : task.isDueToday
-                  ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
-                  : 'bg-muted text-muted-foreground'
+                    ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+                    : 'bg-muted text-muted-foreground'
               }`}
             >
               <Calendar className="w-2.5 h-2.5" />
@@ -130,19 +131,14 @@ export function TaskItem({
 
           {/* Person tags */}
           {task.personTags?.map((name) => (
-            <span
-              key={name}
-              className="text-[10px] px-1 py-0 rounded bg-primary/10 text-primary"
-            >
+            <span key={name} className="text-[10px] px-1 py-0 rounded bg-primary/10 text-primary">
               {name}
             </span>
           ))}
 
           {/* Source file */}
           {showSource && (
-            <span className="text-[10px] text-muted-foreground/60">
-              {sourceLabel}
-            </span>
+            <span className="text-[10px] text-muted-foreground/60">{sourceLabel}</span>
           )}
         </div>
       </div>

@@ -30,7 +30,9 @@ export function useThemeResolver() {
       if (resolved !== prev) {
         if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current)
         syncTimeoutRef.current = setTimeout(() => {
-          api.app.syncClaudeTheme(resolved).catch((e: unknown) => console.warn('Failed to sync Claude theme:', e))
+          api.app
+            .syncClaudeTheme(resolved)
+            .catch((e: unknown) => console.warn('Failed to sync Claude theme:', e))
         }, 200)
       }
     }

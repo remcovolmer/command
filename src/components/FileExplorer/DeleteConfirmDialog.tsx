@@ -40,8 +40,11 @@ export function DeleteConfirmDialog({ entry, projectId, contextKey }: DeleteConf
 
       // Close any editor tabs for the deleted path
       const state = useProjectStore.getState()
-      const tabsToClose = Object.values(state.editorTabs).filter((tab) =>
-        tab.filePath === entry.path || tab.filePath.startsWith(entry.path + '\\') || tab.filePath.startsWith(entry.path + '/')
+      const tabsToClose = Object.values(state.editorTabs).filter(
+        (tab) =>
+          tab.filePath === entry.path ||
+          tab.filePath.startsWith(entry.path + '\\') ||
+          tab.filePath.startsWith(entry.path + '/')
       )
       for (const tab of tabsToClose) {
         state.closeEditorTab(tab.id)
@@ -67,17 +70,13 @@ export function DeleteConfirmDialog({ entry, projectId, contextKey }: DeleteConf
         <p className="text-sm text-muted-foreground mb-1">
           <span className="font-medium text-foreground">{entry.name}</span>
         </p>
-        <p className="text-xs text-muted-foreground mb-4 break-all">
-          {entry.path}
-        </p>
+        <p className="text-xs text-muted-foreground mb-4 break-all">{entry.path}</p>
         {isDirectory && (
           <p className="text-sm text-destructive mb-4">
             This will permanently delete the folder and all its contents.
           </p>
         )}
-        {error && (
-          <p className="text-sm text-destructive mb-4">{error}</p>
-        )}
+        {error && <p className="text-sm text-destructive mb-4">{error}</p>}
         <div className="flex justify-end gap-3">
           <button
             ref={cancelRef}

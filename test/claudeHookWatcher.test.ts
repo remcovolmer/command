@@ -1,5 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { isHookStateData, normalizeStateFile, ClaudeHookWatcher } from '../electron/main/services/ClaudeHookWatcher'
+import {
+  isHookStateData,
+  normalizeStateFile,
+  ClaudeHookWatcher,
+} from '../electron/main/services/ClaudeHookWatcher'
 
 function makeHookState(overrides: Record<string, unknown> = {}) {
   return {
@@ -172,6 +176,11 @@ function createMockWindow() {
   } as unknown as import('electron').BrowserWindow
 }
 
+// Reach the vi.fn() behind the BrowserWindow cast for call assertions
+function getSend(win: unknown) {
+  return (win as { webContents: { send: ReturnType<typeof vi.fn> } }).webContents.send
+}
+
 describe('ClaudeHookWatcher session-terminal mapping', () => {
   let watcher: ClaudeHookWatcher
   let mockWindow: ReturnType<typeof createMockWindow>
@@ -183,7 +192,9 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
 
   function processState(hookState: Record<string, unknown>) {
     // Drive the private processSessionState via type cast
-    ;(watcher as any).processSessionState(hookState)
+    ;(
+      watcher as unknown as { processSessionState(s: Record<string, unknown>): void }
+    ).processSessionState(hookState)
   }
 
   test('registers terminal and maps session on SessionStart', () => {
@@ -224,8 +235,8 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
 
     const sessions = watcher.getTerminalSessions()
     expect(sessions).toHaveLength(2)
-    const s1 = sessions.find(s => s.sessionId === 's1')
-    const s2 = sessions.find(s => s.sessionId === 's2')
+    const s1 = sessions.find((s) => s.sessionId === 's1')
+    const s2 = sessions.find((s) => s.sessionId === 's2')
     expect(s1?.terminalId).toBe('t1')
     expect(s2?.terminalId).toBe('t2')
   })
@@ -261,8 +272,8 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
 
     // Verify mappings are stable
     const sessions = watcher.getTerminalSessions()
-    const s1 = sessions.find(s => s.sessionId === 's1')
-    const s2 = sessions.find(s => s.sessionId === 's2')
+    const s1 = sessions.find((s) => s.sessionId === 's1')
+    const s2 = sessions.find((s) => s.sessionId === 's2')
     expect(s1?.terminalId).toBe('t1')
     expect(s2?.terminalId).toBe('t2')
   })
@@ -299,10 +310,10 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     // s1 and s2 mappings should be unaffected
     const sessions = watcher.getTerminalSessions()
     expect(sessions).toHaveLength(2)
-    expect(sessions.find(s => s.sessionId === 's1')?.terminalId).toBe('t1')
-    expect(sessions.find(s => s.sessionId === 's2')?.terminalId).toBe('t2')
+    expect(sessions.find((s) => s.sessionId === 's1')?.terminalId).toBe('t1')
+    expect(sessions.find((s) => s.sessionId === 's2')?.terminalId).toBe('t2')
     // s3 should NOT be mapped
-    expect(sessions.find(s => s.sessionId === 's3')).toBeUndefined()
+    expect(sessions.find((s) => s.sessionId === 's3')).toBeUndefined()
   })
 
   test('SessionStart steals terminal when old session is dead (no SessionEnd)', () => {
@@ -356,7 +367,7 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
 
   test('duplicate state (same timestamp+event+state) is deduplicated', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
-    const send = (mockWindow as any).webContents.send
+    const send = getSend(mockWindow)
 
     processState({
       session_id: 's1',
@@ -380,7 +391,7 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
 
   test('same timestamp but different state is NOT deduplicated', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
-    const send = (mockWindow as any).webContents.send
+    const send = getSend(mockWindow)
 
     processState({
       session_id: 's1',
@@ -404,7 +415,7 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
 
   test('stale event (older timestamp) is skipped', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
-    const send = (mockWindow as any).webContents.send
+    const send = getSend(mockWindow)
 
     processState({
       session_id: 's1',
@@ -431,7 +442,7 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     // write to be processed before the 'question'/'permission' write, but with a HIGHER
     // timestamp. The older-timestamp input state must NOT be dropped as stale.
     watcher.registerTerminal('t1', 'c:/projects/foo')
-    const send = (mockWindow as any).webContents.send
+    const send = getSend(mockWindow)
 
     processState({
       session_id: 's1',
@@ -455,7 +466,7 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
 
   test('an unchanged input state is not re-emitted on re-read (no spam)', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
-    const send = (mockWindow as any).webContents.send
+    const send = getSend(mockWindow)
 
     processState({
       session_id: 's1',
@@ -488,7 +499,7 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
   test('different sessions with same timestamp are processed independently', () => {
     watcher.registerTerminal('t1', 'c:/projects/foo')
     watcher.registerTerminal('t2', 'c:/projects/foo')
-    const send = (mockWindow as any).webContents.send
+    const send = getSend(mockWindow)
 
     processState({
       session_id: 's1',
@@ -548,10 +559,10 @@ describe('ClaudeHookWatcher session-terminal mapping', () => {
     // Both sessions should be mapped (s1 to t1 on replay, s2 to t2)
     const sessions = watcher.getTerminalSessions()
     expect(sessions).toHaveLength(2)
-    expect(sessions.find(s => s.sessionId === 's1')).toBeDefined()
-    expect(sessions.find(s => s.sessionId === 's2')).toBeDefined()
+    expect(sessions.find((s) => s.sessionId === 's1')).toBeDefined()
+    expect(sessions.find((s) => s.sessionId === 's2')).toBeDefined()
     // They should be on different terminals
-    const terminals = sessions.map(s => s.terminalId)
+    const terminals = sessions.map((s) => s.terminalId)
     expect(new Set(terminals).size).toBe(2)
   })
 

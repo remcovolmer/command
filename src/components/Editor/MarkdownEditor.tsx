@@ -69,26 +69,29 @@ interface MilkdownEditorInnerProps {
 }
 
 function MilkdownEditorInner({ defaultValue, onContentChange }: MilkdownEditorInnerProps) {
-  useEditor((root) => {
-    return Editor.make()
-      .config((ctx) => {
-        ctx.set(rootCtx, root)
-        ctx.set(defaultValueCtx, defaultValue)
-      })
-      .config((ctx) => {
-        ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-          onContentChange(markdown)
+  useEditor(
+    (root) => {
+      return Editor.make()
+        .config((ctx) => {
+          ctx.set(rootCtx, root)
+          ctx.set(defaultValueCtx, defaultValue)
         })
-      })
-      .use(commonmark)
-      .use(gfm)
-      .use(history)
-      .use(clipboard)
-      .use(indent)
-      .use(cursor)
-      .use(listener)
-      .use(taskCheckboxToggle)
-  }, [defaultValue])
+        .config((ctx) => {
+          ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+            onContentChange(markdown)
+          })
+        })
+        .use(commonmark)
+        .use(gfm)
+        .use(history)
+        .use(clipboard)
+        .use(indent)
+        .use(cursor)
+        .use(listener)
+        .use(taskCheckboxToggle)
+    },
+    [defaultValue]
+  )
 
   return (
     <div className="milkdown-wrapper h-full w-full overflow-auto bg-background">
@@ -105,7 +108,13 @@ interface EditorControlsProps {
   currentContentRef: React.MutableRefObject<string>
 }
 
-function EditorControls({ tabId, filePath, isActive, savedContentRef, currentContentRef }: EditorControlsProps) {
+function EditorControls({
+  tabId,
+  filePath,
+  isActive,
+  savedContentRef,
+  currentContentRef,
+}: EditorControlsProps) {
   const api = getElectronAPI()
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
   const [loading, getEditor] = useInstance()
@@ -151,14 +160,16 @@ function EditorControls({ tabId, filePath, isActive, savedContentRef, currentCon
     const editor = getEditor()
     if (editor && !loading) {
       // Store reference to allow external content updates
-      ;(window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace = (content: string) => {
-        editor.action(replaceAll(content))
-        savedContentRef.current = content
-        currentContentRef.current = content
-      }
+      ;(window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace =
+        (content: string) => {
+          editor.action(replaceAll(content))
+          savedContentRef.current = content
+          currentContentRef.current = content
+        }
     }
     return () => {
-      delete (window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace
+      delete (window as unknown as { __milkdownReplace?: (content: string) => void })
+        .__milkdownReplace
     }
   }, [getEditor, loading, savedContentRef, currentContentRef])
 
@@ -171,7 +182,7 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
   const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
   const isDeletedExternally = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
-    return tab?.type === 'editor' ? tab.isDeletedExternally ?? false : false
+    return tab?.type === 'editor' ? (tab.isDeletedExternally ?? false) : false
   })
   const projectId = useProjectStore((s) => {
     const tab = s.editorTabs[tabId]
@@ -199,7 +210,8 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
       }
     }, 10000)
 
-    api.fs.readFile(filePath)
+    api.fs
+      .readFile(filePath)
       .then((text) => {
         clearTimeout(timeoutId)
         if (cancelled) return
@@ -226,22 +238,26 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
 
     const reloadFile = () => {
       const seq = ++readSeqRef.current
-      api.fs.readFile(filePath).then((text) => {
-        if (cancelled || seq !== readSeqRef.current) return
-        const replace = (window as unknown as { __milkdownReplace?: (content: string) => void }).__milkdownReplace
-        if (replace) {
-          replace(text)
-        } else {
-          setContent(text)
-          savedContentRef.current = text
-          currentContentRef.current = text
-        }
-        lastDirtyRef.current = false
-        setEditorDirty(tabId, false)
-        setEditorTabDeletedExternally(tabId, false)
-      }).catch((err) => {
-        if (!cancelled) console.error('Failed to reload file:', err)
-      })
+      api.fs
+        .readFile(filePath)
+        .then((text) => {
+          if (cancelled || seq !== readSeqRef.current) return
+          const replace = (window as unknown as { __milkdownReplace?: (content: string) => void })
+            .__milkdownReplace
+          if (replace) {
+            replace(text)
+          } else {
+            setContent(text)
+            savedContentRef.current = text
+            currentContentRef.current = text
+          }
+          lastDirtyRef.current = false
+          setEditorDirty(tabId, false)
+          setEditorTabDeletedExternally(tabId, false)
+        })
+        .catch((err) => {
+          if (!cancelled) console.error('Failed to reload file:', err)
+        })
     }
 
     const subscriberKey = `markdown-editor-${tabId}`
@@ -273,16 +289,27 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
       cancelled = true
       fileWatcherEvents.unsubscribe(projectId, subscriberKey)
     }
-  }, [projectId, tabId, filePath, normalizedPath, api, setEditorDirty, setEditorTabDeletedExternally])
+  }, [
+    projectId,
+    tabId,
+    filePath,
+    normalizedPath,
+    api,
+    setEditorDirty,
+    setEditorTabDeletedExternally,
+  ])
 
-  const handleContentChange = useCallback((markdown: string) => {
-    currentContentRef.current = markdown
-    const dirty = markdown !== savedContentRef.current
-    if (dirty !== lastDirtyRef.current) {
-      lastDirtyRef.current = dirty
-      setEditorDirty(tabId, dirty)
-    }
-  }, [tabId, setEditorDirty])
+  const handleContentChange = useCallback(
+    (markdown: string) => {
+      currentContentRef.current = markdown
+      const dirty = markdown !== savedContentRef.current
+      if (dirty !== lastDirtyRef.current) {
+        lastDirtyRef.current = dirty
+        setEditorDirty(tabId, dirty)
+      }
+    },
+    [tabId, setEditorDirty]
+  )
 
   if (error) {
     return (
@@ -322,10 +349,7 @@ export function MarkdownEditor({ tabId, filePath, isActive }: MarkdownEditorProp
           savedContentRef={savedContentRef}
           currentContentRef={currentContentRef}
         />
-        <MilkdownEditorInner
-          defaultValue={content}
-          onContentChange={handleContentChange}
-        />
+        <MilkdownEditorInner defaultValue={content} onContentChange={handleContentChange} />
       </MilkdownProvider>
     </div>
   )

@@ -160,7 +160,7 @@ describe('restoreSessions handler', () => {
         verifyClaudeSession: async () => true,
         pathExists: async () => true,
         resolveEnvOverrides: () => undefined,
-      }),
+      })
     ).resolves.toBeUndefined()
   })
 

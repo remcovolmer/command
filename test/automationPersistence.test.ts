@@ -85,8 +85,8 @@ describe('AutomationPersistence.pruneRuns', () => {
     }
 
     const all = persistence.getRuns(automationId)
-    const running = all.filter(r => r.status === 'running')
-    const terminal = all.filter(r => r.status !== 'running')
+    const running = all.filter((r) => r.status === 'running')
+    const terminal = all.filter((r) => r.status !== 'running')
 
     expect(running.length).toBe(1)
     expect(terminal.length).toBe(MAX_RUNS_PER_AUTOMATION)

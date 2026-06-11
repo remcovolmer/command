@@ -24,9 +24,19 @@ vi.mock('node:fs/promises', () => ({
 
 import { ProjectPersistence } from '../electron/main/services/ProjectPersistence'
 
+// Shape of migrated state as asserted by these tests
+type MigratedState = {
+  version: number
+  projects: Array<{ settings: Record<string, unknown> }>
+  profiles: unknown[]
+  activeProfileId: string | null
+}
+
 // Access the private migrateState method for direct testing
 function callMigrateState(instance: ProjectPersistence, state: Record<string, unknown>) {
-  return (instance as any).migrateState(state)
+  return (
+    instance as unknown as { migrateState(s: Record<string, unknown>): MigratedState }
+  ).migrateState(state)
 }
 
 function makeProject(overrides: Record<string, unknown> = {}) {
@@ -163,13 +173,15 @@ describe('ProjectPersistence v5→v6 migration', () => {
   test('other settings preserved alongside migration', () => {
     const state = {
       version: 5,
-      projects: [makeProject({
-        settings: {
-          authMode: 'profile',
-          profileId: 'some-profile-id',
-          dangerouslySkipPermissions: true,
-        },
-      })],
+      projects: [
+        makeProject({
+          settings: {
+            authMode: 'profile',
+            profileId: 'some-profile-id',
+            dangerouslySkipPermissions: true,
+          },
+        }),
+      ],
       worktrees: {},
       sessions: [],
       profiles: [],

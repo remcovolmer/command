@@ -1,5 +1,12 @@
 import { getElectronAPI } from './electron'
-import { isValidTerminalState, type TerminalState, type TerminalSession, type Unsubscribe, type RestoredSession, type SpawnFailedEvent } from '../types'
+import {
+  isValidTerminalState,
+  type TerminalState,
+  type TerminalSession,
+  type Unsubscribe,
+  type RestoredSession,
+  type SpawnFailedEvent,
+} from '../types'
 
 type DataCallback = (data: string) => void
 type StateCallback = (state: TerminalState) => void
@@ -12,8 +19,17 @@ type GeneratedTitleUpdateCallback = (terminalId: string, title: string) => void
 type SessionRestoredCallback = (session: RestoredSession) => void
 type SidecarCreatedCallback = (contextKey: string, terminal: TerminalSession) => void
 type StatusMessageCallback = (terminalId: string, message: string) => void
-type EditorOpenFileCallback = (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void
-type EditorOpenDiffCallback = (data: { filePath: string; fileName: string; projectId: string }) => void
+type EditorOpenFileCallback = (data: {
+  filePath: string
+  fileName: string
+  projectId: string
+  line?: number
+}) => void
+type EditorOpenDiffCallback = (data: {
+  filePath: string
+  fileName: string
+  projectId: string
+}) => void
 type SpawnFailedCallback = (event: SpawnFailedEvent) => void
 
 /**
@@ -281,7 +297,7 @@ class TerminalEventManager {
    * Cleanup all IPC listeners. Call when app is shutting down.
    */
   dispose() {
-    this.unsubscribers.forEach(unsub => unsub())
+    this.unsubscribers.forEach((unsub) => unsub())
     this.unsubscribers = []
     this.dataCallbacks.clear()
     this.stateCallbacks.clear()

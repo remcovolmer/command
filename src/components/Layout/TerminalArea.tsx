@@ -26,39 +26,40 @@ export function TerminalArea() {
     setActiveCenterTab,
     closeEditorTab,
     addTerminal,
-  } = useProjectStore(useShallow((s) => ({
-    activeProjectId: s.activeProjectId,
-    activeTerminalId: s.activeTerminalId,
-    terminals: s.terminals,
-    projects: s.projects,
-    layouts: s.layouts,
-    editorTabs: s.editorTabs,
-    activeCenterTabId: s.activeCenterTabId,
-    setActiveTerminal: s.setActiveTerminal,
-    removeTerminal: s.removeTerminal,
-    addToSplit: s.addToSplit,
-    removeFromSplit: s.removeFromSplit,
-    setSplitSizes: s.setSplitSizes,
-    setActiveCenterTab: s.setActiveCenterTab,
-    closeEditorTab: s.closeEditorTab,
-    addTerminal: s.addTerminal,
-  })))
+  } = useProjectStore(
+    useShallow((s) => ({
+      activeProjectId: s.activeProjectId,
+      activeTerminalId: s.activeTerminalId,
+      terminals: s.terminals,
+      projects: s.projects,
+      layouts: s.layouts,
+      editorTabs: s.editorTabs,
+      activeCenterTabId: s.activeCenterTabId,
+      setActiveTerminal: s.setActiveTerminal,
+      removeTerminal: s.removeTerminal,
+      addToSplit: s.addToSplit,
+      removeFromSplit: s.removeFromSplit,
+      setSplitSizes: s.setSplitSizes,
+      setActiveCenterTab: s.setActiveCenterTab,
+      closeEditorTab: s.closeEditorTab,
+      addTerminal: s.addTerminal,
+    }))
+  )
 
   const { createTerminal } = useCreateTerminal()
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const projectTerminals = useMemo(
-    () => Object.values(terminals).filter(
-      (t) => t.projectId === activeProjectId && t.type !== 'normal'
-    ),
+    () =>
+      Object.values(terminals).filter(
+        (t) => t.projectId === activeProjectId && t.type !== 'normal'
+      ),
     [terminals, activeProjectId]
   )
 
   // Get editor tabs for the active project
   const projectEditorTabs = useMemo(
-    () => Object.values(editorTabs).filter(
-      (t) => t.projectId === activeProjectId
-    ),
+    () => Object.values(editorTabs).filter((t) => t.projectId === activeProjectId),
     [editorTabs, activeProjectId]
   )
 
@@ -134,7 +135,7 @@ export function TerminalArea() {
       if (activeTerminalId && activeTerminalId !== terminalId) {
         pairTerminalId = activeTerminalId
       } else {
-        const otherTerminal = projectTerminals.find(t => t.id !== terminalId)
+        const otherTerminal = projectTerminals.find((t) => t.id !== terminalId)
         pairTerminalId = otherTerminal?.id ?? null
       }
 
@@ -160,22 +161,25 @@ export function TerminalArea() {
     [activeProjectId, setSplitSizes]
   )
 
-  const handleResumeSession = useCallback(async (sessionId: string, initialTitle?: string) => {
-    if (!activeProjectId) return
-    const terminalId = await api.terminal.create(activeProjectId, undefined, 'claude', sessionId)
-    if (terminalId) {
-      addTerminal({
-        id: terminalId,
-        projectId: activeProjectId,
-        worktreeId: null,
-        state: 'busy',
-        lastActivity: Date.now(),
-        title: initialTitle || 'Resuming...',
-        type: 'claude',
-      })
-      setActiveCenterTab(terminalId)
-    }
-  }, [activeProjectId, api, addTerminal, setActiveCenterTab])
+  const handleResumeSession = useCallback(
+    async (sessionId: string, initialTitle?: string) => {
+      if (!activeProjectId) return
+      const terminalId = await api.terminal.create(activeProjectId, undefined, 'claude', sessionId)
+      if (terminalId) {
+        addTerminal({
+          id: terminalId,
+          projectId: activeProjectId,
+          worktreeId: null,
+          state: 'busy',
+          lastActivity: Date.now(),
+          title: initialTitle || 'Resuming...',
+          type: 'claude',
+        })
+        setActiveCenterTab(terminalId)
+      }
+    },
+    [activeProjectId, api, addTerminal, setActiveCenterTab]
+  )
 
   // No project selected - show welcome
   if (!activeProjectId || !activeProject) {
@@ -187,9 +191,7 @@ export function TerminalArea() {
               <Sparkles className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <h2 className="text-2xl font-semibold text-foreground mb-3">
-            Welcome to Command
-          </h2>
+          <h2 className="text-2xl font-semibold text-foreground mb-3">Welcome to Command</h2>
           <p className="text-muted-foreground mb-8">
             Select a project from the sidebar to start managing your Claude Code terminals.
           </p>
@@ -209,8 +211,9 @@ export function TerminalArea() {
   }
 
   // Show project overview when: no terminals/editors, OR user explicitly deselected all tabs (hotkey)
-  const showOverview = (projectTerminals.length === 0 && projectEditorTabs.length === 0)
-    || (!activeCenterTabId && projectTerminals.length > 0)
+  const showOverview =
+    (projectTerminals.length === 0 && projectEditorTabs.length === 0) ||
+    (!activeCenterTabId && projectTerminals.length > 0)
   if (showOverview) {
     return (
       <ProjectOverview

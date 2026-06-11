@@ -71,12 +71,14 @@ export function installClaudeHooks(): void {
 
   // Our hook configuration
   const ourHook = {
-    hooks: [{
-      type: 'command',
-      command: `node "${normalizePath(hookScriptPath)}"`,
-      async: true,
-      timeout: 5
-    }]
+    hooks: [
+      {
+        type: 'command',
+        command: `node "${normalizePath(hookScriptPath)}"`,
+        async: true,
+        timeout: 5,
+      },
+    ],
   }
 
   // Hook events we need to monitor
@@ -87,7 +89,7 @@ export function installClaudeHooks(): void {
     'SessionStart',
     'SessionEnd',
     'UserPromptSubmit',
-    'PermissionRequest'
+    'PermissionRequest',
   ]
 
   let changed = false
@@ -95,8 +97,8 @@ export function installClaudeHooks(): void {
     settings.hooks[event] = settings.hooks[event] || []
 
     // Find existing hook entry
-    const existingIdx = settings.hooks[event].findIndex(
-      (h) => h.hooks?.some((hh) => hh.command?.includes('claude-state-hook'))
+    const existingIdx = settings.hooks[event].findIndex((h) =>
+      h.hooks?.some((hh) => hh.command?.includes('claude-state-hook'))
     )
 
     if (existingIdx === -1) {

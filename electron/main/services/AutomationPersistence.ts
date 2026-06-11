@@ -80,7 +80,7 @@ export class AutomationPersistence {
   }
 
   getAutomation(id: string): Automation | null {
-    return this.automationState.automations.find(a => a.id === id) ?? null
+    return this.automationState.automations.find((a) => a.id === id) ?? null
   }
 
   addAutomation(data: Omit<Automation, 'id' | 'createdAt' | 'updatedAt'>): Automation {
@@ -96,8 +96,11 @@ export class AutomationPersistence {
     return automation
   }
 
-  updateAutomation(id: string, updates: Partial<Omit<Automation, 'id' | 'createdAt'>>): Automation | null {
-    const automation = this.automationState.automations.find(a => a.id === id)
+  updateAutomation(
+    id: string,
+    updates: Partial<Omit<Automation, 'id' | 'createdAt'>>
+  ): Automation | null {
+    const automation = this.automationState.automations.find((a) => a.id === id)
     if (!automation) return null
 
     Object.assign(automation, updates, { updatedAt: new Date().toISOString() })
@@ -106,12 +109,12 @@ export class AutomationPersistence {
   }
 
   removeAutomation(id: string): void {
-    const index = this.automationState.automations.findIndex(a => a.id === id)
+    const index = this.automationState.automations.findIndex((a) => a.id === id)
     if (index !== -1) {
       this.automationState.automations.splice(index, 1)
       this.saveAutomations()
       // Also remove associated runs
-      this.runState.runs = this.runState.runs.filter(r => r.automationId !== id)
+      this.runState.runs = this.runState.runs.filter((r) => r.automationId !== id)
       this.saveRuns()
     }
   }
@@ -137,7 +140,7 @@ export class AutomationPersistence {
   getRuns(automationId?: string, limit?: number): AutomationRun[] {
     let runs = [...this.runState.runs]
     if (automationId) {
-      runs = runs.filter(r => r.automationId === automationId)
+      runs = runs.filter((r) => r.automationId === automationId)
     }
     // Newest first
     runs.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
@@ -148,11 +151,11 @@ export class AutomationPersistence {
   }
 
   getRun(id: string): AutomationRun | null {
-    return this.runState.runs.find(r => r.id === id) ?? null
+    return this.runState.runs.find((r) => r.id === id) ?? null
   }
 
   getUnreadCount(): number {
-    return this.runState.runs.filter(r => !r.read && r.status !== 'running').length
+    return this.runState.runs.filter((r) => !r.read && r.status !== 'running').length
   }
 
   addRun(data: Omit<AutomationRun, 'id'>): AutomationRun {
@@ -166,8 +169,11 @@ export class AutomationPersistence {
     return run
   }
 
-  updateRun(id: string, updates: Partial<Omit<AutomationRun, 'id' | 'automationId'>>): AutomationRun | null {
-    const run = this.runState.runs.find(r => r.id === id)
+  updateRun(
+    id: string,
+    updates: Partial<Omit<AutomationRun, 'id' | 'automationId'>>
+  ): AutomationRun | null {
+    const run = this.runState.runs.find((r) => r.id === id)
     if (!run) {
       // A missing id here means the record was lost between addRun() and the
       // owning updateRun() — most likely a pruning bug. Surface it so the
@@ -182,7 +188,7 @@ export class AutomationPersistence {
   }
 
   removeRun(id: string): void {
-    const index = this.runState.runs.findIndex(r => r.id === id)
+    const index = this.runState.runs.findIndex((r) => r.id === id)
     if (index !== -1) {
       this.runState.runs.splice(index, 1)
       this.saveRuns()
@@ -190,7 +196,7 @@ export class AutomationPersistence {
   }
 
   clearAllRuns(): void {
-    this.runState.runs = this.runState.runs.filter(r => r.status === 'running')
+    this.runState.runs = this.runState.runs.filter((r) => r.status === 'running')
     this.saveRuns()
   }
 
@@ -226,7 +232,7 @@ export class AutomationPersistence {
       const running: AutomationRun[] = []
       const terminal: AutomationRun[] = []
       for (const run of runs) {
-        (run.status === 'running' ? running : terminal).push(run)
+        ;(run.status === 'running' ? running : terminal).push(run)
       }
       terminal.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
       kept.push(...running, ...terminal.slice(0, MAX_RUNS_PER_AUTOMATION))
@@ -270,12 +276,18 @@ export class AutomationPersistence {
     return { version: STATE_VERSION, runs: [] }
   }
 
-  private migrateAutomationState(_oldState: { version: number; automations: Automation[] }): AutomationState {
+  private migrateAutomationState(_oldState: {
+    version: number
+    automations: Automation[]
+  }): AutomationState {
     // v1 is the first version, no migrations needed yet
     return { version: STATE_VERSION, automations: _oldState.automations ?? [] }
   }
 
-  private migrateRunState(_oldState: { version: number; runs: AutomationRun[] }): AutomationRunState {
+  private migrateRunState(_oldState: {
+    version: number
+    runs: AutomationRun[]
+  }): AutomationRunState {
     return { version: STATE_VERSION, runs: _oldState.runs ?? [] }
   }
 

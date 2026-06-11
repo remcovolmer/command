@@ -65,7 +65,7 @@ describe('TerminalManager CLI flag construction', () => {
   const mockWindow = {
     isDestroyed: vi.fn(() => false),
     webContents: { send: vi.fn() },
-  } as any
+  }
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -73,7 +73,7 @@ describe('TerminalManager CLI flag construction', () => {
     mockOnData.mockClear()
     mockOnExit.mockClear()
     mockWindow.webContents.send.mockClear()
-    manager = new TerminalManager(mockWindow)
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
   })
 
   test('claudeMode: chat → command is "claude\\r" (no flags)', () => {
@@ -95,7 +95,9 @@ describe('TerminalManager CLI flag construction', () => {
     manager.createTerminal({ cwd: '/test', claudeMode: 'full-auto' })
     flushTimers()
 
-    expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining('--dangerously-skip-permissions'))
+    expect(mockWrite).toHaveBeenCalledWith(
+      expect.stringContaining('--dangerously-skip-permissions')
+    )
   })
 
   test('claudeMode: undefined → command is "claude\\r" (no flags)', () => {
@@ -132,7 +134,7 @@ describe('TerminalManager CLI flag construction', () => {
     manager.createTerminal({
       cwd: '/test',
       claudeMode: 'auto',
-      resumeSessionId: 'invalid; rm -rf /',  // injection attempt
+      resumeSessionId: 'invalid; rm -rf /', // injection attempt
     })
     flushTimers()
 
@@ -147,7 +149,7 @@ describe('TerminalManager writeToTerminal chunking', () => {
   const mockWindow = {
     isDestroyed: vi.fn(() => false),
     webContents: { send: vi.fn() },
-  } as any
+  }
 
   beforeEach(() => {
     // Real timers so setImmediate yields inside the chunker actually fire
@@ -156,7 +158,7 @@ describe('TerminalManager writeToTerminal chunking', () => {
     mockOnData.mockClear()
     mockOnExit.mockClear()
     mockWindow.webContents.send.mockClear()
-    manager = new TerminalManager(mockWindow)
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
   })
 
   function createNormalTerminal(): string {
@@ -274,14 +276,14 @@ describe('TerminalManager writeToTerminal Windows CRLF handling', () => {
   const mockWindow = {
     isDestroyed: vi.fn(() => false),
     webContents: { send: vi.fn() },
-  } as any
+  }
   const originalPlatform = process.platform
 
   beforeEach(() => {
     vi.useRealTimers()
     mockWrite.mockClear()
     mockWindow.webContents.send.mockClear()
-    manager = new TerminalManager(mockWindow)
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
   })
 
   afterEach(() => {
@@ -334,13 +336,13 @@ describe('TerminalManager writeToTerminal Claude terminal integration', () => {
   const mockWindow = {
     isDestroyed: vi.fn(() => false),
     webContents: { send: vi.fn() },
-  } as any
+  }
 
   beforeEach(() => {
     vi.useFakeTimers()
     mockWrite.mockClear()
     mockWindow.webContents.send.mockClear()
-    manager = new TerminalManager(mockWindow)
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
   })
 
   test('short Enter-bearing input on a Claude terminal reaches pty.write intact', async () => {
@@ -388,7 +390,7 @@ describe('TerminalManager auto-naming: ANSI stripping', () => {
   const mockWindow = {
     isDestroyed: vi.fn(() => false),
     webContents: { send: vi.fn() },
-  } as any
+  }
 
   // Helper: return the title arg from the last terminal:title call for `id`, or null
   function lastTitleFor(id: string): string | null {
@@ -414,7 +416,7 @@ describe('TerminalManager auto-naming: ANSI stripping', () => {
   beforeEach(() => {
     mockWrite.mockClear()
     mockWindow.webContents.send.mockClear()
-    manager = new TerminalManager(mockWindow)
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
   })
 
   test('plain text input produces a clean, capitalized title (regression guard)', async () => {

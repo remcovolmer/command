@@ -50,14 +50,9 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   onCloseTerminal,
 }: SortableProjectItemProps) {
   const shouldReduceMotion = useReducedMotion()
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isOver,
-  } = useSortable({ id: project.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isOver } = useSortable({
+    id: project.id,
+  })
 
   const hasVertexConfig = useProjectStore((s) => s.projectVertexConfigs[project.id] ?? false)
   const hasMismatch = useProjectStore((s) => {
@@ -65,7 +60,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     const profileId = project.settings?.profileId
     if (authMode !== 'profile') return false
     if (!profileId) return true
-    const profile = s.profiles.find(p => p.id === profileId)
+    const profile = s.profiles.find((p) => p.id === profileId)
     return !profile || profile.envVarCount === 0
   })
 
@@ -93,25 +88,29 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       label: 'Open in Antigravity',
       onClick: () => getElectronAPI().shell.openInEditor(project.path),
     },
-    ...(project.type === 'code' ? [{
-      label: 'Open on GitHub',
-      onClick: async () => {
-        try {
-          const url = await getElectronAPI().git.getRemoteUrl(project.path)
-          if (url) {
-            await getElectronAPI().shell.openExternal(url)
-          }
-        } catch {
-          // Remote URL unavailable or invalid
-        }
-      },
-    }] : []),
+    ...(project.type === 'code'
+      ? [
+          {
+            label: 'Open on GitHub',
+            onClick: async () => {
+              try {
+                const url = await getElectronAPI().git.getRemoteUrl(project.path)
+                if (url) {
+                  await getElectronAPI().shell.openExternal(url)
+                }
+              } catch {
+                // Remote URL unavailable or invalid
+              }
+            },
+          },
+        ]
+      : []),
   ]
 
   // Show empty state for active project when there are no terminals
   // Code projects also require no worktrees to show the empty state
-  const showEmptyState = isActive && terminals.length === 0 &&
-    (project.type !== 'code' || worktrees.length === 0)
+  const showEmptyState =
+    isActive && terminals.length === 0 && (project.type !== 'code' || worktrees.length === 0)
 
   return (
     <motion.li
@@ -124,9 +123,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       className="relative"
     >
       {/* Drop indicator line */}
-      {isOver && (
-        <div className="absolute inset-x-0 -top-0.5 h-0.5 bg-primary rounded-full" />
-      )}
+      {isOver && <div className="absolute inset-x-0 -top-0.5 h-0.5 bg-primary rounded-full" />}
 
       {/* Context Menu */}
       {contextMenu && (
@@ -147,23 +144,17 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         className={`
           group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing
           transition-colors duration-150
-          ${isActive
-            ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
-            : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'}
+          ${
+            isActive
+              ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
+              : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'
+          }
         `}
       >
         {project.type === 'code' ? (
-          <Code
-            className={`w-4 h-4 flex-shrink-0 ${
-              isActive ? 'text-primary' : ''
-            }`}
-          />
+          <Code className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
         ) : (
-          <FolderOpen
-            className={`w-4 h-4 flex-shrink-0 ${
-              isActive ? 'text-primary' : ''
-            }`}
-          />
+          <FolderOpen className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
         )}
         <span className="flex-1 text-sm truncate" title={project.path}>
           {project.name}
@@ -176,11 +167,13 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           </span>
         )}
         {hasMismatch && (
-          <span title={
-            !project.settings?.profileId
-              ? 'Auth mode is Profile but no profile selected'
-              : 'Selected profile is missing or has no environment variables'
-          }>
+          <span
+            title={
+              !project.settings?.profileId
+                ? 'Auth mode is Profile but no profile selected'
+                : 'Selected profile is missing or has no environment variables'
+            }
+          >
             <AlertTriangle className="w-3 h-3 shrink-0 text-yellow-500" />
           </span>
         )}
@@ -238,18 +231,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       )}
 
       {/* Worktrees - hidden for inactive projects unless selected */}
-      {(!isInactive || isActive) && worktrees.map((worktree) => (
-        <WorktreeItem
-          key={worktree.id}
-          worktree={worktree}
-          projectPath={project.path}
-          terminals={getWorktreeTerminals(worktree.id)}
-          activeTerminalId={activeTerminalId}
-          onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
-          onSelectTerminal={onSelectTerminal}
-          onRemove={() => onRemoveWorktree(worktree.id)}
-        />
-      ))}
+      {(!isInactive || isActive) &&
+        worktrees.map((worktree) => (
+          <WorktreeItem
+            key={worktree.id}
+            worktree={worktree}
+            projectPath={project.path}
+            terminals={getWorktreeTerminals(worktree.id)}
+            activeTerminalId={activeTerminalId}
+            onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
+            onSelectTerminal={onSelectTerminal}
+            onRemove={() => onRemoveWorktree(worktree.id)}
+          />
+        ))}
 
       {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
       {showEmptyState && (

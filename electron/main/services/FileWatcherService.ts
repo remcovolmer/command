@@ -1,10 +1,15 @@
 import { watch, type FSWatcher } from 'chokidar'
-import { BrowserWindow } from 'electron'
+import { type BrowserWindow } from 'electron'
 import path from 'node:path'
 import { existsSync, watch as fsWatch, type FSWatcher as NodeFSWatcher } from 'node:fs'
 
 // Event type mapping from chokidar events to our event types
-type FileWatchEventType = 'file-added' | 'file-changed' | 'file-removed' | 'dir-added' | 'dir-removed'
+type FileWatchEventType =
+  | 'file-added'
+  | 'file-changed'
+  | 'file-removed'
+  | 'dir-added'
+  | 'dir-removed'
 
 interface FileWatchEvent {
   type: FileWatchEventType
@@ -12,9 +17,9 @@ interface FileWatchEvent {
   path: string
 }
 
-const BATCH_INTERVAL = 150  // ms — avoids Electron IPC memory leak at 100ms
-const MAX_BATCH_SIZE = 100  // flush early if batch grows too large
-const INITIAL_RESTART_DELAY = 5000  // ms before first restart attempt
+const BATCH_INTERVAL = 150 // ms — avoids Electron IPC memory leak at 100ms
+const MAX_BATCH_SIZE = 100 // flush early if batch grows too large
+const INITIAL_RESTART_DELAY = 5000 // ms before first restart attempt
 const MAX_RESTART_ATTEMPTS = 3
 
 const IGNORE_PATTERNS = [
@@ -54,7 +59,7 @@ export class FileWatcherService {
   private watchers = new Map<string, FSWatcher>()
   private batchBuffer = new Map<string, FileWatchEvent[]>()
   private batchTimers = new Map<string, NodeJS.Timeout>()
-  private projectPaths = new Map<string, string>()  // projectId -> projectPath
+  private projectPaths = new Map<string, string>() // projectId -> projectPath
   private restartCounts = new Map<string, number>()
   private headWatchers = new Map<string, NodeFSWatcher>()
 
@@ -69,16 +74,18 @@ export class FileWatcherService {
    * Serialized: concurrent calls queue instead of interleaving.
    */
   async switchTo(projectId: string, projectPath: string): Promise<void> {
-    this.switchLock = this.switchLock.then(async () => {
-      // Skip teardown/setup if already watching the right project
-      const currentIds = [...this.watchers.keys()]
-      if (currentIds.length === 1 && currentIds[0] === projectId) return
+    this.switchLock = this.switchLock
+      .then(async () => {
+        // Skip teardown/setup if already watching the right project
+        const currentIds = [...this.watchers.keys()]
+        if (currentIds.length === 1 && currentIds[0] === projectId) return
 
-      await this.stopAll()
-      this.startWatching(projectId, projectPath)
-    }).catch(err => {
-      console.error('[FileWatcher] switchTo failed:', err)
-    })
+        await this.stopAll()
+        this.startWatching(projectId, projectPath)
+      })
+      .catch((err) => {
+        console.error('[FileWatcher] switchTo failed:', err)
+      })
     return this.switchLock
   }
 
@@ -121,7 +128,9 @@ export class FileWatcherService {
         // Attempt restart with exponential backoff
         const attempts = this.restartCounts.get(projectId) ?? 0
         if (attempts >= MAX_RESTART_ATTEMPTS) {
-          console.error(`[FileWatcher] Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for project ${projectId}`)
+          console.error(
+            `[FileWatcher] Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for project ${projectId}`
+          )
           return
         }
         this.restartCounts.set(projectId, attempts + 1)
@@ -129,21 +138,25 @@ export class FileWatcherService {
 
         setTimeout(() => {
           if (this.watchers.has(projectId)) {
-            console.log(`[FileWatcher] Restart attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS} for project ${projectId}`)
-            this.stopWatching(projectId).then(() => {
-              const savedPath = this.projectPaths.get(projectId)
-              if (savedPath) {
-                this.startWatching(projectId, savedPath)
-              }
-            }).catch((err) => {
-              console.error(`[FileWatcher] Restart failed for project ${projectId}:`, err)
-            })
+            console.log(
+              `[FileWatcher] Restart attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS} for project ${projectId}`
+            )
+            this.stopWatching(projectId)
+              .then(() => {
+                const savedPath = this.projectPaths.get(projectId)
+                if (savedPath) {
+                  this.startWatching(projectId, savedPath)
+                }
+              })
+              .catch((err) => {
+                console.error(`[FileWatcher] Restart failed for project ${projectId}:`, err)
+              })
           }
         }, delay)
       })
 
       this.watchers.set(projectId, watcher)
-      this.restartCounts.delete(projectId)  // Reset retry count on successful start
+      this.restartCounts.delete(projectId) // Reset retry count on successful start
       this.startHeadWatcher(projectId, projectPath)
       console.log(`[FileWatcher] Started watching: ${projectPath} (project: ${projectId})`)
     } catch (error) {
@@ -176,7 +189,7 @@ export class FileWatcherService {
   }
 
   async stopAll(): Promise<void> {
-    const stops = [...this.watchers.keys()].map(id => this.stopWatching(id))
+    const stops = [...this.watchers.keys()].map((id) => this.stopWatching(id))
     await Promise.all(stops)
     this.projectPaths.clear()
   }
@@ -235,7 +248,11 @@ export class FileWatcherService {
 
       // Notify file change listeners (used by AutomationService)
       for (const cb of this.fileChangeCallbacks) {
-        try { cb(events) } catch { /* listener error */ }
+        try {
+          cb(events)
+        } catch {
+          /* listener error */
+        }
       }
 
       this.batchBuffer.set(projectId, [])

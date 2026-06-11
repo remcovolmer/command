@@ -15,25 +15,26 @@ interface PREventContext {
   state: 'OPEN' | 'CLOSED' | 'MERGED'
 }
 
-function resolvePromptTemplate(
-  template: string,
-  prContext?: PREventContext
-): string {
+function resolvePromptTemplate(template: string, prContext?: PREventContext): string {
   const sanitize = (s: string, maxLen = 200): string =>
-    s.replace(/[\r\n\t]/g, ' ').replace(/[^\x20-\x7E]/g, '').slice(0, maxLen)
+    s
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/[^\x20-\x7E]/g, '')
+      .slice(0, maxLen)
 
-  const templateVars: Record<string, string> = prContext ? {
-    number: String(prContext.number),
-    title: sanitize(prContext.title),
-    branch: sanitize(prContext.branch),
-    url: sanitize(prContext.url, 500),
-    mergeable: prContext.mergeable,
-    state: prContext.state,
-  } : {}
+  const templateVars: Record<string, string> = prContext
+    ? {
+        number: String(prContext.number),
+        title: sanitize(prContext.title),
+        branch: sanitize(prContext.branch),
+        url: sanitize(prContext.url, 500),
+        mergeable: prContext.mergeable,
+        state: prContext.state,
+      }
+    : {}
 
-  return template.replace(
-    /\{\{pr\.(\w+)\}\}/g,
-    (_match, key: string) => (key in templateVars) ? templateVars[key] : ''
+  return template.replace(/\{\{pr\.(\w+)\}\}/g, (_match, key: string) =>
+    key in templateVars ? templateVars[key] : ''
   )
 }
 
@@ -47,7 +48,6 @@ const fullContext: PREventContext = {
 }
 
 describe('resolvePromptTemplate', () => {
-
   // --- Full context replacement ---
 
   describe('full context replacement', () => {
@@ -60,7 +60,7 @@ describe('resolvePromptTemplate', () => {
 
       expect(result).toBe(
         'Review PR #42: Fix bug in auth flow on branch fix/auth-bug. ' +
-        'URL: https://github.com/org/repo/pull/42, mergeable: MERGEABLE, state: OPEN'
+          'URL: https://github.com/org/repo/pull/42, mergeable: MERGEABLE, state: OPEN'
       )
     })
 
@@ -198,18 +198,12 @@ describe('resolvePromptTemplate', () => {
         mergeable: 'CONFLICTING',
         state: 'MERGED',
       }
-      const result = resolvePromptTemplate(
-        '{{pr.mergeable}} {{pr.state}}',
-        ctx
-      )
+      const result = resolvePromptTemplate('{{pr.mergeable}} {{pr.state}}', ctx)
       expect(result).toBe('CONFLICTING MERGED')
     })
 
     test('adjacent template variables resolve correctly', () => {
-      const result = resolvePromptTemplate(
-        '{{pr.number}}{{pr.title}}',
-        fullContext
-      )
+      const result = resolvePromptTemplate('{{pr.number}}{{pr.title}}', fullContext)
       expect(result).toBe('42Fix bug in auth flow')
     })
 

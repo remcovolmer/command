@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 
 type ExecFileCb = (
   err: (Error & { stderr?: string; code?: number }) | null,
-  result?: { stdout: string; stderr: string },
+  result?: { stdout: string; stderr: string }
 ) => void
 
 // Per-test stub that child_process.execFile delegates to.
@@ -12,15 +12,10 @@ let execFileStub: (args: string[]) => Promise<{ stdout: string; stderr: string }
 })
 
 vi.mock('node:child_process', () => ({
-  execFile: (
-    _cmd: string,
-    args: string[],
-    _opts: unknown,
-    cb: ExecFileCb,
-  ) => {
+  execFile: (_cmd: string, args: string[], _opts: unknown, cb: ExecFileCb) => {
     execFileStub(args).then(
       (result) => cb(null, result),
-      (err) => cb(err as Error & { stderr?: string }),
+      (err) => cb(err as Error & { stderr?: string })
     )
   },
 }))
@@ -58,9 +53,7 @@ describe('GitHubService.getPRStatus', () => {
         mergeable: 'MERGEABLE',
         mergeStateStatus: 'CLEAN',
         reviewDecision: 'APPROVED',
-        statusCheckRollup: [
-          { name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
-        ],
+        statusCheckRollup: [{ name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' }],
         additions: 10,
         deletions: 2,
         changedFiles: 1,
@@ -73,7 +66,11 @@ describe('GitHubService.getPRStatus', () => {
     expect(status.noPR).toBe(false)
     expect(status.number).toBe(42)
     expect(status.state).toBe('OPEN')
-    expect(status.statusCheckRollup?.[0]).toEqual({ name: 'ci', state: 'COMPLETED', bucket: 'pass' })
+    expect(status.statusCheckRollup?.[0]).toEqual({
+      name: 'ci',
+      state: 'COMPLETED',
+      bucket: 'pass',
+    })
     expect(status.error).toBeUndefined()
   })
 

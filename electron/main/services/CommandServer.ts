@@ -29,7 +29,10 @@ export interface RouteContext {
 }
 
 /** Route handler function signature */
-export type RouteHandler = (body: Record<string, unknown>, context: RouteContext) => Promise<CommandResponse>
+export type RouteHandler = (
+  body: Record<string, unknown>,
+  context: RouteContext
+) => Promise<CommandResponse>
 
 /** Services required by CommandServer */
 export interface CommandServerDeps {
@@ -86,7 +89,10 @@ export class CommandServer {
       }
 
       const branch = body.branch
-      if (branch !== undefined && (typeof branch !== 'string' || branch.length === 0 || branch.length > 200)) {
+      if (
+        branch !== undefined &&
+        (typeof branch !== 'string' || branch.length === 0 || branch.length > 200)
+      ) {
         return { ok: false, error: 'Invalid "branch" (string, 1-200 chars)' }
       }
       if (typeof branch === 'string' && branch.startsWith('-')) {
@@ -94,7 +100,10 @@ export class CommandServer {
       }
 
       const sourceBranch = body.sourceBranch
-      if (sourceBranch !== undefined && (typeof sourceBranch !== 'string' || sourceBranch.length === 0 || sourceBranch.length > 200)) {
+      if (
+        sourceBranch !== undefined &&
+        (typeof sourceBranch !== 'string' || sourceBranch.length === 0 || sourceBranch.length > 200)
+      ) {
         return { ok: false, error: 'Invalid "sourceBranch" (string, 1-200 chars)' }
       }
       if (typeof sourceBranch === 'string' && sourceBranch.startsWith('-')) {
@@ -114,7 +123,7 @@ export class CommandServer {
 
       const projectId = terminalInfo.projectId
       const projects = context.projectPersistence.getProjects()
-      const project = projects.find(p => p.id === projectId)
+      const project = projects.find((p) => p.id === projectId)
       if (!project) {
         return { ok: false, error: 'Project not found' }
       }
@@ -125,7 +134,7 @@ export class CommandServer {
         project.path,
         branchName,
         name,
-        typeof sourceBranch === 'string' ? sourceBranch : undefined,
+        typeof sourceBranch === 'string' ? sourceBranch : undefined
       )
 
       // Register in persistence
@@ -141,7 +150,11 @@ export class CommandServer {
       })
 
       // Update terminal's worktree assignment
-      const updateResult = context.terminalManager.updateTerminalWorktree(terminalId, worktree.id, worktree.path)
+      const updateResult = context.terminalManager.updateTerminalWorktree(
+        terminalId,
+        worktree.id,
+        worktree.path
+      )
       if (!updateResult.success) {
         return { ok: false, error: updateResult.error ?? 'Failed to assign worktree to terminal' }
       }
@@ -158,7 +171,11 @@ export class CommandServer {
     this.route('POST', '/worktree/link', async (body, context) => {
       // Validate required fields
       const worktreePath = body.path
-      if (typeof worktreePath !== 'string' || worktreePath.length === 0 || worktreePath.length > 1000) {
+      if (
+        typeof worktreePath !== 'string' ||
+        worktreePath.length === 0 ||
+        worktreePath.length > 1000
+      ) {
         return { ok: false, error: 'Missing or invalid "path" (absolute path string)' }
       }
 
@@ -175,7 +192,7 @@ export class CommandServer {
 
       const projectId = terminalInfo.projectId
       const projects = context.projectPersistence.getProjects()
-      const project = projects.find(p => p.id === projectId)
+      const project = projects.find((p) => p.id === projectId)
       if (!project) {
         return { ok: false, error: 'Project not found' }
       }
@@ -194,7 +211,10 @@ export class CommandServer {
       }
 
       if (!gitFileContent.startsWith('gitdir:')) {
-        return { ok: false, error: 'Path is not a valid git worktree (.git is not a gitdir reference)' }
+        return {
+          ok: false,
+          error: 'Path is not a valid git worktree (.git is not a gitdir reference)',
+        }
       }
 
       // Extract branch name by reading HEAD from the gitdir
@@ -208,8 +228,14 @@ export class CommandServer {
         const isWin = process.platform === 'win32'
         const normalizedGitdir = isWin ? resolvedGitdir.toLowerCase() : resolvedGitdir
         const normalizedProjectGit = isWin ? projectGitDir.toLowerCase() : projectGitDir
-        if (!normalizedGitdir.startsWith(normalizedProjectGit + path.sep) && normalizedGitdir !== normalizedProjectGit) {
-          return { ok: false, error: 'Worktree gitdir points outside the project — refusing to read' }
+        if (
+          !normalizedGitdir.startsWith(normalizedProjectGit + path.sep) &&
+          normalizedGitdir !== normalizedProjectGit
+        ) {
+          return {
+            ok: false,
+            error: 'Worktree gitdir points outside the project — refusing to read',
+          }
         }
 
         const headContent = readFileSync(path.join(resolvedGitdir, 'HEAD'), 'utf-8').trim()
@@ -238,7 +264,11 @@ export class CommandServer {
       })
 
       // Update terminal's worktree assignment
-      const updateResult = context.terminalManager.updateTerminalWorktree(terminalId, worktree.id, worktree.path)
+      const updateResult = context.terminalManager.updateTerminalWorktree(
+        terminalId,
+        worktree.id,
+        worktree.path
+      )
       if (!updateResult.success) {
         return { ok: false, error: updateResult.error ?? 'Failed to assign worktree to terminal' }
       }
@@ -280,7 +310,7 @@ export class CommandServer {
 
       // Look up project path
       const projects = context.projectPersistence.getProjects()
-      const project = projects.find(p => p.id === worktree.projectId)
+      const project = projects.find((p) => p.id === worktree.projectId)
       if (!project) {
         return { ok: false, error: 'Project not found' }
       }
@@ -294,7 +324,10 @@ export class CommandServer {
       // Check for uncommitted changes
       const hasChanges = await context.worktreeService.hasUncommittedChanges(worktree.path)
       if (hasChanges) {
-        return { ok: false, error: 'Worktree has uncommitted changes. Commit or stash before merging.' }
+        return {
+          ok: false,
+          error: 'Worktree has uncommitted changes. Commit or stash before merging.',
+        }
       }
 
       // Merge the PR
@@ -311,7 +344,10 @@ export class CommandServer {
    * Validate that a file path is within a project or worktree boundary.
    * Returns the resolved path or a CommandResponse error.
    */
-  private validateFilePath(filePath: unknown, context: RouteContext): { ok: true; resolved: string; projectId: string } | (CommandResponse & { ok: false }) {
+  private validateFilePath(
+    filePath: unknown,
+    context: RouteContext
+  ): { ok: true; resolved: string; projectId: string } | (CommandResponse & { ok: false }) {
     if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 1000) {
       return { ok: false, error: 'Missing or invalid "file" (absolute path string)' }
     }
@@ -325,7 +361,10 @@ export class CommandServer {
     for (const p of projects) {
       const projectPath = path.resolve(p.path)
       const normalizedProject = isWin ? projectPath.toLowerCase() : projectPath
-      if (normalizedResolved.startsWith(normalizedProject + path.sep) || normalizedResolved === normalizedProject) {
+      if (
+        normalizedResolved.startsWith(normalizedProject + path.sep) ||
+        normalizedResolved === normalizedProject
+      ) {
         return { ok: true as const, resolved, projectId: p.id }
       }
     }
@@ -398,12 +437,12 @@ export class CommandServer {
 
       const { projectId } = resolved
       const allTerminals = context.terminalManager.getAllTerminals()
-      const projectTerminals = allTerminals.filter(t => t.projectId === projectId)
+      const projectTerminals = allTerminals.filter((t) => t.projectId === projectId)
 
       return {
         ok: true,
         data: {
-          chats: projectTerminals.map(t => ({
+          chats: projectTerminals.map((t) => ({
             id: t.id,
             title: t.title ?? null,
             state: t.state,
@@ -458,11 +497,11 @@ export class CommandServer {
       return {
         ok: true,
         data: {
-          projects: projects.map(p => ({
+          projects: projects.map((p) => ({
             id: p.id,
             name: p.name,
             path: p.path,
-            terminalCount: allTerminals.filter(t => t.projectId === p.id).length,
+            terminalCount: allTerminals.filter((t) => t.projectId === p.id).length,
             worktreeCount: (allWorktrees[p.id] ?? []).length,
           })),
         },
@@ -472,7 +511,11 @@ export class CommandServer {
     // POST /project/create — create a new project
     this.route('POST', '/project/create', async (body, context) => {
       const projectPath = body.path
-      if (typeof projectPath !== 'string' || projectPath.length === 0 || projectPath.length > 1000) {
+      if (
+        typeof projectPath !== 'string' ||
+        projectPath.length === 0 ||
+        projectPath.length > 1000
+      ) {
         return { ok: false, error: 'Missing or invalid "path" (absolute path string)' }
       }
 
@@ -494,9 +537,10 @@ export class CommandServer {
         return { ok: false, error: 'Path is not a git repository (no .git found)' }
       }
 
-      const name = typeof body.name === 'string' && body.name.length > 0 && body.name.length <= 200
-        ? body.name
-        : path.basename(projectPath)
+      const name =
+        typeof body.name === 'string' && body.name.length > 0 && body.name.length <= 200
+          ? body.name
+          : path.basename(projectPath)
 
       const project = context.projectPersistence.addProject(projectPath, name)
 
@@ -517,14 +561,14 @@ export class CommandServer {
       }
 
       const projects = context.projectPersistence.getProjects()
-      const project = projects.find(p => p.id === projectId)
+      const project = projects.find((p) => p.id === projectId)
       if (!project) {
         return { ok: false, error: 'Not found', statusCode: 404 }
       }
 
       const worktrees = context.projectPersistence.getWorktrees(projectId)
       const allTerminals = context.terminalManager.getAllTerminals()
-      const terminalCount = allTerminals.filter(t => t.projectId === projectId).length
+      const terminalCount = allTerminals.filter((t) => t.projectId === projectId).length
 
       return {
         ok: true,
@@ -533,7 +577,7 @@ export class CommandServer {
           name: project.name,
           path: project.path,
           terminalCount,
-          worktrees: worktrees.map(w => ({
+          worktrees: worktrees.map((w) => ({
             id: w.id,
             name: w.name,
             branch: w.branch,
@@ -552,11 +596,15 @@ export class CommandServer {
     this.route('POST', '/notify', async (body) => {
       const message = body.message
       if (typeof message !== 'string' || message.length === 0 || message.length > 5000) {
-        return { ok: false, error: 'Missing or invalid "message" (non-empty string, max 5000 chars)' }
+        return {
+          ok: false,
+          error: 'Missing or invalid "message" (non-empty string, max 5000 chars)',
+        }
       }
-      const title = typeof body.title === 'string' && body.title.length > 0 && body.title.length <= 200
-        ? body.title
-        : 'Command'
+      const title =
+        typeof body.title === 'string' && body.title.length > 0 && body.title.length <= 200
+          ? body.title
+          : 'Command'
 
       new Notification({ title, body: message }).show()
       return { ok: true }
@@ -571,7 +619,10 @@ export class CommandServer {
 
       const message = body.message
       if (typeof message !== 'string' || message.length === 0 || message.length > 5000) {
-        return { ok: false, error: 'Missing or invalid "message" (non-empty string, max 5000 chars)' }
+        return {
+          ok: false,
+          error: 'Missing or invalid "message" (non-empty string, max 5000 chars)',
+        }
       }
 
       context.mainWindow.webContents.send('terminal:status', terminalId, message)
@@ -603,16 +654,19 @@ export class CommandServer {
     sidecarId: string,
     projectId: string,
     worktreeId: string | undefined,
-    context: RouteContext,
+    context: RouteContext
   ): CommandResponse | null {
     const sidecarInfo = context.terminalManager.getTerminalInfo(sidecarId)
     if (!sidecarInfo) return { ok: false, error: 'Sidecar terminal not found' }
     if (sidecarInfo.type !== 'normal') return { ok: false, error: 'Terminal is not a sidecar' }
-    if (sidecarInfo.projectId !== projectId) return { ok: false, error: 'Sidecar does not belong to your project' }
+    if (sidecarInfo.projectId !== projectId)
+      return { ok: false, error: 'Sidecar does not belong to your project' }
     if (worktreeId) {
-      if (sidecarInfo.worktreeId !== worktreeId) return { ok: false, error: 'Sidecar does not belong to your worktree context' }
+      if (sidecarInfo.worktreeId !== worktreeId)
+        return { ok: false, error: 'Sidecar does not belong to your worktree context' }
     } else {
-      if (sidecarInfo.worktreeId) return { ok: false, error: 'Sidecar does not belong to your project context' }
+      if (sidecarInfo.worktreeId)
+        return { ok: false, error: 'Sidecar does not belong to your project context' }
     }
     return null
   }
@@ -621,7 +675,9 @@ export class CommandServer {
    * Resolve the caller's project/worktree context from X-Terminal-ID header.
    * Returns context info or a CommandResponse error.
    */
-  private resolveCallerContext(context: RouteContext): { projectId: string; worktreeId: string | undefined; contextKey: string } | CommandResponse {
+  private resolveCallerContext(
+    context: RouteContext
+  ): { projectId: string; worktreeId: string | undefined; contextKey: string } | CommandResponse {
     const { terminalId } = context
     if (!terminalId) {
       return { ok: false, error: 'Missing X-Terminal-ID header' }
@@ -647,7 +703,11 @@ export class CommandServer {
       const { projectId, worktreeId, contextKey } = resolved
 
       // Check existing sidecar count for this context
-      const existing = context.terminalManager.getTerminalsByContext(projectId, worktreeId, 'normal')
+      const existing = context.terminalManager.getTerminalsByContext(
+        projectId,
+        worktreeId,
+        'normal'
+      )
       if (existing.length >= 5) {
         return { ok: false, error: 'Sidecar limit reached (max 5 per context)' }
       }
@@ -662,16 +722,17 @@ export class CommandServer {
         cwd = worktree.path
       } else {
         const projects = context.projectPersistence.getProjects()
-        const project = projects.find(p => p.id === projectId)
+        const project = projects.find((p) => p.id === projectId)
         if (!project) {
           return { ok: false, error: 'Project not found' }
         }
         cwd = project.path
       }
 
-      const title = typeof body.title === 'string' && body.title.length > 0 && body.title.length <= 200
-        ? body.title
-        : 'Terminal'
+      const title =
+        typeof body.title === 'string' && body.title.length > 0 && body.title.length <= 200
+          ? body.title
+          : 'Terminal'
 
       const terminalId = context.terminalManager.createTerminal({
         cwd,
@@ -704,12 +765,16 @@ export class CommandServer {
       if ('ok' in resolved) return resolved
       const { projectId, worktreeId } = resolved
 
-      const sidecars = context.terminalManager.getTerminalsByContext(projectId, worktreeId, 'normal')
+      const sidecars = context.terminalManager.getTerminalsByContext(
+        projectId,
+        worktreeId,
+        'normal'
+      )
 
       return {
         ok: true,
         data: {
-          sidecars: sidecars.map(s => ({
+          sidecars: sidecars.map((s) => ({
             id: s.id,
             title: s.title ?? 'Terminal',
             lastActivity: s.lastActivity,
@@ -730,7 +795,12 @@ export class CommandServer {
       }
 
       // Validate that the sidecar belongs to the caller's context
-      const ownershipError = this.validateSidecarOwnership(sidecarId, projectId, worktreeId, context)
+      const ownershipError = this.validateSidecarOwnership(
+        sidecarId,
+        projectId,
+        worktreeId,
+        context
+      )
       if (ownershipError) return ownershipError
 
       const linesParam = context.query.get('lines')
@@ -764,7 +834,12 @@ export class CommandServer {
       }
 
       // Validate that the sidecar belongs to the caller's context
-      const ownershipError = this.validateSidecarOwnership(sidecarId, projectId, worktreeId, context)
+      const ownershipError = this.validateSidecarOwnership(
+        sidecarId,
+        projectId,
+        worktreeId,
+        context
+      )
       if (ownershipError) return ownershipError
 
       const success = context.terminalManager.writeToPty(sidecarId, command + '\n')
@@ -907,9 +982,8 @@ export class CommandServer {
     }
 
     // Build context
-    const terminalId = typeof req.headers['x-terminal-id'] === 'string'
-      ? req.headers['x-terminal-id']
-      : null
+    const terminalId =
+      typeof req.headers['x-terminal-id'] === 'string' ? req.headers['x-terminal-id'] : null
 
     const context: RouteContext = {
       terminalId,
@@ -932,7 +1006,9 @@ export class CommandServer {
     }
   }
 
-  private async parseBody(req: IncomingMessage): Promise<{ body: Record<string, unknown>; error?: string }> {
+  private async parseBody(
+    req: IncomingMessage
+  ): Promise<{ body: Record<string, unknown>; error?: string }> {
     return new Promise((resolve) => {
       const chunks: Buffer[] = []
       let size = 0

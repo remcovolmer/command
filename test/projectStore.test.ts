@@ -2,14 +2,19 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 
 // Mock zustand persist middleware to bypass localStorage
 vi.mock('zustand/middleware', () => ({
-  persist: (fn: any) => fn,
+  persist: (fn: unknown) => fn,
 }))
 
 // Mock electron API before importing store
 vi.mock('../src/utils/electron', () => ({
   getElectronAPI: () => ({
     terminal: { create: vi.fn(), close: vi.fn() },
-    project: { list: vi.fn(), update: vi.fn(), reorder: vi.fn(), setActiveWatcher: vi.fn().mockResolvedValue(undefined) },
+    project: {
+      list: vi.fn(),
+      update: vi.fn(),
+      reorder: vi.fn(),
+      setActiveWatcher: vi.fn().mockResolvedValue(undefined),
+    },
     worktree: { list: vi.fn() },
     fs: { readDirectory: vi.fn() },
   }),
@@ -18,7 +23,9 @@ vi.mock('../src/utils/electron', () => ({
 import { useProjectStore } from '../src/stores/projectStore'
 import type { TerminalSession } from '../src/types'
 
-function makeTerminal(overrides: Partial<TerminalSession> & { id: string; projectId: string }): TerminalSession {
+function makeTerminal(
+  overrides: Partial<TerminalSession> & { id: string; projectId: string }
+): TerminalSession {
   return {
     state: 'done',
     lastActivity: Date.now(),
@@ -322,7 +329,15 @@ describe('projectStore activeCenterTabId', () => {
         activeTerminalId: 'term-1',
         activeCenterTabId: 'term-1',
         activeProjectId: 'proj-1',
-        worktrees: { 'wt-1': { id: 'wt-1', projectId: 'proj-1', name: 'feature', path: '/wt1', branch: 'feature' } },
+        worktrees: {
+          'wt-1': {
+            id: 'wt-1',
+            projectId: 'proj-1',
+            name: 'feature',
+            path: '/wt1',
+            branch: 'feature',
+          },
+        },
       })
 
       useProjectStore.getState().removeWorktree('wt-1')
@@ -351,7 +366,15 @@ describe('projectStore activeCenterTabId', () => {
             projectId: 'proj-1',
           },
         },
-        worktrees: { 'wt-1': { id: 'wt-1', projectId: 'proj-1', name: 'feature', path: '/wt1', branch: 'feature' } },
+        worktrees: {
+          'wt-1': {
+            id: 'wt-1',
+            projectId: 'proj-1',
+            name: 'feature',
+            path: '/wt1',
+            branch: 'feature',
+          },
+        },
       })
 
       useProjectStore.getState().removeWorktree('wt-1')
@@ -372,7 +395,15 @@ describe('projectStore activeCenterTabId', () => {
         activeCenterTabId: 'term-1',
         activeProjectId: 'proj-1',
         sidecarTerminals: { 'proj-1': ['sidecar-1'] },
-        worktrees: { 'wt-1': { id: 'wt-1', projectId: 'proj-1', name: 'feature', path: '/wt1', branch: 'feature' } },
+        worktrees: {
+          'wt-1': {
+            id: 'wt-1',
+            projectId: 'proj-1',
+            name: 'feature',
+            path: '/wt1',
+            branch: 'feature',
+          },
+        },
       })
 
       useProjectStore.getState().removeWorktree('wt-1')
@@ -427,7 +458,14 @@ describe('projectStore activeCenterTabId', () => {
     test('a fresh setPRStatus clears stale/error from prior state', () => {
       useProjectStore.setState({
         prStatus: {
-          'wt-1': { noPR: false, number: 1, state: 'OPEN', stale: true, error: 'prev error', lastUpdated: 0 },
+          'wt-1': {
+            noPR: false,
+            number: 1,
+            state: 'OPEN',
+            stale: true,
+            error: 'prev error',
+            lastUpdated: 0,
+          },
         },
       })
 

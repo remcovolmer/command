@@ -4,22 +4,23 @@ import { createRequire } from 'module'
 // The hook is a standalone .cjs executed by Claude Code per event. Its pure decision
 // logic is exported (the stdin wiring is guarded by `require.main === module`).
 const require = createRequire(import.meta.url)
-const { mapEventToState, shouldSkipWrite, INPUT_STATE_GUARD_MS } = require(
-  '../electron/main/hooks/claude-state-hook.cjs'
-) as {
-  mapEventToState: (data: Record<string, unknown>) => string | null
-  shouldSkipWrite: (
-    current: { state: string; timestamp: number } | undefined,
-    incoming: { state: string; hook_event: string },
-    now: number,
-    guardMs?: number
-  ) => boolean
-  INPUT_STATE_GUARD_MS: number
-}
+const { mapEventToState, shouldSkipWrite, INPUT_STATE_GUARD_MS } =
+  require('../electron/main/hooks/claude-state-hook.cjs') as {
+    mapEventToState: (data: Record<string, unknown>) => string | null
+    shouldSkipWrite: (
+      current: { state: string; timestamp: number } | undefined,
+      incoming: { state: string; hook_event: string },
+      now: number,
+      guardMs?: number
+    ) => boolean
+    INPUT_STATE_GUARD_MS: number
+  }
 
 describe('mapEventToState', () => {
   test('AskUserQuestion PreToolUse maps to question', () => {
-    expect(mapEventToState({ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion' })).toBe('question')
+    expect(mapEventToState({ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion' })).toBe(
+      'question'
+    )
   })
 
   test('other tool PreToolUse maps to busy', () => {
@@ -27,19 +28,27 @@ describe('mapEventToState', () => {
   })
 
   test('PermissionRequest maps to permission (AskUserQuestion also fires this)', () => {
-    expect(mapEventToState({ hook_event_name: 'PermissionRequest', tool_name: 'AskUserQuestion' })).toBe('permission')
+    expect(
+      mapEventToState({ hook_event_name: 'PermissionRequest', tool_name: 'AskUserQuestion' })
+    ).toBe('permission')
   })
 
   test('Notification permission_prompt maps to permission', () => {
-    expect(mapEventToState({ hook_event_name: 'Notification', notification_type: 'permission_prompt' })).toBe('permission')
+    expect(
+      mapEventToState({ hook_event_name: 'Notification', notification_type: 'permission_prompt' })
+    ).toBe('permission')
   })
 
   test('Notification idle_prompt maps to done', () => {
-    expect(mapEventToState({ hook_event_name: 'Notification', notification_type: 'idle_prompt' })).toBe('done')
+    expect(
+      mapEventToState({ hook_event_name: 'Notification', notification_type: 'idle_prompt' })
+    ).toBe('done')
   })
 
   test('Notification with unhandled type maps to null', () => {
-    expect(mapEventToState({ hook_event_name: 'Notification', notification_type: 'auth_success' })).toBeNull()
+    expect(
+      mapEventToState({ hook_event_name: 'Notification', notification_type: 'auth_success' })
+    ).toBeNull()
   })
 
   test('lifecycle events map correctly', () => {
@@ -64,7 +73,11 @@ describe('shouldSkipWrite', () => {
 
   test('skips redundant busy when already busy', () => {
     expect(
-      shouldSkipWrite({ state: 'busy', timestamp: now }, { state: 'busy', hook_event: 'PreToolUse' }, now)
+      shouldSkipWrite(
+        { state: 'busy', timestamp: now },
+        { state: 'busy', hook_event: 'PreToolUse' },
+        now
+      )
     ).toBe(true)
   })
 
@@ -97,7 +110,11 @@ describe('shouldSkipWrite', () => {
 
   test('never skips an incoming input state (question/permission must surface)', () => {
     const current = { state: 'busy', timestamp: now }
-    expect(shouldSkipWrite(current, { state: 'question', hook_event: 'PreToolUse' }, now)).toBe(false)
-    expect(shouldSkipWrite(current, { state: 'permission', hook_event: 'PermissionRequest' }, now)).toBe(false)
+    expect(shouldSkipWrite(current, { state: 'question', hook_event: 'PreToolUse' }, now)).toBe(
+      false
+    )
+    expect(
+      shouldSkipWrite(current, { state: 'permission', hook_event: 'PermissionRequest' }, now)
+    ).toBe(false)
   })
 })

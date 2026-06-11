@@ -18,7 +18,11 @@ interface FileTreeProps {
   contextKey?: string | null
 }
 
-export function FileTree({ project, rootPath: rootPathProp, contextKey: contextKeyProp }: FileTreeProps) {
+export function FileTree({
+  project,
+  rootPath: rootPathProp,
+  contextKey: contextKeyProp,
+}: FileTreeProps) {
   // Use worktree-aware root path, falling back to project path
   const rootPath = rootPathProp ?? project.path
   const contextKey = contextKeyProp ?? project.id
@@ -127,12 +131,16 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
         const entries = await api.fs.readDirectory(rootPath)
         setDirectoryContents(rootPath, entries)
         // Re-fetch all expanded directories in parallel
-        await Promise.all(Object.keys(expandedPathsMap).map(async (dir) => {
-          try {
-            const dirEntries = await api.fs.readDirectory(dir)
-            setDirectoryContents(dir, dirEntries)
-          } catch { /* directory may no longer exist */ }
-        }))
+        await Promise.all(
+          Object.keys(expandedPathsMap).map(async (dir) => {
+            try {
+              const dirEntries = await api.fs.readDirectory(dir)
+              setDirectoryContents(dir, dirEntries)
+            } catch {
+              /* directory may no longer exist */
+            }
+          })
+        )
       } catch (err) {
         console.error('Failed to refresh directories:', err)
       }
@@ -140,10 +148,13 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
     refetchAll()
   }, [directoryCacheVersion, api, rootPath, expandedPathsMap, setDirectoryContents])
 
-  const handleContextMenu = useCallback((entry: FileSystemEntry, x: number, y: number) => {
-    setFileExplorerSelectedPath(entry.path)
-    setContextMenu({ entry, x, y })
-  }, [setFileExplorerSelectedPath])
+  const handleContextMenu = useCallback(
+    (entry: FileSystemEntry, x: number, y: number) => {
+      setFileExplorerSelectedPath(entry.path)
+      setContextMenu({ entry, x, y })
+    },
+    [setFileExplorerSelectedPath]
+  )
 
   const handleRootContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -154,43 +165,54 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
     setContextMenu(null)
   }, [])
 
-  const buildMenuItems = useCallback((entry: FileSystemEntry | null): ContextMenuEntry[] => {
-    // Determine where new files/folders should be created
-    const createPath = !entry
-      ? rootPath
-      : entry.type === 'directory'
-        ? entry.path
-        : getParentPath(entry.path)
+  const buildMenuItems = useCallback(
+    (entry: FileSystemEntry | null): ContextMenuEntry[] => {
+      // Determine where new files/folders should be created
+      const createPath = !entry
+        ? rootPath
+        : entry.type === 'directory'
+          ? entry.path
+          : getParentPath(entry.path)
 
-    const items: ContextMenuEntry[] = [
-      { label: 'New File', onClick: () => startCreate(createPath, 'file'), shortcut: 'Ctrl+Alt+N' },
-      { label: 'New Folder', onClick: () => startCreate(createPath, 'directory'), shortcut: 'Ctrl+Alt+Shift+N' },
-    ]
+      const items: ContextMenuEntry[] = [
+        {
+          label: 'New File',
+          onClick: () => startCreate(createPath, 'file'),
+          shortcut: 'Ctrl+Alt+N',
+        },
+        {
+          label: 'New Folder',
+          onClick: () => startCreate(createPath, 'directory'),
+          shortcut: 'Ctrl+Alt+Shift+N',
+        },
+      ]
 
-    if (!entry) return items
+      if (!entry) return items
 
-    return [
-      ...items,
-      { type: 'separator' },
-      { label: 'Rename', onClick: () => startRename(entry.path), shortcut: 'F2' },
-      {
-        label: 'Copy Path',
-        onClick: () => navigator.clipboard.writeText(entry.path),
-        shortcut: 'Ctrl+Shift+C',
-      },
-      {
-        label: 'Reveal in File Explorer',
-        onClick: () => api.shell.showItemInFolder(entry.path),
-      },
-      { type: 'separator' },
-      {
-        label: 'Delete',
-        onClick: () => setDeletingEntry(entry),
-        shortcut: 'Del',
-        variant: 'destructive',
-      },
-    ]
-  }, [api, rootPath, startCreate, startRename, setDeletingEntry])
+      return [
+        ...items,
+        { type: 'separator' },
+        { label: 'Rename', onClick: () => startRename(entry.path), shortcut: 'F2' },
+        {
+          label: 'Copy Path',
+          onClick: () => navigator.clipboard.writeText(entry.path),
+          shortcut: 'Ctrl+Shift+C',
+        },
+        {
+          label: 'Reveal in File Explorer',
+          onClick: () => api.shell.showItemInFolder(entry.path),
+        },
+        { type: 'separator' },
+        {
+          label: 'Delete',
+          onClick: () => setDeletingEntry(entry),
+          shortcut: 'Del',
+          variant: 'destructive',
+        },
+      ]
+    },
+    [api, rootPath, startCreate, startRename, setDeletingEntry]
+  )
 
   if (isLoading) {
     return (
@@ -201,11 +223,7 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
   }
 
   if (error) {
-    return (
-      <div className="px-3 py-4 text-sm text-destructive">
-        {error}
-      </div>
-    )
+    return <div className="px-3 py-4 text-sm text-destructive">{error}</div>
   }
 
   if (!rootEntries || rootEntries.length === 0) {
@@ -223,7 +241,11 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
     <div className="py-1 min-h-full" onContextMenu={handleRootContextMenu}>
       {/* Root-level create ghost entry */}
       {fileExplorerCreating && fileExplorerCreating.parentPath === rootPath && (
-        <RootCreateEntry type={fileExplorerCreating.type} projectPath={rootPath} projectId={project.id} />
+        <RootCreateEntry
+          type={fileExplorerCreating.type}
+          projectPath={rootPath}
+          projectId={project.id}
+        />
       )}
 
       {rootEntries.map((entry) => (
@@ -257,7 +279,15 @@ export function FileTree({ project, rootPath: rootPathProp, contextKey: contextK
 }
 
 /** Inline create entry shown at project root level */
-function RootCreateEntry({ type, projectPath, projectId }: { type: 'file' | 'directory'; projectPath: string; projectId: string }) {
+function RootCreateEntry({
+  type,
+  projectPath,
+  projectId,
+}: {
+  type: 'file' | 'directory'
+  projectPath: string
+  projectId: string
+}) {
   const api = getElectronAPI()
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -314,7 +344,10 @@ function RootCreateEntry({ type, projectPath, projectId }: { type: 'file' | 'dir
         <input
           ref={inputRef}
           value={value}
-          onChange={(e) => { setValue(e.target.value); setError(null) }}
+          onChange={(e) => {
+            setValue(e.target.value)
+            setError(null)
+          }}
           onKeyDown={(e) => {
             e.stopPropagation()
             if (e.key === 'Enter') handleSubmit()

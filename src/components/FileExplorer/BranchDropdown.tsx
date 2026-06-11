@@ -14,7 +14,13 @@ interface BranchDropdownProps {
 
 const MAX_RENDERED = 50
 
-export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, onSwitch }: BranchDropdownProps) {
+export function BranchDropdown({
+  gitPath,
+  currentBranch,
+  triggerRef,
+  onClose,
+  onSwitch,
+}: BranchDropdownProps) {
   const api = getElectronAPI()
   const [branches, setBranches] = useState<GitBranchListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,7 +51,9 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
       }
     }
     fetchBranches()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [api, gitPath])
 
   // Position dropdown below trigger
@@ -93,18 +101,21 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
   const displayed = filtered.slice(0, MAX_RENDERED)
   const totalFiltered = filtered.length
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setActiveIndex((i) => Math.min(i + 1, displayed.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setActiveIndex((i) => Math.max(i - 1, 0))
-    } else if (e.key === 'Enter' && displayed[activeIndex]) {
-      e.preventDefault()
-      onSwitch(displayed[activeIndex].name)
-    }
-  }, [displayed, activeIndex, onSwitch])
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setActiveIndex((i) => Math.min(i + 1, displayed.length - 1))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setActiveIndex((i) => Math.max(i - 1, 0))
+      } else if (e.key === 'Enter' && displayed[activeIndex]) {
+        e.preventDefault()
+        onSwitch(displayed[activeIndex].name)
+      }
+    },
+    [displayed, activeIndex, onSwitch]
+  )
 
   const handleCreateBranch = useCallback(async () => {
     if (!newBranchName.trim() || creating) return
@@ -120,52 +131,55 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
     }
   }, [api, gitPath, newBranchName, creating, onClose])
 
-  const handleDeleteBranch = useCallback(async (name: string, force = false) => {
-    if (!force) {
+  const handleDeleteBranch = useCallback(
+    async (name: string, force = false) => {
+      if (!force) {
+        setDeleting(name)
+        setError(null)
+        try {
+          await api.git.deleteBranch(gitPath, name, false)
+          setBranches((prev) => {
+            const next = prev.filter((b) => b.name !== name)
+            const nextDisplayedLen = next
+              .filter((b) => !b.current && b.name.toLowerCase().includes(filter.toLowerCase()))
+              .slice(0, MAX_RENDERED).length
+            setActiveIndex((i) => Math.min(i, Math.max(nextDisplayedLen - 1, 0)))
+            return next
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Delete failed'
+          if (msg.includes('not fully merged')) {
+            setConfirmDelete(name)
+          } else {
+            setError(msg)
+          }
+        } finally {
+          setDeleting(null)
+        }
+        return
+      }
+      // Force delete
       setDeleting(name)
       setError(null)
       try {
-        await api.git.deleteBranch(gitPath, name, false)
+        await api.git.deleteBranch(gitPath, name, true)
         setBranches((prev) => {
           const next = prev.filter((b) => b.name !== name)
-          const nextDisplayedLen = next.filter(
-            (b) => !b.current && b.name.toLowerCase().includes(filter.toLowerCase())
-          ).slice(0, MAX_RENDERED).length
+          const nextDisplayedLen = next
+            .filter((b) => !b.current && b.name.toLowerCase().includes(filter.toLowerCase()))
+            .slice(0, MAX_RENDERED).length
           setActiveIndex((i) => Math.min(i, Math.max(nextDisplayedLen - 1, 0)))
           return next
         })
+        setConfirmDelete(null)
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Delete failed'
-        if (msg.includes('not fully merged')) {
-          setConfirmDelete(name)
-        } else {
-          setError(msg)
-        }
+        setError(err instanceof Error ? err.message : 'Delete failed')
       } finally {
         setDeleting(null)
       }
-      return
-    }
-    // Force delete
-    setDeleting(name)
-    setError(null)
-    try {
-      await api.git.deleteBranch(gitPath, name, true)
-      setBranches((prev) => {
-        const next = prev.filter((b) => b.name !== name)
-        const nextDisplayedLen = next.filter(
-          (b) => !b.current && b.name.toLowerCase().includes(filter.toLowerCase())
-        ).slice(0, MAX_RENDERED).length
-        setActiveIndex((i) => Math.min(i, Math.max(nextDisplayedLen - 1, 0)))
-        return next
-      })
-      setConfirmDelete(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed')
-    } finally {
-      setDeleting(null)
-    }
-  }, [api, gitPath, filter])
+    },
+    [api, gitPath, filter]
+  )
 
   // Adjust position if near bottom of viewport
   const adjustedTop = Math.min(position.top, window.innerHeight - 300)
@@ -189,7 +203,10 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
           <input
             ref={searchRef}
             value={filter}
-            onChange={(e) => { setFilter(e.target.value); setActiveIndex(0) }}
+            onChange={(e) => {
+              setFilter(e.target.value)
+              setActiveIndex(0)
+            }}
             placeholder="Filter branches..."
             className="w-full bg-input border border-border rounded-md pl-7 pr-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
@@ -205,8 +222,15 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
                 value={newBranchName}
                 onChange={(e) => setNewBranchName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); handleCreateBranch() }
-                  if (e.key === 'Escape') { e.stopPropagation(); setShowNewBranch(false); setNewBranchName('') }
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleCreateBranch()
+                  }
+                  if (e.key === 'Escape') {
+                    e.stopPropagation()
+                    setShowNewBranch(false)
+                    setNewBranchName('')
+                  }
                 }}
                 placeholder="Branch name"
                 autoFocus
@@ -224,7 +248,10 @@ export function BranchDropdown({ gitPath, currentBranch, triggerRef, onClose, on
           </div>
         ) : (
           <button
-            onClick={() => { setShowNewBranch(true); setError(null) }}
+            onClick={() => {
+              setShowNewBranch(true)
+              setError(null)
+            }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />

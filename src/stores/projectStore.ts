@@ -1,6 +1,24 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, CenterTab, TasksData, AccountProfile } from '../types'
+import type {
+  Project,
+  TerminalSession,
+  TerminalState,
+  TerminalLayout,
+  FileSystemEntry,
+  GitStatus,
+  Worktree,
+  TerminalType,
+  PRStatus,
+  EditorTab,
+  DiffTab,
+  WorkingTreeDiffTab,
+  GitCommit,
+  GitCommitLog,
+  CenterTab,
+  TasksData,
+  AccountProfile,
+} from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
@@ -33,7 +51,7 @@ interface ProjectStore {
   activeTerminalId: string | null
 
   // Worktree state
-  worktrees: Record<string, Worktree>  // worktreeId -> Worktree
+  worktrees: Record<string, Worktree> // worktreeId -> Worktree
 
   // File explorer state
   fileExplorerVisible: boolean
@@ -55,12 +73,12 @@ interface ProjectStore {
   gitStatusLoading: Record<string, boolean>
 
   // GitHub PR status (not persisted)
-  prStatus: Record<string, PRStatus>  // key (worktreeId or projectId) -> PRStatus
+  prStatus: Record<string, PRStatus> // key (worktreeId or projectId) -> PRStatus
   ghAvailable: { installed: boolean; authenticated: boolean } | null
 
   // Editor tab state (includes both file editor and diff tabs)
-  editorTabs: Record<string, CenterTab>  // tabId -> EditorTab | DiffTab
-  activeCenterTabId: string | null  // can be terminal or editor tab (type derived from lookup)
+  editorTabs: Record<string, CenterTab> // tabId -> EditorTab | DiffTab
+  activeCenterTabId: string | null // can be terminal or editor tab (type derived from lookup)
 
   // Hotkey configuration
   hotkeyConfig: HotkeyConfig
@@ -80,7 +98,7 @@ interface ProjectStore {
   // Profile state
   profiles: AccountProfile[]
   activeProfileId: string | null
-  projectVertexConfigs: Record<string, boolean>  // projectId -> has Vertex AI configured
+  projectVertexConfigs: Record<string, boolean> // projectId -> has Vertex AI configured
 
   // Profile actions
   loadProfiles: () => Promise<void>
@@ -113,12 +131,16 @@ interface ProjectStore {
   toggleInactiveSectionCollapsed: () => void
 
   // Sidecar terminal state (per context: worktreeId or projectId)
-  sidecarTerminals: Record<string, string[]>  // contextKey -> terminalId[]
+  sidecarTerminals: Record<string, string[]> // contextKey -> terminalId[]
   sidecarTerminalCollapsed: boolean
-  activeSidecarTerminalId: Record<string, string | null>  // per-context active terminal
+  activeSidecarTerminalId: Record<string, string | null> // per-context active terminal
 
   // Sidecar terminal actions
-  createSidecarTerminal: (contextKey: string, projectId: string, worktreeId?: string) => Promise<void>
+  createSidecarTerminal: (
+    contextKey: string,
+    projectId: string,
+    worktreeId?: string
+  ) => Promise<void>
   registerSidecarTerminal: (contextKey: string, terminal: TerminalSession) => void
   closeSidecarTerminal: (contextKey: string, terminalId: string) => void
   setSidecarTerminalCollapsed: (collapsed: boolean) => void
@@ -175,8 +197,20 @@ interface ProjectStore {
   setGitHeadHash: (contextId: string, hash: string | null) => void
 
   // Diff tab actions
-  openDiffTab: (filePath: string, fileName: string, commitHash: string, parentHash: string, projectId: string, oldPath?: string) => void
-  openWorkingTreeDiffTab: (filePath: string, fileName: string, diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted', projectId: string) => void
+  openDiffTab: (
+    filePath: string,
+    fileName: string,
+    commitHash: string,
+    parentHash: string,
+    projectId: string,
+    oldPath?: string
+  ) => void
+  openWorkingTreeDiffTab: (
+    filePath: string,
+    fileName: string,
+    diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted',
+    projectId: string
+  ) => void
   closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
 
   // Discard confirmation state
@@ -185,7 +219,7 @@ interface ProjectStore {
   clearDiscardingFiles: () => void
 
   // Tasks state (not persisted - reload from disk)
-  tasksData: Record<string, TasksData>        // keyed by project.id
+  tasksData: Record<string, TasksData> // keyed by project.id
   tasksLoading: Record<string, boolean>
 
   // Tasks actions
@@ -265,7 +299,10 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Theme state (system follows OS preference)
       theme: 'system',
-      resolvedTheme: typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+      resolvedTheme:
+        typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light',
 
       // Terminal status messages (not persisted)
       terminalStatus: {},
@@ -343,7 +380,7 @@ export const useProjectStore = create<ProjectStore>()(
           const updated = await api.profile.update(id, updates)
           if (updated) {
             set((state) => ({
-              profiles: state.profiles.map(p => p.id === id ? updated : p),
+              profiles: state.profiles.map((p) => (p.id === id ? updated : p)),
             }))
           }
         } catch (error) {
@@ -356,7 +393,7 @@ export const useProjectStore = create<ProjectStore>()(
         try {
           await api.profile.remove(id)
           set((state) => ({
-            profiles: state.profiles.filter(p => p.id !== id),
+            profiles: state.profiles.filter((p) => p.id !== id),
             activeProfileId: state.activeProfileId === id ? null : state.activeProfileId,
           }))
         } catch (error) {
@@ -423,9 +460,7 @@ export const useProjectStore = create<ProjectStore>()(
       openEditorTab: (filePath, fileName, projectId) =>
         set((state) => {
           // Check if already open
-          const existing = Object.values(state.editorTabs).find(
-            (t) => t.filePath === filePath
-          )
+          const existing = Object.values(state.editorTabs).find((t) => t.filePath === filePath)
           if (existing) {
             return { activeCenterTabId: existing.id }
           }
@@ -437,7 +472,14 @@ export const useProjectStore = create<ProjectStore>()(
             return state
           }
           const id = `editor-${crypto.randomUUID()}`
-          const tab: EditorTab = { id, type: 'editor', filePath, fileName, isDirty: false, projectId }
+          const tab: EditorTab = {
+            id,
+            type: 'editor',
+            filePath,
+            fileName,
+            isDirty: false,
+            projectId,
+          }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
             activeCenterTabId: id,
@@ -516,8 +558,7 @@ export const useProjectStore = create<ProjectStore>()(
           },
         })),
 
-      resetAllHotkeys: () =>
-        set({ hotkeyConfig: DEFAULT_HOTKEY_CONFIG }),
+      resetAllHotkeys: () => set({ hotkeyConfig: DEFAULT_HOTKEY_CONFIG }),
 
       // Confirmed mode keys
       addConfirmedModeKey: (key) => {
@@ -546,14 +587,13 @@ export const useProjectStore = create<ProjectStore>()(
           // When collapsing, auto-switch away from inactive project if selected
           if (newCollapsed && state.activeProjectId) {
             const terminalValues = Object.values(state.terminals)
-            const hasTerminals = terminalValues.some(
-              (t) => t.projectId === state.activeProjectId
-            )
-            const activeProject = state.projects.find(p => p.id === state.activeProjectId)
+            const hasTerminals = terminalValues.some((t) => t.projectId === state.activeProjectId)
+            const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
             if (activeProject && activeProject.type !== 'workspace' && !hasTerminals) {
-              const firstVisible = state.projects.find(
-                (p) => p.type !== 'workspace' && terminalValues.some((t) => t.projectId === p.id)
-              ) ?? state.projects.find((p) => p.type === 'workspace')
+              const firstVisible =
+                state.projects.find(
+                  (p) => p.type !== 'workspace' && terminalValues.some((t) => t.projectId === p.id)
+                ) ?? state.projects.find((p) => p.type === 'workspace')
               if (firstVisible) {
                 return {
                   inactiveSectionCollapsed: newCollapsed,
@@ -666,8 +706,7 @@ export const useProjectStore = create<ProjectStore>()(
         })
       },
 
-      setSidecarTerminalCollapsed: (collapsed) =>
-        set({ sidecarTerminalCollapsed: collapsed }),
+      setSidecarTerminalCollapsed: (collapsed) => set({ sidecarTerminalCollapsed: collapsed }),
 
       setActiveSidecarTerminal: (contextKey, id) =>
         set((state) => ({
@@ -684,26 +723,20 @@ export const useProjectStore = create<ProjectStore>()(
       },
 
       // File explorer interaction actions
-      setFileExplorerSelectedPath: (path) =>
-        set({ fileExplorerSelectedPath: path }),
+      setFileExplorerSelectedPath: (path) => set({ fileExplorerSelectedPath: path }),
 
-      startRename: (path) =>
-        set({ fileExplorerRenamingPath: path, fileExplorerCreating: null }),
+      startRename: (path) => set({ fileExplorerRenamingPath: path, fileExplorerCreating: null }),
 
-      cancelRename: () =>
-        set({ fileExplorerRenamingPath: null }),
+      cancelRename: () => set({ fileExplorerRenamingPath: null }),
 
       startCreate: (parentPath, type) =>
         set({ fileExplorerCreating: { parentPath, type }, fileExplorerRenamingPath: null }),
 
-      cancelCreate: () =>
-        set({ fileExplorerCreating: null }),
+      cancelCreate: () => set({ fileExplorerCreating: null }),
 
-      setDeletingEntry: (entry) =>
-        set({ fileExplorerDeletingEntry: entry }),
+      setDeletingEntry: (entry) => set({ fileExplorerDeletingEntry: entry }),
 
-      clearDeletingEntry: () =>
-        set({ fileExplorerDeletingEntry: null }),
+      clearDeletingEntry: () => set({ fileExplorerDeletingEntry: null }),
 
       refreshDirectory: async (dirPath) => {
         const api = getElectronAPI()
@@ -748,7 +781,11 @@ export const useProjectStore = create<ProjectStore>()(
           let changed = false
           const filtered: Record<string, true> = {}
           for (const p of Object.keys(current)) {
-            if (p === deletedPath || p.startsWith(deletedPath + '\\') || p.startsWith(deletedPath + '/')) {
+            if (
+              p === deletedPath ||
+              p.startsWith(deletedPath + '\\') ||
+              p.startsWith(deletedPath + '/')
+            ) {
               changed = true
             } else {
               filtered[p] = true
@@ -777,11 +814,9 @@ export const useProjectStore = create<ProjectStore>()(
       toggleFileExplorer: () =>
         set((state) => ({ fileExplorerVisible: !state.fileExplorerVisible })),
 
-      setFileExplorerVisible: (visible) =>
-        set({ fileExplorerVisible: visible }),
+      setFileExplorerVisible: (visible) => set({ fileExplorerVisible: visible }),
 
-      setFileExplorerActiveTab: (tab) =>
-        set({ fileExplorerActiveTab: tab }),
+      setFileExplorerActiveTab: (tab) => set({ fileExplorerActiveTab: tab }),
 
       toggleExpandedPath: (projectId, path) =>
         set((state) => {
@@ -817,12 +852,15 @@ export const useProjectStore = create<ProjectStore>()(
               delete newCache[path]
             }
           })
-          return { directoryCache: newCache, directoryCacheVersion: state.directoryCacheVersion + 1 }
+          return {
+            directoryCache: newCache,
+            directoryCacheVersion: state.directoryCacheVersion + 1,
+          }
         }),
 
       invalidateDirectories: (dirPaths) =>
         set((state) => {
-          const toDelete = dirPaths.filter(dir => state.directoryCache[dir])
+          const toDelete = dirPaths.filter((dir) => state.directoryCache[dir])
           if (toDelete.length === 0) return state
           const newCache = { ...state.directoryCache }
           for (const dir of toDelete) {
@@ -834,7 +872,7 @@ export const useProjectStore = create<ProjectStore>()(
       // Theme actions
       toggleTheme: () =>
         set((state) => ({
-          theme: state.theme === 'light' ? 'dark' : state.theme === 'dark' ? 'system' : 'light'
+          theme: state.theme === 'light' ? 'dark' : state.theme === 'dark' ? 'system' : 'light',
         })),
 
       setTheme: (theme) => set({ theme }),
@@ -846,22 +884,26 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => {
           // Shallow equality check to avoid no-op re-renders from file watcher
           const existing = state.gitStatus[projectId]
-          if (existing &&
-              existing.isClean === status.isClean &&
-              existing.branch?.name === status.branch?.name &&
-              existing.branch?.ahead === status.branch?.ahead &&
-              existing.branch?.behind === status.branch?.behind &&
-              existing.staged.length === status.staged.length &&
-              existing.modified.length === status.modified.length &&
-              existing.untracked.length === status.untracked.length &&
-              existing.conflicted.length === status.conflicted.length) {
+          if (
+            existing &&
+            existing.isClean === status.isClean &&
+            existing.branch?.name === status.branch?.name &&
+            existing.branch?.ahead === status.branch?.ahead &&
+            existing.branch?.behind === status.branch?.behind &&
+            existing.staged.length === status.staged.length &&
+            existing.modified.length === status.modified.length &&
+            existing.untracked.length === status.untracked.length &&
+            existing.conflicted.length === status.conflicted.length
+          ) {
             // Check if actual file paths changed
             const sameFiles = (a: { path: string }[], b: { path: string }[]) =>
               a.length === b.length && a.every((f, i) => f.path === b[i].path)
-            if (sameFiles(existing.staged, status.staged) &&
-                sameFiles(existing.modified, status.modified) &&
-                sameFiles(existing.untracked, status.untracked) &&
-                sameFiles(existing.conflicted, status.conflicted)) {
+            if (
+              sameFiles(existing.staged, status.staged) &&
+              sameFiles(existing.modified, status.modified) &&
+              sameFiles(existing.untracked, status.untracked) &&
+              sameFiles(existing.conflicted, status.conflicted)
+            ) {
               return state // no change, skip re-render
             }
           }
@@ -914,13 +956,25 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => {
           // Check if already open with same commit+file
           const existing = Object.values(state.editorTabs).find(
-            (t) => t.type === 'diff' && (t as DiffTab).commitHash === commitHash && t.filePath === filePath
+            (t) =>
+              t.type === 'diff' &&
+              (t as DiffTab).commitHash === commitHash &&
+              t.filePath === filePath
           )
           if (existing) {
             return { activeCenterTabId: existing.id }
           }
           const id = `diff-${crypto.randomUUID()}`
-          const tab: DiffTab = { id, type: 'diff', filePath, fileName, commitHash, parentHash, projectId, ...(oldPath ? { oldPath } : {}) }
+          const tab: DiffTab = {
+            id,
+            type: 'diff',
+            filePath,
+            fileName,
+            commitHash,
+            parentHash,
+            projectId,
+            ...(oldPath ? { oldPath } : {}),
+          }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
             activeCenterTabId: id,
@@ -931,14 +985,19 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => {
           // Check if already open with same file+diffKind
           const existing = Object.values(state.editorTabs).find(
-            (t) => t.type === 'working-tree-diff' && (t as WorkingTreeDiffTab).diffKind === diffKind && t.filePath === filePath
+            (t) =>
+              t.type === 'working-tree-diff' &&
+              (t as WorkingTreeDiffTab).diffKind === diffKind &&
+              t.filePath === filePath
           )
           if (existing) {
             return { activeCenterTabId: existing.id }
           }
           // Enforce MAX_EDITOR_TABS
           const MAX_EDITOR_TABS = 15
-          const projectTabs = Object.values(state.editorTabs).filter((t) => t.projectId === projectId)
+          const projectTabs = Object.values(state.editorTabs).filter(
+            (t) => t.projectId === projectId
+          )
           const newTabs = { ...state.editorTabs }
           if (projectTabs.length >= MAX_EDITOR_TABS) {
             // Remove oldest non-active tab
@@ -946,7 +1005,14 @@ export const useProjectStore = create<ProjectStore>()(
             if (toRemove) delete newTabs[toRemove.id]
           }
           const id = `wt-diff-${crypto.randomUUID()}`
-          const tab: WorkingTreeDiffTab = { id, type: 'working-tree-diff', filePath, fileName, diffKind, projectId }
+          const tab: WorkingTreeDiffTab = {
+            id,
+            type: 'working-tree-diff',
+            filePath,
+            fileName,
+            diffKind,
+            projectId,
+          }
           return {
             editorTabs: { ...newTabs, [id]: tab },
             activeCenterTabId: id,
@@ -966,9 +1032,10 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
           if (!changed) return state
-          const newActiveId = state.activeCenterTabId && newTabs[state.activeCenterTabId]
-            ? state.activeCenterTabId
-            : null
+          const newActiveId =
+            state.activeCenterTabId && newTabs[state.activeCenterTabId]
+              ? state.activeCenterTabId
+              : null
           return { editorTabs: newTabs, activeCenterTabId: newActiveId }
         }),
 
@@ -1006,8 +1073,7 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
-      setGhAvailable: (available) =>
-        set({ ghAvailable: available }),
+      setGhAvailable: (available) => set({ ghAvailable: available }),
 
       // Project actions
       setProjects: (projects) => set({ projects }),
@@ -1051,9 +1117,7 @@ export const useProjectStore = create<ProjectStore>()(
           // Update active project if needed
           const newProjects = state.projects.filter((p) => p.id !== id)
           const newActiveProjectId =
-            state.activeProjectId === id
-              ? newProjects[0]?.id ?? null
-              : state.activeProjectId
+            state.activeProjectId === id ? (newProjects[0]?.id ?? null) : state.activeProjectId
 
           // Clean sidecar terminals for removed project/worktrees
           const removedTerminalIds = new Set(
@@ -1108,7 +1172,11 @@ export const useProjectStore = create<ProjectStore>()(
           const newDirectoryCache = { ...state.directoryCache }
           if (projectPath) {
             for (const key of Object.keys(newDirectoryCache)) {
-              if (key === projectPath || key.startsWith(projectPath + '/') || key.startsWith(projectPath + '\\')) {
+              if (
+                key === projectPath ||
+                key.startsWith(projectPath + '/') ||
+                key.startsWith(projectPath + '\\')
+              ) {
                 delete newDirectoryCache[key]
               }
             }
@@ -1121,7 +1189,12 @@ export const useProjectStore = create<ProjectStore>()(
               : null
           // Fix activeCenterTabId: check both terminals and remaining editor tabs
           let newActiveCenterTabId = state.activeCenterTabId
-          if (state.activeProjectId === id || (newActiveCenterTabId && !newTerminals[newActiveCenterTabId] && !newEditorTabs[newActiveCenterTabId])) {
+          if (
+            state.activeProjectId === id ||
+            (newActiveCenterTabId &&
+              !newTerminals[newActiveCenterTabId] &&
+              !newEditorTabs[newActiveCenterTabId])
+          ) {
             newActiveCenterTabId = newActiveTerminalId
           }
 
@@ -1214,7 +1287,11 @@ export const useProjectStore = create<ProjectStore>()(
           let newActiveCenterTabId = state.activeCenterTabId
 
           if (state.activeTerminalId === id || state.activeCenterTabId === id) {
-            const visible = getVisibleTerminals(newTerminals, state.sidecarTerminals, removedTerminal?.projectId ?? '')
+            const visible = getVisibleTerminals(
+              newTerminals,
+              state.sidecarTerminals,
+              removedTerminal?.projectId ?? ''
+            )
             const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
 
             if (state.activeTerminalId === id) {
@@ -1230,9 +1307,7 @@ export const useProjectStore = create<ProjectStore>()(
           if (removedTerminal) {
             const layout = newLayouts[removedTerminal.projectId]
             if (layout && layout.splitTerminalIds.includes(id)) {
-              const newSplitIds = layout.splitTerminalIds.filter(
-                (tid) => tid !== id
-              )
+              const newSplitIds = layout.splitTerminalIds.filter((tid) => tid !== id)
               if (newSplitIds.length <= 1) {
                 delete newLayouts[removedTerminal.projectId]
               } else {
@@ -1377,9 +1452,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       getWorktreeTerminals: (worktreeId) => {
         const state = get()
-        return Object.values(state.terminals).filter(
-          (t) => t.worktreeId === worktreeId
-        )
+        return Object.values(state.terminals).filter((t) => t.worktreeId === worktreeId)
       },
 
       // Worktree actions
@@ -1462,10 +1535,17 @@ export const useProjectStore = create<ProjectStore>()(
           let newActiveTerminalId = state.activeTerminalId
           let newActiveCenterTabId = state.activeCenterTabId
           const activeTerminalGone = state.activeTerminalId && !newTerminals[state.activeTerminalId]
-          const activeCenterGone = state.activeCenterTabId && !newTerminals[state.activeCenterTabId] && !newEditorTabs[state.activeCenterTabId]
+          const activeCenterGone =
+            state.activeCenterTabId &&
+            !newTerminals[state.activeCenterTabId] &&
+            !newEditorTabs[state.activeCenterTabId]
 
           if (activeTerminalGone || activeCenterGone) {
-            const visible = getVisibleTerminals(newTerminals, newSidecarTerminals, removedWorktree?.projectId ?? '')
+            const visible = getVisibleTerminals(
+              newTerminals,
+              newSidecarTerminals,
+              removedWorktree?.projectId ?? ''
+            )
             const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
 
             if (activeTerminalGone) {
@@ -1496,9 +1576,7 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectWorktrees: (projectId) => {
         const state = get()
-        return Object.values(state.worktrees).filter(
-          (w) => w.projectId === projectId
-        )
+        return Object.values(state.worktrees).filter((w) => w.projectId === projectId)
       },
 
       loadWorktrees: async (projectId) => {
@@ -1567,9 +1645,7 @@ export const useProjectStore = create<ProjectStore>()(
           const currentLayout = state.layouts[projectId]
           if (!currentLayout) return state
 
-          const newSplitIds = currentLayout.splitTerminalIds.filter(
-            (id) => id !== terminalId
-          )
+          const newSplitIds = currentLayout.splitTerminalIds.filter((id) => id !== terminalId)
 
           // If only one left, clear the split
           if (newSplitIds.length <= 1) {
@@ -1687,14 +1763,12 @@ export const useProjectStore = create<ProjectStore>()(
 // Centralized watcher: whenever activeProjectId changes, notify the main process.
 // This ensures ALL code paths that modify activeProjectId trigger a watcher switch
 // (setActiveProject, setActiveTerminal, addProject, removeProject, loadProjects, etc.)
-useProjectStore.subscribe(
-  (state, prevState) => {
-    if (!isRendererReady) return
-    if (state.activeProjectId && state.activeProjectId !== prevState.activeProjectId) {
-      const api = getElectronAPI()
-      api.project.setActiveWatcher(state.activeProjectId).catch((err: unknown) => {
-        console.error('Failed to switch active watcher:', err)
-      })
-    }
+useProjectStore.subscribe((state, prevState) => {
+  if (!isRendererReady) return
+  if (state.activeProjectId && state.activeProjectId !== prevState.activeProjectId) {
+    const api = getElectronAPI()
+    api.project.setActiveWatcher(state.activeProjectId).catch((err: unknown) => {
+      console.error('Failed to switch active watcher:', err)
+    })
   }
-)
+})

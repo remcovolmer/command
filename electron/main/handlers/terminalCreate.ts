@@ -17,7 +17,9 @@ export interface TerminalCreateDeps {
   projectPersistence: ProjectPersistence | null
   crashLogger: CrashLogger
   getWindow: () => BrowserWindow | null
-  resolveEnvOverrides: (project: { settings?: { authMode?: string; profileId?: string } } | undefined) => Record<string, string> | undefined
+  resolveEnvOverrides: (
+    project: { settings?: { authMode?: string; profileId?: string } } | undefined
+  ) => Record<string, string> | undefined
   isValidUUID: (id: string) => boolean
 }
 
@@ -35,10 +37,17 @@ export interface TerminalCreateArgs {
  */
 export async function handleTerminalCreate(
   deps: TerminalCreateDeps,
-  args: TerminalCreateArgs,
+  args: TerminalCreateArgs
 ): Promise<string | null> {
   const { projectId, worktreeId, type = 'claude', resumeSessionId } = args
-  const { terminalManager, projectPersistence, crashLogger, getWindow, resolveEnvOverrides, isValidUUID } = deps
+  const {
+    terminalManager,
+    projectPersistence,
+    crashLogger,
+    getWindow,
+    resolveEnvOverrides,
+    isValidUUID,
+  } = deps
 
   if (!isValidUUID(projectId)) {
     throw new Error('Invalid project ID')
@@ -49,13 +58,16 @@ export async function handleTerminalCreate(
   if (type !== undefined && type !== 'claude' && type !== 'normal') {
     throw new Error('Invalid terminal type')
   }
-  if (resumeSessionId !== undefined && (typeof resumeSessionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(resumeSessionId))) {
+  if (
+    resumeSessionId !== undefined &&
+    (typeof resumeSessionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(resumeSessionId))
+  ) {
     throw new Error('Invalid session ID format')
   }
 
   // Look up project for settings and path
   const projects = projectPersistence?.getProjects() ?? []
-  const project = projects.find(p => p.id === projectId)
+  const project = projects.find((p) => p.id === projectId)
 
   // Determine the working directory and initial title
   let cwd: string
@@ -75,16 +87,18 @@ export async function handleTerminalCreate(
   const envOverrides = resolveEnvOverrides(project)
 
   try {
-    return terminalManager?.createTerminal({
-      cwd,
-      type,
-      initialTitle,
-      projectId,
-      worktreeId: worktreeId ?? undefined,
-      resumeSessionId: resumeSessionId ?? undefined,
-      claudeMode: project?.settings?.claudeMode,
-      envOverrides,
-    }) ?? null
+    return (
+      terminalManager?.createTerminal({
+        cwd,
+        type,
+        initialTitle,
+        projectId,
+        worktreeId: worktreeId ?? undefined,
+        resumeSessionId: resumeSessionId ?? undefined,
+        claudeMode: project?.settings?.claudeMode,
+        envOverrides,
+      }) ?? null
+    )
   } catch (error) {
     // Convert SpawnError into a non-throwing, renderer-visible event so the
     // user gets an inline toast instead of an unhandled IPC rejection or the
