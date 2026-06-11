@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Raw/Preview scroll &amp; edit-behoud — Implementation Plan</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f5;
+    --fg: #18181b;
+    --fg-muted: #52525b;
+    --fg-dim: #71717a;
+    --border: #e4e4e7;
+    --border-strong: #d4d4d8;
+
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --accent-fg: #1e40af;
+
+    --u1: #f59e0b;
+    --u1-soft: #fef3c7;
+    --u2: #0ea5e9;
+    --u2-soft: #e0f2fe;
+    --u3: #8b5cf6;
+    --u3-soft: #ede9fe;
+    --u4: #10b981;
+    --u4-soft: #d1fae5;
+
+    --danger: #ef4444;
+    --danger-soft: #fee2e2;
+    --warn: #f59e0b;
+    --warn-soft: #fef3c7;
+    --ok: #10b981;
+    --ok-soft: #d1fae5;
+
+    --code-bg: #f4f4f5;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #09090b;
+      --surface: #131316;
+      --surface-2: #1c1c1f;
+      --fg: #fafafa;
+      --fg-muted: #a1a1aa;
+      --fg-dim: #71717a;
+      --border: #27272a;
+      --border-strong: #3f3f46;
+
+      --accent: #60a5fa;
+      --accent-soft: #1e3a8a40;
+      --accent-fg: #93c5fd;
+
+      --u1: #fbbf24;
+      --u1-soft: #78350f40;
+      --u2: #38bdf8;
+      --u2-soft: #0c4a6e40;
+      --u3: #a78bfa;
+      --u3-soft: #4c1d9540;
+      --u4: #34d399;
+      --u4-soft: #064e3b40;
+
+      --danger: #f87171;
+      --danger-soft: #7f1d1d40;
+      --warn: #fbbf24;
+      --warn-soft: #78350f40;
+      --ok: #34d399;
+      --ok-soft: #064e3b40;
+
+      --code-bg: #1c1c1f;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .page { max-width: 1100px; margin: 0 auto; padding: 0 24px 120px; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    margin: 0 0 48px;
+    padding: 56px 24px 48px;
+    background:
+      radial-gradient(ellipse at top left, var(--u2-soft) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, var(--u1-soft) 0%, transparent 50%),
+      var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--fg-muted); margin-bottom: 16px;
+  }
+  .hero .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .hero h1 {
+    font-size: clamp(28px, 4.5vw, 40px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    font-weight: 700;
+  }
+  .hero p.lede {
+    font-size: 16px;
+    color: var(--fg-muted);
+    max-width: 760px;
+    margin: 0 0 24px;
+    line-height: 1.55;
+  }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--fg-muted);
+  }
+  .pill code { background: transparent; border: none; padding: 0; color: var(--fg); }
+  .pill.active { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+  .pill.active .status { color: var(--ok); font-weight: 600; }
+
+  /* ---------- Stats ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 56px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .stat .num {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--fg); line-height: 1;
+  }
+  .stat .label { margin-top: 6px; font-size: 12.5px; color: var(--fg-muted); }
+
+  /* ---------- Section ---------- */
+  section { margin-bottom: 56px; scroll-margin-top: 20px; }
+  .section-head {
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 0 8px;
+  }
+  .section-head h2 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
+  }
+  .section-head .badge {
+    width: 28px; height: 28px;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .section-sub {
+    color: var(--fg-muted); font-size: 14.5px; margin: 0 0 24px; max-width: 78ch;
+  }
+
+  /* ---------- TOC ---------- */
+  .toc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 56px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .toc a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    color: var(--fg-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-radius: 6px;
+  }
+  .toc a:hover { background: var(--surface-2); color: var(--fg); }
+  .toc a .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  /* ---------- Requirements (R-IDs) ---------- */
+  .req-group-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em;
+    font-weight: 700; color: var(--accent-fg); margin: 18px 0 8px;
+  }
+  .req-pill-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 10px;
+  }
+  .req-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 10px;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .req-item .rid {
+    background: var(--accent-soft);
+    color: var(--accent-fg);
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 5px;
+    padding: 4px 0;
+    text-align: center;
+    height: fit-content;
+  }
+
+  /* ---------- Decisions ---------- */
+  .decisions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 760px) { .decisions { grid-template-columns: 1fr; } }
+  .decision {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .decision .title {
+    font-weight: 600; margin: 0 0 6px; color: var(--fg);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px;
+  }
+  .decision .title .num {
+    min-width: 38px; height: 22px; padding: 0 6px;
+    display: inline-grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 6px;
+    font-size: 11px; font-weight: 700; font-family: ui-monospace, monospace;
+  }
+  .decision p { margin: 0; color: var(--fg-muted); font-size: 13px; line-height: 1.6; }
+  .decision .src { display: block; margin-top: 8px; font-size: 11.5px; color: var(--fg-dim); }
+
+  /* ---------- Design diagram ---------- */
+  .dep-graph {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .dep-graph svg { display: block; width: 100%; height: auto; max-width: 820px; margin: 0 auto; }
+  .design-note {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    color: var(--fg);
+    margin-top: 16px;
+    line-height: 1.6;
+  }
+
+  /* ---------- Implementation units (timeline) ---------- */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px; top: 14px; bottom: 14px;
+    width: 2px;
+    background: var(--border-strong);
+  }
+  .unit {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .unit::before {
+    content: '';
+    position: absolute;
+    left: -27px; top: 18px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--accent);
+    z-index: 2;
+  }
+  .unit[data-u="1"]::before { border-color: var(--u1); background: var(--u1); }
+  .unit[data-u="2"]::before { border-color: var(--u2); background: var(--u2); }
+  .unit[data-u="3"]::before { border-color: var(--u3); background: var(--u3); }
+
+  .unit-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .unit-head .uid {
+    display: inline-grid; place-items: center;
+    font-family: ui-monospace, monospace;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: white;
+    width: 32px; height: 24px;
+    border-radius: 5px;
+  }
+  .unit[data-u="1"] .uid { background: var(--u1); }
+  .unit[data-u="2"] .uid { background: var(--u2); }
+  .unit[data-u="3"] .uid { background: var(--u3); }
+  .unit-head h3 { margin: 0; font-size: 15.5px; font-weight: 600; letter-spacing: -0.005em; }
+  .unit-head .deps {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--fg-muted);
+    background: var(--surface-2);
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .unit-body { padding: 0; }
+  .unit-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 16px;
+    padding: 12px 18px;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .unit-row:last-child { border-bottom: none; }
+  .unit-row .label {
+    color: var(--fg-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .unit-row .body ul { margin: 0; padding-left: 18px; }
+  .unit-row .body li { margin: 3px 0; }
+  .files { display: flex; flex-direction: column; gap: 4px; }
+  .files .file {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: ui-monospace, monospace; font-size: 12.5px;
+  }
+  .files .file .tag {
+    display: inline-block;
+    background: var(--accent-soft); color: var(--accent-fg);
+    padding: 1px 6px; border-radius: 4px;
+    font-size: 10.5px; font-family: -apple-system, sans-serif; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    min-width: 50px; text-align: center;
+  }
+  .files .file .tag.create { background: var(--ok-soft); color: var(--ok); }
+  .files .file .tag.modify { background: var(--warn-soft); color: var(--warn); }
+  .files .file .tag.test   { background: var(--u3-soft); color: var(--u3); }
+  .scenario-tag {
+    display: inline-block;
+    font-size: 10.5px; font-weight: 600;
+    padding: 1px 6px; border-radius: 4px; margin-right: 6px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .scenario-tag.happy { background: var(--ok-soft);     color: var(--ok); }
+  .scenario-tag.edge  { background: var(--warn-soft);   color: var(--warn); }
+  .scenario-tag.error { background: var(--danger-soft); color: var(--danger); }
+  .scenario-tag.integ { background: var(--u3-soft);     color: var(--u3); }
+
+  /* ---------- AE / Open questions ---------- */
+  .q-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .q-split { grid-template-columns: 1fr; } }
+  .q-col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .q-col.resolved { border-left: 3px solid var(--ok); }
+  .q-col.deferred { border-left: 3px solid var(--warn); }
+  .q-col h4 {
+    margin: 0 0 12px; font-size: 13px; font-weight: 600;
+    color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .q-list { list-style: none; padding: 0; margin: 0; }
+  .q-list li {
+    padding: 10px 0; border-bottom: 1px dashed var(--border);
+    font-size: 13.5px; line-height: 1.55;
+  }
+  .q-list li:last-child { border-bottom: none; }
+  .q-list .q { color: var(--fg); font-weight: 500; margin-bottom: 3px; }
+  .q-list .a { color: var(--fg-muted); }
+
+  /* ---------- AE table ---------- */
+  .ae-table, .risks {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .ae-table table, .risks table { width: 100%; border-collapse: collapse; }
+  .ae-table th, .ae-table td, .risks th, .risks td {
+    text-align: left; padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px; vertical-align: top; line-height: 1.55;
+  }
+  .ae-table tr:last-child td, .risks tr:last-child td { border-bottom: none; }
+  .ae-table th, .risks th {
+    background: var(--surface-2); color: var(--fg-muted);
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
+  }
+  .ae-table td .aeid {
+    font-family: ui-monospace, monospace; font-weight: 700; font-size: 11.5px;
+    color: var(--accent-fg);
+  }
+  .risks td:first-child { width: 42%; color: var(--fg); }
+
+  /* ---------- Files manifest ---------- */
+  .file-list {
+    list-style: none; padding: 0; margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .file-list li {
+    display: grid;
+    grid-template-columns: 60px 1fr 120px;
+    gap: 12px; padding: 10px 16px; align-items: center;
+    border-bottom: 1px solid var(--border);
+    font-family: ui-monospace, monospace; font-size: 13px;
+  }
+  .file-list li:last-child { border-bottom: none; }
+  .file-list .badge {
+    font-size: 10.5px; font-weight: 700; text-align: center;
+    padding: 3px 0; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .file-list .badge.create { background: var(--ok-soft); color: var(--ok); }
+  .file-list .badge.modify { background: var(--warn-soft); color: var(--warn); }
+  .file-list .uref { color: var(--fg-muted); font-size: 11.5px; text-align: right; }
+
+  /* ---------- callout ---------- */
+  .callout {
+    background: var(--warn-soft);
+    border-left: 3px solid var(--warn);
+    padding: 14px 18px; border-radius: var(--radius-sm);
+    font-size: 13.5px; line-height: 1.6; margin-top: 16px;
+  }
+  .callout strong { color: var(--fg); }
+
+  /* ---------- CTA ---------- */
+  .cta {
+    margin-top: 32px; padding: 24px;
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    display: flex; align-items: center; gap: 18px;
+  }
+  @media (max-width: 600px) { .cta { flex-direction: column; align-items: flex-start; } }
+  .cta .arrow {
+    width: 44px; height: 44px; display: grid; place-items: center;
+    background: var(--accent); color: white; border-radius: 50%; flex-shrink: 0;
+  }
+  .cta-text strong { display: block; font-size: 15px; margin-bottom: 4px; }
+  .cta-text span { color: var(--fg-muted); font-size: 13.5px; }
+
+  .ico { width: 16px; height: 16px; display: inline-block; vertical-align: -3px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow"><span class="dot"></span> Plan · Standard scope · 3 units</div>
+    <h1>Markdown raw/preview: scroll-positie én onopgeslagen edits overleven de wissel</h1>
+    <p class="lede">
+      Markdown wisselt vandaag van pane via een ternary die de inactieve editor unmount —
+      scroll én edits weg. We spiegelen het bewezen <code>HtmlEditor</code>-patroon: één
+      container bezit content/dirty/save/watcher (de single-source-of-truth), beide panes
+      blijven gemount en togglen via <code>visibility:hidden</code>, en de content reconcilieert
+      bij de wissel. Geen aanpak voor de HTML-editor of cross-tab scroll.
+    </p>
+    <div class="meta-row">
+      <span class="pill">📅 <code>2026-06-08</code></span>
+      <span class="pill">🏷 <code>feat</code></span>
+      <span class="pill active">● <span class="status">completed</span></span>
+      <span class="pill">🌿 <code>feat/raw-preview-scroll-position</code></span>
+      <span class="pill">📄 origin: <code>docs/brainstorm/2026-06-08-raw-preview-scroll-position.html</code></span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+<!-- ============ STATS ============ -->
+<div class="stats">
+  <div class="stat"><div class="num">3</div><div class="label">Implementation units</div></div>
+  <div class="stat"><div class="num">7</div><div class="label">Requirements (R1–R7)</div></div>
+  <div class="stat"><div class="num">6</div><div class="label">Key decisions</div></div>
+  <div class="stat"><div class="num">2</div><div class="label">Nieuwe files</div></div>
+  <div class="stat"><div class="num">5</div><div class="label">Risks</div></div>
+</div>
+
+<!-- ============ TOC ============ -->
+<nav class="toc" aria-label="Inhoudsopgave">
+  <a href="#problem"><span class="dot"></span> Problem Frame</a>
+  <a href="#decisions"><span class="dot"></span> Key Technical Decisions</a>
+  <a href="#design"><span class="dot"></span> Technical Design</a>
+  <a href="#req"><span class="dot"></span> Requirements</a>
+  <a href="#units"><span class="dot"></span> Implementation Units</a>
+  <a href="#ae"><span class="dot"></span> Acceptance Examples</a>
+  <a href="#verify"><span class="dot"></span> Manual Verification</a>
+  <a href="#scope"><span class="dot"></span> Scope Boundaries</a>
+  <a href="#questions"><span class="dot"></span> Open Questions</a>
+  <a href="#risks"><span class="dot"></span> Risks</a>
+  <a href="#files"><span class="dot"></span> Files Manifest</a>
+  <a href="#sources"><span class="dot"></span> Sources</a>
+</nav>
+
+<!-- ============ PROBLEM FRAME ============ -->
+<section id="problem">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
+    <h2>Problem Frame</h2>
+  </div>
+  <p class="section-sub">
+    De markdown-branch in <code>src/components/Editor/EditorContainer.tsx</code> rendert óf
+    <code>MarkdownEditor</code> (Milkdown) óf <code>CodeEditor</code> (Monaco) via een ternary.
+    Bij elke wissel unmount React de inactieve editor; de nieuwe mount leest het bestand vers van
+    disk (<code>MarkdownEditor.tsx</code> en <code>CodeEditor.tsx</code> laden in een effect op mount).
+    Eén oorzaak — de unmount gooit in-memory state weg — geeft twee symptomen: de scroll springt naar
+    boven, en onopgeslagen edits in de verlaten pane verdwijnen. De HTML-branch loste het mount-deel al
+    op (beide panes gemount, CSS-toggle), maar daar is de preview een read-only iframe; markdown heeft
+    <em>twee editable panes</em> en vereist dus inhoudelijke reconciliatie.
+  </p>
+</section>
+
+<!-- ============ KEY TECHNICAL DECISIONS ============ -->
+<section id="decisions">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/><circle cx="12" cy="12" r="3"/></svg></span>
+    <h2>Key Technical Decisions</h2>
+  </div>
+  <p class="section-sub">De load-bearing keuzes. KTD1/KTD6 komen uit de brainstorm; KTD2/KTD4/KTD5 zijn afgedwongen door bestaande learnings en repo-onderzoek.</p>
+  <div class="decisions">
+    <div class="decision">
+      <div class="title"><span class="num">KTD1</span> Container bezit de state (spiegel <code>HtmlEditor</code>)</div>
+      <p><code>MarkdownEditor</code> wordt de enige eigenaar van content, saved-content, dirty, save en file-watcher voor een markdown-tab; de twee panes worden views. Dit is de single source of truth die R5 oplost — geen twee buffers die vechten.</p>
+      <span class="src">origin: KD1 · pattern: <code>src/components/Editor/HtmlEditor.tsx</code></span>
+    </div>
+    <div class="decision">
+      <div class="title"><span class="num">KTD2</span> Toggle via <code>visibility:hidden</code>, niet <code>display:none</code></div>
+      <p>Beide panes blijven absoluut gepositioneerd in een <code>relative</code> wrapper; de inactieve krijgt <code>visibility:hidden</code>. <code>display:none</code> nuleert layout en geeft stale scroll-geometry bij reveal — wat precies het doel ondermijnt. Met visibility blijft de pane gelayout, dus <code>scrollTop</code> overleeft zonder JS.</p>
+      <span class="src">learning: <code>docs/solutions/ui-bugs/chat-scrollbar-disappears-fitaddon-fit-noop.md</code></span>
+    </div>
+    <div class="decision">
+      <div class="title"><span class="num">KTD3</span> Reconciliatie bij activatie, bidirectioneel — niet continu</div>
+      <p>Milkdown is een ProseMirror-WYSIWYG met eigen state; content elke toetsaanslag als controlled prop terugvoeren reset de cursor. De panes zijn nooit tegelijk zichtbaar, dus: push de canonieke content alléén in de net-geactiveerde pane, en lees edits uit de actieve pane op.</p>
+      <span class="src">origin: open vraag "reconciliatie-timing" → opgelost</span>
+    </div>
+    <div class="decision">
+      <div class="title"><span class="num">KTD4</span> Vervang <code>__milkdownReplace</code> window-global door een per-instance handle</div>
+      <p>De huidige <code>window.__milkdownReplace</code> is één global die botst zodra meerdere markdown-tabs gemount zijn (last-mount-wins) — een latent bug vandaag. De reconciliatie heeft een betrouwbare handle nodig, dus we vervangen de global door een ref/imperative handle per editor-instance.</p>
+      <span class="src">research: <code>MarkdownEditor.tsx:154</code> + <code>:231</code></span>
+    </div>
+    <div class="decision">
+      <div class="title"><span class="num">KTD5</span> Eén save/keydown-handler op containerniveau, gegate op echte <code>isActive</code></div>
+      <p>Met beide panes gemount zouden per-pane globale listeners dubbel afvuren (de PR&nbsp;#29-regressie). Eén handler in de container, gegate op de echte tab-<code>isActive</code>, voorkomt dat per constructie — verboden hidden panes te laten saven.</p>
+      <span class="src">learning: <code>docs/solutions/logic-errors/editor-save-handler-double-fire-and-isactive-propagation.md</code></span>
+    </div>
+    <div class="decision">
+      <div class="title"><span class="num">KTD6</span> Round-trip fidelity voorlopig geaccepteerd</div>
+      <p>Preview→raw serialiseert via Milkdown's <code>getMarkdown()</code>, wat ruwe opmaak kan normaliseren (witruimte, list-markers). Niet hier opgelost; gedragen als bekend risico met een herzieningstrigger (zie Open Questions).</p>
+      <span class="src">origin: KD4</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TECHNICAL DESIGN ============ -->
+<section id="design">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+    <h2>High-Level Technical Design</h2>
+  </div>
+  <p class="section-sub">Eigendoms- en datastroom-model na de rework. De container is de bron van waarheid; panes zijn views die bij activatie gesynct worden.</p>
+  <div class="dep-graph">
+    <svg viewBox="0 0 820 430" role="img" aria-label="Component- en datastroomdiagram van de markdown editor container">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#71717a"/>
+        </marker>
+        <marker id="arrUp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#2563eb"/>
+        </marker>
+      </defs>
+
+      <!-- EditorContainer -->
+      <rect x="290" y="20" width="240" height="56" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="410" y="44" text-anchor="middle" font-size="14" font-weight="700" fill="#18181b">EditorContainer</text>
+      <text x="410" y="62" text-anchor="middle" font-size="11.5" fill="#52525b">toggle-knoppen → mode: 'raw' | 'preview'</text>
+
+      <!-- mode prop arrow -->
+      <line x1="410" y1="76" x2="410" y2="120" stroke="#71717a" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="420" y="102" font-size="11" fill="#52525b">mode</text>
+
+      <!-- Container (state owner) -->
+      <rect x="170" y="120" width="480" height="96" rx="12" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.8"/>
+      <text x="410" y="146" text-anchor="middle" font-size="14" font-weight="700" fill="#18181b">MarkdownEditor — state owner</text>
+      <text x="410" y="168" text-anchor="middle" font-size="11.5" fill="#52525b">single source of truth: content · savedContent · dirty</text>
+      <text x="410" y="186" text-anchor="middle" font-size="11.5" fill="#52525b">file-load · file-watcher · één save/Ctrl+S handler (gegate op isActive)</text>
+      <text x="410" y="204" text-anchor="middle" font-size="11.5" fill="#52525b">reconcile-on-activate · per-instance replace-handle (geen global)</text>
+
+      <!-- Push down arrows to panes -->
+      <line x1="300" y1="216" x2="240" y2="280" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrUp)"/>
+      <line x1="520" y1="216" x2="580" y2="280" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrUp)"/>
+      <text x="150" y="252" font-size="10.5" fill="#1e40af">push canonical</text>
+      <text x="150" y="266" font-size="10.5" fill="#1e40af">bij activatie</text>
+
+      <!-- onChange up arrows -->
+      <line x1="270" y1="280" x2="330" y2="216" stroke="#71717a" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+      <line x1="550" y1="280" x2="490" y2="216" stroke="#71717a" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+      <text x="600" y="252" font-size="10.5" fill="#52525b">onChange →</text>
+      <text x="600" y="266" font-size="10.5" fill="#52525b">canonical (actief)</text>
+
+      <!-- Raw pane -->
+      <rect x="120" y="282" width="240" height="86" rx="10" fill="#ffffff" stroke="#d4d4d8" stroke-width="1.5"/>
+      <text x="240" y="308" text-anchor="middle" font-size="13.5" font-weight="700" fill="#18181b">Monaco — Raw</text>
+      <text x="240" y="328" text-anchor="middle" font-size="11" fill="#52525b">editable · eigen scrollTop</text>
+      <text x="240" y="346" text-anchor="middle" font-size="11" fill="#52525b">visibility togglet zichtbaarheid</text>
+
+      <!-- Preview pane -->
+      <rect x="460" y="282" width="240" height="86" rx="10" fill="#ffffff" stroke="#d4d4d8" stroke-width="1.5"/>
+      <text x="580" y="308" text-anchor="middle" font-size="13.5" font-weight="700" fill="#18181b">Milkdown — Preview</text>
+      <text x="580" y="328" text-anchor="middle" font-size="11" fill="#52525b">editable WYSIWYG · eigen scrollTop</text>
+      <text x="580" y="346" text-anchor="middle" font-size="11" fill="#52525b">replace-handle (replaceAll)</text>
+
+      <!-- both mounted note -->
+      <rect x="120" y="392" width="580" height="26" rx="6" fill="#f4f4f5" stroke="#e4e4e7" stroke-width="1"/>
+      <text x="410" y="409" text-anchor="middle" font-size="11.5" fill="#52525b">Beide panes altijd gemount (relative wrapper, absolute inset-0) — alleen één zichtbaar via visibility:hidden</text>
+    </svg>
+  </div>
+  <div class="design-note">
+    <strong>Reconcile-on-toggle, in één regel:</strong> als <code>mode</code> wijzigt, vergelijkt de container z'n
+    canonieke content met de content van de net-zichtbaar wordende pane; verschillen ze, dan duwt de container
+    de canonieke content in die pane (Monaco <code>setValue</code> / Milkdown <code>replaceAll</code>). Terwijl een pane
+    actief is, schrijft z'n <code>onChange</code> terug naar de canonieke content. Scroll hoeft niet bewaard te worden —
+    de pane blijft gelayout (KTD2), dus <code>scrollTop</code> staat er nog.
+  </div>
+</section>
+
+<!-- ============ REQUIREMENTS ============ -->
+<section id="req">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+    <h2>Requirements</h2>
+  </div>
+  <p class="section-sub">Zeven requirements uit de origin doorgetrokken. Elke unit hieronder citeert de R-IDs die hij vervult.</p>
+
+  <div class="req-group-label">Scroll-geheugen</div>
+  <div class="req-pill-grid">
+    <div class="req-item"><span class="rid">R1</span><span>Bij wisselen raw↔preview herstelt elke pane de scroll-positie van toen hij voor het laatst zichtbaar was.</span></div>
+    <div class="req-item"><span class="rid">R2</span><span>Terugkeren naar een pane landt op de eerder bekeken positie zonder handmatig scrollen.</span></div>
+  </div>
+
+  <div class="req-group-label">Edit-behoud</div>
+  <div class="req-pill-grid">
+    <div class="req-item"><span class="rid">R3</span><span>Onopgeslagen edits in de ene pane gaan niet verloren bij wisselen naar de andere en terug.</span></div>
+    <div class="req-item"><span class="rid">R4</span><span>Edits in raw verschijnen in preview na de wissel, en omgekeerd — de actieve pane toont de meest recente content.</span></div>
+    <div class="req-item"><span class="rid">R5</span><span>Dirty-state is consistent over beide panes: één bron per tab; <code>Ctrl+S</code> bewaart de meest recente content ongeacht welke pane actief is.</span></div>
+  </div>
+
+  <div class="req-group-label">Geen regressies</div>
+  <div class="req-pill-grid">
+    <div class="req-item"><span class="rid">R6</span><span>Externe bestandswijzigingen (file watcher) werken beide panes consistent bij; de "overschrijf geen onopgeslagen edits"-bescherming blijft intact.</span></div>
+    <div class="req-item"><span class="rid">R7</span><span>De eerste wissel naar preview landt op preview's eigen beginpositie (bovenaan) — cross-pane positionering wordt expliciet niet geleverd en is geen bug.</span></div>
+  </div>
+</section>
+
+<!-- ============ IMPLEMENTATION UNITS ============ -->
+<section id="units">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+    <h2>Implementation Units</h2>
+  </div>
+  <p class="section-sub">Drie units. U1 en U3 zijn co-dependent (de container is dode code tot U3 hem rendert); U2 is de gedrags-laag erbovenop. Manuele verificatie staat apart hieronder.</p>
+
+  <div class="timeline">
+
+    <!-- ===== U1 ===== -->
+    <article class="unit" data-u="1">
+      <div class="unit-head">
+        <span class="uid">U1</span>
+        <h3><code>MarkdownEditor</code> wordt een dual-pane state-owner</h3>
+        <span class="deps">deps: none</span>
+      </div>
+      <div class="unit-body">
+        <div class="unit-row"><span class="label">Goal</span><div class="body">Maak <code>MarkdownEditor</code> de enige eigenaar van content/dirty/save/file-watcher voor een markdown-tab, met een Monaco raw-view én een Milkdown preview-view tegelijk gemount, getoggeld door een <code>mode</code>-prop. Spiegel <code>HtmlEditor</code>. Dit zet R5 neer en maakt R1/R3 mogelijk.</div></div>
+        <div class="unit-row"><span class="label">Reqs</span><div class="body">R1 · R3 · R5 · R6</div></div>
+        <div class="unit-row"><span class="label">Files</span>
+          <div class="body files">
+            <span class="file"><span class="tag modify">modify</span><code>src/components/Editor/MarkdownEditor.tsx</code></span>
+            <span class="file"><span class="tag create">create</span><code>src/components/Editor/MarkdownPreviewPane.tsx</code></span>
+            <span class="file"><span class="tag modify">modify</span><code>src/index.css</code></span>
+            <span class="file"><span class="tag test">test</span><code>test/MarkdownEditor.test.tsx</code> <em>(save-gating)</em></span>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Approach</span>
+          <div class="body">
+            <ul>
+              <li>Spiegel <code>HtmlEditor</code>'s lifecycle: <code>api.fs.readFile</code>, <code>fileWatcherEvents</code> subscribe, <code>savedContentRef</code>/<code>currentContentRef</code>, dirty in <code>projectStore</code> (<code>setEditorDirty</code>), en de self-write-echo-onderdrukking (<code>pendingSelfWriteAtRef</code>) zodat een watcher-reload geen eigen save terugdraait (R6).</li>
+              <li>Eén <code>editor-save-request</code> + Ctrl+S keydown-handler op containerniveau, gegate op de echte <code>isActive</code> (KTD5). Schrijft de canonieke content, ongeacht zichtbare pane.</li>
+              <li>Render-shell: <code>relative</code> wrapper; elke pane <code>absolute inset-0</code>; inactieve pane <code>visibility:hidden</code> (KTD2). Géén <code>display:none</code> op de panes.</li>
+              <li>Raw-pane: inline <code>@monaco-editor/react</code> <code>&lt;Editor language="markdown"&gt;</code> met dezelfde options als <code>CodeEditor</code> (geen herbruik van <code>CodeEditor</code> — die bezit z'n eigen state).</li>
+              <li>Preview-pane: nieuwe <code>MarkdownPreviewPane</code> bevat <code>MilkdownProvider</code>/<code>Milkdown</code> + de huidige plugins (<code>commonmark</code>, <code>gfm</code>, <code>history</code>, <code>clipboard</code>, <code>indent</code>, <code>cursor</code>, <code>listener</code>, <code>taskCheckboxToggle</code>) en exposeert een <code>replace(content)</code> handle via ref — vervangt <code>window.__milkdownReplace</code> (KTD4).</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Patterns</span><div class="body"><code>src/components/Editor/HtmlEditor.tsx</code> (state-owner, watcher, echo-suppress, dirty, beide panes gemount) · huidige Milkdown-setup in <code>MarkdownEditor.tsx</code> · Monaco-options in <code>CodeEditor.tsx</code>.</div></div>
+        <div class="unit-row"><span class="label">Test scenarios</span>
+          <div class="body">
+            <ul>
+              <li><span class="scenario-tag happy">Happy</span>Container met <code>isActive=true</code>: <code>editor-save-request</code> event → <code>api.fs.writeFile</code> aangeroepen met de canonieke content.</li>
+              <li><span class="scenario-tag error">Error</span>Container met <code>isActive=false</code>: <code>editor-save-request</code> + Ctrl+S keydown → <code>writeFile</code> NIET aangeroepen (hidden/inactive tab saved niet — de PR&nbsp;#29-regressie).</li>
+              <li><span class="scenario-tag integ">Integ</span>Watcher <code>file-changed</code> met schone buffer → content state ververst; met dirty buffer én afwijkende disk → edits behouden + console-warn (mirror <code>HtmlEditor</code>).</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Verification</span><div class="body">Markdown-tab opent met beide panes in de DOM (één <code>visibility:hidden</code>); Ctrl+S in raw bewaart; watcher-reload draait een eigen save niet terug. Scroll-/layout-gedrag wordt manueel geverifieerd (zie Manual Verification) — niet headless-testbaar.</div></div>
+      </div>
+    </article>
+
+    <!-- ===== U2 ===== -->
+    <article class="unit" data-u="2">
+      <div class="unit-head">
+        <span class="uid">U2</span>
+        <h3>Bidirectionele content-reconciliatie bij de toggle</h3>
+        <span class="deps">deps: U1</span>
+      </div>
+      <div class="unit-body">
+        <div class="unit-row"><span class="label">Goal</span><div class="body">Zorg dat edits over de panes heen meekomen: bij <code>mode</code>-wissel duwt de container de canonieke content in de net-actieve pane (alleen bij verschil); de actieve pane schrijft via <code>onChange</code> terug. Dit levert R3/R4 en bewaakt de single dirty-source (R5).</div></div>
+        <div class="unit-row"><span class="label">Reqs</span><div class="body">R3 · R4 · R5</div></div>
+        <div class="unit-row"><span class="label">Files</span>
+          <div class="body files">
+            <span class="file"><span class="tag create">create</span><code>src/utils/editorReconcile.ts</code> <em>(pure helpers)</em></span>
+            <span class="file"><span class="tag modify">modify</span><code>src/components/Editor/MarkdownEditor.tsx</code></span>
+            <span class="file"><span class="tag test">test</span><code>test/editorReconcile.test.ts</code></span>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Approach</span>
+          <div class="body">
+            <ul>
+              <li>Extraheer de beslislogica naar pure functies in <code>editorReconcile.ts</code> zodat ze headless testbaar zijn (CLAUDE.md: schrijf geen code die je niet kunt testen): bv. <code>needsSync(activePaneContent, canonical)</code> en <code>computeDirty(current, saved)</code>.</li>
+              <li><code>useEffect</code> op <code>mode</code>: bij activatie van een pane, als <code>needsSync</code> → push canonical via de pane-handle (Monaco <code>setValue</code> + cursor-herstel zoals de bestaande watcher-reload; Milkdown <code>replace</code>). Inactieve pane blijft bevroren.</li>
+              <li>Actieve pane's <code>onChange</code> updatet <code>currentContentRef</code> + dirty. Bij de wissel wordt eerst de uittredende pane's laatste content uitgelezen en canonical gemaakt, dán de intredende pane gesynct.</li>
+              <li>Let op de reconcile-volgorde-discipline (restore ná subscribe) uit de terminal-LRU-learning: lees-uittredend → schrijf-intredend, niet andersom.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Patterns</span><div class="body">Watcher-reload cursor-herstel in <code>CodeEditor.tsx</code> (<code>getPosition</code>/<code>setValue</code>/<code>setPosition</code>) · <code>replaceAll</code>-gebruik in huidige <code>MarkdownEditor.tsx</code>.</div></div>
+        <div class="unit-row"><span class="label">Test scenarios</span>
+          <div class="body">
+            <ul>
+              <li><span class="scenario-tag happy">Happy</span><code>needsSync('a', 'b')</code> → <code>true</code>; <code>needsSync('a', 'a')</code> → <code>false</code> (geen onnodige replace die de cursor reset).</li>
+              <li><span class="scenario-tag happy">Happy</span>Covers AE2. Canonical bevat een nieuw geschreven heading → na sync bevat de doel-pane die heading.</li>
+              <li><span class="scenario-tag edge">Edge</span><code>computeDirty(current, saved)</code>: gelijk → false; afwijkend → true; lege string vs lege string → false.</li>
+              <li><span class="scenario-tag edge">Edge</span>Wissel zonder edits (alleen scroll) → <code>needsSync</code> false → geen replace, dus geen cursor-/scroll-verstoring.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Verification</span><div class="body">Edit in raw (niet opgeslagen) → wissel naar preview toont de edit; en omgekeerd. Eén dirty-indicator per tab; <code>Ctrl+S</code> bewaart de gecombineerde laatste content.</div></div>
+      </div>
+    </article>
+
+    <!-- ===== U3 ===== -->
+    <article class="unit" data-u="3">
+      <div class="unit-head">
+        <span class="uid">U3</span>
+        <h3><code>EditorContainer</code> markdown-branch gedreven door <code>mode</code></h3>
+        <span class="deps">deps: U1</span>
+      </div>
+      <div class="unit-body">
+        <div class="unit-row"><span class="label">Goal</span><div class="body">Vervang de ternary die <code>MarkdownEditor</code> of <code>CodeEditor</code> rendert door één <code>MarkdownEditor</code> met een <code>mode</code>-prop, gedreven door de bestaande Raw/Preview-toggleknoppen — pariteit met de HTML-branch.</div></div>
+        <div class="unit-row"><span class="label">Reqs</span><div class="body">R1 · R2 · R7 (enabling — maakt de gemounte container daadwerkelijk zichtbaar)</div></div>
+        <div class="unit-row"><span class="label">Files</span>
+          <div class="body files">
+            <span class="file"><span class="tag modify">modify</span><code>src/components/Editor/EditorContainer.tsx</code></span>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Approach</span>
+          <div class="body">
+            <ul>
+              <li>Spiegel de HTML-branch (regels ~40–85): de <code>useWysiwyg</code>-boolean wordt een <code>mode: 'raw' | 'preview'</code> (default <code>'preview'</code>, behoudt huidige WYSIWYG-default); knoppen zetten <code>mode</code>.</li>
+              <li>Render één <code>&lt;MarkdownEditor mode={mode} .../&gt;</code> binnen de bestaande <code>Suspense</code>; verwijder de <code>CodeEditor</code>-tak uit de markdown-branch. <code>CodeEditor</code> blijft ongewijzigd voor niet-md/html bestanden.</li>
+              <li><code>useState mode</code> blijft bewaard over tab-switches (component blijft gemount via <code>TerminalViewport</code>) — geen extra werk nodig.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Patterns</span><div class="body">De HTML-branch in <code>EditorContainer.tsx</code> (<code>usePreview</code> → <code>mode</code> prop op <code>HtmlEditor</code>).</div></div>
+        <div class="unit-row"><span class="label">Test scenarios</span>
+          <div class="body">
+            <ul>
+              <li><span class="scenario-tag happy">Happy</span>Een <code>.md</code> rendert de toggle-knoppen + <code>MarkdownEditor</code>; klikken op Raw zet <code>mode='raw'</code>, Preview zet <code>mode='preview'</code> (assert op doorgegeven prop).</li>
+              <li><span class="scenario-tag edge">Edge</span>Een <code>.txt</code>/code-bestand rendert nog steeds <code>CodeEditor</code> ongewijzigd (geen regressie op de niet-markdown branch).</li>
+            </ul>
+          </div>
+        </div>
+        <div class="unit-row"><span class="label">Verification</span><div class="body">Wisselen tussen Raw en Preview unmount niets meer; <code>npm run build</code> + <code>npm test</code> groen. Volledige feature werkt na U1+U2+U3.</div></div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ============ ACCEPTANCE EXAMPLES ============ -->
+<section id="ae">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+    <h2>Acceptance Examples</h2>
+  </div>
+  <p class="section-sub">Uit de origin doorgetrokken. De meeste zijn scroll-/layout-gedrag en dus manueel (zie hieronder); de content-reconciliatie is wél automatisch gedekt.</p>
+  <div class="ae-table">
+    <table>
+      <tr><th style="width:60px">ID</th><th>Scenario</th><th style="width:160px">Dekking</th></tr>
+      <tr><td><span class="aeid">AE1</span></td><td>Bewerk halverwege in raw, scroll omlaag, wissel naar preview en terug → scroll hersteld, edits aanwezig. (R2, R3)</td><td>Manueel (scroll) + U2-test (edits)</td></tr>
+      <tr><td><span class="aeid">AE2</span></td><td>Typ een nieuwe heading in raw (niet opgeslagen), wissel naar preview → heading gerenderd. (R4)</td><td>U2 reconcile-test</td></tr>
+      <tr><td><span class="aeid">AE3</span></td><td>Open een doc en wissel meteen naar preview → preview staat bovenaan (geen cross-mapping). (R7)</td><td>Manueel</td></tr>
+      <tr><td><span class="aeid">AE4</span></td><td>Bewerk raw (niet opslaan), wissel naar preview, bewerk verder, <code>Ctrl+S</code> → bestand bevat gecombineerde laatste content; dirty weg. (R5)</td><td>Manueel + U1 save-test</td></tr>
+      <tr><td><span class="aeid">AE5</span></td><td>Externe edit door Claude met schone buffer → beide panes tonen nieuwe content. (R6)</td><td>Manueel + U1 watcher-test</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ MANUAL VERIFICATION ============ -->
+<section id="verify">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+    <h2>Manual Verification</h2>
+  </div>
+  <p class="section-sub">Scroll- en layout-gedrag is niet headless-unit-testbaar (zelfde klasse als de FitAddon-learning). Verplichte handmatige pass vóór merge:</p>
+  <div class="q-col">
+    <ul class="q-list">
+      <li><span class="q">Scroll-behoud (R1/R2)</span><span class="a">Scroll raw één scherm omlaag → Preview → Raw: zelfde positie, geen sprong.</span></li>
+      <li><span class="q">Edit-behoud (R3/R4)</span><span class="a">Onopgeslagen edits in raw overleven een wissel naar preview en terug, en verschijnen in preview.</span></li>
+      <li><span class="q">Eerste peek (R7)</span><span class="a">Vers geopend doc → Preview staat bovenaan; bevestig dat dit als verwacht voelt.</span></li>
+      <li><span class="q">File-watcher (R6/AE5)</span><span class="a">Laat Claude het bestand wijzigen met schone buffer → beide panes tonen nieuwe content; met dirty buffer blijven edits staan.</span></li>
+      <li><span class="q">Multi-tab</span><span class="a">Twee markdown-tabs open: reconciliatie/dirty/save gaan naar de juiste tab (verifieert dat KTD4 de global-collision oplost).</span></li>
+      <li><span class="q">Split-view &amp; layout</span><span class="a">Geen layout-regressie in split-view of bij tab-switch; Monaco rendert correct na reveal (geen 0-breedte).</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ SCOPE ============ -->
+<section id="scope">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></span>
+    <h2>Scope Boundaries</h2>
+  </div>
+  <div class="q-split">
+    <div class="q-col deferred">
+      <h4>Uitgesteld (later mogelijk)</h4>
+      <ul class="q-list">
+        <li><span class="q">Cross-pane scroll-sync</span><span class="a">Landen op exact dezelfde inhoudelijke plek in de andere view (proportioneel of regel-gemapt).</span></li>
+        <li><span class="q">Cross-tab scroll-geheugen</span><span class="a">Scroll bewaren wanneer je een hele editor-tab verlaat en terugkomt (tab-niveau gebruikt nog <code>display:none</code>).</span></li>
+        <li><span class="q">Round-trip fidelity oplossen</span><span class="a">Raw als canoniek behandelen zodat Milkdown opmaak niet normaliseert (KTD6).</span></li>
+      </ul>
+    </div>
+    <div class="q-col">
+      <h4>Buiten deze feature</h4>
+      <ul class="q-list">
+        <li><span class="q">HTML-editor</span><span class="a">Preserveert per-pane scroll al; read-only preview, geen edit-verlies. Geen wijziging.</span></li>
+        <li><span class="q">Brede <code>display:none</code>→<code>visibility</code> refactor</span><span class="a">Alleen de markdown raw/preview-toggle krijgt visibility; andere editors/tab-niveau blijven ongemoeid.</span></li>
+        <li><span class="q">Nieuwe hotkey</span><span class="a">Geen nieuwe gebruikersactie geïntroduceerd; de bestaande toggle verbetert alleen.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPEN QUESTIONS ============ -->
+<section id="questions">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+    <h2>Open Questions</h2>
+  </div>
+  <div class="q-split">
+    <div class="q-col resolved">
+      <h4>✓ Opgelost tijdens planning</h4>
+      <ul class="q-list">
+        <li><span class="q">Reconciliatie-timing</span><span class="a">Alleen bij de wissel — panes zijn nooit tegelijk zichtbaar (KTD3).</span></li>
+        <li><span class="q">Canonieke bron content + dirty</span><span class="a">De container (<code>MarkdownEditor</code>) bezit het; panes zijn views (KTD1).</span></li>
+      </ul>
+    </div>
+    <div class="q-col deferred">
+      <h4>→ Naar implementatie</h4>
+      <ul class="q-list">
+        <li><span class="q">Monaco layout bij reveal</span><span class="a"><code>automaticLayout</code> + <code>visibility:hidden</code> houdt dimensies; verifieer of een expliciete <code>layout()</code> bij activatie nodig is.</span></li>
+        <li><span class="q">Vorm van de Milkdown replace-handle</span><span class="a">Ref-callback vs <code>useImperativeHandle</code> — beslis tijdens U1.</span></li>
+        <li><span class="q">KTD6-herzieningstrigger</span><span class="a">Wanneer is round-trip-normalisatie onacceptabel (bv. code-fences/list-markers hercodeerd)? Bepaalt of de raw-canoniek-fix naar voren wordt gehaald.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RISKS ============ -->
+<section id="risks">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+    <h2>Risks &amp; Dependencies</h2>
+  </div>
+  <div class="risks">
+    <table>
+      <tr><th>Risk</th><th>Mitigatie</th></tr>
+      <tr><td>Round-trip reformatting: preview→raw normaliseert ruwe markdown (KTD6).</td><td>Geaccepteerd voor nu; herzieningstrigger in Open Questions. Raw-canoniek-fix staat klaar als follow-up.</td></tr>
+      <tr><td>Beide chunks (Monaco ~4.2MB + Milkdown ~460KB) laden bij eerste markdown-open i.p.v. lazy per toggle.</td><td>Acceptabel: WYSIWYG-default mount Milkdown vandaag al, en Monaco-config zit in de EditorContainer-chunk. Netto-effect klein; bewust genoteerd (zie terminal-LRU-learning).</td></tr>
+      <tr><td>Twee gemounte editors per markdown-tab × meerdere open tabs = meer geheugen.</td><td>Acceptabel voor typisch gebruik (enkele tabs). Geen LRU op editors; monitoren bij veel open tabs.</td></tr>
+      <tr><td>Monaco/Milkdown layout terwijl <code>visibility:hidden</code> (0-breedte-render bij reveal).</td><td><code>visibility:hidden</code> behoudt layout-dimensies (anders dan <code>display:none</code>), dus dit hoort goed te gaan — expliciet in Manual Verification + Open Questions.</td></tr>
+      <tr><td>Watcher-reconciliatie verplaatst naar de container kan de echo-suppress/don't-clobber-logica subtiel breken (R6).</td><td>Kopieer <code>HtmlEditor</code>'s bewezen logica 1-op-1 (<code>pendingSelfWriteAtRef</code>, dirty-guard); U1 integratie-test dekt beide takken.</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ FILES MANIFEST ============ -->
+<section id="files">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></span>
+    <h2>Files Manifest</h2>
+  </div>
+  <ul class="file-list">
+    <li><span class="badge modify">modify</span><span>src/components/Editor/MarkdownEditor.tsx</span><span class="uref">U1 · U2</span></li>
+    <li><span class="badge modify">modify</span><span>src/components/Editor/EditorContainer.tsx</span><span class="uref">U3</span></li>
+    <li><span class="badge create">create</span><span>src/components/Editor/MarkdownPreviewPane.tsx</span><span class="uref">U1</span></li>
+    <li><span class="badge create">create</span><span>src/utils/editorReconcile.ts</span><span class="uref">U2</span></li>
+    <li><span class="badge modify">modify</span><span>src/index.css</span><span class="uref">U1</span></li>
+    <li><span class="badge create">create</span><span>test/MarkdownEditor.test.tsx</span><span class="uref">U1</span></li>
+    <li><span class="badge create">create</span><span>test/editorReconcile.test.ts</span><span class="uref">U2</span></li>
+  </ul>
+</section>
+
+<!-- ============ SOURCES ============ -->
+<section id="sources">
+  <div class="section-head">
+    <span class="badge"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+    <h2>Sources &amp; Research</h2>
+  </div>
+  <div class="q-col">
+    <ul class="q-list">
+      <li><span class="q">Origin brainstorm</span><span class="a"><code>docs/brainstorm/2026-06-08-raw-preview-scroll-position.html</code> — R1–R7, KD1–KD4, AE1–AE5.</span></li>
+      <li><span class="q">Referentiepatroon</span><span class="a"><code>src/components/Editor/HtmlEditor.tsx</code> — state-owner met beide panes gemount, watcher, echo-suppress, dirty.</span></li>
+      <li><span class="q">Toggle &amp; ternary</span><span class="a"><code>src/components/Editor/EditorContainer.tsx</code> (markdown-branch ~99–151; HTML-branch ~40–85).</span></li>
+      <li><span class="q">Huidige editors</span><span class="a"><code>MarkdownEditor.tsx</code> (Milkdown, <code>__milkdownReplace</code>), <code>CodeEditor.tsx</code> (Monaco, cursor-herstel bij reload).</span></li>
+      <li><span class="q">Learning — scroll-geometry</span><span class="a"><code>docs/solutions/ui-bugs/chat-scrollbar-disappears-fitaddon-fit-noop.md</code> — <code>visibility:hidden</code> boven <code>display:none</code>; KTD2.</span></li>
+      <li><span class="q">Learning — save double-fire</span><span class="a"><code>docs/solutions/logic-errors/editor-save-handler-double-fire-and-isactive-propagation.md</code> — KTD5.</span></li>
+      <li><span class="q">Learning — lazy/chunk-load</span><span class="a"><code>docs/solutions/performance-issues/terminal-lru-pooling-memory-optimization.md</code> — chunk-load-trade-off + restore-ná-subscribe-volgorde.</span></li>
+      <li><span class="q">Store</span><span class="a"><code>src/stores/projectStore.ts</code> — <code>editorTabs</code>, <code>setEditorDirty</code>, <code>activeCenterTabId</code>; <code>EditorTab</code> in <code>src/types/index.ts</code>.</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<div class="cta">
+  <div class="arrow"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></div>
+  <div class="cta-text">
+    <strong>Klaar voor implementatie</strong>
+    <span>Start met U1 (container-rework), dan U2 (reconciliatie), dan U3 (wiring). Sluit af met de Manual Verification pass en <code>npm test</code>.</span>
+  </div>
+</div>
+
+</main>
+</body>
+</html>
