@@ -9,15 +9,6 @@ export const STATE_DOT_COLORS: Record<TerminalState, string> = {
   stopped: 'bg-red-500',
 }
 
-// State text colors for terminal icons
-export const STATE_TEXT_COLORS: Record<TerminalState, string> = {
-  busy: 'text-gray-400',
-  permission: 'text-orange-500',
-  question: 'text-orange-500',
-  done: 'text-green-500',
-  stopped: 'text-red-500',
-}
-
 // States that require user input (show blinking indicator)
 export const INPUT_STATES = ['done', 'permission', 'question'] as const
 export const isInputState = (state: TerminalState): boolean =>

@@ -7,6 +7,7 @@ import {
   isInputState,
   isVisibleState,
 } from '../../utils/terminalState'
+import { AttentionChip, AttentionRail, attentionRowBg } from './AttentionRail'
 
 interface TerminalListItemProps {
   terminal: TerminalSession
@@ -24,18 +25,11 @@ export const TerminalListItem = memo(function TerminalListItem({
   className,
 }: TerminalListItemProps) {
   const isAttention = isAttentionState(terminal.state)
-  const activeBg = isAttention
-    ? 'bg-[color-mix(in_oklch,var(--status-attention)_14%,var(--sidebar-highlight))]'
-    : 'bg-[var(--sidebar-highlight)]'
-  const inactiveBg = isAttention
-    ? 'bg-[color-mix(in_oklch,var(--status-attention)_8%,transparent)]'
-    : 'hover:bg-muted/50'
   const defaultClassName = `
     group flex items-center gap-2 px-3 py-1.5 cursor-pointer
     transition-colors duration-150 rounded-md
-    ${isActive
-      ? `${activeBg} text-sidebar-foreground`
-      : `${inactiveBg} text-muted-foreground hover:text-sidebar-foreground`}
+    ${attentionRowBg(isAttention, isActive)}
+    ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
   `
   const isClaude = terminal.type === 'claude'
   const showSummary = isClaude && isActive && Boolean(terminal.summary)
@@ -46,14 +40,7 @@ export const TerminalListItem = memo(function TerminalListItem({
       className={`relative ${className ?? defaultClassName}`}
       title={isClaude && !isActive && terminal.summary ? terminal.summary : undefined}
     >
-      {/* Attention rail - 3px left-edge bar for permission/question (pulse lives on the rail) */}
-      {isAttention && (
-        <span
-          data-testid="attention-rail"
-          aria-hidden="true"
-          className="attention-rail absolute inset-y-0 left-0 w-[3px] rounded-full bg-[var(--status-attention)] pointer-events-none"
-        />
-      )}
+      {isAttention && <AttentionRail />}
       <TerminalIcon className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
       <div className="flex-1 min-w-0">
         <span className="text-xs truncate block">{terminal.generatedTitle || terminal.title}</span>
@@ -64,11 +51,7 @@ export const TerminalListItem = memo(function TerminalListItem({
         )}
       </div>
       {/* Attention chip - permission/question rows say what they need */}
-      {isAttention && (
-        <span className="text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[var(--status-attention)]">
-          wacht op jou
-        </span>
-      )}
+      {isAttention && <AttentionChip />}
       {/* State dot - only for visible non-attention states (busy static, done blinking) */}
       {!isAttention && isVisibleState(terminal.state) && (
         <span
