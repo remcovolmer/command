@@ -542,6 +542,27 @@ export function parseKeyEvent(e: KeyboardEvent): Omit<HotkeyBinding, 'descriptio
 }
 
 /**
+ * Backfill defaults for actions missing from a persisted hotkey config.
+ *
+ * Persisted configs from existing users predate newly added actions; without
+ * this, a new action is active (via the lookup fallback in useHotkeys) but
+ * invisible in Settings, the Ctrl+/ overlay and conflict detection — all of
+ * which iterate the persisted config. Called from onRehydrateStorage in
+ * projectStore.ts. Existing user customizations are left untouched.
+ */
+export function mergeMissingHotkeyDefaults(config: HotkeyConfig): HotkeyConfig {
+  let changed = false;
+  const merged = { ...config };
+  for (const action of Object.keys(DEFAULT_HOTKEY_CONFIG) as HotkeyAction[]) {
+    if (!merged[action]) {
+      merged[action] = DEFAULT_HOTKEY_CONFIG[action];
+      changed = true;
+    }
+  }
+  return changed ? merged : config;
+}
+
+/**
  * Get hotkey actions grouped by category
  */
 export function getHotkeysByCategory(config: HotkeyConfig): Map<string, Array<{ action: HotkeyAction; binding: HotkeyBinding }>> {

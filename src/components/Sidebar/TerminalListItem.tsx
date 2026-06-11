@@ -4,7 +4,6 @@ import type { TerminalSession } from '../../types'
 import {
   STATE_DOT_COLORS,
   isAttentionState,
-  isInputState,
   isVisibleState,
 } from '../../utils/terminalState'
 import { AttentionChip, AttentionRail, attentionRowBg } from './AttentionRail'
@@ -41,7 +40,12 @@ export const TerminalListItem = memo(function TerminalListItem({
       title={isClaude && !isActive && terminal.summary ? terminal.summary : undefined}
     >
       {isAttention && <AttentionRail />}
-      <TerminalIcon className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
+      {/* Stopped is the only state without a dot/rail/chip; the red icon is its sole indicator */}
+      <TerminalIcon
+        className={`w-3 h-3 flex-shrink-0 ${
+          terminal.state === 'stopped' ? 'text-[var(--status-stopped)]' : 'text-muted-foreground'
+        }`}
+      />
       <div className="flex-1 min-w-0">
         <span className="text-xs truncate block">{terminal.generatedTitle || terminal.title}</span>
         {showSummary && (
@@ -56,7 +60,7 @@ export const TerminalListItem = memo(function TerminalListItem({
       {!isAttention && isVisibleState(terminal.state) && (
         <span
           className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
-            isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
+            terminal.state === 'done' ? 'needs-input-indicator' : ''
           }`}
         />
       )}

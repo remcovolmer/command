@@ -119,6 +119,9 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   // Highest-priority child status, shown as a dot on the collapsed header
   const rollupState = isCollapsed ? getProjectRollupState(terminals) : null
 
+  // Counter chip counts Claude chats only — sidecar 'normal' shells are not chats.
+  const chatCount = terminals.filter((t) => t.type === 'claude').length
+
   return (
     <motion.li
       ref={setNodeRef}
@@ -190,18 +193,22 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           {project.name}
         </span>
 
-        {/* Collapsed summary: counter chip + highest-priority child status dot */}
+        {/* Collapsed summary: counter chip + highest-priority child status dot.
+            Worktrees load lazily, so the worktree segment only shows once known (> 0)
+            — a 0 would lie for never-visited projects. */}
         {isCollapsed && (
           <span
             className="flex items-center gap-1.5 flex-shrink-0"
-            title={`${terminals.length} chat${terminals.length === 1 ? '' : 's'} · ${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`}
+            title={`${chatCount} chat${chatCount === 1 ? '' : 's'}${
+              worktrees.length > 0 ? ` · ${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}` : ''
+            }`}
           >
             <span className="text-[11px] tabular-nums text-muted-foreground bg-muted rounded-full px-1.5 py-px">
-              {worktrees.length > 0 ? `${terminals.length} · ${worktrees.length}` : terminals.length}
+              {worktrees.length > 0 ? `${chatCount} · ${worktrees.length}` : chatCount}
             </span>
             {rollupState && (
               <span
-                className={`w-2 h-2 rounded-full flex-shrink-0 ${rollupState === 'attention' ? 'attention-rail' : ''}`}
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${rollupState === 'attention' ? 'attention-pulse' : ''}`}
                 style={{ backgroundColor: `var(--status-${rollupState})` }}
               />
             )}
@@ -261,46 +268,51 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         </div>
       </div>
 
-      {/* Direct Chats (not in worktree) */}
-      {!isCollapsed && directTerminals.length > 0 && (
-        <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30">
-          {directTerminals.map((terminal) => (
-            <TerminalListItem
-              key={terminal.id}
-              terminal={terminal}
-              isActive={terminal.id === activeTerminalId}
-              onSelect={() => onSelectTerminal(terminal.id)}
-              onClose={(e) => onCloseTerminal(e, terminal.id)}
+      {/* Expanded children: chats, worktrees and empty state */}
+      {!isCollapsed && (
+        <>
+          {/* Direct Chats (not in worktree) */}
+          {directTerminals.length > 0 && (
+            <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30">
+              {directTerminals.map((terminal) => (
+                <TerminalListItem
+                  key={terminal.id}
+                  terminal={terminal}
+                  isActive={terminal.id === activeTerminalId}
+                  onSelect={() => onSelectTerminal(terminal.id)}
+                  onClose={(e) => onCloseTerminal(e, terminal.id)}
+                />
+              ))}
+            </ul>
+          )}
+
+          {/* Worktrees - hidden for inactive projects unless selected */}
+          {(!isInactive || isActive) && worktrees.map((worktree) => (
+            <WorktreeItem
+              key={worktree.id}
+              worktree={worktree}
+              projectPath={project.path}
+              terminals={getWorktreeTerminals(worktree.id)}
+              activeTerminalId={activeTerminalId}
+              onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
+              onSelectTerminal={onSelectTerminal}
+              onRemove={() => onRemoveWorktree(worktree.id)}
             />
           ))}
-        </ul>
-      )}
 
-      {/* Worktrees - hidden for inactive projects unless selected */}
-      {!isCollapsed && (!isInactive || isActive) && worktrees.map((worktree) => (
-        <WorktreeItem
-          key={worktree.id}
-          worktree={worktree}
-          projectPath={project.path}
-          terminals={getWorktreeTerminals(worktree.id)}
-          activeTerminalId={activeTerminalId}
-          onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
-          onSelectTerminal={onSelectTerminal}
-          onRemove={() => onRemoveWorktree(worktree.id)}
-        />
-      ))}
-
-      {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
-      {!isCollapsed && showEmptyState && (
-        <div className="ml-6 pl-3 py-2 border-l border-border/30">
-          <button
-            onClick={() => onCreateTerminal(project.id)}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            New Chat
-          </button>
-        </div>
+          {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
+          {showEmptyState && (
+            <div className="ml-6 pl-3 py-2 border-l border-border/30">
+              <button
+                onClick={() => onCreateTerminal(project.id)}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                New Chat
+              </button>
+            </div>
+          )}
+        </>
       )}
     </motion.li>
   )

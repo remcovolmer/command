@@ -4,13 +4,16 @@
 // keeping rail, chip and row tint in one place prevents the two row types
 // from drifting apart.
 
-/** 3px left-edge bar for permission/question rows (pulse lives on the rail). */
+/** Base classes for small status chips (attention chip, PR badge). */
+export const CHIP_BASE = 'text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap'
+
+/** 3px left-edge bar for permission/question rows (.attention-pulse animates it). */
 export function AttentionRail() {
   return (
     <span
       data-testid="attention-rail"
       aria-hidden="true"
-      className="attention-rail absolute inset-y-0 left-0 w-[3px] rounded-full bg-[var(--status-attention)] pointer-events-none"
+      className="attention-pulse absolute inset-y-0 left-0 w-[3px] rounded-full bg-[var(--status-attention)] pointer-events-none"
     />
   )
 }
@@ -18,7 +21,7 @@ export function AttentionRail() {
 /** Chip telling the user a permission/question row needs them. */
 export function AttentionChip() {
   return (
-    <span className="text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[var(--status-attention)]">
+    <span className={`${CHIP_BASE} flex-shrink-0 bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[var(--status-attention)]`}>
       wacht op jou
     </span>
   )

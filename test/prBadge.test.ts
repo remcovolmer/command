@@ -75,6 +75,26 @@ describe('getPRBadge — priority chain', () => {
   })
 })
 
+describe('getPRBadge — unknown mergeability (right after a push)', () => {
+  test('mergeable UNKNOWN with empty checks yields pending, not ready', () => {
+    const badge = getPRBadge(makePRStatus({ mergeable: 'UNKNOWN', statusCheckRollup: [] }))
+    expect(badge).toEqual({ kind: 'pending', label: 'pending' })
+  })
+
+  test('mergeable UNKNOWN with all-pass checks still yields pending', () => {
+    const badge = getPRBadge(makePRStatus({ mergeable: 'UNKNOWN' }))
+    expect(badge).toEqual({ kind: 'pending', label: 'pending' })
+  })
+
+  test('failing checks win over unknown mergeability', () => {
+    const badge = getPRBadge(makePRStatus({
+      mergeable: 'UNKNOWN',
+      statusCheckRollup: [makeCheck('fail')],
+    }))
+    expect(badge).toEqual({ kind: 'ci-fail', label: 'CI ✗' })
+  })
+})
+
 describe('getPRBadge — empty or missing check list', () => {
   test('empty statusCheckRollup follows the ready path without crashing', () => {
     expect(getPRBadge(makePRStatus({ statusCheckRollup: [] }))).toEqual({ kind: 'ready', label: '✓ klaar' })

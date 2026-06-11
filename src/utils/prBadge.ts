@@ -24,7 +24,10 @@ export function getPRBadge(prStatus: PRStatus): PRBadge | null {
   if (checks.some((c) => c.bucket === 'fail')) {
     return { kind: 'ci-fail', label: 'CI ✗' }
   }
-  if (checks.some((c) => c.bucket === 'pending')) {
+  // Right after a push gh briefly reports mergeable UNKNOWN with an empty check
+  // list; that must read as pending, not as a misleading green "klaar". An empty
+  // check list with mergeable MERGEABLE stays ready (repos without CI).
+  if (checks.some((c) => c.bucket === 'pending') || prStatus.mergeable === 'UNKNOWN') {
     return { kind: 'pending', label: 'pending' }
   }
 

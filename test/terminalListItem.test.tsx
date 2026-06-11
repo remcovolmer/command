@@ -65,6 +65,31 @@ describe('TerminalListItem summary rendering', () => {
   })
 })
 
+describe('TerminalListItem stopped state (red icon is the sole indicator)', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  const getTerminalIcon = (li: HTMLElement) => li.querySelector('svg')!
+
+  test('stopped state: terminal icon carries the --status-stopped color', () => {
+    renderItem(makeTerminal({ state: 'stopped' }), false)
+    const icon = getTerminalIcon(screen.getByRole('listitem'))
+    expect(icon.getAttribute('class')).toContain('text-[var(--status-stopped)]')
+    expect(icon.getAttribute('class')).not.toContain('text-muted-foreground')
+  })
+
+  test('non-stopped states: icon stays muted', () => {
+    for (const state of ['busy', 'done', 'permission', 'question'] as const) {
+      const { unmount } = renderItem(makeTerminal({ state }), false)
+      const icon = getTerminalIcon(screen.getByRole('listitem'))
+      expect(icon.getAttribute('class')).toContain('text-muted-foreground')
+      expect(icon.getAttribute('class')).not.toContain('text-[var(--status-stopped)]')
+      unmount()
+    }
+  })
+})
+
 describe('TerminalListItem attention rail (permission/question)', () => {
   afterEach(() => {
     cleanup()

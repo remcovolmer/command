@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Project, TerminalSession, TerminalState, TerminalLayout, FileSystemEntry, GitStatus, Worktree, TerminalType, PRStatus, EditorTab, DiffTab, WorkingTreeDiffTab, GitCommit, GitCommitLog, CenterTab, TasksData, AccountProfile } from '../types'
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
-import { DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
+import { DEFAULT_HOTKEY_CONFIG, mergeMissingHotkeyDefaults } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
 import { terminalPool } from '../utils/terminalPool'
 
@@ -574,6 +574,10 @@ export const useProjectStore = create<ProjectStore>()(
       collapsedProjects: {},
       toggleProjectCollapsed: (projectId) =>
         set((state) => {
+          // Workspaces render without a collapse affordance (see Sidebar.tsx);
+          // toggling one would write dead state that nothing ever reads.
+          const project = state.projects.find((p) => p.id === projectId)
+          if (project?.type === 'workspace') return state
           const next = { ...state.collapsedProjects }
           if (next[projectId]) {
             delete next[projectId]
@@ -1689,6 +1693,13 @@ export const useProjectStore = create<ProjectStore>()(
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error('Zustand hydration failed:', error)
+        }
+        // Backfill hotkey defaults for actions added after the user's config
+        // was persisted, so they show up in Settings, the Ctrl+/ overlay and
+        // conflict detection. The lookup fallback in useHotkeys stays as a
+        // safety net for the pre-hydration window.
+        if (state?.hotkeyConfig) {
+          state.hotkeyConfig = mergeMissingHotkeyDefaults(state.hotkeyConfig)
         }
         // Migrate expandedPaths from old string[] format to Record<string, true>
         if (state?.expandedPaths) {

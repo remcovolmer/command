@@ -3,10 +3,10 @@ import { GitBranch, Trash2, ExternalLink, GitMerge, RefreshCw, Loader2 } from 'l
 import type { Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
-import { STATE_DOT_COLORS, isAttentionState, isInputState, isVisibleState } from '../../utils/terminalState'
+import { STATE_DOT_COLORS, isAttentionState, isVisibleState } from '../../utils/terminalState'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
-import { getPRBadge, type PRBadgeKind } from '../../utils/prBadge'
-import { AttentionChip, AttentionRail, attentionRowBg } from '../Sidebar/AttentionRail'
+import { getPRBadge, type PRBadge, type PRBadgeKind } from '../../utils/prBadge'
+import { AttentionChip, AttentionRail, attentionRowBg, CHIP_BASE } from '../Sidebar/AttentionRail'
 
 interface WorktreeItemProps {
   worktree: Worktree
@@ -26,14 +26,19 @@ const BADGE_KIND_CLASSES: Record<PRBadgeKind, string> = {
   ready: 'bg-green-500/15 text-green-600 dark:text-green-400',
 }
 
-function PRStatusBadge({ status }: { status: PRStatus }) {
+const REVIEW_DECISION_LABELS: Record<string, string> = {
+  CHANGES_REQUESTED: 'changes requested',
+  REVIEW_REQUIRED: 'required',
+  APPROVED: 'approved',
+}
+
+function PRStatusBadge({ status, badge }: { status: PRStatus; badge: PRBadge }) {
   const [hovered, setHovered] = useState(false)
-  const badge = getPRBadge(status)
-  if (!badge) return null
 
   const checks = status.statusCheckRollup ?? []
   const hasDiffstat = status.additions !== undefined || status.deletions !== undefined
-  const hasPopover = checks.length > 0 || hasDiffstat
+  const reviewLabel = status.reviewDecision ? REVIEW_DECISION_LABELS[status.reviewDecision] : undefined
+  const hasPopover = checks.length > 0 || hasDiffstat || Boolean(reviewLabel)
 
   return (
     <span
@@ -41,7 +46,7 @@ function PRStatusBadge({ status }: { status: PRStatus }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <span className={`text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${BADGE_KIND_CLASSES[badge.kind]}`}>
+      <span className={`${CHIP_BASE} ${BADGE_KIND_CLASSES[badge.kind]}`}>
         {badge.label}
       </span>
       {hovered && hasPopover && (
@@ -52,6 +57,10 @@ function PRStatusBadge({ status }: { status: PRStatus }) {
               <span className="text-muted-foreground">/</span>
               <span className="text-red-500">-{status.deletions ?? 0}</span>
             </div>
+          )}
+          {/* Review decision is masked when a higher-priority badge wins; keep it discoverable here */}
+          {reviewLabel && (
+            <div className="py-0.5 text-popover-foreground">Review: {reviewLabel}</div>
           )}
           {checks.map((c, i) => (
             <div key={i} className="flex items-center gap-1.5 py-0.5">
@@ -67,7 +76,18 @@ function PRStatusBadge({ status }: { status: PRStatus }) {
   )
 }
 
-function MergeButton({ checks, onMerge, isMerging }: { checks: PRCheckStatus[]; onMerge: () => void; isMerging: boolean }) {
+interface MergeButtonProps {
+  badgeKind: PRBadgeKind
+  checks: PRCheckStatus[]
+  onMerge: () => void
+  isMerging: boolean
+}
+
+// Button color follows the badge kind computed once in the PR row (single
+// source of truth with the chip): ready → green, anything else gray-but-
+// clickable (not all checks are blocking); the window.confirm warning in
+// handleMerge remains the guardrail and re-derives from click-time data.
+function MergeButton({ badgeKind, checks, onMerge, isMerging }: MergeButtonProps) {
   if (isMerging) {
     return (
       <button
@@ -81,22 +101,20 @@ function MergeButton({ checks, onMerge, isMerging }: { checks: PRCheckStatus[]; 
     )
   }
 
+  const btnColor = badgeKind === 'ready'
+    ? 'bg-green-600 hover:bg-green-700'
+    : 'bg-gray-500 hover:bg-gray-600'
+
+  // Check names only feed the tooltip detail; the decision lives in badgeKind
   const failNames = checks.filter(c => c.bucket === 'fail').map(c => c.name)
   const pendingNames = checks.filter(c => c.bucket === 'pending').map(c => c.name)
-  const anyFail = failNames.length > 0
-  const anyPending = pendingNames.length > 0
-
-  // Gray-but-clickable when checks fail or run (not all checks are blocking);
-  // the window.confirm warning in handleMerge remains the guardrail.
-  const btnColor = anyFail || anyPending
-    ? 'bg-gray-500 hover:bg-gray-600'
-    : 'bg-green-600 hover:bg-green-700'
-
-  const title = anyFail
+  const title = badgeKind === 'ci-fail'
     ? `Merge & Squash (checks failing: ${failNames.join(', ')})`
-    : anyPending
+    : badgeKind === 'pending'
       ? `Merge & Squash (checks running: ${pendingNames.join(', ')})`
-      : 'Merge & Squash this PR'
+      : badgeKind === 'review'
+        ? 'Merge & Squash (review outstanding)'
+        : 'Merge & Squash this PR'
 
   return (
     <button
@@ -104,7 +122,7 @@ function MergeButton({ checks, onMerge, isMerging }: { checks: PRCheckStatus[]; 
       className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-white transition-colors ml-auto ${btnColor}`}
       title={title}
     >
-      {anyPending && !anyFail
+      {badgeKind === 'pending'
         ? <Loader2 className="w-3 h-3 animate-spin" />
         : <GitMerge className="w-3 h-3" />
       }
@@ -265,6 +283,9 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   const hasPR = prStatus && !prStatus.noPR && prStatus.state === 'OPEN'
 
+  // Computed once per render; chip and merge button both derive from this badge
+  const badge = hasPR ? getPRBadge(prStatus) : null
+
   const isActive = terminal?.id === activeTerminalId
 
   const isAttention = terminal ? isAttentionState(terminal.state) : false
@@ -299,7 +320,7 @@ export const WorktreeItem = memo(function WorktreeItem({
           {terminal && !isAttention && isVisibleState(terminal.state) && (
             <span
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
-                isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
+                terminal.state === 'done' ? 'needs-input-indicator' : ''
               }`}
             />
           )}
@@ -350,12 +371,17 @@ export const WorktreeItem = memo(function WorktreeItem({
           </button>
 
           {/* Composite status badge (conflict > CI-fail > pending > review > ready);
-              diffstat and per-check details live in its hover popover */}
-          <PRStatusBadge status={prStatus} />
+              diffstat, review decision and per-check details live in its hover popover */}
+          {badge && <PRStatusBadge status={prStatus} badge={badge} />}
 
           {/* Merge button */}
-          {showMergeButton && (
-            <MergeButton checks={prStatus.statusCheckRollup ?? []} onMerge={handleMerge} isMerging={isMerging} />
+          {showMergeButton && badge && (
+            <MergeButton
+              badgeKind={badge.kind}
+              checks={prStatus.statusCheckRollup ?? []}
+              onMerge={handleMerge}
+              isMerging={isMerging}
+            />
           )}
         </div>
       )}
