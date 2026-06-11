@@ -1,10 +1,11 @@
 import { memo, useState, useEffect, useCallback } from 'react'
-import { GitBranch, Trash2, ExternalLink, GitMerge, AlertTriangle, CheckCircle2, XCircle, Clock, RefreshCw, Loader2 } from 'lucide-react'
+import { GitBranch, Trash2, ExternalLink, GitMerge, RefreshCw, Loader2 } from 'lucide-react'
 import type { Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { STATE_DOT_COLORS, isAttentionState, isInputState, isVisibleState } from '../../utils/terminalState'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
+import { getPRBadge, type PRBadgeKind } from '../../utils/prBadge'
 
 interface WorktreeItemProps {
   worktree: Worktree
@@ -16,20 +17,22 @@ interface WorktreeItemProps {
   onRemove: () => void
 }
 
-function CIStatusIcon({ status }: { status: PRStatus }) {
+const BADGE_KIND_CLASSES: Record<PRBadgeKind, string> = {
+  conflict: 'bg-red-500/15 text-red-600 dark:text-red-400',
+  'ci-fail': 'bg-red-500/15 text-red-600 dark:text-red-400',
+  pending: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  review: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  ready: 'bg-green-500/15 text-green-600 dark:text-green-400',
+}
+
+function PRStatusBadge({ status }: { status: PRStatus }) {
   const [hovered, setHovered] = useState(false)
+  const badge = getPRBadge(status)
+  if (!badge) return null
+
   const checks = status.statusCheckRollup ?? []
-  if (checks.length === 0) return null
-
-  const allPass = checks.every(c => c.bucket === 'pass')
-  const anyFail = checks.some(c => c.bucket === 'fail')
-  const anyPending = checks.some(c => c.bucket === 'pending')
-
-  let Icon = CheckCircle2
-  let iconClass = 'text-green-500'
-  if (anyFail) { Icon = XCircle; iconClass = 'text-red-500' }
-  else if (anyPending) { Icon = Clock; iconClass = 'text-yellow-500' }
-  else if (!allPass) return null
+  const hasDiffstat = status.additions !== undefined || status.deletions !== undefined
+  const hasPopover = checks.length > 0 || hasDiffstat
 
   return (
     <span
@@ -37,9 +40,18 @@ function CIStatusIcon({ status }: { status: PRStatus }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Icon className={`w-3 h-3 ${iconClass}`} />
-      {hovered && (
+      <span className={`text-[10px] leading-none font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${BADGE_KIND_CLASSES[badge.kind]}`}>
+        {badge.label}
+      </span>
+      {hovered && hasPopover && (
         <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg py-1.5 px-2 text-xs whitespace-nowrap">
+          {hasDiffstat && (
+            <div className="font-mono py-0.5">
+              <span className="text-green-500">+{status.additions ?? 0}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-red-500">-{status.deletions ?? 0}</span>
+            </div>
+          )}
           {checks.map((c, i) => (
             <div key={i} className="flex items-center gap-1.5 py-0.5">
               <span className={c.bucket === 'pass' ? 'text-green-500' : c.bucket === 'fail' ? 'text-red-500' : 'text-yellow-500'}>
@@ -50,22 +62,6 @@ function CIStatusIcon({ status }: { status: PRStatus }) {
           ))}
         </div>
       )}
-    </span>
-  )
-}
-
-function ReviewBadge({ decision }: { decision: PRStatus['reviewDecision'] }) {
-  if (!decision) return null
-  const map: Record<string, { label: string; cls: string }> = {
-    APPROVED: { label: 'Approved', cls: 'text-green-600 bg-green-500/10' },
-    CHANGES_REQUESTED: { label: 'Changes', cls: 'text-orange-600 bg-orange-500/10' },
-    REVIEW_REQUIRED: { label: 'Review', cls: 'text-yellow-600 bg-yellow-500/10' },
-  }
-  const info = map[decision]
-  if (!info) return null
-  return (
-    <span className={`text-[10px] px-1 py-0.5 rounded ${info.cls}`} title={`Review: ${decision}`}>
-      {info.label}
     </span>
   )
 }
@@ -89,11 +85,11 @@ function MergeButton({ checks, onMerge, isMerging }: { checks: PRCheckStatus[]; 
   const anyFail = failNames.length > 0
   const anyPending = pendingNames.length > 0
 
-  const btnColor = anyFail
-    ? 'bg-red-600 hover:bg-red-700'
-    : anyPending
-      ? 'bg-yellow-600 hover:bg-yellow-700'
-      : 'bg-green-600 hover:bg-green-700'
+  // Gray-but-clickable when checks fail or run (not all checks are blocking);
+  // the window.confirm warning in handleMerge remains the guardrail.
+  const btnColor = anyFail || anyPending
+    ? 'bg-gray-500 hover:bg-gray-600'
+    : 'bg-green-600 hover:bg-green-700'
 
   const title = anyFail
     ? `Merge & Squash (checks failing: ${failNames.join(', ')})`
@@ -267,7 +263,6 @@ export const WorktreeItem = memo(function WorktreeItem({
     !prStatus.stale
 
   const hasPR = prStatus && !prStatus.noPR && prStatus.state === 'OPEN'
-  const hasConflicts = prStatus?.mergeable === 'CONFLICTING'
 
   const isActive = terminal?.id === activeTerminalId
 
@@ -361,37 +356,19 @@ export const WorktreeItem = memo(function WorktreeItem({
           `}
           title={prStatus.stale ? `PR status update failed — showing last known data. ${prStatus.error ?? ''}`.trim() : undefined}
         >
-          {/* PR number */}
+          {/* PR number - neutral clickable chip */}
           <button
             onClick={(e) => { e.stopPropagation(); handleOpenPR() }}
-            className="flex items-center gap-0.5 text-[10px] text-primary hover:underline"
+            className="flex items-center gap-0.5 text-[10px] leading-none px-1 py-0.5 rounded bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title={`Open PR #${prStatus.number} in browser`}
           >
             #{prStatus.number}
             <ExternalLink className="w-2.5 h-2.5" />
           </button>
 
-          {/* CI Status */}
-          <CIStatusIcon status={prStatus} />
-
-          {/* Diff stats */}
-          {(prStatus.additions !== undefined || prStatus.deletions !== undefined) && (
-            <span className="text-[10px] font-mono bg-muted/50 rounded px-1 py-0.5 leading-none">
-              <span className="text-green-500">+{prStatus.additions ?? 0}</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-red-500">-{prStatus.deletions ?? 0}</span>
-            </span>
-          )}
-
-          {/* Conflicts */}
-          {hasConflicts && (
-            <span className="flex items-center gap-0.5 text-[10px] text-red-500" title="Merge conflicts">
-              <AlertTriangle className="w-3 h-3" />
-            </span>
-          )}
-
-          {/* Review status */}
-          <ReviewBadge decision={prStatus.reviewDecision} />
+          {/* Composite status badge (conflict > CI-fail > pending > review > ready);
+              diffstat and per-check details live in its hover popover */}
+          <PRStatusBadge status={prStatus} />
 
           {/* Merge button */}
           {showMergeButton && (
