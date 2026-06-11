@@ -14,7 +14,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
-import { CrashLogger, type LogEntry } from './services/CrashLogger'
+import { CrashLogger, writeCrashFallback, type LogEntry } from './services/CrashLogger'
+import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
@@ -41,6 +42,22 @@ import { randomUUID } from 'node:crypto'
 process.stdout?.on('error', () => {})
 process.stderr?.on('error', () => {})
 
+// Structured logging: rotating file in userData (+ console transport in dev).
+// Initialized before anything else so early-boot logs are captured.
+initLogger()
+const mainLog = createLogger('Main')
+const appLog = createLogger('App')
+const fsLog = createLogger('fs')
+const sessionLog = createLogger('Session')
+const sessionIndexLog = createLogger('SessionIndex')
+const skillLog = createLogger('SkillInstaller')
+const automationLog = createLogger('Automation')
+const automationServiceLog = createLogger('AutomationService')
+const fileWatcherLog = createLogger('FileWatcher')
+const commandServerLog = createLogger('CommandServer')
+const terminalLog = createLogger('Terminal')
+const powerLog = createLogger('PowerMonitor')
+
 // Global safety net: prevents the Electron "JavaScript error in main process"
 // crash dialog. The most common trigger is node-pty's WindowsPtyAgent emitting
 // "Cannot create process, error code: 267" from a worker thread when a cwd
@@ -64,24 +81,17 @@ let handlingCrash = false
 function safeHandleCrash(err: unknown, source: 'uncaughtException' | 'unhandledRejection'): void {
   if (handlingCrash) {
     // Last-resort visibility; cannot use the logger or IPC without risking recursion.
-    try {
-      console.error(`[${source}] (re-entrant, suppressed)`, err)
-    } catch {
-      /* nothing */
-    }
+    writeCrashFallback(`[${source}] (re-entrant, suppressed)`, err)
     return
   }
   handlingCrash = true
   try {
     const entry = crashLogger.log(err, source)
-    console.error(`[${source}]`, err)
+    mainLog.error(`[${source}]`, err)
     notifyUncaughtError(entry)
   } catch (innerErr) {
-    try {
-      console.error(`[${source}] handler failed:`, innerErr)
-    } catch {
-      /* nothing */
-    }
+    // The structured logger may be the thing that failed; raw stderr only.
+    writeCrashFallback(`[${source}] handler failed:`, innerErr)
   } finally {
     handlingCrash = false
   }
@@ -331,7 +341,7 @@ async function createWindow() {
     })
 
     sessionIndexService.refreshAndPush(info.cwd, terminalSessions).catch((err) => {
-      console.error('[SessionIndex] Refresh failed:', err)
+      sessionIndexLog.error('Refresh failed:', err)
     })
   })
 
@@ -368,16 +378,12 @@ async function createWindow() {
 
   // Install ccli as a global skill and clean up legacy per-project command files
   skillInstaller = new SkillInstaller()
-  skillInstaller
-    .install()
-    .catch((err) => console.error('[SkillInstaller] Global install failed:', err))
+  skillInstaller.install().catch((err) => skillLog.error('Global install failed:', err))
   const allProjectsForSkills = projectPersistence.getProjects()
   for (const project of allProjectsForSkills) {
     skillInstaller
       .cleanupLegacyCommand(project.path)
-      .catch((err) =>
-        console.error(`[SkillInstaller] Legacy cleanup failed for ${project.path}:`, err)
-      )
+      .catch((err) => skillLog.error(`Legacy cleanup failed for ${project.path}:`, err))
   }
 
   updateService = new UpdateService()
@@ -402,7 +408,7 @@ async function createWindow() {
     const allProjects = projectPersistence?.getProjects() ?? []
     automationService
       ?.garbageCollectWorktrees(allProjects.map((p) => p.path))
-      .catch((err) => console.error('[Automation] Worktree GC failed:', err))
+      .catch((err) => automationLog.error('Worktree GC failed:', err))
   })
 
   // Pause/resume GitHub polling on focus/blur
@@ -469,8 +475,8 @@ ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
   if (!result.ok) {
     if (result.reason === 'too-large') {
       const { title, body } = formatOversizeMessage(result.size, result.limit)
-      console.warn(
-        `[terminal:write] Rejected ${result.size}B payload for ${terminalId}: exceeds ${result.limit}B limit`
+      terminalLog.warn(
+        `terminal:write rejected ${result.size}B payload for ${terminalId}: exceeds ${result.limit}B limit`
       )
       new Notification({ title, body }).show()
     }
@@ -548,7 +554,7 @@ ipcMain.handle(
     // Clean up legacy ccli command file if present in the new project
     skillInstaller
       ?.cleanupLegacyCommand(projectPath)
-      .catch((err) => console.error(`[SkillInstaller] Legacy cleanup failed on project add:`, err))
+      .catch((err) => skillLog.error(`Legacy cleanup failed on project add:`, err))
     return result
   }
 )
@@ -754,7 +760,7 @@ ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
 
     return result
   } catch (error) {
-    console.error('Failed to read directory:', dirPath, error)
+    fsLog.error('Failed to read directory:', dirPath, error)
     throw error
   }
 })
@@ -787,17 +793,17 @@ function validateFilePathInProject(filePath: string): string {
 }
 
 ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
-  console.log('[fs:readFile] Request:', filePath)
+  fsLog.debug('readFile request:', filePath)
   try {
     const resolved = validateFilePathInProject(filePath)
-    console.log('[fs:readFile] Validated:', resolved)
+    fsLog.debug('readFile validated:', resolved)
     const stat = await fs.stat(resolved)
     if (stat.size > 10 * 1024 * 1024) {
       throw new Error('File too large (max 10MB)')
     }
     return fs.readFile(resolved, 'utf-8')
   } catch (error) {
-    console.error('[fs:readFile] Error:', error)
+    fsLog.error('readFile error:', error)
     throw error
   }
 })
@@ -1329,7 +1335,7 @@ ipcMain.handle('worktree:list', async (_event, projectId: string) => {
 
     return projectPersistence.getWorktrees(projectId)
   } catch (error) {
-    console.error('Failed to sync worktrees:', error)
+    mainLog.error('Failed to sync worktrees:', error)
     // Fallback to persisted worktrees if sync fails
     return projectPersistence.getWorktrees(projectId)
   }
@@ -1486,6 +1492,20 @@ ipcMain.handle('app:open-crash-log', async () => {
   }
 })
 
+// Mirrors app:open-crash-log for the regular (electron-log) log file
+ipcMain.handle('app:open-log-file', async () => {
+  const logPath = getLogFilePath()
+  if (!logPath) {
+    return { success: false, error: 'Log file not initialized' }
+  }
+  try {
+    await shell.openPath(logPath)
+    return { success: true, path: logPath }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 // Sync theme to Claude Code's config (~/.claude.json)
 ipcMain.handle('app:sync-claude-theme', async (_event, theme: 'light' | 'dark') => {
   if (theme !== 'light' && theme !== 'dark') return
@@ -1506,7 +1526,7 @@ ipcMain.handle('app:sync-claude-theme', async (_event, theme: 'light' | 'dark') 
     await fs.writeFile(tempPath, JSON.stringify(config, null, 2), 'utf-8')
     await fs.rename(tempPath, claudeConfigPath)
   } catch (e) {
-    console.warn('[App] Failed to sync Claude theme:', e)
+    appLog.warn('Failed to sync Claude theme:', e)
   }
 })
 
@@ -1619,7 +1639,7 @@ ipcMain.handle('automation:trigger', async (_event, id: string) => {
     if (project) {
       // Fire and forget - don't await, let it run in background
       automationService.triggerRun(id, project.path, projectId).catch((err) => {
-        console.error(`[Automation] Run failed for ${id}:`, err)
+        automationLog.error(`Run failed for ${id}:`, err)
       })
     }
   }
@@ -1668,7 +1688,7 @@ app.whenReady().then(async () => {
     if (sessionsRestored) return
     sessionsRestored = true
     restoreSessions().catch((err) => {
-      console.error('Session restoration failed:', err)
+      mainLog.error('Session restoration failed:', err)
     })
   }
   ipcMain.once('store:hydrated', (_event) => doRestore())
@@ -1678,14 +1698,14 @@ app.whenReady().then(async () => {
   setTimeout(() => {
     if (app.isPackaged) {
       updateService?.checkForUpdates().catch((err) => {
-        console.error('Auto update check failed:', err)
+        mainLog.error('Auto update check failed:', err)
       })
     }
   }, 5000) // 5 second delay
 
   // Check for missed automation runs on wake from sleep
   powerMonitor.on('resume', () => {
-    console.log('[PowerMonitor] System resumed from sleep, checking missed automation runs')
+    powerLog.info('System resumed from sleep, checking missed automation runs')
     automationService?.checkMissedRuns()
   })
 })
@@ -1718,23 +1738,23 @@ app.on('before-quit', () => {
     }
 
     if (sessionsToSave.length > 0) {
-      console.log(`[Session] Persisting ${sessionsToSave.length} sessions for restoration`)
+      sessionLog.info(`Persisting ${sessionsToSave.length} sessions for restoration`)
       projectPersistence.setSessions(sessionsToSave)
     }
   }
 
   // Stop automations (kills running processes, marks runs as failed)
   automationService?.destroy().catch((err) => {
-    console.error('[AutomationService] Cleanup error:', err)
+    automationServiceLog.error('Cleanup error:', err)
   })
 
   // Stop file watchers before terminal cleanup to avoid EBUSY
   fileWatcherService?.stopAll().catch((err) => {
-    console.error('[FileWatcher] Cleanup error:', err)
+    fileWatcherLog.error('Cleanup error:', err)
   })
   // Stop CommandServer
   commandServer?.stop().catch((err) => {
-    console.error('[CommandServer] Cleanup error:', err)
+    commandServerLog.error('Cleanup error:', err)
   })
   unsubSessionIndex?.()
   sessionIndexService?.destroy()

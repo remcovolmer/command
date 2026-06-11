@@ -7,10 +7,13 @@
  */
 
 import { isSpawnError } from '../services/errors'
+import { createLogger } from '../services/Logger'
 import type { TerminalManager } from '../services/TerminalManager'
 import type { ProjectPersistence } from '../services/ProjectPersistence'
 import type { CrashLogger } from '../services/CrashLogger'
 import type { BrowserWindow } from 'electron'
+
+const log = createLogger('Terminal')
 
 export interface TerminalCreateDeps {
   terminalManager: TerminalManager | null
@@ -118,7 +121,7 @@ export async function handleTerminalCreate(
         cwd: error.cwd,
         message: error.message,
       })
-      console.warn(`[Terminal] Spawn failed: ${error.code} for cwd ${error.cwd}`)
+      log.warn(`Spawn failed: ${error.code} for cwd ${error.cwd}`)
       return null
     }
     throw error
