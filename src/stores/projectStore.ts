@@ -247,6 +247,7 @@ interface ProjectStore {
   addProject: (project: Project) => void
   removeProject: (id: string) => void
   updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>) => Promise<void>
+  togglePinProject: (id: string) => Promise<void>
   setActiveProject: (id: string | null) => void
   reorderProjects: (projectIds: string[]) => Promise<void>
 
@@ -609,11 +610,13 @@ export const useProjectStore = create<ProjectStore>()(
             const terminalValues = Object.values(state.terminals)
             const hasTerminals = terminalValues.some((t) => t.projectId === state.activeProjectId)
             const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-            if (activeProject && activeProject.type !== 'workspace' && !hasTerminals) {
+            // Pinned projects sit in the always-visible Pinned section; only a
+            // non-pinned project with no terminals gets hidden when the inactive
+            // section collapses, so switch away from it to a visible one.
+            if (activeProject && !activeProject.pinned && !hasTerminals) {
               const firstVisible =
-                state.projects.find(
-                  (p) => p.type !== 'workspace' && terminalValues.some((t) => t.projectId === p.id)
-                ) ?? state.projects.find((p) => p.type === 'workspace')
+                state.projects.find((p) => terminalValues.some((t) => t.projectId === p.id)) ??
+                state.projects.find((p) => p.pinned)
               if (firstVisible) {
                 return {
                   inactiveSectionCollapsed: newCollapsed,
@@ -630,10 +633,6 @@ export const useProjectStore = create<ProjectStore>()(
       collapsedProjects: {},
       toggleProjectCollapsed: (projectId) =>
         set((state) => {
-          // Workspaces render without a collapse affordance (see Sidebar.tsx);
-          // toggling one would write dead state that nothing ever reads.
-          const project = state.projects.find((p) => p.id === projectId)
-          if (project?.type === 'workspace') return state
           const next = { ...state.collapsedProjects }
           if (next[projectId]) {
             delete next[projectId]
@@ -1330,6 +1329,21 @@ export const useProjectStore = create<ProjectStore>()(
           set({ projects })
         } catch (error) {
           console.error('Failed to reorder projects:', error)
+        }
+      },
+
+      togglePinProject: async (id) => {
+        const api = getElectronAPI()
+        try {
+          const project = get().projects.find((p) => p.id === id)
+          if (!project) return
+          const result = await api.project.setPinned(id, !project.pinned)
+          if (result) {
+            const projects = await api.project.list()
+            set({ projects })
+          }
+        } catch (error) {
+          console.error('Failed to toggle project pin:', error)
         }
       },
 

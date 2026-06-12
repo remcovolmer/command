@@ -11,7 +11,7 @@
  */
 
 // Project types
-export type ProjectType = 'workspace' | 'project' | 'code'
+export type ProjectType = 'project' | 'code'
 
 export type AuthMode = 'subscription' | 'profile'
 
@@ -36,6 +36,7 @@ export interface Project {
   type: ProjectType
   createdAt: number
   sortOrder: number
+  pinned?: boolean
   settings?: ProjectSettings
 }
 

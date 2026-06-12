@@ -270,6 +270,7 @@ export interface ElectronAPI {
       id: string,
       updates: Partial<Pick<Project, 'name' | 'settings'>>
     ) => Promise<Project | null>
+    setPinned: (id: string, pinned: boolean) => Promise<Project | null>
     selectFolder: () => Promise<string | null>
     reorder: (projectIds: string[]) => Promise<Project[]>
     setActiveWatcher: (projectId: string) => Promise<void>

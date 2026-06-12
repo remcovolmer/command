@@ -551,8 +551,8 @@ ipcMain.handle('project:list', async () => {
 
 ipcMain.handle(
   'project:add',
-  async (_event, projectPath: string, name?: string, type?: 'workspace' | 'project' | 'code') => {
-    const validTypes = ['workspace', 'project', 'code'] as const
+  async (_event, projectPath: string, name?: string, type?: 'project' | 'code') => {
+    const validTypes = ['project', 'code'] as const
     if (type !== undefined && !validTypes.includes(type)) {
       throw new Error('Invalid project type')
     }
@@ -606,6 +606,12 @@ ipcMain.handle('project:update', async (_event, id: string, updates: Record<stri
     allowedUpdates.name = updates.name
   }
   return projectPersistence?.updateProject(id, allowedUpdates)
+})
+
+ipcMain.handle('project:setPinned', async (_event, id: string, pinned: boolean) => {
+  if (!isValidUUID(id)) throw new Error('Invalid project ID')
+  if (typeof pinned !== 'boolean') throw new Error('Invalid pinned value')
+  return projectPersistence?.setProjectPinned(id, pinned)
 })
 
 ipcMain.handle('project:select-folder', async () => {

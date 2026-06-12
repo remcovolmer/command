@@ -70,7 +70,7 @@ describe('ProjectPersistence v5→v6 migration', () => {
 
     const result = callMigrateState(persistence, state)
 
-    expect(result.version).toBe(6)
+    expect(result.version).toBe(7)
     expect(result.projects[0].settings.claudeMode).toBe('full-auto')
     expect(result.projects[0].settings).not.toHaveProperty('dangerouslySkipPermissions')
   })
@@ -87,7 +87,7 @@ describe('ProjectPersistence v5→v6 migration', () => {
 
     const result = callMigrateState(persistence, state)
 
-    expect(result.version).toBe(6)
+    expect(result.version).toBe(7)
     expect(result.projects[0].settings).not.toHaveProperty('dangerouslySkipPermissions')
     expect(result.projects[0].settings).not.toHaveProperty('claudeMode')
   })
@@ -104,7 +104,7 @@ describe('ProjectPersistence v5→v6 migration', () => {
 
     const result = callMigrateState(persistence, state)
 
-    expect(result.version).toBe(6)
+    expect(result.version).toBe(7)
     expect(result.projects[0]).not.toHaveProperty('settings')
   })
 
@@ -120,7 +120,7 @@ describe('ProjectPersistence v5→v6 migration', () => {
 
     const result = callMigrateState(persistence, state)
 
-    expect(result.version).toBe(6)
+    expect(result.version).toBe(7)
     expect(result.projects[0].settings).not.toHaveProperty('dangerouslySkipPermissions')
     expect(result.projects[0].settings).not.toHaveProperty('claudeMode')
   })
@@ -141,7 +141,7 @@ describe('ProjectPersistence v5→v6 migration', () => {
 
     const result = callMigrateState(persistence, state)
 
-    expect(result.version).toBe(6)
+    expect(result.version).toBe(7)
     // First: true → full-auto
     expect(result.projects[0].settings.claudeMode).toBe('full-auto')
     expect(result.projects[0].settings).not.toHaveProperty('dangerouslySkipPermissions')
@@ -152,7 +152,7 @@ describe('ProjectPersistence v5→v6 migration', () => {
     expect(result.projects[2]).not.toHaveProperty('settings')
   })
 
-  test('chained migration: v4 state → reaches v6 via v4→v5→v6', () => {
+  test('chained migration: v4 state → reaches v7 via v4→v5→v6→v7', () => {
     const state = {
       version: 4,
       projects: [makeProject({ settings: { dangerouslySkipPermissions: true } })],
@@ -162,7 +162,7 @@ describe('ProjectPersistence v5→v6 migration', () => {
 
     const result = callMigrateState(persistence, state)
 
-    expect(result.version).toBe(6)
+    expect(result.version).toBe(7)
     expect(result.projects[0].settings.claudeMode).toBe('full-auto')
     expect(result.projects[0].settings).not.toHaveProperty('dangerouslySkipPermissions')
     // v4→v5 adds profiles and activeProfileId
@@ -190,10 +190,98 @@ describe('ProjectPersistence v5→v6 migration', () => {
 
     const result = callMigrateState(persistence, state)
 
-    expect(result.version).toBe(6)
+    expect(result.version).toBe(7)
     expect(result.projects[0].settings.claudeMode).toBe('full-auto')
     expect(result.projects[0].settings.authMode).toBe('profile')
     expect(result.projects[0].settings.profileId).toBe('some-profile-id')
     expect(result.projects[0].settings).not.toHaveProperty('dangerouslySkipPermissions')
+  })
+})
+
+describe('ProjectPersistence v6→v7 migration (workspace type → pinned project)', () => {
+  let persistence: ProjectPersistence
+
+  beforeEach(() => {
+    persistence = new ProjectPersistence()
+  })
+
+  test('workspace project → type project + pinned true', () => {
+    const state = {
+      version: 6,
+      projects: [makeProject({ id: 'aaaa-ws', type: 'workspace' })],
+      worktrees: {},
+      sessions: [],
+      profiles: [],
+      activeProfileId: null,
+    }
+
+    const result = callMigrateState(persistence, state)
+
+    expect(result.version).toBe(7)
+    expect(result.projects[0].type).toBe('project')
+    expect(result.projects[0].pinned).toBe(true)
+  })
+
+  test('non-workspace projects keep their type and are not auto-pinned', () => {
+    const state = {
+      version: 6,
+      projects: [
+        makeProject({ id: 'aaaa-code', type: 'code' }),
+        makeProject({ id: 'aaaa-proj', type: 'project' }),
+      ],
+      worktrees: {},
+      sessions: [],
+      profiles: [],
+      activeProfileId: null,
+    }
+
+    const result = callMigrateState(persistence, state)
+
+    expect(result.projects[0].type).toBe('code')
+    expect(result.projects[0].pinned).toBeUndefined()
+    expect(result.projects[1].type).toBe('project')
+    expect(result.projects[1].pinned).toBeUndefined()
+  })
+
+  test('migrated workspace preserves name, path, and settings', () => {
+    const state = {
+      version: 6,
+      projects: [
+        makeProject({
+          id: 'aaaa-ws',
+          type: 'workspace',
+          name: 'Docs',
+          path: '/docs',
+          settings: { claudeMode: 'chat' },
+        }),
+      ],
+      worktrees: {},
+      sessions: [],
+      profiles: [],
+      activeProfileId: null,
+    }
+
+    const result = callMigrateState(persistence, state)
+
+    expect(result.projects[0].name).toBe('Docs')
+    expect(result.projects[0].path).toBe('/docs')
+    expect(result.projects[0].settings).toEqual({ claudeMode: 'chat' })
+  })
+
+  test('idempotent: an already-pinned project survives a re-run unchanged', () => {
+    const migrated = callMigrateState(persistence, {
+      version: 6,
+      projects: [makeProject({ id: 'aaaa-ws', type: 'workspace' })],
+      worktrees: {},
+      sessions: [],
+      profiles: [],
+      activeProfileId: null,
+    })
+
+    const rerun = callMigrateState(persistence, migrated)
+
+    expect(rerun.version).toBe(7)
+    expect(rerun.projects[0].type).toBe('project')
+    expect(rerun.projects[0].pinned).toBe(true)
   })
 })
