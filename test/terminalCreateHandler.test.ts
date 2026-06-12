@@ -8,12 +8,18 @@ import type { BrowserWindow } from 'electron'
 
 const VALID_PROJECT_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 
-function makeDeps(overrides: Partial<{
-  createTerminal: (opts: { cwd: string }) => string
-  getProjects: () => Array<{ id: string; path: string; settings?: { claudeMode?: 'chat' | 'auto' | 'full-auto' } }>
-  send: ReturnType<typeof vi.fn>
-  log: ReturnType<typeof vi.fn>
-}> = {}) {
+function makeDeps(
+  overrides: Partial<{
+    createTerminal: (opts: { cwd: string }) => string
+    getProjects: () => Array<{
+      id: string
+      path: string
+      settings?: { claudeMode?: 'chat' | 'auto' | 'full-auto' }
+    }>
+    send: ReturnType<typeof vi.fn>
+    log: ReturnType<typeof vi.fn>
+  }> = {}
+) {
   const send = overrides.send ?? vi.fn()
   const win = {
     isDestroyed: () => false,
@@ -39,7 +45,8 @@ function makeDeps(overrides: Partial<{
       crashLogger,
       getWindow: () => win,
       resolveEnvOverrides: () => undefined,
-      isValidUUID: (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
+      isValidUUID: (id: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
     },
     send,
     createTerminal,
@@ -87,9 +94,9 @@ describe('terminal:create IPC handler body', () => {
     })
     const { deps, send } = makeDeps({ createTerminal })
 
-    await expect(
-      handleTerminalCreate(deps, { projectId: VALID_PROJECT_ID }),
-    ).rejects.toThrow('boom')
+    await expect(handleTerminalCreate(deps, { projectId: VALID_PROJECT_ID })).rejects.toThrow(
+      'boom'
+    )
 
     // The spawn-failed channel must NOT have been used for a non-SpawnError
     expect(send.mock.calls.filter((c) => c[0] === 'terminal:spawn-failed')).toHaveLength(0)
@@ -106,9 +113,9 @@ describe('terminal:create IPC handler body', () => {
 
   test('invalid projectId rejects with validation error', async () => {
     const { deps } = makeDeps()
-    await expect(
-      handleTerminalCreate(deps, { projectId: 'not-a-uuid' }),
-    ).rejects.toThrow(/Invalid project ID/)
+    await expect(handleTerminalCreate(deps, { projectId: 'not-a-uuid' })).rejects.toThrow(
+      /Invalid project ID/
+    )
   })
 
   test('invalid resumeSessionId rejects with validation error (injection guard)', async () => {
@@ -117,7 +124,7 @@ describe('terminal:create IPC handler body', () => {
       handleTerminalCreate(deps, {
         projectId: VALID_PROJECT_ID,
         resumeSessionId: 'evil; rm -rf /',
-      }),
+      })
     ).rejects.toThrow(/Invalid session ID/)
   })
 

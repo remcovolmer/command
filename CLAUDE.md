@@ -135,7 +135,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 - Tailwind CSS for styling (all colors via CSS variables for runtime theming)
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
-- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG with 43 actions), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
+- **Hotkey Requirement**: All new user-facing features MUST include keyboard shortcuts. Add shortcuts to `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG with 50 actions), register handlers in `src/App.tsx`, and document in the Keyboard Shortcuts table below.
 
 ## Windows Development
 
@@ -207,6 +207,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl + Shift + I` | Toggle inactive projects section |
+| `Ctrl + Shift + P` | Toggle collapse active project |
 
 ### UI & Settings
 | Shortcut | Action |

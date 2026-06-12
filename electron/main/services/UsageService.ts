@@ -1,32 +1,13 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
-import { BrowserWindow } from 'electron'
+import { type BrowserWindow } from 'electron'
+import { createLogger } from './Logger'
+import type { UsageData, UsageWindow } from '../../../shared/ipc-types'
 
-const isDev = process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL
+export type { UsageData, UsageWindow }
 
-/**
- * Plan-usage data pushed to the renderer.
- * Canonical declaration; mirrored in `src/types/index.ts` and inline in
- * `electron/preload/index.ts` because Electron process isolation prevents a
- * shared import. When you add or rename a field here, update the other two
- * declarations in the same commit.
- */
-export interface UsageWindow {
-  utilization: number
-  resetsAt: string
-}
-
-export interface UsageData {
-  status: 'ok' | 'unavailable'
-  fiveHour?: UsageWindow
-  sevenDay?: UsageWindow
-  sevenDaySonnet?: UsageWindow
-  extraUsage?: {
-    usedCredits: number
-    currency: string
-  }
-}
+const log = createLogger('Usage')
 
 interface Credentials {
   accessToken: string
@@ -235,7 +216,7 @@ export class UsageService {
     }
     const creds = parseCredentials(raw)
     if (!creds) {
-      if (isDev) console.error('[Usage] credentials parse failed')
+      log.warn('credentials parse failed')
       return UNAVAILABLE
     }
 

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Root cause analyse — spatie valt weg in Claude chat</title>
+<style>
+  :root {
+    --ink: #1a1d23; --muted: #5c6470; --line: #e3e6ea; --bg: #ffffff;
+    --accent: #0a5c9e; --ok: #1a7f4e; --warn: #b3661a; --bad: #b3322b;
+    --soft: #f5f7f9; --code-bg: #f0f2f5;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; color: var(--ink); background: var(--bg); margin: 0; line-height: 1.55; }
+  .page { max-width: 960px; margin: 0 auto; padding: 48px 32px 80px; }
+  h1 { font-size: 26px; line-height: 1.3; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 36px; }
+  h2 { font-size: 19px; margin: 44px 0 14px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+  h3 { font-size: 15px; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-family: Consolas, monospace; font-size: 13px; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0; }
+  th, td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); font-weight: 600; }
+  .scr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 20px 0; }
+  .scr > div { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: var(--soft); }
+  .scr h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+  .scr p { font-size: 14px; margin: 0; }
+  .chain { margin: 24px 0; }
+  .step { display: flex; gap: 14px; align-items: stretch; }
+  .step .num { flex: 0 0 28px; display: flex; flex-direction: column; align-items: center; }
+  .step .num .dot { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+  .step .num .bar { flex: 1; width: 2px; background: var(--line); margin: 4px 0; }
+  .step:last-child .num .bar { display: none; }
+  .step .body { padding-bottom: 22px; font-size: 14px; }
+  .step .body b { display: block; margin-bottom: 2px; }
+  .step .body .ref { color: var(--muted); font-size: 12.5px; font-family: Consolas, monospace; }
+  .callout { border-left: 4px solid var(--accent); background: var(--soft); padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 14px; }
+  .callout.warn { border-color: var(--warn); }
+  .callout.ok { border-color: var(--ok); }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-right: 6px; }
+  .tag.verified { background: #e2f3ea; color: var(--ok); }
+  .tag.assumed { background: #fdf0e0; color: var(--warn); }
+  .tag.ruledout { background: #fae5e4; color: var(--bad); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+  .compare > div { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .compare h4 { margin: 0 0 8px; font-size: 14px; }
+  .compare ul { margin: 0; padding-left: 18px; font-size: 13.5px; }
+  .keys { display: flex; gap: 24px; margin: 20px 0; flex-wrap: wrap; }
+  .keypath { flex: 1 1 380px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .keypath .head { padding: 10px 14px; font-weight: 600; font-size: 14px; color: #fff; }
+  .keypath.ok-path .head { background: var(--ok); }
+  .keypath.bad-path .head { background: var(--bad); }
+  .keypath .flow { padding: 14px; }
+  .fbox { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; font-size: 13px; background: var(--soft); }
+  .farrow { text-align: center; color: var(--muted); font-size: 13px; padding: 3px 0; }
+  .fbox.lost { background: #fae5e4; border-color: #e8b6b3; }
+  .fbox.sent { background: #e2f3ea; border-color: #b5ddc6; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Spatie valt weg omdat Windows' tekstsuggestie/IME-laag de spatietoets als <code>keyCode 229</code> aflevert — en xterm.js die per ontwerp niet als toetsaanslag verwerkt</h1>
+<div class="sub">Root cause analyse · Command Center · 11 juni 2026 · branch <code>fix/spatie-werkt-niet</code></div>
+
+<div class="scr">
+  <div>
+    <h4>Situatie</h4>
+    <p>In Claude-chats (xterm.js terminals) valt na verloop van tijd alléén de spatiebalk uit. Alle andere toetsen blijven werken.</p>
+  </div>
+  <div>
+    <h4>Complicatie</h4>
+    <p>Geen zichtbaar patroon; wisselen naar een ander venster en terug herstelt het. Eigen code (hotkeys, key handlers) behandelt spatie nergens apart.</p>
+  </div>
+  <div>
+    <h4>Resolutie</h4>
+    <p>De oorzaak zit in de interactie tussen Windows' IME/tekstsuggestie-laag en xterm.js' compositie-afhandeling — niet in Command Center-code. Fix: omgevingsinstelling én een app-level vangnet.</p>
+  </div>
+</div>
+
+<h2>Waarom alléén de spatie uitvalt: twee verschillende routes door xterm.js</h2>
+<p>Zodra een IME-achtige laag (dead keys bij US-International, of Windows 11 "tekstsuggesties bij fysiek toetsenbord") actief wordt op het verborgen invoerveld van xterm, krijgen toetsaanslagen <code>keyCode 229</code> ("door IME verwerkt"). xterm.js verwerkt die nooit als toets — het kijkt alleen achteraf of er tekst in het verborgen textarea is verschenen:</p>
+
+<pre>// @xterm/xterm 5.5.0 — CompositionHelper.keydown (gedeminificeerd)
+keydown(e) {
+  if (this._isComposing || this._isSendingComposition) {
+    if (e.keyCode === 229) return false;            // IME-toets: xterm negeert hem
+    if (e.keyCode === 16 || 17 || 18) return false;
+    this._finalizeComposition(false);
+  }
+  return e.keyCode !== 229 ||
+    (this._handleAnyTextareaChanges(), false);      // 229 buiten compositie: alleen textarea-diff
+}</pre>
+
+<div class="keys">
+  <div class="keypath ok-path">
+    <div class="head">Letter (bijv. "a") tijdens IME-laag → komt aan</div>
+    <div class="flow">
+      <div class="fbox">keydown met keyCode 229 — xterm verwerkt de toets niet</div>
+      <div class="farrow">↓</div>
+      <div class="fbox">IME voegt "a" toe aan het verborgen textarea</div>
+      <div class="farrow">↓</div>
+      <div class="fbox sent"><code>_handleAnyTextareaChanges()</code> ziet het verschil en stuurt "a" alsnog naar de PTY ✓</div>
+    </div>
+  </div>
+  <div class="keypath bad-path">
+    <div class="head">Spatie tijdens IME-laag → verdwijnt</div>
+    <div class="flow">
+      <div class="fbox">keydown met keyCode 229 — xterm verwerkt de toets niet</div>
+      <div class="farrow">↓</div>
+      <div class="fbox">IME consumeert de spatie als commit/accepteer-actie en zet géén " " in het textarea</div>
+      <div class="farrow">↓</div>
+      <div class="fbox lost">Textarea-diff is leeg → er wordt niets naar de PTY gestuurd ✗</div>
+    </div>
+  </div>
+</div>
+
+<p>Spatie is voor IME-/suggestielagen een <em>besturingstoets</em> (suggestie accepteren, dead-key committen), geen tekstinvoer. Letters zijn dat niet — precies de scheidslijn die je waarneemt.</p>
+
+<h2>De volledige causale keten</h2>
+<div class="chain">
+  <div class="step">
+    <div class="num"><div class="dot">1</div><div class="bar"></div></div>
+    <div class="body"><b>Trigger: Windows activeert een IME-laag op het verborgen xterm-textarea</b>
+    Dead key (bijv. <code>'</code> of <code>"</code> op US-International) of de tekstsuggestie-engine grijpt in. Verklaart "soms, na een tijdje" — het hangt af van wát je typt, niet van hoelang.
+    <div class="ref">omgeving — nog te bevestigen (zie onder)</div></div>
+  </div>
+  <div class="step">
+    <div class="num"><div class="dot">2</div><div class="bar"></div></div>
+    <div class="body"><b>Alle toetsaanslagen krijgen keyCode 229; xterm valt terug op textarea-diffing</b>
+    <div class="ref">node_modules/@xterm/xterm — CompositionHelper.keydown</div></div>
+  </div>
+  <div class="step">
+    <div class="num"><div class="dot">3</div><div class="bar"></div></div>
+    <div class="body"><b>Letters overleven de omweg (IME zet ze in het textarea), spaties niet</b>
+    De IME gebruikt spatie als commit-toets en voegt geen spatie-karakter toe — het diff-mechanisme heeft niets om door te sturen.
+    <div class="ref">CompositionHelper._handleAnyTextareaChanges</div></div>
+  </div>
+  <div class="step">
+    <div class="num"><div class="dot">4</div><div class="bar"></div></div>
+    <div class="body"><b>Venster wisselen blurt het textarea → Chromium reset de IME-staat van dat element</b>
+    Bij terugkeren focust Command Center het textarea opnieuw, en de normale toetsverwerking is hersteld — exact jouw workaround.
+    <div class="ref">src/App.tsx:437-441 (refocusActiveTerminal op window focus)</div></div>
+  </div>
+</div>
+
+<h2>Wat is geverifieerd en wat is uitgesloten</h2>
+<table>
+  <tr><th style="width:42%">Bevinding</th><th style="width:12%">Status</th><th>Onderbouwing</th></tr>
+  <tr><td>Spatie en letters volgen in xterm 5.5.0 exact hetzelfde normale keydown-pad — een app-bug die alléén spatie raakt kan daar niet ontstaan</td><td><span class="tag verified">geverifieerd</span></td><td>Gedeminificeerde <code>Terminal._keyDown</code> in de geïnstalleerde xterm 5.5.0: beide gaan via <code>triggerDataEvent(result.key)</code></td></tr>
+  <tr><td>Eigen key handlers onderscheppen geen kale spatie</td><td><span class="tag ruledout">uitgesloten</span></td><td><code>useHotkeys.ts</code>, <code>App.tsx</code> (toast-Escape), <code>attachCustomKeyEventHandler</code> (alleen Ctrl+C/V), editor-handlers (alleen Ctrl+S); geen default binding met key <code>' '</code></td></tr>
+  <tr><td>Geen Electron-menu accelerators of main-process key handling</td><td><span class="tag ruledout">uitgesloten</span></td><td><code>Menu.setApplicationMenu(null)</code> (electron/main/index.ts:256); geen <code>before-input-event</code>/<code>globalShortcut</code></td></tr>
+  <tr><td>Geen regressie door recente app-wijzigingen</td><td><span class="tag ruledout">uitgesloten</span></td><td>git log op keyboard-gerelateerde bestanden: geen recente wijzigingen in het toetspad</td></tr>
+  <tr><td>xterm negeert elke keydown met keyCode 229 als toets en leunt dan volledig op textarea-diffs</td><td><span class="tag verified">geverifieerd</span></td><td>CompositionHelper.keydown, hierboven geciteerd</td></tr>
+  <tr><td>Windows levert bij jou spaties als keyCode 229 af (stap 1)</td><td><span class="tag assumed">aanname</span></td><td>Enige niet-geverifieerde schakel; extern gestaafd: Claude Code issue #43429 beschrijft identiek "alleen spaties verdwijnen"-gedrag bij virtuele toetsenborden</td></tr>
+</table>
+
+<div class="callout warn">
+<b>De openstaande schakel verifiëren kost 1 minuut.</b> Check: (1) Windows-instellingen → Tijd en taal → Typen → "Tekstsuggesties weergeven tijdens het typen op het fysieke toetsenbord" — staat die aan? (2) Gebruik je de toetsenbordindeling <b>Verenigde Staten (internationaal)</b> (dead keys op <code>'</code> <code>"</code> <code>`</code> <code>~</code> <code>^</code>)? En de volgende keer dat het optreedt: plak via Ctrl+V een spatie — komt die wél aan, dan is de keten definitief bevestigd (plakken omzeilt het toetsenpad volledig).
+</div>
+
+<h2>Fix-opties: omgeving aanpakken, app-vangnet, of beide</h2>
+<div class="compare">
+  <div>
+    <h4>A — Omgevingsfix (geen code)</h4>
+    <ul>
+      <li>Tekstsuggesties voor fysiek toetsenbord uitzetten en/of wisselen naar layout zonder dead keys</li>
+      <li>Lost de oorzaak op bij de bron; ook effectief buiten Command Center</li>
+      <li>Helpt andere gebruikers met dezelfde setup niet</li>
+    </ul>
+  </div>
+  <div>
+    <h4>B — App-level vangnet (code)</h4>
+    <ul>
+      <li>In <code>useXtermInstance.ts</code>: detecteer spatie-keydown (<code>event.code === 'Space'</code>, geen modifiers) die als keyCode 229 binnenkomt en waarvoor géén data bij de PTY aankomt → injecteer zelf <code>' '</code></li>
+      <li>Werkt voor iedere gebruiker, onafhankelijk van Windows-instellingen</li>
+      <li>Vergt zorg rond echte CJK-compositie (daar mág spatie geconsumeerd worden); testbaar als unit-test op de watchdog-logica</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout ok">
+<b>Advies:</b> eerst de omgevingscheck (bevestigt de keten en is mogelijk direct de oplossing), daarna beslissen of het app-vangnet de moeite waard is voor robuustheid richting andere gebruikers.
+</div>
+
+<h2>Aanbevolen tests bij een code-fix</h2>
+<table>
+  <tr><th>Test</th><th>Verifieert</th></tr>
+  <tr><td>Unit-test op de watchdog: gesimuleerde keydown met <code>code:'Space'</code>, <code>keyCode:229</code>, geen volgende data-event → injectie van <code>' '</code></td><td>Het vangnet vuurt in het kapotte scenario</td></tr>
+  <tr><td>Unit-test: spatie-keydown gevolgd door regulier data-event met spatie → géén injectie (geen dubbele spatie)</td><td>Het vangnet vuurt niet als xterm de spatie zelf afhandelt</td></tr>
+  <tr><td>Unit-test: keydown met <code>isComposing: true</code> → géén injectie</td><td>Echte IME-compositie (CJK) blijft ongemoeid</td></tr>
+</table>
+
+<p class="sub" style="margin-top:40px">Bronnen: @xterm/xterm 5.5.0 (geïnstalleerde bundle), src/App.tsx, src/hooks/useHotkeys.ts, src/hooks/useXtermInstance.ts, electron/main/index.ts, <a href="https://github.com/anthropics/claude-code/issues/43429">anthropics/claude-code#43429</a></p>
+
+</div>
+</body>
+</html>

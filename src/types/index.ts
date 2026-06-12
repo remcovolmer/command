@@ -1,141 +1,131 @@
-// Project types
-export type ProjectType = 'workspace' | 'project' | 'code';
+// IPC contract types are declared once in shared/ipc-types.ts (single source
+// for renderer, preload and main). Re-exported here so existing imports from
+// '@/types' / '../types' keep working unchanged.
+export type {
+  ProjectType,
+  AuthMode,
+  ClaudeMode,
+  AccountProfile,
+  ProjectSettings,
+  Project,
+  Worktree,
+  BranchList,
+  TerminalState,
+  TerminalType,
+  Unsubscribe,
+  TerminalSession,
+  SessionIndexEntry,
+  FileSystemEntry,
+  GitFileChange,
+  GitBranchInfo,
+  GitStatus,
+  GitCommit,
+  GitCommitFile,
+  GitCommitDetail,
+  GitCommitLog,
+  GitBranchListItem,
+  PRCheckStatus,
+  PRStatus,
+  UsageWindow,
+  UsageData,
+  TaskItem,
+  TaskSection,
+  TasksData,
+  TaskUpdate,
+  TaskMove,
+  TaskAdd,
+  UpdateCheckResult,
+  UpdateAvailableInfo,
+  UpdateProgressInfo,
+  UpdateDownloadedInfo,
+  UpdateErrorInfo,
+  RestoredSession,
+  SpawnFailureCode,
+  SpawnFailedEvent,
+  UncaughtErrorEvent,
+} from '@shared/ipc-types'
 
-export type AuthMode = 'subscription' | 'profile';
-
-export type ClaudeMode = 'chat' | 'auto' | 'full-auto';
-
-export interface AccountProfile {
-  id: string;
-  name: string;
-  envVarCount: number;  // renderer sees count only, never the values
-}
-
-export interface ProjectSettings {
-  claudeMode?: ClaudeMode;
-  authMode?: AuthMode;
-  profileId?: string;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  path: string;
-  type: ProjectType;
-  createdAt: number;
-  sortOrder: number;
-  settings?: ProjectSettings;
-}
-
-// Worktree types
-export interface Worktree {
-  id: string;
-  projectId: string;
-  name: string;
-  branch: string;
-  path: string;
-  createdAt: number;
-  isLocked: boolean;
-}
-
-// Terminal types - Claude Code states (5 states)
-export type TerminalState =
-  | 'busy'        // Gray - Claude is working (includes starting)
-  | 'permission'  // Orange - Claude needs permission for tool/command
-  | 'question'    // Orange - Claude asked a question via AskUserQuestion
-  | 'done'        // Green - Claude finished, waiting for new prompt
-  | 'stopped';    // Red - Terminal stopped or error
-
-// Terminal type: 'claude' runs Claude Code, 'normal' is a plain shell
-export type TerminalType = 'claude' | 'normal';
+import type {
+  Project,
+  Worktree,
+  BranchList,
+  ProjectType,
+  AccountProfile,
+  TerminalState,
+  TerminalType,
+  Unsubscribe,
+  TerminalSession,
+  SessionIndexEntry,
+  FileSystemEntry,
+  GitStatus,
+  GitCommitLog,
+  GitCommitDetail,
+  GitBranchListItem,
+  PRStatus,
+  UsageData,
+  TasksData,
+  TaskUpdate,
+  TaskMove,
+  TaskAdd,
+  UpdateCheckResult,
+  UpdateAvailableInfo,
+  UpdateProgressInfo,
+  UpdateDownloadedInfo,
+  UpdateErrorInfo,
+  RestoredSession,
+  SpawnFailedEvent,
+  UncaughtErrorEvent,
+} from '@shared/ipc-types'
 
 // Valid terminal states for runtime validation
 export const VALID_TERMINAL_STATES: readonly TerminalState[] = [
-  'busy', 'permission', 'question', 'done', 'stopped'
-] as const;
+  'busy',
+  'permission',
+  'question',
+  'done',
+  'stopped',
+] as const
 
 // Type guard for terminal state
 export function isValidTerminalState(state: string): state is TerminalState {
-  return VALID_TERMINAL_STATES.includes(state as TerminalState);
-}
-
-// Unsubscribe function type for IPC listeners
-export type Unsubscribe = () => void;
-
-export interface TerminalSession {
-  id: string;
-  projectId: string;
-  worktreeId: string | null;  // null = direct in project, string = in worktree
-  state: TerminalState;
-  lastActivity: number;
-  title: string;
-  type: TerminalType;  // 'claude' or 'normal' shell
-  summary?: string;  // Session summary from Claude Code's sessions-index.json
-  generatedTitle?: string;  // LLM-generated title from Ollama via session-summary-hook
-}
-
-/**
- * Session metadata extracted from Claude Code JSONL transcripts.
- * Keep in sync with the canonical declaration in
- * `electron/main/services/SessionIndexService.ts` — Electron process isolation
- * prevents a shared import here, so changes must be applied to both files.
- */
-export interface SessionIndexEntry {
-  sessionId: string;
-  summary: string;
-  firstPrompt: string;
-  messageCount: number;
-  gitBranch: string;
-  modified: string;
-  created: string;
-  projectPath: string;
-  isSidechain: boolean;
-  filesModified: string[];
-  filesRead: string[];
-  toolCounts: Record<string, number>;
-  errorCount: number;
-  durationMs: number;
-  assistantMessageCount: number;
-  generatedTitle?: string;  // LLM-generated title from Ollama
-  generatedSummary?: string;  // LLM-generated summary from Ollama
-  worktreeName?: string;  // Name of worktree this session was started in (undefined for root-cwd)
+  return VALID_TERMINAL_STATES.includes(state as TerminalState)
 }
 
 // Editor tab types
 export interface EditorTab {
-  id: string;
-  type: 'editor';
-  filePath: string;
-  fileName: string;
-  isDirty: boolean;
-  projectId: string;
-  isDeletedExternally?: boolean;
+  id: string
+  type: 'editor'
+  filePath: string
+  fileName: string
+  isDirty: boolean
+  projectId: string
+  isDeletedExternally?: boolean
 }
 
 // Diff tab types (read-only, for viewing commit diffs)
 export interface DiffTab {
-  id: string;
-  type: 'diff';
-  filePath: string;
-  fileName: string;
-  commitHash: string;
-  parentHash: string;  // empty string for initial commits
-  oldPath?: string;    // original path for renamed files (used to fetch parent commit content)
-  projectId: string;
+  id: string
+  type: 'diff'
+  filePath: string
+  fileName: string
+  commitHash: string
+  parentHash: string // empty string for initial commits
+  oldPath?: string // original path for renamed files (used to fetch parent commit content)
+  projectId: string
 }
 
 // Working tree diff tab (for viewing uncommitted changes)
 export interface WorkingTreeDiffTab {
-  id: string;
-  type: 'working-tree-diff';
-  filePath: string;
-  fileName: string;
-  diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted';
-  projectId: string;
+  id: string
+  type: 'working-tree-diff'
+  filePath: string
+  fileName: string
+  diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted'
+  projectId: string
 }
 
 // Union of all center tab types
-export type CenterTab = EditorTab | DiffTab | WorkingTreeDiffTab;
+export type CenterTab = EditorTab | DiffTab | WorkingTreeDiffTab
 
 // File watcher types
 export const FILE_WATCH_EVENT_TYPES = [
@@ -146,12 +136,12 @@ export const FILE_WATCH_EVENT_TYPES = [
   'dir-removed',
 ] as const
 
-export type FileWatchEventType = typeof FILE_WATCH_EVENT_TYPES[number]
+export type FileWatchEventType = (typeof FILE_WATCH_EVENT_TYPES)[number]
 
 export interface FileWatchEvent {
   type: FileWatchEventType
   projectId: string
-  path: string  // normalized absolute path with forward slashes
+  path: string // normalized absolute path with forward slashes
 }
 
 export interface FileWatchError {
@@ -159,460 +149,275 @@ export interface FileWatchError {
   error: string
 }
 
-// File system types
-export interface FileSystemEntry {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  extension?: string;
-}
-
-// Git types
-export interface GitFileChange {
-  path: string;
-  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted';
-  staged: boolean;
-}
-
-export interface GitBranchInfo {
-  name: string;
-  upstream: string | null;
-  ahead: number;
-  behind: number;
-}
-
-export interface GitStatus {
-  isGitRepo: boolean;
-  branch: GitBranchInfo | null;
-  staged: GitFileChange[];
-  modified: GitFileChange[];
-  untracked: GitFileChange[];
-  conflicted: GitFileChange[];
-  isClean: boolean;
-  error?: string;
-}
-
-// Git commit types
-export interface GitCommit {
-  hash: string;
-  shortHash: string;
-  message: string;       // first line only
-  authorName: string;
-  authorDate: string;    // ISO 8601
-  parentHashes: string[];
-}
-
-export interface GitCommitFile {
-  path: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
-  additions: number;
-  deletions: number;
-  oldPath?: string;
-}
-
-export interface GitCommitDetail {
-  hash: string;
-  fullMessage: string;
-  authorName: string;
-  authorEmail: string;
-  authorDate: string;
-  files: GitCommitFile[];
-  isMerge: boolean;
-  parentHashes: string[];
-}
-
-export interface GitCommitLog {
-  commits: GitCommit[];
-  hasMore: boolean;
-}
-
-export interface GitBranchListItem {
-  name: string;
-  current: boolean;
-  upstream: string | null;
-}
-
-// GitHub PR types
-export interface PRCheckStatus {
-  name: string;
-  state: string;
-  bucket: string;
-}
-
-export interface PRStatus {
-  noPR: boolean;
-  number?: number;
-  title?: string;
-  url?: string;
-  headRefName?: string;
-  state?: 'OPEN' | 'CLOSED' | 'MERGED';
-  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
-  mergeStateStatus?: 'CLEAN' | 'DIRTY' | 'BLOCKED' | 'UNSTABLE' | 'UNKNOWN';
-  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
-  statusCheckRollup?: PRCheckStatus[];
-  additions?: number;
-  deletions?: number;
-  changedFiles?: number;
-  loading?: boolean;
-  error?: string;
-  lastUpdated?: number;
-  // True when the most recent refresh failed transiently. The rest of the
-  // fields hold the last known-good values so the UI can keep showing them.
-  stale?: boolean;
-}
-
-// Plan-usage types
-// NOTE: Duplicated due to Electron process isolation. Keep in sync with
-// electron/main/services/UsageService.ts and electron/preload/index.ts.
-export interface UsageWindow {
-  utilization: number;
-  resetsAt: string;
-}
-
-export interface UsageData {
-  status: 'ok' | 'unavailable';
-  fiveHour?: UsageWindow;
-  sevenDay?: UsageWindow;
-  sevenDaySonnet?: UsageWindow;
-  extraUsage?: {
-    usedCredits: number;
-    currency: string;
-  };
-}
-
-// Task types
-export interface TaskItem {
-  id: string;                    // Generated: `${filePath}:${lineNumber}`
-  text: string;                  // Full task text (without checkbox syntax)
-  completed: boolean;            // true = [x], false = [ ]
-  section: string;               // Section name (e.g., "Now", "Next", custom)
-  filePath: string;              // Source TASKS.md file path
-  lineNumber: number;            // Line number in source file
-  dueDate?: string;              // Parsed from 📅 YYYY-MM-DD
-  personTags?: string[];         // Parsed from [[Name]] syntax
-  isOverdue?: boolean;           // Computed: dueDate < today
-  isDueToday?: boolean;          // Computed: dueDate === today
-}
-
-export interface TaskSection {
-  name: string;                  // Section heading text
-  priority: number;              // Sort order (Now=0, Next=1, Waiting=2, Later=3, Done=4, custom=5+)
-  tasks: TaskItem[];
-}
-
-export interface TasksData {
-  sections: TaskSection[];
-  files: string[];               // All discovered TASKS.md file paths
-  totalOpen: number;             // Count of uncompleted tasks
-  nowCount: number;              // Count of tasks in "Now" section (for badge)
-}
-
-export interface TaskUpdate {
-  filePath: string;
-  lineNumber: number;
-  action: 'toggle' | 'edit' | 'delete';
-  newText?: string;              // For 'edit' action
-}
-
-export interface TaskMove {
-  filePath: string;
-  lineNumber: number;
-  targetSection: string;         // Section name to move to
-}
-
-export interface TaskAdd {
-  filePath: string;              // Which TASKS.md to add to
-  section: string;               // Which section
-  text: string;                  // Task text
-}
-
 // Automation types
-export type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled';
+export type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled'
 
 // Keep in sync with GitHubService.GitEvent (main process)
-export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict';
+export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict'
 
 export type AutomationTrigger =
   | { type: 'schedule'; cron: string }
   | { type: 'claude-done'; projectId?: string }
   | { type: 'git-event'; event: GitEvent }
-  | { type: 'file-change'; patterns: string[]; cooldownSeconds: number };
+  | { type: 'file-change'; patterns: string[]; cooldownSeconds: number }
 
 export interface Automation {
-  id: string;
-  name: string;
-  prompt: string;
-  projectIds: string[];
-  trigger: AutomationTrigger;
-  enabled: boolean;
-  baseBranch?: string;
-  timeoutMinutes: number;
-  createdAt: string;
-  updatedAt: string;
-  lastRunAt?: string;
+  id: string
+  name: string
+  prompt: string
+  projectIds: string[]
+  trigger: AutomationTrigger
+  enabled: boolean
+  baseBranch?: string
+  timeoutMinutes: number
+  createdAt: string
+  updatedAt: string
+  lastRunAt?: string
 }
 
 export interface AutomationRun {
-  id: string;
-  automationId: string;
-  projectId: string;
-  status: AutomationRunStatus;
-  startedAt: string;
-  completedAt?: string;
-  result?: string;
-  sessionId?: string;
-  exitCode?: number;
-  durationMs?: number;
-  error?: string;
-  read: boolean;
-  worktreeBranch?: string;
-  prUrl?: string;
-  prNumber?: number;
-}
-
-// Update types
-export interface UpdateCheckResult {
-  updateAvailable: boolean;
-  version?: string;
-  currentVersion?: string;
-  isDev?: boolean;
-}
-
-export interface UpdateAvailableInfo {
-  version: string;
-  releaseDate?: string;
-  releaseNotes?: string | null;
-}
-
-export interface UpdateProgressInfo {
-  percent: number;
-  bytesPerSecond: number;
-  transferred: number;
-  total: number;
-}
-
-export interface UpdateDownloadedInfo {
-  version: string;
-}
-
-export interface UpdateErrorInfo {
-  message: string;
+  id: string
+  automationId: string
+  projectId: string
+  status: AutomationRunStatus
+  startedAt: string
+  completedAt?: string
+  result?: string
+  sessionId?: string
+  exitCode?: number
+  durationMs?: number
+  error?: string
+  read: boolean
+  worktreeBranch?: string
+  prUrl?: string
+  prNumber?: number
 }
 
 // Layout types
-export type SplitDirection = 'horizontal' | 'vertical';
+export type SplitDirection = 'horizontal' | 'vertical'
 
 export interface TerminalLayout {
-  projectId: string;
+  projectId: string
   // Terminal IDs currently shown in split view (2-3 terminals side by side)
   // Empty array or single item = no split, just tabs
-  splitTerminalIds: string[];
+  splitTerminalIds: string[]
   // Percentages for each split pane (should match splitTerminalIds length)
-  splitSizes: number[];
+  splitSizes: number[]
 }
 
 // App state
 export interface AppState {
-  projects: Project[];
-  terminals: Record<string, TerminalSession>;
-  layouts: Record<string, TerminalLayout>;
-  activeProjectId: string | null;
-  activeTerminalId: string | null;
-}
-
-// IPC API types
-export interface RestoredSession {
-  terminalId: string;
-  projectId: string;
-  worktreeId: string | null;
-  title: string;
-  summary?: string;
-}
-
-export type SpawnFailureCode = 'CWD_MISSING' | 'CWD_NOT_DIR' | 'SPAWN_FAILED';
-
-export interface SpawnFailedEvent {
-  projectId?: string;
-  worktreeId?: string;
-  code: SpawnFailureCode;
-  cwd: string;
-  message: string;
-}
-
-export interface UncaughtErrorEvent {
-  source: 'uncaughtException' | 'unhandledRejection';
-  message: string;
-  logPath: string;
+  projects: Project[]
+  terminals: Record<string, TerminalSession>
+  layouts: Record<string, TerminalLayout>
+  activeProjectId: string | null
+  activeTerminalId: string | null
 }
 
 export interface ElectronAPI {
   terminal: {
-    create: (projectId: string, worktreeId?: string, type?: TerminalType, resumeSessionId?: string) => Promise<string | null>;
-    write: (terminalId: string, data: string) => void;
-    resize: (terminalId: string, cols: number, rows: number) => void;
-    close: (terminalId: string) => void;
-    evict: (terminalId: string) => void;
-    restore: (terminalId: string) => void;
-    onData: (callback: (id: string, data: string) => void) => Unsubscribe;
-    onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe;
-    onExit: (callback: (id: string, code: number) => void) => Unsubscribe;
-    updateWorktree: (terminalId: string, worktreeId: string, newCwd: string) => Promise<{ success: boolean }>;
-    onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
-    onStatusMessage: (callback: (id: string, message: string) => void) => Unsubscribe;
-    onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void) => Unsubscribe;
-    onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe;
-    onSidecarCreated: (callback: (contextKey: string, terminal: TerminalSession) => void) => Unsubscribe;
-    onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe;
-    onGeneratedTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe;
-    onSpawnFailed: (callback: (event: SpawnFailedEvent) => void) => Unsubscribe;
-  };
+    create: (
+      projectId: string,
+      worktreeId?: string,
+      type?: TerminalType,
+      resumeSessionId?: string
+    ) => Promise<string | null>
+    write: (terminalId: string, data: string) => void
+    resize: (terminalId: string, cols: number, rows: number) => void
+    close: (terminalId: string) => void
+    evict: (terminalId: string) => void
+    restore: (terminalId: string) => void
+    onData: (callback: (id: string, data: string) => void) => Unsubscribe
+    onStateChange: (callback: (id: string, state: TerminalState) => void) => Unsubscribe
+    onExit: (callback: (id: string, code: number) => void) => Unsubscribe
+    updateWorktree: (
+      terminalId: string,
+      worktreeId: string,
+      newCwd: string
+    ) => Promise<{ success: boolean }>
+    onTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe
+    onStatusMessage: (callback: (id: string, message: string) => void) => Unsubscribe
+    onWorktreeUpdated: (callback: (id: string, worktreeId: string) => void) => Unsubscribe
+    onSessionRestored: (callback: (session: RestoredSession) => void) => Unsubscribe
+    onSidecarCreated: (
+      callback: (contextKey: string, terminal: TerminalSession) => void
+    ) => Unsubscribe
+    onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe
+    onGeneratedTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe
+    onSpawnFailed: (callback: (event: SpawnFailedEvent) => void) => Unsubscribe
+  }
   editor: {
-    onOpenFile: (callback: (data: { filePath: string; fileName: string; projectId: string; line?: number }) => void) => Unsubscribe;
-    onOpenDiff: (callback: (data: { filePath: string; fileName: string; projectId: string }) => void) => Unsubscribe;
-  };
+    onOpenFile: (
+      callback: (data: {
+        filePath: string
+        fileName: string
+        projectId: string
+        line?: number
+      }) => void
+    ) => Unsubscribe
+    onOpenDiff: (
+      callback: (data: { filePath: string; fileName: string; projectId: string }) => void
+    ) => Unsubscribe
+  }
   sessionIndex: {
-    getForProject: (projectPath: string) => Promise<SessionIndexEntry[]>;
-  };
+    getForProject: (projectPath: string) => Promise<SessionIndexEntry[]>
+  }
   project: {
-    list: () => Promise<Project[]>;
-    add: (path: string, name?: string, type?: ProjectType) => Promise<Project>;
-    remove: (id: string) => Promise<void>;
-    update: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>) => Promise<Project | null>;
-    selectFolder: () => Promise<string | null>;
-    reorder: (projectIds: string[]) => Promise<Project[]>;
-    setActiveWatcher: (projectId: string) => Promise<void>;
-    hasVertexConfig: (projectId: string) => Promise<boolean>;
-  };
+    list: () => Promise<Project[]>
+    add: (path: string, name?: string, type?: ProjectType) => Promise<Project>
+    remove: (id: string) => Promise<void>
+    update: (
+      id: string,
+      updates: Partial<Pick<Project, 'name' | 'settings'>>
+    ) => Promise<Project | null>
+    selectFolder: () => Promise<string | null>
+    reorder: (projectIds: string[]) => Promise<Project[]>
+    setActiveWatcher: (projectId: string) => Promise<void>
+    hasVertexConfig: (projectId: string) => Promise<boolean>
+  }
   profile: {
-    list: () => Promise<AccountProfile[]>;
-    add: (name: string) => Promise<AccountProfile>;
-    update: (id: string, updates: { name: string }) => Promise<AccountProfile | null>;
-    remove: (id: string) => Promise<void>;
-    setActive: (id: string | null) => Promise<void>;
-    getActive: () => Promise<string | null>;
-    setEnvVars: (profileId: string, vars: Record<string, string>) => Promise<void>;
-    getEnvVarKeys: (profileId: string) => Promise<string[]>;
-    clearEnvVars: (profileId: string) => Promise<void>;
-  };
+    list: () => Promise<AccountProfile[]>
+    add: (name: string) => Promise<AccountProfile>
+    update: (id: string, updates: { name: string }) => Promise<AccountProfile | null>
+    remove: (id: string) => Promise<void>
+    setActive: (id: string | null) => Promise<void>
+    getActive: () => Promise<string | null>
+    setEnvVars: (profileId: string, vars: Record<string, string>) => Promise<void>
+    getEnvVarKeys: (profileId: string) => Promise<string[]>
+    clearEnvVars: (profileId: string) => Promise<void>
+  }
   worktree: {
-    create: (projectId: string, branchName: string, worktreeName?: string, sourceBranch?: string) => Promise<Worktree>;
-    list: (projectId: string) => Promise<Worktree[]>;
-    listBranches: (projectId: string) => Promise<{ local: string[]; remote: string[]; current: string | null }>;
-    remove: (worktreeId: string, force?: boolean) => Promise<void>;
-    hasChanges: (worktreeId: string) => Promise<boolean>;
-    onWorktreeAdded: (callback: (projectId: string, worktree: Worktree) => void) => Unsubscribe;
-  };
+    create: (
+      projectId: string,
+      branchName: string,
+      worktreeName?: string,
+      sourceBranch?: string
+    ) => Promise<Worktree>
+    list: (projectId: string) => Promise<Worktree[]>
+    listBranches: (projectId: string) => Promise<BranchList>
+    remove: (worktreeId: string, force?: boolean) => Promise<void>
+    hasChanges: (worktreeId: string) => Promise<boolean>
+    onWorktreeAdded: (callback: (projectId: string, worktree: Worktree) => void) => Unsubscribe
+  }
   shell: {
-    openPath: (path: string) => Promise<string>;
-    openInEditor: (path: string) => Promise<void>;
-    openExternal: (url: string) => Promise<void>;
-    showItemInFolder: (filePath: string) => Promise<void>;
-  };
+    openPath: (path: string) => Promise<string>
+    openInEditor: (path: string) => Promise<void>
+    openExternal: (url: string) => Promise<void>
+    showItemInFolder: (filePath: string) => Promise<void>
+  }
   notification: {
-    show: (title: string, body: string) => void;
-  };
+    show: (title: string, body: string) => void
+  }
   app: {
-    onCloseRequest: (callback: () => void) => Unsubscribe;
-    confirmClose: () => void;
-    cancelClose: () => void;
-    storeHydrated: () => void;
-    syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>;
-    onUncaughtError: (callback: (event: UncaughtErrorEvent) => void) => Unsubscribe;
-    openCrashLog: () => Promise<{ success: boolean; path?: string; error?: string }>;
-  };
+    onCloseRequest: (callback: () => void) => Unsubscribe
+    confirmClose: () => void
+    cancelClose: () => void
+    storeHydrated: () => void
+    syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>
+    onUncaughtError: (callback: (event: UncaughtErrorEvent) => void) => Unsubscribe
+    openCrashLog: () => Promise<{ success: boolean; path?: string; error?: string }>
+    openLogFile: () => Promise<{ success: boolean; path?: string; error?: string }>
+  }
   fs: {
-    readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>;
-    readFile: (filePath: string) => Promise<string>;
-    writeFile: (filePath: string, content: string) => Promise<void>;
-    onWatchChanges: (callback: (events: FileWatchEvent[]) => void) => Unsubscribe;
-    onWatchError: (callback: (error: FileWatchError) => void) => Unsubscribe;
-    stat: (filePath: string) => Promise<{ exists: boolean; isFile: boolean; resolved: string }>;
-    createFile: (filePath: string) => Promise<void>;
-    createDirectory: (dirPath: string) => Promise<void>;
-    rename: (oldPath: string, newPath: string) => Promise<void>;
-    delete: (targetPath: string) => Promise<void>;
-  };
+    readDirectory: (dirPath: string) => Promise<FileSystemEntry[]>
+    readFile: (filePath: string) => Promise<string>
+    writeFile: (filePath: string, content: string) => Promise<void>
+    onWatchChanges: (callback: (events: FileWatchEvent[]) => void) => Unsubscribe
+    onWatchError: (callback: (error: FileWatchError) => void) => Unsubscribe
+    stat: (filePath: string) => Promise<{ exists: boolean; isFile: boolean; resolved: string }>
+    createFile: (filePath: string) => Promise<void>
+    createDirectory: (dirPath: string) => Promise<void>
+    rename: (oldPath: string, newPath: string) => Promise<void>
+    delete: (targetPath: string) => Promise<void>
+  }
   git: {
-    getStatus: (projectPath: string) => Promise<GitStatus>;
-    fetch: (projectPath: string) => Promise<string>;
-    pull: (projectPath: string) => Promise<string>;
-    push: (projectPath: string) => Promise<string>;
-    getRemoteUrl: (projectPath: string) => Promise<string | null>;
-    getCommitLog: (projectPath: string, skip?: number, limit?: number) => Promise<GitCommitLog>;
-    getCommitDetail: (projectPath: string, commitHash: string) => Promise<GitCommitDetail | null>;
-    getFileAtCommit: (projectPath: string, commitHash: string, filePath: string) => Promise<string | null>;
-    getHeadHash: (projectPath: string) => Promise<string | null>;
-    stageFiles: (projectPath: string, files: string[]) => Promise<void>;
-    unstageFiles: (projectPath: string, files: string[]) => Promise<void>;
-    commit: (projectPath: string, message: string) => Promise<string>;
-    discardFiles: (projectPath: string, files: string[]) => Promise<void>;
-    deleteUntrackedFiles: (projectPath: string, files: string[]) => Promise<void>;
-    getIndexFileContent: (projectPath: string, filePath: string) => Promise<string | null>;
-    listBranches: (projectPath: string) => Promise<GitBranchListItem[]>;
-    createBranch: (projectPath: string, name: string) => Promise<void>;
-    switchBranch: (projectPath: string, name: string) => Promise<void>;
-    deleteBranch: (projectPath: string, name: string, force: boolean) => Promise<void>;
-  };
+    getStatus: (projectPath: string) => Promise<GitStatus>
+    fetch: (projectPath: string) => Promise<string>
+    pull: (projectPath: string) => Promise<string>
+    push: (projectPath: string) => Promise<string>
+    getRemoteUrl: (projectPath: string) => Promise<string | null>
+    getCommitLog: (projectPath: string, skip?: number, limit?: number) => Promise<GitCommitLog>
+    getCommitDetail: (projectPath: string, commitHash: string) => Promise<GitCommitDetail | null>
+    getFileAtCommit: (
+      projectPath: string,
+      commitHash: string,
+      filePath: string
+    ) => Promise<string | null>
+    getHeadHash: (projectPath: string) => Promise<string | null>
+    stageFiles: (projectPath: string, files: string[]) => Promise<void>
+    unstageFiles: (projectPath: string, files: string[]) => Promise<void>
+    commit: (projectPath: string, message: string) => Promise<string>
+    discardFiles: (projectPath: string, files: string[]) => Promise<void>
+    deleteUntrackedFiles: (projectPath: string, files: string[]) => Promise<void>
+    getIndexFileContent: (projectPath: string, filePath: string) => Promise<string | null>
+    listBranches: (projectPath: string) => Promise<GitBranchListItem[]>
+    createBranch: (projectPath: string, name: string) => Promise<void>
+    switchBranch: (projectPath: string, name: string) => Promise<void>
+    deleteBranch: (projectPath: string, name: string, force: boolean) => Promise<void>
+  }
   github: {
-    checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>;
+    checkAvailable: () => Promise<{ installed: boolean; authenticated: boolean }>
     // Rejects on transient gh failures (timeout, network, rate-limit). Callers
     // must catch and call markPRStatusStale to preserve last-known-good data.
-    getPRStatus: (projectPath: string) => Promise<PRStatus>;
-    mergePR: (projectPath: string, prNumber: number) => Promise<void>;
-    startPolling: (key: string, projectPath: string) => Promise<void>;
-    stopPolling: (key: string) => Promise<void>;
-    onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void) => Unsubscribe;
-    onPRStatusStale: (callback: (key: string, error: string) => void) => Unsubscribe;
-  };
+    getPRStatus: (projectPath: string) => Promise<PRStatus>
+    mergePR: (projectPath: string, prNumber: number) => Promise<void>
+    startPolling: (key: string, projectPath: string) => Promise<void>
+    stopPolling: (key: string) => Promise<void>
+    onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void) => Unsubscribe
+    onPRStatusStale: (callback: (key: string, error: string) => void) => Unsubscribe
+  }
   usage: {
-    setEnabled: (enabled: boolean) => Promise<void>;
-    onUpdate: (callback: (data: UsageData) => void) => Unsubscribe;
-  };
+    setEnabled: (enabled: boolean) => Promise<void>
+    onUpdate: (callback: (data: UsageData) => void) => Unsubscribe
+  }
   update: {
-    check: () => Promise<UpdateCheckResult>;
-    download: () => Promise<{ success: boolean; isDev?: boolean }>;
-    install: () => Promise<void>;
-    getVersion: () => Promise<string>;
-    onChecking: (callback: () => void) => Unsubscribe;
-    onAvailable: (callback: (info: UpdateAvailableInfo) => void) => Unsubscribe;
-    onNotAvailable: (callback: () => void) => Unsubscribe;
-    onProgress: (callback: (progress: UpdateProgressInfo) => void) => Unsubscribe;
-    onDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => Unsubscribe;
-    onError: (callback: (error: UpdateErrorInfo) => void) => Unsubscribe;
-  };
+    check: () => Promise<UpdateCheckResult>
+    download: () => Promise<{ success: boolean; isDev?: boolean }>
+    install: () => Promise<void>
+    getVersion: () => Promise<string>
+    onChecking: (callback: () => void) => Unsubscribe
+    onAvailable: (callback: (info: UpdateAvailableInfo) => void) => Unsubscribe
+    onNotAvailable: (callback: () => void) => Unsubscribe
+    onProgress: (callback: (progress: UpdateProgressInfo) => void) => Unsubscribe
+    onDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => Unsubscribe
+    onError: (callback: (error: UpdateErrorInfo) => void) => Unsubscribe
+  }
   tasks: {
-    scan: (projectPath: string) => Promise<TasksData>;
-    update: (projectPath: string, update: TaskUpdate) => Promise<TasksData>;
-    add: (projectPath: string, task: TaskAdd) => Promise<TasksData>;
-    delete: (projectPath: string, filePath: string, lineNumber: number) => Promise<TasksData>;
-    move: (projectPath: string, move: TaskMove) => Promise<TasksData>;
-    createFile: (projectPath: string) => Promise<string>;
-  };
+    scan: (projectPath: string) => Promise<TasksData>
+    update: (projectPath: string, update: TaskUpdate) => Promise<TasksData>
+    add: (projectPath: string, task: TaskAdd) => Promise<TasksData>
+    delete: (projectPath: string, filePath: string, lineNumber: number) => Promise<TasksData>
+    move: (projectPath: string, move: TaskMove) => Promise<TasksData>
+    createFile: (projectPath: string) => Promise<string>
+  }
   automation: {
-    list: () => Promise<Automation[]>;
-    create: (automation: Omit<Automation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Automation>;
-    update: (id: string, updates: Partial<Omit<Automation, 'id' | 'createdAt'>>) => Promise<Automation | null>;
-    delete: (id: string) => Promise<void>;
-    toggle: (id: string) => Promise<Automation | null>;
-    trigger: (id: string) => Promise<void>;
-    stopRun: (runId: string) => Promise<void>;
-    listRuns: (automationId?: string, limit?: number) => Promise<AutomationRun[]>;
-    markRead: (runId: string) => Promise<void>;
-    deleteRun: (runId: string) => Promise<void>;
-    clearAllRuns: () => Promise<void>;
-    getNextRun: (automationId: string) => Promise<string | null>;
-    checkPR: (runId: string) => Promise<AutomationRun | null>;
-    onRunStarted: (callback: (run: AutomationRun) => void) => Unsubscribe;
-    onRunCompleted: (callback: (run: AutomationRun) => void) => Unsubscribe;
-    onRunFailed: (callback: (run: AutomationRun) => void) => Unsubscribe;
-  };
-  removeAllListeners: (channel: string) => void;
+    list: () => Promise<Automation[]>
+    create: (automation: Omit<Automation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Automation>
+    update: (
+      id: string,
+      updates: Partial<Omit<Automation, 'id' | 'createdAt'>>
+    ) => Promise<Automation | null>
+    delete: (id: string) => Promise<void>
+    toggle: (id: string) => Promise<Automation | null>
+    trigger: (id: string) => Promise<void>
+    stopRun: (runId: string) => Promise<void>
+    listRuns: (automationId?: string, limit?: number) => Promise<AutomationRun[]>
+    markRead: (runId: string) => Promise<void>
+    deleteRun: (runId: string) => Promise<void>
+    clearAllRuns: () => Promise<void>
+    getNextRun: (automationId: string) => Promise<string | null>
+    checkPR: (runId: string) => Promise<AutomationRun | null>
+    onRunStarted: (callback: (run: AutomationRun) => void) => Unsubscribe
+    onRunCompleted: (callback: (run: AutomationRun) => void) => Unsubscribe
+    onRunFailed: (callback: (run: AutomationRun) => void) => Unsubscribe
+  }
+  removeAllListeners: (channel: string) => void
 }
 
 declare global {
   interface Window {
-    electronAPI: ElectronAPI;
+    electronAPI: ElectronAPI
   }
 }
 
-export {};
+export {}

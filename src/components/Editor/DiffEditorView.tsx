@@ -62,7 +62,9 @@ export function DiffEditorView({ tab, isActive }: DiffEditorViewProps) {
     }
 
     fetchContent()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [api, gitPath, tab.commitHash, tab.parentHash, tab.filePath])
 
   if (!isActive) {

@@ -40,7 +40,7 @@ export function buildBaseHref(fileDir: string): string {
  *   - allow-popups-to-escape-sandbox: would let popups bypass the sandbox for
  *                                    network exfiltration
  */
-export const IFRAME_SANDBOX = "allow-scripts allow-forms allow-modals allow-popups"
+export const IFRAME_SANDBOX = 'allow-scripts allow-forms allow-modals allow-popups'
 
 /**
  * Permissive CSP injected into preview srcdoc. The iframe sandbox omits
@@ -51,7 +51,8 @@ export const IFRAME_SANDBOX = "allow-scripts allow-forms allow-modals allow-popu
  * from index.html cascades into the iframe and blocks almost everything
  * previewed HTML wants to do.
  */
-const PREVIEW_CSP = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: file:; img-src * data: blob: file:; style-src * 'unsafe-inline' data: blob: file:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob: file:; font-src * data: blob: file:; connect-src * data: blob: file:; frame-src * data: blob: file:;"
+const PREVIEW_CSP =
+  "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: file:; img-src * data: blob: file:; style-src * 'unsafe-inline' data: blob: file:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob: file:; font-src * data: blob: file:; connect-src * data: blob: file:; frame-src * data: blob: file:;"
 
 // HTML-attribute-escape so a path containing `"`, `<`, `>`, `&`, or `'` cannot
 // break out of the <base href="..."> attribute and inject markup into srcdoc.
@@ -97,10 +98,7 @@ export function injectBaseHref(content: string, baseHref: string): string {
  * and decides when to update.
  */
 export function HtmlPreview({ content, fileDir, isActive }: HtmlPreviewProps) {
-  const srcDoc = useMemo(
-    () => injectBaseHref(content, buildBaseHref(fileDir)),
-    [content, fileDir]
-  )
+  const srcDoc = useMemo(() => injectBaseHref(content, buildBaseHref(fileDir)), [content, fileDir])
 
   return (
     <iframe

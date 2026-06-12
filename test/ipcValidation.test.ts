@@ -25,17 +25,12 @@ describe('claudeMode IPC validation', () => {
   })
 
   describe('invalid strings fall back to chat', () => {
-    test.each([
-      'invalid',
-      'fullauto',
-      '',
-      'CHAT',
-      'Auto',
-      'Full-Auto',
-      'full_auto',
-    ])('"%s" falls back to "chat"', (mode) => {
-      expect(validateClaudeMode(mode)).toBe('chat')
-    })
+    test.each(['invalid', 'fullauto', '', 'CHAT', 'Auto', 'Full-Auto', 'full_auto'])(
+      '"%s" falls back to "chat"',
+      (mode) => {
+        expect(validateClaudeMode(mode)).toBe('chat')
+      }
+    )
   })
 
   describe('non-string types fall back to chat', () => {

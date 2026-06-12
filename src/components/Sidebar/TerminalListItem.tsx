@@ -1,12 +1,8 @@
 import { memo } from 'react'
 import { Terminal as TerminalIcon, X } from 'lucide-react'
 import type { TerminalSession } from '../../types'
-import {
-  STATE_TEXT_COLORS,
-  STATE_DOT_COLORS,
-  isInputState,
-  isVisibleState,
-} from '../../utils/terminalState'
+import { STATE_DOT_COLORS, isAttentionState, isVisibleState } from '../../utils/terminalState'
+import { AttentionChip, AttentionRail, attentionRowBg } from './AttentionRail'
 
 interface TerminalListItemProps {
   terminal: TerminalSession
@@ -23,36 +19,44 @@ export const TerminalListItem = memo(function TerminalListItem({
   onClose,
   className,
 }: TerminalListItemProps) {
+  const isAttention = isAttentionState(terminal.state)
   const defaultClassName = `
     group flex items-center gap-2 px-3 py-1.5 cursor-pointer
-    transition-colors duration-150
-    ${isActive
-      ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground rounded-md'
-      : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-md'}
+    transition-colors duration-150 rounded-md
+    ${attentionRowBg(isAttention, isActive)}
+    ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
   `
   const isClaude = terminal.type === 'claude'
+  const showSummary = isClaude && isActive && Boolean(terminal.summary)
 
   return (
     <li
       onClick={onSelect}
-      className={className ?? defaultClassName}
+      className={`relative ${className ?? defaultClassName}`}
+      title={isClaude && !isActive && terminal.summary ? terminal.summary : undefined}
     >
+      {isAttention && <AttentionRail />}
+      {/* Stopped is the only state without a dot/rail/chip; the red icon is its sole indicator */}
       <TerminalIcon
-        className={`w-3 h-3 flex-shrink-0 ${isClaude ? 'mt-0.5' : ''} ${STATE_TEXT_COLORS[terminal.state]}`}
+        className={`w-3 h-3 flex-shrink-0 ${
+          terminal.state === 'stopped' ? 'text-[var(--status-stopped)]' : 'text-muted-foreground'
+        }`}
       />
       <div className="flex-1 min-w-0">
         <span className="text-xs truncate block">{terminal.generatedTitle || terminal.title}</span>
-        {isClaude && (
-          <span className="text-[10px] text-text-secondary truncate block leading-tight opacity-70">
-            {terminal.summary || '\u00A0'}
+        {showSummary && (
+          <span className="text-[10px] text-muted-foreground truncate block leading-tight opacity-70">
+            {terminal.summary}
           </span>
         )}
       </div>
-      {/* State indicator - shows for busy (static) and input states (blinking) */}
-      {isVisibleState(terminal.state) && (
+      {/* Attention chip - permission/question rows say what they need */}
+      {isAttention && <AttentionChip />}
+      {/* State dot - only for visible non-attention states (busy static, done blinking) */}
+      {!isAttention && isVisibleState(terminal.state) && (
         <span
           className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
-            isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
+            terminal.state === 'done' ? 'needs-input-indicator' : ''
           }`}
         />
       )}

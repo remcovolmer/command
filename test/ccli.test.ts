@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll, vi, beforeEach, afterEach } from 'vitest'
+import { describe, test, expect, beforeAll, afterAll } from 'vitest'
 import http from 'node:http'
 import path from 'node:path'
 
@@ -9,14 +9,14 @@ const ccli = require('../electron/main/cli/ccli.cjs') as {
   parseArgs: (argv: string[]) => { positional: string[]; flags: Record<string, string | boolean> }
   buildRoute: (
     positional: string[],
-    flags: Record<string, string | boolean>,
+    flags: Record<string, string | boolean>
   ) => { method?: string; path?: string; body?: Record<string, unknown>; error?: string }
   formatPretty: (data: unknown) => string
   httpRequest: (
     method: string,
     urlPath: string,
     body: Record<string, unknown> | null,
-    env: { port: number; terminalId: string; token: string },
+    env: { port: number; terminalId: string; token: string }
   ) => Promise<{ statusCode: number; body: Record<string, unknown> }>
   VERSION: string
 }
@@ -298,14 +298,14 @@ describe('ccli', () => {
             serverPort = typeof addr === 'object' && addr !== null ? addr.port : 0
             resolve()
           })
-        }),
+        })
     )
 
     afterAll(
       () =>
         new Promise<void>((resolve) => {
           server.close(() => resolve())
-        }),
+        })
     )
 
     test('sends correct POST request for worktree create', async () => {
@@ -369,7 +369,7 @@ describe('ccli', () => {
             req.on('end', () => {
               res.writeHead(500, {
                 'Content-Type': 'application/json',
-                'Connection': 'close',
+                Connection: 'close',
               })
               res.end(JSON.stringify({ ok: false, error: 'Internal server error' }))
             })
@@ -379,14 +379,14 @@ describe('ccli', () => {
             serverPort = typeof addr === 'object' && addr !== null ? addr.port : 0
             resolve()
           })
-        }),
+        })
     )
 
     afterAll(
       () =>
         new Promise<void>((resolve) => {
           server.close(() => resolve())
-        }),
+        })
     )
 
     test('server error response is returned', async () => {
@@ -401,7 +401,7 @@ describe('ccli', () => {
     test('connection refused throws descriptive error', async () => {
       const env = { port: 1, terminalId: 'term-1', token: 'tok' }
       await expect(ccli.httpRequest('GET', '/chat/list', null, env)).rejects.toThrow(
-        /Failed to connect to Command server/,
+        /Failed to connect to Command server/
       )
     })
   })
@@ -425,7 +425,7 @@ describe('ccli', () => {
           },
           (_err, _stdout, stderr) => {
             resolve({ code: proc.exitCode, stderr: stderr ?? '' })
-          },
+          }
         )
       })
 

@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelHandle,
+} from 'react-resizable-panels'
 import { Sidebar } from '../Sidebar/Sidebar'
 import { TerminalArea } from './TerminalArea'
 import { FileExplorer } from '../FileExplorer/FileExplorer'
@@ -31,13 +36,7 @@ export function MainLayout() {
       <UncaughtErrorToast />
       <PanelGroup direction="horizontal" autoSaveId="main-layout">
         {/* Sidebar */}
-        <Panel
-          id="sidebar"
-          defaultSize={20}
-          minSize={15}
-          maxSize={35}
-          className="bg-sidebar"
-        >
+        <Panel id="sidebar" defaultSize={20} minSize={15} maxSize={35} className="bg-sidebar">
           <Sidebar />
         </Panel>
 
@@ -50,7 +49,9 @@ export function MainLayout() {
         </Panel>
 
         {/* Resize Handle for File Explorer */}
-        <PanelResizeHandle className={`w-1 transition-colors ${!fileExplorerVisible ? 'hidden' : ''}`} />
+        <PanelResizeHandle
+          className={`w-1 transition-colors ${!fileExplorerVisible ? 'hidden' : ''}`}
+        />
 
         {/* File Explorer (always rendered, but collapsible) */}
         <Panel

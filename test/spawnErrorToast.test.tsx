@@ -58,9 +58,7 @@ describe('SpawnErrorToast', () => {
     render(<SpawnErrorToast />)
     emit({ code: 'CWD_MISSING', cwd: 'C:\\gone', message: 'missing' })
     expect(screen.getByText('Working directory not found')).toBeTruthy()
-    expect(
-      screen.getByText(/C:\\gone no longer exists/),
-    ).toBeTruthy()
+    expect(screen.getByText(/C:\\gone no longer exists/)).toBeTruthy()
   })
 
   test('CWD_NOT_DIR renders the not-a-directory title', () => {

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Center — Top 5 professionalisering</title>
+<style>
+  :root {
+    --ink: #1a2332;
+    --ink-soft: #4a5568;
+    --accent: #0b5fff;
+    --accent-soft: #e8f0ff;
+    --green: #15803d;
+    --green-soft: #e9f7ef;
+    --amber: #b45309;
+    --amber-soft: #fef3e2;
+    --red: #b91c1c;
+    --red-soft: #fdeaea;
+    --line: #e2e8f0;
+    --bg: #f7f9fc;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.55; font-size: 15px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 28px 80px; }
+  header { border-bottom: 3px solid var(--accent); padding-bottom: 20px; margin-bottom: 32px; }
+  .kicker { text-transform: uppercase; letter-spacing: 2px; font-size: 12px; color: var(--accent); font-weight: 700; }
+  h1 { font-size: 27px; line-height: 1.3; margin-top: 8px; font-weight: 700; }
+  .meta { color: var(--ink-soft); font-size: 13px; margin-top: 10px; }
+  h2 { font-size: 20px; margin: 44px 0 6px; font-weight: 700; line-height: 1.35; }
+  h2 .num { color: var(--accent); margin-right: 8px; }
+  .lede { color: var(--ink-soft); margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; margin-top: 14px; }
+  .scr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .scr .card { margin-top: 0; border-top: 4px solid var(--line); }
+  .scr .card.s { border-top-color: var(--green); }
+  .scr .card.c { border-top-color: var(--amber); }
+  .scr .card.r { border-top-color: var(--accent); }
+  .scr h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; color: var(--ink-soft); }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 14px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .kpi .v { font-size: 26px; font-weight: 700; }
+  .kpi .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+  .kpi.good .v { color: var(--green); }
+  .kpi.bad .v { color: var(--red); }
+  .kpi.warn .v { color: var(--amber); }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; background: var(--card); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); font-size: 14px; }
+  th { background: var(--ink); color: #fff; text-align: left; padding: 10px 14px; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.8px; }
+  td { padding: 11px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: #fafcff; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill.hi { background: var(--red-soft); color: var(--red); }
+  .pill.mid { background: var(--amber-soft); color: var(--amber); }
+  .pill.lo { background: var(--green-soft); color: var(--green); }
+  .pill.acc { background: var(--accent-soft); color: var(--accent); }
+  .item { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--accent); border-radius: 10px; padding: 22px 26px; margin-top: 18px; }
+  .item h3 { font-size: 17px; line-height: 1.4; margin-bottom: 10px; }
+  .item .rank { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; margin-right: 10px; flex-shrink: 0; }
+  .item .head { display: flex; align-items: flex-start; }
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin: 12px 0; padding: 14px 16px; background: var(--bg); border-radius: 8px; font-size: 13.5px; }
+  .facts div::before { content: "▸ "; color: var(--accent); font-weight: 700; }
+  .tags { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  code { background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; font-size: 13px; font-family: 'Cascadia Code', Consolas, monospace; }
+  .matrix-wrap { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: start; }
+  .roadmap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  .roadmap .card { margin-top: 0; }
+  .roadmap h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 10px; }
+  .roadmap ul { padding-left: 18px; font-size: 13.5px; }
+  .roadmap li { margin-bottom: 6px; }
+  .note { background: var(--amber-soft); border-left: 4px solid var(--amber); border-radius: 6px; padding: 12px 16px; margin-top: 18px; font-size: 13.5px; }
+  footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12.5px; }
+  @media (max-width: 800px) { .scr, .kpis, .matrix-wrap, .roadmap { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Brainstorm · Command Center</div>
+  <h1>De app is functioneel volwassen, maar kwaliteit leunt op discipline — vijf ingrepen verankeren die kwaliteit in infrastructuur</h1>
+  <div class="meta">10 juni 2026 · Codebase-analyse v0.19.1 · 133 bestanden · 32.926 regels TypeScript · branch refactor/fable-test</div>
+</header>
+
+<!-- SCR -->
+<section>
+  <div class="scr">
+    <div class="card s">
+      <h3>Situatie</h3>
+      <p>Command Center is in korte tijd uitgegroeid tot een serieuze app: 19 main-process services, 95 gevalideerde IPC-handlers, strict TypeScript met welgeteld één <code>any</code>, atomic file writes en een eigen crash logger. De fundering is beter dan "gevibede code" doet vermoeden.</p>
+    </div>
+    <div class="card c">
+      <h3>Complicatie</h3>
+      <p>Niets dwingt die kwaliteit af. CI draait geen enkele test, er is geen ESLint, geen coverage-meting, geen gestructureerde logging en het IPC-typecontract bestaat twee keer. Elke regressie haalt nu ongezien de release — bij 0.19.x met auto-update naar echte gebruikers.</p>
+    </div>
+    <div class="card r">
+      <h3>Resolutie</h3>
+      <p>Vijf ingrepen, gerangschikt op impact per uur inspanning. De eerste twee zijn samen ±1 dag werk en sluiten het grootste gat: een merge kan vandaag 6.454 regels testcode breken zonder dat iemand het merkt.</p>
+    </div>
+  </div>
+</section>
+
+<!-- KPI's -->
+<section>
+  <h2>De cijfers tonen een paradox: sterke code, afwezige bewaking</h2>
+  <div class="kpis">
+    <div class="kpi bad"><div class="v">0</div><div class="l">tests in de CI-pipeline (25 testbestanden bestaan wél)</div></div>
+    <div class="kpi bad"><div class="v">0</div><div class="l">ESLint-regels geconfigureerd op 33k regels code</div></div>
+    <div class="kpi warn"><div class="v">120</div><div class="l">losse console.* calls i.p.v. gestructureerde logging</div></div>
+    <div class="kpi warn"><div class="v">30+</div><div class="l">types handmatig gedupliceerd tussen preload en renderer</div></div>
+  </div>
+  <div class="kpis" style="margin-top:14px">
+    <div class="kpi good"><div class="v">1</div><div class="l">any-type in de hele codebase (strict mode aan)</div></div>
+    <div class="kpi good"><div class="v">100%</div><div class="l">shell-calls via execFile (geen injectierisico)</div></div>
+    <div class="kpi good"><div class="v">14/19</div><div class="l">services met unit tests (6.454 regels testcode)</div></div>
+    <div class="kpi warn"><div class="v">6</div><div class="l">onbeteste services, waaronder SecureEnvStore (credentials)</div></div>
+  </div>
+</section>
+
+<!-- TOP 5 -->
+<section>
+  <h2>Top 5 — geprioriteerd op impact per uur inspanning</h2>
+
+  <div class="item">
+    <div class="head"><span class="rank">1</span><h3>Maak CI een kwaliteitspoort: tests, typecheck en lint moeten een merge kunnen blokkeren</h3></div>
+    <p><code>build.yml</code> draait alleen <code>npm run build</code>; de 25 testbestanden (6.454 regels) draaien uitsluitend als iemand er lokaal aan denkt. De typecheck zit verstopt in het build-script en kan niet apart falen. Een PR die <code>TerminalManager</code> breekt, merget vandaag groen.</p>
+    <div class="facts">
+      <div>Geen <code>npm test</code>-stap in .github/workflows/build.yml</div>
+      <div>Geen los <code>typecheck</code>- of <code>lint</code>-script in package.json</div>
+      <div>E2E-smoketest (Playwright) draait nergens automatisch</div>
+      <div>Release publiceert direct naar gebruikers via electron-updater</div>
+    </div>
+    <p><strong>Aanpak:</strong> één PR-workflow met drie parallelle jobs (test, typecheck, lint) + branch protection op main. Lint-job activeert zodra #2 staat.</p>
+    <div class="tags"><span class="pill hi">Impact: hoog</span><span class="pill lo">Effort: ~0,5 dag</span><span class="pill acc">Quick win</span></div>
+  </div>
+
+  <div class="item">
+    <div class="head"><span class="rank">2</span><h3>Voer ESLint + Prettier in: de codestandaard bestaat al impliciet, maar niets dwingt hem af</h3></div>
+    <p>Nul lint-configuratie op een codebase van 33k regels. De code is nu consistent dankzij discipline, maar elke bijdrage (mens of agent) kan ongemerkt afwijken. De eigen workflow-regel — elk TS-project heeft ESLint, de PostToolUse lint-fix hook leunt erop — wordt door dit project zelf geschonden.</p>
+    <div class="facts">
+      <div>Geen .eslintrc / eslint.config.* aanwezig</div>
+      <div>Geen Prettier; formattering is handwerk</div>
+      <div>Flat config + typescript-eslint + react-hooks volstaat</div>
+      <div>no-explicit-any borgt de huidige 1-any-status permanent</div>
+    </div>
+    <p><strong>Aanpak:</strong> flat config met <code>typescript-eslint</code> (recommended-type-checked), <code>react-hooks</code> en Prettier; eenmalige autofix-pass; daarna afdwingen via de CI-poort uit #1.</p>
+    <div class="tags"><span class="pill hi">Impact: hoog</span><span class="pill lo">Effort: ~0,5–1 dag</span><span class="pill acc">Quick win</span></div>
+  </div>
+
+  <div class="item">
+    <div class="head"><span class="rank">3</span><h3>Bouw observability: bij een bug in het veld is er nu geen enkel signaal behalve een lokale crash.log</h3></div>
+    <p>120 console-calls verdwijnen in productie in het niets; alleen harde crashes halen de CrashLogger. Vijf stille <code>catch {}</code>-blokken slikken fouten volledig in, en het hook-statebestand — het hart van de attention-indicator — wordt als enige níet atomair geschreven. Een gebruiker met een probleem kan niets aanleveren, en jij ziet niets.</p>
+    <div class="facts">
+      <div>Geen electron-log of Sentry; alleen crash.log bij fatale fouten</div>
+      <div>5 lege catch-blokken (o.a. WorktreeService.ts:212, git pull)</div>
+      <div>ClaudeHookWatcher schrijft state niet-atomair (writeFileSync)</div>
+      <div>CommandServer (990 regels HTTP) logt geen enkele request</div>
+    </div>
+    <p><strong>Aanpak:</strong> electron-log als drop-in voor console.* met logniveaus en rotatie; de vijf stille catches loggen of expliciet motiveren; atomic write in ClaudeHookWatcher. Sentry is een optionele tweede stap — pragmatisch starten met lokale logs die een gebruiker kan opsturen.</p>
+    <div class="tags"><span class="pill hi">Impact: hoog</span><span class="pill mid">Effort: 1–2 dagen</span></div>
+  </div>
+
+  <div class="item">
+    <div class="head"><span class="rank">4</span><h3>Eén gedeeld IPC-contract: 30+ gedupliceerde types zijn een driftrisico bij elke schemawijziging</h3></div>
+    <p>De preload (864 regels) definieert <code>Project</code>, <code>GitStatus</code>, <code>AccountProfile</code> en ~30 andere types opnieuw in plaats van ze te importeren. Elke schemawijziging vereist nu een handmatige sync tussen twee bestanden; een gemiste sync compileert gewoon en faalt pas runtime — precies de bugcategorie die strict TypeScript had moeten uitsluiten.</p>
+    <div class="facts">
+      <div>src/types/index.ts: 595 regels, 86 typedefinities</div>
+      <div>electron/preload/index.ts dupliceert er 30+ lokaal</div>
+      <div>Sync-verplichting staat als comment, niet als check</div>
+      <div>Oplosbaar met een shared/ types-map in beide tsconfig-scopes</div>
+    </div>
+    <p><strong>Aanpak:</strong> verplaats de contract-types naar een <code>shared/</code>-map die zowel renderer als preload importeert; daarna kan de compiler drift zelf afvangen. Geen runtime-wijziging, puur structuur.</p>
+    <div class="tags"><span class="pill mid">Impact: middel-hoog</span><span class="pill mid">Effort: 1–2 dagen</span></div>
+  </div>
+
+  <div class="item">
+    <div class="head"><span class="rank">5</span><h3>Dek de zes onbeteste services — juist die met credentials, updates en user-data — en maak coverage meetbaar</h3></div>
+    <p>De testdekking is selectief sterk: 14 van 19 services hebben serieuze tests. Maar de zes onbeteste zijn niet de onschuldigste: <code>SecureEnvStore</code> (versleutelde credentials), <code>UpdateService</code> (auto-update naar alle gebruikers), <code>AutomationRunner</code> (draait agents in worktrees) en <code>HookInstaller</code> (schrijft in ~/.claude/settings.json van de gebruiker). Zonder coverage-tooling blijft dit gat onzichtbaar.</p>
+    <div class="facts">
+      <div>Onbetest: AutomationRunner, FileWatcherService, HookInstaller, SecureEnvStore, TaskService, UpdateService</div>
+      <div>Geen @vitest/coverage-v8 geconfigureerd; geen drempel</div>
+      <div>E2E beperkt tot 3 smoke-tests (76 regels)</div>
+      <div>Test-code-ratio nu 24,5% — basis is er al</div>
+    </div>
+    <p><strong>Aanpak:</strong> coverage-rapportage aanzetten met een realistische drempel (geen 100%-fetisj), daarna per service gericht de risicopaden testen: corrupte input, ontbrekende binaries, failure tijdens schrijven.</p>
+    <div class="tags"><span class="pill mid">Impact: middel-hoog</span><span class="pill hi">Effort: 3–5 dagen, opdeelbaar</span></div>
+  </div>
+</section>
+
+<!-- MATRIX + ROADMAP -->
+<section>
+  <h2>Volgorde: twee quick wins eerst, daarna bouwen op de poort die er dan staat</h2>
+  <div class="matrix-wrap">
+    <div class="card">
+      <svg viewBox="0 0 460 340" width="100%" role="img" aria-label="Impact-effort matrix">
+        <!-- axes -->
+        <line x1="60" y1="290" x2="430" y2="290" stroke="#1a2332" stroke-width="1.5"/>
+        <line x1="60" y1="290" x2="60" y2="20" stroke="#1a2332" stroke-width="1.5"/>
+        <text x="245" y="322" text-anchor="middle" font-size="12" fill="#4a5568">Inspanning →</text>
+        <text x="22" y="155" text-anchor="middle" font-size="12" fill="#4a5568" transform="rotate(-90 22 155)">Impact →</text>
+        <!-- quadrant guides -->
+        <line x1="245" y1="290" x2="245" y2="20" stroke="#e2e8f0" stroke-dasharray="4 4"/>
+        <line x1="60" y1="155" x2="430" y2="155" stroke="#e2e8f0" stroke-dasharray="4 4"/>
+        <text x="150" y="38" text-anchor="middle" font-size="11" fill="#15803d" font-weight="700">DOEN — quick wins</text>
+        <text x="338" y="38" text-anchor="middle" font-size="11" fill="#b45309" font-weight="700">PLANNEN</text>
+        <!-- points -->
+        <g>
+          <circle cx="105" cy="60" r="16" fill="#0b5fff"/><text x="105" y="65" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">1</text>
+          <text x="105" y="92" text-anchor="middle" font-size="11" fill="#1a2332">CI-poort</text>
+        </g>
+        <g>
+          <circle cx="160" cy="75" r="16" fill="#0b5fff"/><text x="160" y="80" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">2</text>
+          <text x="160" y="107" text-anchor="middle" font-size="11" fill="#1a2332">ESLint</text>
+        </g>
+        <g>
+          <circle cx="270" cy="85" r="16" fill="#4a5568"/><text x="270" y="90" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">3</text>
+          <text x="270" y="117" text-anchor="middle" font-size="11" fill="#1a2332">Logging</text>
+        </g>
+        <g>
+          <circle cx="290" cy="140" r="16" fill="#4a5568"/><text x="290" y="145" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">4</text>
+          <text x="290" y="172" text-anchor="middle" font-size="11" fill="#1a2332">IPC-contract</text>
+        </g>
+        <g>
+          <circle cx="375" cy="125" r="16" fill="#4a5568"/><text x="375" y="130" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">5</text>
+          <text x="375" y="157" text-anchor="middle" font-size="11" fill="#1a2332">Coverage</text>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <div class="roadmap" style="grid-template-columns:1fr">
+        <div class="card">
+          <h4>Stap 1 · ±1 dag</h4>
+          <ul>
+            <li><strong>#1 + #2 samen:</strong> ESLint-config + CI-workflow in één PR — de lint-poort heeft de config nodig, dus combineren scheelt een iteratie.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Stap 2 · 2–4 dagen</h4>
+          <ul>
+            <li><strong>#3 logging</strong> en <strong>#4 shared types</strong> — onafhankelijk van elkaar, beide bewaakt door de CI uit stap 1.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Stap 3 · doorlopend</h4>
+          <ul>
+            <li><strong>#5 coverage:</strong> per service oppakken, te beginnen bij SecureEnvStore en UpdateService (hoogste risico).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Bewust uitgesteld:</strong> het opsplitsen van <code>electron/main/index.ts</code> (1.595 regels, 95 handlers) en <code>projectStore.ts</code> (1.700 regels) is een terechte kandidaat, maar pas ná stap 1 — een refactor van die omvang zonder CI-vangnet is precies het risico dat deze top 5 elimineert. Zelfde geldt voor een CHANGELOG: nuttig, niet urgent.
+  </div>
+</section>
+
+<footer>
+  Gebaseerd op codebase-analyse van 10 juni 2026 (3 parallelle audits: quality-infrastructuur, robuustheid/security, architectuur). Alle cijfers verifieerbaar in de genoemde bestanden. Volgende stap: <code>/ce-plan</code> op item #1+#2.
+</footer>
+
+</div>
+</body>
+</html>

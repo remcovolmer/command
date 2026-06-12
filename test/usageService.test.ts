@@ -9,6 +9,10 @@ vi.mock('fs/promises', () => ({
   readFile: (..._args: unknown[]) => readFileStub(),
 }))
 
+vi.mock('../electron/main/services/Logger', () => ({
+  createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
+}))
+
 // Import after mock so the service picks up the stub.
 import {
   UsageService,

@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useProjectStore } from '../../stores/projectStore'
-import { formatResetTime, formatCredits, usageLevel, type UsageLevel } from '../../utils/usageFormat'
+import {
+  formatResetTime,
+  formatCredits,
+  usageLevel,
+  type UsageLevel,
+} from '../../utils/usageFormat'
 
 const LEVEL_BAR: Record<UsageLevel, string> = {
   normal: 'bg-primary',
@@ -29,11 +34,12 @@ export function UsageIndicator() {
 
   // Reset hover when the indicator hides: the div unmounts before
   // onMouseLeave can fire, so without this the popover would reappear
-  // open when the indicator returns.
+  // open when the indicator returns. Render-time state adjustment per the
+  // React "storing information from previous renders" pattern.
   const hidden = !showUsageIndicator || !usageData || usageData.status !== 'ok'
-  useEffect(() => {
-    if (hidden) setHovered(false)
-  }, [hidden])
+  if (hidden && hovered) {
+    setHovered(false)
+  }
 
   if (!showUsageIndicator || !usageData || usageData.status !== 'ok') return null
 
@@ -62,8 +68,7 @@ export function UsageIndicator() {
           />
         </div>
         <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-          {Math.round(fivePct)}%
-          {resetTime ? ` · ${resetTime}` : ''}
+          {Math.round(fivePct)}%{resetTime ? ` · ${resetTime}` : ''}
           {weekDrives ? ` · wk ${Math.round(weekPct)}%` : ''}
         </span>
       </div>

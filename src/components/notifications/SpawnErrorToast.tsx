@@ -62,16 +62,19 @@ export function SpawnErrorToast() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  const scheduleDismiss = useCallback((id: number) => {
-    // Clear any prior timer for this id so dedup can refresh cleanly.
-    const existing = timeoutsRef.current.get(id)
-    if (existing !== undefined) clearTimeout(existing)
-    const handle = setTimeout(() => {
-      timeoutsRef.current.delete(id)
-      dismiss(id)
-    }, AUTO_DISMISS_MS)
-    timeoutsRef.current.set(id, handle)
-  }, [dismiss])
+  const scheduleDismiss = useCallback(
+    (id: number) => {
+      // Clear any prior timer for this id so dedup can refresh cleanly.
+      const existing = timeoutsRef.current.get(id)
+      if (existing !== undefined) clearTimeout(existing)
+      const handle = setTimeout(() => {
+        timeoutsRef.current.delete(id)
+        dismiss(id)
+      }, AUTO_DISMISS_MS)
+      timeoutsRef.current.set(id, handle)
+    },
+    [dismiss]
+  )
 
   useEffect(() => {
     const unsub = terminalEvents.onSpawnFailed((event) => {
@@ -85,7 +88,10 @@ export function SpawnErrorToast() {
         }
         const id = ++nextIdRef.current
         scheduleDismiss(id)
-        registryUnsubsRef.current.set(id, pushToastDismiss(() => dismiss(id)))
+        registryUnsubsRef.current.set(
+          id,
+          pushToastDismiss(() => dismiss(id))
+        )
         // Cap visible count: drop the oldest when over the limit so a flood of
         // spawn failures doesn't bury the whole UI under toasts.
         const next = [...prev, { id, code: event.code, cwd: event.cwd, message: event.message }]
@@ -140,7 +146,12 @@ export function SpawnErrorToast() {
             <div className="flex items-start gap-3">
               <div className="text-red-400 mt-0.5">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
@@ -161,7 +172,12 @@ export function SpawnErrorToast() {
                 aria-label="Dismiss"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>

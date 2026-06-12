@@ -1,4 +1,4 @@
-import type { HotkeyAction, HotkeyBinding, HotkeyConfig, ModifierKey } from '../types/hotkeys';
+import type { HotkeyAction, HotkeyBinding, HotkeyConfig, ModifierKey } from '../types/hotkeys'
 
 /**
  * Default hotkey configuration
@@ -304,6 +304,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'sidebar',
     enabled: true,
   },
+  'sidebar.toggleProjectCollapse': {
+    key: 'p',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle collapse active project',
+    category: 'sidebar',
+    enabled: true,
+  },
 
   // UI & Settings
   'ui.openSettings': {
@@ -364,125 +371,125 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'dialog',
     enabled: true,
   },
-};
+}
 
 /**
  * Check if a keyboard event matches a hotkey binding
  */
 export function matchesBinding(e: KeyboardEvent, binding: HotkeyBinding): boolean {
-  if (!binding.enabled) return false;
+  if (!binding.enabled) return false
 
   // Check modifiers
-  const ctrlRequired = binding.modifiers.includes('ctrl');
-  const altRequired = binding.modifiers.includes('alt');
-  const shiftRequired = binding.modifiers.includes('shift');
-  const metaRequired = binding.modifiers.includes('meta');
+  const ctrlRequired = binding.modifiers.includes('ctrl')
+  const altRequired = binding.modifiers.includes('alt')
+  const shiftRequired = binding.modifiers.includes('shift')
+  const metaRequired = binding.modifiers.includes('meta')
 
   // Support both Ctrl and Meta (Cmd on Mac) for 'ctrl' modifier
-  const ctrlOrMeta = e.ctrlKey || e.metaKey;
+  const ctrlOrMeta = e.ctrlKey || e.metaKey
 
-  if (ctrlRequired && !ctrlOrMeta) return false;
-  if (altRequired && !e.altKey) return false;
-  if (shiftRequired && !e.shiftKey) return false;
-  if (metaRequired && !e.metaKey) return false;
+  if (ctrlRequired && !ctrlOrMeta) return false
+  if (altRequired && !e.altKey) return false
+  if (shiftRequired && !e.shiftKey) return false
+  if (metaRequired && !e.metaKey) return false
 
   // Check that no extra modifiers are pressed
-  if (!ctrlRequired && e.ctrlKey && !metaRequired) return false;
-  if (!altRequired && e.altKey) return false;
-  if (!shiftRequired && e.shiftKey) return false;
-  if (!metaRequired && e.metaKey && !ctrlRequired) return false;
+  if (!ctrlRequired && e.ctrlKey && !metaRequired) return false
+  if (!altRequired && e.altKey) return false
+  if (!shiftRequired && e.shiftKey) return false
+  if (!metaRequired && e.metaKey && !ctrlRequired) return false
 
   // Check key (case-insensitive for letters)
-  const pressedKey = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  const bindingKey = binding.key.length === 1 ? binding.key.toLowerCase() : binding.key;
+  const pressedKey = e.key.length === 1 ? e.key.toLowerCase() : e.key
+  const bindingKey = binding.key.length === 1 ? binding.key.toLowerCase() : binding.key
 
-  return pressedKey === bindingKey;
+  return pressedKey === bindingKey
 }
 
 /**
  * Format a hotkey binding for display
  */
 export function formatBinding(binding: HotkeyBinding): string {
-  const parts: string[] = [];
+  const parts: string[] = []
 
   // Use platform-specific modifier names
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
 
   if (binding.modifiers.includes('ctrl')) {
-    parts.push(isMac ? '⌘' : 'Ctrl');
+    parts.push(isMac ? '⌘' : 'Ctrl')
   }
   if (binding.modifiers.includes('alt')) {
-    parts.push(isMac ? '⌥' : 'Alt');
+    parts.push(isMac ? '⌥' : 'Alt')
   }
   if (binding.modifiers.includes('shift')) {
-    parts.push(isMac ? '⇧' : 'Shift');
+    parts.push(isMac ? '⇧' : 'Shift')
   }
   if (binding.modifiers.includes('meta')) {
-    parts.push(isMac ? '⌘' : 'Win');
+    parts.push(isMac ? '⌘' : 'Win')
   }
 
   // Format key name for display
-  let keyDisplay = binding.key;
+  let keyDisplay = binding.key
   switch (binding.key) {
     case 'ArrowUp':
-      keyDisplay = '↑';
-      break;
+      keyDisplay = '↑'
+      break
     case 'ArrowDown':
-      keyDisplay = '↓';
-      break;
+      keyDisplay = '↓'
+      break
     case 'ArrowLeft':
-      keyDisplay = '←';
-      break;
+      keyDisplay = '←'
+      break
     case 'ArrowRight':
-      keyDisplay = '→';
-      break;
+      keyDisplay = '→'
+      break
     case 'Escape':
-      keyDisplay = 'Esc';
-      break;
+      keyDisplay = 'Esc'
+      break
     case 'Tab':
-      keyDisplay = 'Tab';
-      break;
+      keyDisplay = 'Tab'
+      break
     case 'Enter':
-      keyDisplay = '↵';
-      break;
+      keyDisplay = '↵'
+      break
     case 'Delete':
-      keyDisplay = 'Del';
-      break;
+      keyDisplay = 'Del'
+      break
     case ' ':
-      keyDisplay = 'Space';
-      break;
+      keyDisplay = 'Space'
+      break
     case '\\':
-      keyDisplay = '\\';
-      break;
+      keyDisplay = '\\'
+      break
     default:
       if (keyDisplay.length === 1) {
-        keyDisplay = keyDisplay.toUpperCase();
+        keyDisplay = keyDisplay.toUpperCase()
       }
   }
 
-  parts.push(keyDisplay);
+  parts.push(keyDisplay)
 
-  return isMac ? parts.join('') : parts.join(' + ');
+  return isMac ? parts.join('') : parts.join(' + ')
 }
 
 /**
  * Check if two hotkey bindings conflict
  */
 export function hasConflict(a: HotkeyBinding, b: HotkeyBinding): boolean {
-  if (!a.enabled || !b.enabled) return false;
+  if (!a.enabled || !b.enabled) return false
 
   // Check if keys match (case-insensitive for letters)
-  const keyA = a.key.length === 1 ? a.key.toLowerCase() : a.key;
-  const keyB = b.key.length === 1 ? b.key.toLowerCase() : b.key;
-  if (keyA !== keyB) return false;
+  const keyA = a.key.length === 1 ? a.key.toLowerCase() : a.key
+  const keyB = b.key.length === 1 ? b.key.toLowerCase() : b.key
+  if (keyA !== keyB) return false
 
   // Check if modifiers match exactly
-  const modsA = [...a.modifiers].sort();
-  const modsB = [...b.modifiers].sort();
+  const modsA = [...a.modifiers].sort()
+  const modsB = [...b.modifiers].sort()
 
-  if (modsA.length !== modsB.length) return false;
+  if (modsA.length !== modsB.length) return false
 
-  return modsA.every((mod, i) => mod === modsB[i]);
+  return modsA.every((mod, i) => mod === modsB[i])
 }
 
 /**
@@ -493,78 +500,93 @@ export function findConflicts(
   config: HotkeyConfig,
   excludeAction?: HotkeyAction
 ): HotkeyAction[] {
-  const conflicts: HotkeyAction[] = [];
+  const conflicts: HotkeyAction[] = []
 
   for (const [action, existingBinding] of Object.entries(config)) {
-    if (action === excludeAction) continue;
+    if (action === excludeAction) continue
     if (hasConflict(binding, existingBinding)) {
-      conflicts.push(action as HotkeyAction);
+      conflicts.push(action as HotkeyAction)
     }
   }
 
-  return conflicts;
+  return conflicts
 }
 
 // Modifier-only keys that should be ignored when parsing key events
-const MODIFIER_ONLY_KEYS = ['Control', 'Alt', 'Shift', 'Meta'] as const;
+const MODIFIER_ONLY_KEYS = ['Control', 'Alt', 'Shift', 'Meta'] as const
 
 // Type guard to check if a key is a modifier-only key
 function isModifierOnlyKey(key: string): key is (typeof MODIFIER_ONLY_KEYS)[number] {
-  return (MODIFIER_ONLY_KEYS as readonly string[]).includes(key);
+  return (MODIFIER_ONLY_KEYS as readonly string[]).includes(key)
 }
 
 // Mapping from KeyboardEvent modifier flags to ModifierKey values
-const MODIFIER_FLAG_MAP: ReadonlyArray<{ flag: keyof Pick<KeyboardEvent, 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>; modifier: ModifierKey }> = [
+const MODIFIER_FLAG_MAP: ReadonlyArray<{
+  flag: keyof Pick<KeyboardEvent, 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>
+  modifier: ModifierKey
+}> = [
   { flag: 'ctrlKey', modifier: 'ctrl' },
   { flag: 'altKey', modifier: 'alt' },
   { flag: 'shiftKey', modifier: 'shift' },
   { flag: 'metaKey', modifier: 'meta' },
-];
+]
 
 /**
  * Parse a key event into a binding (for recording)
  */
-export function parseKeyEvent(e: KeyboardEvent): Omit<HotkeyBinding, 'description' | 'category' | 'enabled'> | null {
+export function parseKeyEvent(
+  e: KeyboardEvent
+): Omit<HotkeyBinding, 'description' | 'category' | 'enabled'> | null {
   // Ignore modifier-only key presses using type guard
   if (isModifierOnlyKey(e.key)) {
-    return null;
+    return null
   }
 
   // Build modifiers array using type-safe mapping
-  const modifiers = MODIFIER_FLAG_MAP
-    .filter(({ flag }) => e[flag])
-    .map(({ modifier }) => modifier);
+  const modifiers = MODIFIER_FLAG_MAP.filter(({ flag }) => e[flag]).map(({ modifier }) => modifier)
 
   return {
     key: e.key,
     modifiers,
-  };
+  }
+}
+
+/**
+ * Backfill defaults for actions missing from a persisted hotkey config.
+ *
+ * Persisted configs from existing users predate newly added actions; without
+ * this, a new action is active (via the lookup fallback in useHotkeys) but
+ * invisible in Settings, the Ctrl+/ overlay and conflict detection — all of
+ * which iterate the persisted config. Called from onRehydrateStorage in
+ * projectStore.ts. Existing user customizations are left untouched.
+ */
+export function mergeMissingHotkeyDefaults(config: HotkeyConfig): HotkeyConfig {
+  let changed = false
+  const merged = { ...config }
+  for (const action of Object.keys(DEFAULT_HOTKEY_CONFIG) as HotkeyAction[]) {
+    if (!merged[action]) {
+      merged[action] = DEFAULT_HOTKEY_CONFIG[action]
+      changed = true
+    }
+  }
+  return changed ? merged : config
 }
 
 /**
  * Get hotkey actions grouped by category
  */
-export function getHotkeysByCategory(config: HotkeyConfig): Map<string, Array<{ action: HotkeyAction; binding: HotkeyBinding }>> {
-  const grouped = new Map<string, Array<{ action: HotkeyAction; binding: HotkeyBinding }>>();
+export function getHotkeysByCategory(
+  config: HotkeyConfig
+): Map<string, Array<{ action: HotkeyAction; binding: HotkeyBinding }>> {
+  const grouped = new Map<string, Array<{ action: HotkeyAction; binding: HotkeyBinding }>>()
 
   for (const [action, binding] of Object.entries(config)) {
-    const category = binding.category;
+    const category = binding.category
     if (!grouped.has(category)) {
-      grouped.set(category, []);
+      grouped.set(category, [])
     }
-    grouped.get(category)!.push({ action: action as HotkeyAction, binding });
+    grouped.get(category)!.push({ action: action as HotkeyAction, binding })
   }
 
-  return grouped;
-}
-
-/**
- * Merge a persisted hotkey config with the defaults so actions shipped after
- * the user's config was first persisted become available. The persisted
- * config wholesale replaces DEFAULT_HOTKEY_CONFIG during Zustand rehydration,
- * so without this backfill a new action's hotkey is dead on existing installs
- * and invisible in the settings UI.
- */
-export function backfillHotkeyConfig(persisted: Partial<HotkeyConfig>): HotkeyConfig {
-  return { ...DEFAULT_HOTKEY_CONFIG, ...persisted };
+  return grouped
 }

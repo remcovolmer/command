@@ -6,13 +6,13 @@ import { useTerminalPool } from '../../hooks/useTerminalPool'
 import type { TerminalSession, CenterTab, DiffTab, WorkingTreeDiffTab } from '../../types'
 
 const EditorContainer = lazy(() =>
-  import('../Editor/EditorContainer').then(m => ({ default: m.EditorContainer }))
+  import('../Editor/EditorContainer').then((m) => ({ default: m.EditorContainer }))
 )
 const DiffEditorView = lazy(() =>
-  import('../Editor/DiffEditorView').then(m => ({ default: m.DiffEditorView }))
+  import('../Editor/DiffEditorView').then((m) => ({ default: m.DiffEditorView }))
 )
 const WorkingTreeDiffView = lazy(() =>
-  import('../Editor/WorkingTreeDiffView').then(m => ({ default: m.WorkingTreeDiffView }))
+  import('../Editor/WorkingTreeDiffView').then((m) => ({ default: m.WorkingTreeDiffView }))
 )
 
 interface TerminalViewportProps {
@@ -97,10 +97,7 @@ export function TerminalViewport({
   // If we have a split view with 2+ terminals
   if (splitTerminals.length >= 2) {
     return (
-      <div
-        className="h-full w-full relative"
-        onDragOver={(e) => e.preventDefault()}
-      >
+      <div className="h-full w-full relative" onDragOver={(e) => e.preventDefault()}>
         <PanelGroup
           direction="horizontal"
           autoSaveId={`split-${projectId}`}
@@ -141,7 +138,8 @@ export function TerminalViewport({
   }
 
   // Derive active type from the ID
-  const isEditorActive = activeCenterTabId != null && editorTabs.some((t) => t.id === activeCenterTabId)
+  const isEditorActive =
+    activeCenterTabId != null && editorTabs.some((t) => t.id === activeCenterTabId)
   const effectiveTerminalId = isEditorActive ? null : (activeCenterTabId ?? activeTerminalId)
 
   // Single terminal view (active terminal from tabs)
@@ -152,10 +150,7 @@ export function TerminalViewport({
   }
 
   return (
-    <div
-      className="h-full w-full relative"
-      onDragOver={(e) => e.preventDefault()}
-    >
+    <div className="h-full w-full relative" onDragOver={(e) => e.preventDefault()}>
       <div className="h-full w-full relative">
         {/* Render all terminals (hidden if not active) */}
         {terminals.map((terminal) => (
@@ -169,7 +164,7 @@ export function TerminalViewport({
         {/* Render all editor/diff tabs (hidden if not active, lazy-loaded) */}
         {editorTabs.length > 0 && (
           <Suspense fallback={<EditorSkeleton />}>
-            {editorTabs.map((tab) => (
+            {editorTabs.map((tab) =>
               tab.type === 'diff' ? (
                 <DiffEditorView
                   key={tab.id}
@@ -190,7 +185,7 @@ export function TerminalViewport({
                   isActive={isEditorActive && tab.id === activeCenterTabId}
                 />
               )
-            ))}
+            )}
           </Suspense>
         )}
       </div>
@@ -236,9 +231,7 @@ function SplitPanel({ terminal, isActive, isLast, onSelect }: SplitPanelProps) {
           <Terminal id={terminal.id} isActive={isActive} />
         </div>
       </Panel>
-      {!isLast && (
-        <PanelResizeHandle className="w-1 transition-colors" />
-      )}
+      {!isLast && <PanelResizeHandle className="w-1 transition-colors" />}
     </>
   )
 }

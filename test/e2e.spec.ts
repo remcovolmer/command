@@ -6,13 +6,7 @@ import {
   _electron as electron,
 } from 'playwright'
 import type { BrowserWindow } from 'electron'
-import {
-  beforeAll,
-  afterAll,
-  describe,
-  expect,
-  test,
-} from 'vitest'
+import { beforeAll, afterAll, describe, expect, test } from 'vitest'
 
 const root = path.join(__dirname, '..')
 let electronApp: ElectronApplication | undefined
@@ -69,7 +63,10 @@ if (process.platform === 'linux') {
       expect(page).toBeDefined()
       // Wait for sidebar to render - it has the "w-64" class
       await page!.waitForSelector('aside, [class*="sidebar"], .w-64', { timeout: 10000 })
-      const sidebar = await page!.$('aside') || await page!.$('[class*="sidebar"]') || await page!.$('.w-64')
+      const sidebar =
+        (await page!.$('aside')) ||
+        (await page!.$('[class*="sidebar"]')) ||
+        (await page!.$('.w-64'))
       expect(sidebar).not.toBeNull()
     })
   })

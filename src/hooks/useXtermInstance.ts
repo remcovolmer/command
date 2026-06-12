@@ -12,6 +12,7 @@ import { buildTerminalTheme, invalidateTerminalThemeCache } from '../utils/termi
 import { createFileLinkProvider } from '../utils/fileLinkProvider'
 import { classifyOsc8Uri } from '../utils/osc8LinkRouter'
 import { terminalPool } from '../utils/terminalPool'
+import { createSpaceKeyWatchdog } from '../utils/spaceKeyWatchdog'
 
 // Timing constants for terminal dimension calculations
 const FIT_RETRY_DELAY_MS = 50
@@ -147,8 +148,8 @@ export function useXtermInstance({
     const store = useProjectStore.getState()
     const termSession = store.terminals[id]
     const worktree = termSession?.worktreeId ? store.worktrees[termSession.worktreeId] : null
-    const project = store.projects.find(p => p.id === projectId)
-    const contextPath = projectId ? (worktree?.path || project?.path || '') : ''
+    const project = store.projects.find((p) => p.id === projectId)
+    const contextPath = projectId ? worktree?.path || project?.path || '' : ''
 
     const terminal = new XTerm({
       cursorBlink: true,
@@ -165,33 +166,42 @@ export function useXtermInstance({
       // markdown link in OSC 8 with a bare relative path as URI; xterm's default
       // filters non-HTTP protocols, so allowNonHttpProtocols is required. The
       // classifier in osc8LinkRouter is the single security chokepoint.
-      linkHandler: contextPath ? {
-        allowNonHttpProtocols: true,
-        activate: (_event, text) => {
-          const decision = classifyOsc8Uri(text, contextPath)
-          if (decision.kind === 'external') {
-            api.shell.openExternal(decision.url).catch(console.error)
-            return
-          }
-          if (decision.kind === 'editor') {
-            api.fs.stat(decision.resolved).then((stat) => {
-              if (stat.exists && stat.isFile) {
-                store.openEditorTab(stat.resolved, decision.fileName, projectId)
+      linkHandler: contextPath
+        ? {
+            allowNonHttpProtocols: true,
+            activate: (_event, text) => {
+              const decision = classifyOsc8Uri(text, contextPath)
+              if (decision.kind === 'external') {
+                api.shell.openExternal(decision.url).catch(console.error)
+                return
               }
-            }).catch(() => { /* silent — fs:stat never throws but defense in depth */ })
-            return
+              if (decision.kind === 'editor') {
+                api.fs
+                  .stat(decision.resolved)
+                  .then((stat) => {
+                    if (stat.exists && stat.isFile) {
+                      store.openEditorTab(stat.resolved, decision.fileName, projectId)
+                    }
+                  })
+                  .catch(() => {
+                    /* silent — fs:stat never throws but defense in depth */
+                  })
+                return
+              }
+              // decision.kind === 'ignore' — silent no-op (wrong extension, traversal,
+              // unsupported scheme, oversized URI, etc.)
+            },
           }
-          // decision.kind === 'ignore' — silent no-op (wrong extension, traversal,
-          // unsupported scheme, oversized URI, etc.)
-        },
-      } : undefined,
+        : undefined,
     })
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
-    terminal.loadAddon(new WebLinksAddon((_event: MouseEvent, uri: string) => {
-      api.shell.openExternal(uri).catch(console.error)
-    }))
+    terminal.loadAddon(
+      new WebLinksAddon((_event: MouseEvent, uri: string) => {
+        api.shell.openExternal(uri).catch(console.error)
+      })
+    )
 
     // Unicode 11 addon for better wide character and emoji support
     const unicodeAddon = new Unicode11Addon()
@@ -264,8 +274,22 @@ export function useXtermInstance({
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
+    // Recover spaces that a Windows IME/text-suggestion layer eats: those
+    // keydowns arrive as keyCode 229 and xterm drops them by design (only
+    // textarea diffs are forwarded, and the layer inserts no space). The
+    // watchdog injects the space when no space data follows the keydown.
+    const spaceWatchdog = createSpaceKeyWatchdog({
+      writeSpace: () => {
+        if (!isDisposedRef.current) {
+          api.terminal.write(id, ' ')
+        }
+      },
+    })
+
     // Handle Ctrl+C (copy when selected, otherwise send SIGINT) and Ctrl+V (paste)
     terminal.attachCustomKeyEventHandler((event) => {
+      spaceWatchdog.handleKeyEvent(event)
+
       if (event.type !== 'keydown') return true
 
       if (event.ctrlKey && event.key === 'c') {
@@ -279,11 +303,14 @@ export function useXtermInstance({
 
       if (event.ctrlKey && event.key === 'v') {
         event.preventDefault()
-        navigator.clipboard.readText().then((text) => {
-          if (text && !isDisposedRef.current) {
-            api.terminal.write(id, text)
-          }
-        }).catch(() => {})
+        navigator.clipboard
+          .readText()
+          .then((text) => {
+            if (text && !isDisposedRef.current) {
+              api.terminal.write(id, text)
+            }
+          })
+          .catch(() => {})
         return false
       }
 
@@ -298,6 +325,7 @@ export function useXtermInstance({
     }, READY_DELAY_MS)
 
     terminal.onData((data) => {
+      spaceWatchdog.handleData(data)
       api.terminal.write(id, data)
     })
 
@@ -317,9 +345,10 @@ export function useXtermInstance({
         updateTerminalState(id, state)
       },
       onExit ? () => onExit() : undefined,
-      onTitle ?? ((title) => {
-        updateTerminalTitle(id, title)
-      })
+      onTitle ??
+        ((title) => {
+          updateTerminalTitle(id, title)
+        })
     )
 
     // Flush main-process buffer after subscribing to events (ensures flushed data is captured)
@@ -364,19 +393,24 @@ export function useXtermInstance({
       }
       resizeObserver.disconnect()
       mutationObserver.disconnect()
+      spaceWatchdog.dispose()
       terminalEvents.unsubscribe(id)
       terminalPool.unregisterCallbacks(id)
       // Dispose WebGL addon before terminal to avoid _isDisposed race
-      try { webglAddon?.dispose() } catch { /* already disposed */ }
+      try {
+        webglAddon?.dispose()
+      } catch {
+        /* already disposed */
+      }
       webglAddon = null
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
       serializeAddonRef.current = null
     }
-  // Intentionally excludes: projectId, onExit, onTitle, fontSize, scrollback.
-  // This effect initializes once per terminal (guarded by hasInitializedRef).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Intentionally excludes: projectId, onExit, onTitle, fontSize, scrollback.
+    // This effect initializes once per terminal (guarded by hasInitializedRef).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, id, updateTerminalState, updateTerminalTitle, api, safeFit])
 
   // Cleanup on unmount only (terminal closed or component removed)
@@ -391,7 +425,7 @@ export function useXtermInstance({
         terminalPool.remove(id)
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update terminal theme when app theme changes

@@ -3,6 +3,9 @@ import { join } from 'path'
 import { homedir } from 'os'
 import { app } from 'electron'
 import { normalizePath } from '../utils/paths'
+import { createLogger } from './Logger'
+
+const log = createLogger('HookInstaller')
 
 interface ClaudeSettings {
   hooks?: {
@@ -47,8 +50,8 @@ export function installClaudeHooks(): void {
   const settingsPath = join(claudeDir, 'settings.json')
   const hookScriptPath = getHookScriptPath()
 
-  console.log('[HookInstaller] Installing hooks...')
-  console.log('[HookInstaller] Hook script path:', hookScriptPath)
+  log.info('Installing hooks...')
+  log.debug('Hook script path:', hookScriptPath)
 
   // Ensure .claude directory exists
   if (!existsSync(claudeDir)) {
@@ -61,7 +64,7 @@ export function installClaudeHooks(): void {
     try {
       settings = JSON.parse(readFileSync(settingsPath, 'utf-8'))
     } catch (e) {
-      console.warn('[HookInstaller] Failed to parse existing settings, creating new')
+      log.warn('Failed to parse existing settings, creating new')
       settings = {}
     }
   }
@@ -71,12 +74,14 @@ export function installClaudeHooks(): void {
 
   // Our hook configuration
   const ourHook = {
-    hooks: [{
-      type: 'command',
-      command: `node "${normalizePath(hookScriptPath)}"`,
-      async: true,
-      timeout: 5
-    }]
+    hooks: [
+      {
+        type: 'command',
+        command: `node "${normalizePath(hookScriptPath)}"`,
+        async: true,
+        timeout: 5,
+      },
+    ],
   }
 
   // Hook events we need to monitor
@@ -87,7 +92,7 @@ export function installClaudeHooks(): void {
     'SessionStart',
     'SessionEnd',
     'UserPromptSubmit',
-    'PermissionRequest'
+    'PermissionRequest',
   ]
 
   let changed = false
@@ -95,15 +100,15 @@ export function installClaudeHooks(): void {
     settings.hooks[event] = settings.hooks[event] || []
 
     // Find existing hook entry
-    const existingIdx = settings.hooks[event].findIndex(
-      (h) => h.hooks?.some((hh) => hh.command?.includes('claude-state-hook'))
+    const existingIdx = settings.hooks[event].findIndex((h) =>
+      h.hooks?.some((hh) => hh.command?.includes('claude-state-hook'))
     )
 
     if (existingIdx === -1) {
       // Not installed yet — add it
       settings.hooks[event].push(ourHook)
       changed = true
-      console.log(`[HookInstaller] Added hook for ${event}`)
+      log.info(`Added hook for ${event}`)
     } else {
       // Already installed — migrate if missing async or command path changed
       const existing = settings.hooks[event][existingIdx]
@@ -111,7 +116,7 @@ export function installClaudeHooks(): void {
       if (hookEntry && (!hookEntry.async || hookEntry.command !== ourHook.hooks[0].command)) {
         settings.hooks[event][existingIdx] = ourHook
         changed = true
-        console.log(`[HookInstaller] Migrated hook for ${event} (async: true)`)
+        log.info(`Migrated hook for ${event} (async: true)`)
       }
     }
   }
@@ -119,13 +124,13 @@ export function installClaudeHooks(): void {
   if (changed) {
     try {
       writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-      console.log('[HookInstaller] Hooks installed/updated successfully')
-      console.log('[HookInstaller] Note: Restart Claude Code for hooks to take effect')
+      log.info('Hooks installed/updated successfully')
+      log.info('Note: Restart Claude Code for hooks to take effect')
     } catch (e) {
-      console.error('[HookInstaller] Failed to write hooks:', e)
+      log.error('Failed to write hooks:', e)
     }
   } else {
-    console.log('[HookInstaller] Hooks already up to date')
+    log.info('Hooks already up to date')
   }
 }
 
@@ -163,8 +168,8 @@ export function uninstallClaudeHooks(): void {
     }
 
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-    console.log('[HookInstaller] Hooks uninstalled successfully')
+    log.info('Hooks uninstalled successfully')
   } catch (e) {
-    console.error('[HookInstaller] Failed to uninstall hooks:', e)
+    log.error('Failed to uninstall hooks:', e)
   }
 }

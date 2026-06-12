@@ -1,10 +1,12 @@
 import { memo, useState, useEffect, useCallback } from 'react'
-import { GitBranch, Trash2, ExternalLink, GitMerge, AlertTriangle, CheckCircle2, XCircle, Clock, RefreshCw, Loader2 } from 'lucide-react'
+import { GitBranch, Trash2, ExternalLink, GitMerge, RefreshCw, Loader2 } from 'lucide-react'
 import type { Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
-import { STATE_DOT_COLORS, isInputState, isVisibleState } from '../../utils/terminalState'
+import { STATE_DOT_COLORS, isAttentionState, isVisibleState } from '../../utils/terminalState'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
+import { getPRBadge, type PRBadge, type PRBadgeKind } from '../../utils/prBadge'
+import { AttentionChip, AttentionRail, attentionRowBg, CHIP_BASE } from '../Sidebar/AttentionRail'
 
 interface WorktreeItemProps {
   worktree: Worktree
@@ -16,20 +18,29 @@ interface WorktreeItemProps {
   onRemove: () => void
 }
 
-function CIStatusIcon({ status }: { status: PRStatus }) {
+const BADGE_KIND_CLASSES: Record<PRBadgeKind, string> = {
+  conflict: 'bg-red-500/15 text-red-600 dark:text-red-400',
+  'ci-fail': 'bg-red-500/15 text-red-600 dark:text-red-400',
+  pending: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  review: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  ready: 'bg-green-500/15 text-green-600 dark:text-green-400',
+}
+
+const REVIEW_DECISION_LABELS: Record<string, string> = {
+  CHANGES_REQUESTED: 'changes requested',
+  REVIEW_REQUIRED: 'required',
+  APPROVED: 'approved',
+}
+
+function PRStatusBadge({ status, badge }: { status: PRStatus; badge: PRBadge }) {
   const [hovered, setHovered] = useState(false)
+
   const checks = status.statusCheckRollup ?? []
-  if (checks.length === 0) return null
-
-  const allPass = checks.every(c => c.bucket === 'pass')
-  const anyFail = checks.some(c => c.bucket === 'fail')
-  const anyPending = checks.some(c => c.bucket === 'pending')
-
-  let Icon = CheckCircle2
-  let iconClass = 'text-green-500'
-  if (anyFail) { Icon = XCircle; iconClass = 'text-red-500' }
-  else if (anyPending) { Icon = Clock; iconClass = 'text-yellow-500' }
-  else if (!allPass) return null
+  const hasDiffstat = status.additions !== undefined || status.deletions !== undefined
+  const reviewLabel = status.reviewDecision
+    ? REVIEW_DECISION_LABELS[status.reviewDecision]
+    : undefined
+  const hasPopover = checks.length > 0 || hasDiffstat || Boolean(reviewLabel)
 
   return (
     <span
@@ -37,12 +48,31 @@ function CIStatusIcon({ status }: { status: PRStatus }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Icon className={`w-3 h-3 ${iconClass}`} />
-      {hovered && (
+      <span className={`${CHIP_BASE} ${BADGE_KIND_CLASSES[badge.kind]}`}>{badge.label}</span>
+      {hovered && hasPopover && (
         <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg py-1.5 px-2 text-xs whitespace-nowrap">
+          {hasDiffstat && (
+            <div className="font-mono py-0.5">
+              <span className="text-green-500">+{status.additions ?? 0}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-red-500">-{status.deletions ?? 0}</span>
+            </div>
+          )}
+          {/* Review decision is masked when a higher-priority badge wins; keep it discoverable here */}
+          {reviewLabel && (
+            <div className="py-0.5 text-popover-foreground">Review: {reviewLabel}</div>
+          )}
           {checks.map((c, i) => (
             <div key={i} className="flex items-center gap-1.5 py-0.5">
-              <span className={c.bucket === 'pass' ? 'text-green-500' : c.bucket === 'fail' ? 'text-red-500' : 'text-yellow-500'}>
+              <span
+                className={
+                  c.bucket === 'pass'
+                    ? 'text-green-500'
+                    : c.bucket === 'fail'
+                      ? 'text-red-500'
+                      : 'text-yellow-500'
+                }
+              >
                 {c.bucket === 'pass' ? '\u2713' : c.bucket === 'fail' ? '\u2717' : '\u25cb'}
               </span>
               <span className="text-popover-foreground">{c.name}</span>
@@ -54,23 +84,18 @@ function CIStatusIcon({ status }: { status: PRStatus }) {
   )
 }
 
-function ReviewBadge({ decision }: { decision: PRStatus['reviewDecision'] }) {
-  if (!decision) return null
-  const map: Record<string, { label: string; cls: string }> = {
-    APPROVED: { label: 'Approved', cls: 'text-green-600 bg-green-500/10' },
-    CHANGES_REQUESTED: { label: 'Changes', cls: 'text-orange-600 bg-orange-500/10' },
-    REVIEW_REQUIRED: { label: 'Review', cls: 'text-yellow-600 bg-yellow-500/10' },
-  }
-  const info = map[decision]
-  if (!info) return null
-  return (
-    <span className={`text-[10px] px-1 py-0.5 rounded ${info.cls}`} title={`Review: ${decision}`}>
-      {info.label}
-    </span>
-  )
+interface MergeButtonProps {
+  badgeKind: PRBadgeKind
+  checks: PRCheckStatus[]
+  onMerge: () => void
+  isMerging: boolean
 }
 
-function MergeButton({ checks, onMerge, isMerging }: { checks: PRCheckStatus[]; onMerge: () => void; isMerging: boolean }) {
+// Button color follows the badge kind computed once in the PR row (single
+// source of truth with the chip): ready → green, anything else gray-but-
+// clickable (not all checks are blocking); the window.confirm warning in
+// handleMerge remains the guardrail and re-derives from click-time data.
+function MergeButton({ badgeKind, checks, onMerge, isMerging }: MergeButtonProps) {
   if (isMerging) {
     return (
       <button
@@ -84,33 +109,35 @@ function MergeButton({ checks, onMerge, isMerging }: { checks: PRCheckStatus[]; 
     )
   }
 
-  const failNames = checks.filter(c => c.bucket === 'fail').map(c => c.name)
-  const pendingNames = checks.filter(c => c.bucket === 'pending').map(c => c.name)
-  const anyFail = failNames.length > 0
-  const anyPending = pendingNames.length > 0
+  const btnColor =
+    badgeKind === 'ready' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
 
-  const btnColor = anyFail
-    ? 'bg-red-600 hover:bg-red-700'
-    : anyPending
-      ? 'bg-yellow-600 hover:bg-yellow-700'
-      : 'bg-green-600 hover:bg-green-700'
-
-  const title = anyFail
-    ? `Merge & Squash (checks failing: ${failNames.join(', ')})`
-    : anyPending
-      ? `Merge & Squash (checks running: ${pendingNames.join(', ')})`
-      : 'Merge & Squash this PR'
+  // Check names only feed the tooltip detail; the decision lives in badgeKind
+  const failNames = checks.filter((c) => c.bucket === 'fail').map((c) => c.name)
+  const pendingNames = checks.filter((c) => c.bucket === 'pending').map((c) => c.name)
+  const title =
+    badgeKind === 'ci-fail'
+      ? `Merge & Squash (checks failing: ${failNames.join(', ')})`
+      : badgeKind === 'pending'
+        ? `Merge & Squash (checks running: ${pendingNames.join(', ')})`
+        : badgeKind === 'review'
+          ? 'Merge & Squash (review outstanding)'
+          : 'Merge & Squash this PR'
 
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); onMerge() }}
+      onClick={(e) => {
+        e.stopPropagation()
+        onMerge()
+      }}
       className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-white transition-colors ml-auto ${btnColor}`}
       title={title}
     >
-      {anyPending && !anyFail
-        ? <Loader2 className="w-3 h-3 animate-spin" />
-        : <GitMerge className="w-3 h-3" />
-      }
+      {badgeKind === 'pending' ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : (
+        <GitMerge className="w-3 h-3" />
+      )}
       Merge
     </button>
   )
@@ -142,7 +169,10 @@ export const WorktreeItem = memo(function WorktreeItem({
   useEffect(() => {
     if (ghAvailable !== null) return
     const api = getElectronAPI()
-    api.github.checkAvailable().then(setGhAvailable).catch(() => {})
+    api.github
+      .checkAvailable()
+      .then(setGhAvailable)
+      .catch(() => {})
   }, [ghAvailable, setGhAvailable])
 
   // Start/stop polling for this worktree (GitHubService applies its own jitter)
@@ -196,10 +226,12 @@ export const WorktreeItem = memo(function WorktreeItem({
       // Build warning message parts
       const warnings: string[] = []
       const currentChecks = prStatus?.statusCheckRollup ?? []
-      const failingChecks = currentChecks.filter(c => c.bucket === 'fail')
-      const pendingChecks = currentChecks.filter(c => c.bucket === 'pending')
+      const failingChecks = currentChecks.filter((c) => c.bucket === 'fail')
+      const pendingChecks = currentChecks.filter((c) => c.bucket === 'pending')
       if (failingChecks.length > 0) {
-        warnings.push(`WARNING: Some checks are failing (${failingChecks.map(c => c.name).join(', ')}).`)
+        warnings.push(
+          `WARNING: Some checks are failing (${failingChecks.map((c) => c.name).join(', ')}).`
+        )
       } else if (pendingChecks.length > 0) {
         warnings.push(`WARNING: Some checks are still running.`)
       }
@@ -226,7 +258,10 @@ export const WorktreeItem = memo(function WorktreeItem({
         } catch (err) {
           console.error('[WorktreeItem] Worktree removal failed after merge:', err)
           api.github.stopPolling(worktree.id)
-          api.notification.show('PR Merged', `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`)
+          api.notification.show(
+            'PR Merged',
+            `PR #${prStatus.number} merged, but worktree removal failed. Remove it manually.`
+          )
           return
         }
 
@@ -261,15 +296,21 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   // Merge button visibility (show for any open, conflict-free PR with fresh data)
   // Hide while stale so the destructive merge can't fire against acknowledged-stale checks.
-  const showMergeButton = prStatus && !prStatus.noPR &&
+  const showMergeButton =
+    prStatus &&
+    !prStatus.noPR &&
     prStatus.state === 'OPEN' &&
     prStatus.mergeable === 'MERGEABLE' &&
     !prStatus.stale
 
   const hasPR = prStatus && !prStatus.noPR && prStatus.state === 'OPEN'
-  const hasConflicts = prStatus?.mergeable === 'CONFLICTING'
+
+  // Computed once per render; chip and merge button both derive from this badge
+  const badge = hasPR ? getPRBadge(prStatus) : null
 
   const isActive = terminal?.id === activeTerminalId
+
+  const isAttention = terminal ? isAttentionState(terminal.state) : false
 
   return (
     <div className="mt-0.5 border-l border-primary/30 ml-6">
@@ -277,16 +318,16 @@ export const WorktreeItem = memo(function WorktreeItem({
       <div
         onClick={handleRowClick}
         className={`
-          group flex items-center gap-2 px-3 py-1.5 cursor-pointer
-          transition-colors duration-150
-          ${isActive
-            ? 'bg-sidebar-accent text-sidebar-foreground rounded-t-md'
-            : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 rounded-t-md'}
-          ${!hasPR ? (isActive ? 'rounded-b-md' : 'rounded-b-md') : ''}
+          group relative flex items-center gap-2 px-3 py-1.5 cursor-pointer
+          transition-colors duration-150 rounded-t-md
+          ${attentionRowBg(isAttention, isActive)}
+          ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
+          ${!hasPR ? 'rounded-b-md' : ''}
         `}
       >
+        {isAttention && <AttentionRail />}
         {/* Branch icon */}
-        <GitBranch className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+        <GitBranch className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
 
         {/* Branch name */}
         <span className="flex-1 text-xs font-medium truncate" title={worktree.branch}>
@@ -295,11 +336,13 @@ export const WorktreeItem = memo(function WorktreeItem({
 
         {/* Right side: State dot + hover actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Terminal state dot - only show for visible states */}
-          {terminal && isVisibleState(terminal.state) && (
+          {/* Attention chip - permission/question rows say what they need */}
+          {isAttention && <AttentionChip />}
+          {/* Terminal state dot - only for visible non-attention states (busy/done) */}
+          {terminal && !isAttention && isVisibleState(terminal.state) && (
             <span
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
-                isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
+                terminal.state === 'done' ? 'needs-input-indicator' : ''
               }`}
             />
           )}
@@ -308,7 +351,10 @@ export const WorktreeItem = memo(function WorktreeItem({
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {ghAvailable?.installed && ghAvailable?.authenticated && (
               <button
-                onClick={(e) => { e.stopPropagation(); handleRefresh() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleRefresh()
+                }}
                 className="p-0.5 rounded hover:bg-border"
                 title="Refresh PR status"
               >
@@ -334,46 +380,40 @@ export const WorktreeItem = memo(function WorktreeItem({
         <div
           className={`
             flex items-center gap-1.5 pl-9 pr-3 py-1 text-muted-foreground
-            ${isActive ? 'bg-sidebar-accent rounded-b-md' : ''}
+            ${isActive ? 'bg-[var(--sidebar-highlight)] rounded-b-md' : ''}
             ${prStatus.stale ? 'opacity-60' : ''}
           `}
-          title={prStatus.stale ? `PR status update failed — showing last known data. ${prStatus.error ?? ''}`.trim() : undefined}
+          title={
+            prStatus.stale
+              ? `PR status update failed — showing last known data. ${prStatus.error ?? ''}`.trim()
+              : undefined
+          }
         >
-          {/* PR number */}
+          {/* PR number - neutral clickable chip */}
           <button
-            onClick={(e) => { e.stopPropagation(); handleOpenPR() }}
-            className="flex items-center gap-0.5 text-[10px] text-primary hover:underline"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleOpenPR()
+            }}
+            className="flex items-center gap-0.5 text-[10px] leading-none px-1 py-0.5 rounded bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title={`Open PR #${prStatus.number} in browser`}
           >
             #{prStatus.number}
             <ExternalLink className="w-2.5 h-2.5" />
           </button>
 
-          {/* CI Status */}
-          <CIStatusIcon status={prStatus} />
-
-          {/* Diff stats */}
-          {(prStatus.additions !== undefined || prStatus.deletions !== undefined) && (
-            <span className="text-[10px] font-mono bg-muted/50 rounded px-1 py-0.5 leading-none">
-              <span className="text-green-500">+{prStatus.additions ?? 0}</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-red-500">-{prStatus.deletions ?? 0}</span>
-            </span>
-          )}
-
-          {/* Conflicts */}
-          {hasConflicts && (
-            <span className="flex items-center gap-0.5 text-[10px] text-red-500" title="Merge conflicts">
-              <AlertTriangle className="w-3 h-3" />
-            </span>
-          )}
-
-          {/* Review status */}
-          <ReviewBadge decision={prStatus.reviewDecision} />
+          {/* Composite status badge (conflict > CI-fail > pending > review > ready);
+              diffstat, review decision and per-check details live in its hover popover */}
+          {badge && <PRStatusBadge status={prStatus} badge={badge} />}
 
           {/* Merge button */}
-          {showMergeButton && (
-            <MergeButton checks={prStatus.statusCheckRollup ?? []} onMerge={handleMerge} isMerging={isMerging} />
+          {showMergeButton && badge && (
+            <MergeButton
+              badgeKind={badge.kind}
+              checks={prStatus.statusCheckRollup ?? []}
+              onMerge={handleMerge}
+              isMerging={isMerging}
+            />
           )}
         </div>
       )}

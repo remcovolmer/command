@@ -13,6 +13,19 @@ export interface LogEntry {
 
 const MAX_WRITES_PER_MINUTE = 5
 
+/**
+ * Last-resort stderr write for crash paths where the structured logger
+ * cannot be trusted (re-entrant crashes, logger failures). Deliberately
+ * raw console: anything richer could itself throw and recurse.
+ */
+export function writeCrashFallback(...args: unknown[]): void {
+  try {
+    console.error(...args)
+  } catch {
+    /* stdout/stderr gone; nothing left to do */
+  }
+}
+
 export class CrashLogger {
   private writeTimestamps: number[] = []
   private cachedLogPath: string | null = null

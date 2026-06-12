@@ -1,5 +1,13 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, GitBranch, MessageSquare, TerminalSquare, FileEdit, Clock, AlertTriangle } from 'lucide-react'
+import {
+  Plus,
+  GitBranch,
+  MessageSquare,
+  TerminalSquare,
+  FileEdit,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react'
 import { getElectronAPI } from '../utils/electron'
 import type { SessionIndexEntry } from '../types'
 
@@ -38,7 +46,6 @@ function formatDuration(ms: number): string {
 }
 
 export function ProjectOverview({
-  projectId,
   projectName,
   projectPath,
   onCreateTerminal,
@@ -52,19 +59,24 @@ export function ProjectOverview({
     let cancelled = false
     setLoading(true)
 
-    api.sessionIndex.getForProject(projectPath).then((entries) => {
-      if (!cancelled) {
-        setSessions(entries)
-        setLoading(false)
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setSessions([])
-        setLoading(false)
-      }
-    })
+    api.sessionIndex
+      .getForProject(projectPath)
+      .then((entries) => {
+        if (!cancelled) {
+          setSessions(entries)
+          setLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessions([])
+          setLoading(false)
+        }
+      })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [api, projectPath])
 
   if (loading) {
@@ -79,9 +91,7 @@ export function ProjectOverview({
     <div className="flex flex-col h-full bg-sidebar">
       {/* Header */}
       <div className="px-6 pt-8 pb-4">
-        <h2 className="text-xl font-semibold text-sidebar-foreground mb-1">
-          {projectName}
-        </h2>
+        <h2 className="text-xl font-semibold text-sidebar-foreground mb-1">{projectName}</h2>
         <p className="text-muted-foreground text-sm">
           {sessions.length > 0
             ? `${sessions.length} recent session${sessions.length !== 1 ? 's' : ''}`
@@ -111,63 +121,61 @@ export function ProjectOverview({
               const sessionTitle = session.generatedTitle || session.summary || session.firstPrompt
               const subtitle = session.generatedSummary || session.firstPrompt
               return (
-              <button
-                key={session.sessionId}
-                onClick={() => onResumeSession(session.sessionId, sessionTitle)}
-                className="w-full text-left p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
-              >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className="text-sm font-medium text-sidebar-foreground truncate flex-1">
-                    {sessionTitle || 'Untitled session'}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground flex-shrink-0 mt-0.5">
-                    {formatRelativeTime(session.modified)}
-                  </span>
-                </div>
-                {subtitle && subtitle !== sessionTitle ? (
-                  <p className="text-xs text-muted-foreground line-clamp-3 mb-2">
-                    {subtitle}
-                  </p>
-                ) : null}
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                  {session.gitBranch && (
+                <button
+                  key={session.sessionId}
+                  onClick={() => onResumeSession(session.sessionId, sessionTitle)}
+                  className="w-full text-left p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className="text-sm font-medium text-sidebar-foreground truncate flex-1">
+                      {sessionTitle || 'Untitled session'}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground flex-shrink-0 mt-0.5">
+                      {formatRelativeTime(session.modified)}
+                    </span>
+                  </div>
+                  {subtitle && subtitle !== sessionTitle ? (
+                    <p className="text-xs text-muted-foreground line-clamp-3 mb-2">{subtitle}</p>
+                  ) : null}
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    {session.gitBranch && (
+                      <span className="flex items-center gap-1">
+                        <GitBranch className="w-3 h-3" />
+                        {session.gitBranch}
+                      </span>
+                    )}
+                    {session.worktreeName && (
+                      <span
+                        className="px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground"
+                        title={`Worktree: ${session.worktreeName}`}
+                      >
+                        worktree
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
-                      <GitBranch className="w-3 h-3" />
-                      {session.gitBranch}
+                      <MessageSquare className="w-3 h-3" />
+                      {session.messageCount}
                     </span>
-                  )}
-                  {session.worktreeName && (
-                    <span
-                      className="px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground"
-                      title={`Worktree: ${session.worktreeName}`}
-                    >
-                      worktree
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="w-3 h-3" />
-                    {session.messageCount}
-                  </span>
-                  {session.filesModified?.length > 0 && (
-                    <span className="flex items-center gap-1">
-                      <FileEdit className="w-3 h-3" />
-                      {session.filesModified.length}
-                    </span>
-                  )}
-                  {session.durationMs > 0 && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formatDuration(session.durationMs)}
-                    </span>
-                  )}
-                  {session.errorCount > 0 && (
-                    <span className="flex items-center gap-1 text-destructive/70">
-                      <AlertTriangle className="w-3 h-3" />
-                      {session.errorCount}
-                    </span>
-                  )}
-                </div>
-              </button>
+                    {session.filesModified?.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <FileEdit className="w-3 h-3" />
+                        {session.filesModified.length}
+                      </span>
+                    )}
+                    {session.durationMs > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatDuration(session.durationMs)}
+                      </span>
+                    )}
+                    {session.errorCount > 0 && (
+                      <span className="flex items-center gap-1 text-destructive/70">
+                        <AlertTriangle className="w-3 h-3" />
+                        {session.errorCount}
+                      </span>
+                    )}
+                  </div>
+                </button>
               )
             })}
           </div>

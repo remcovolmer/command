@@ -1,6 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { DEFAULT_HOTKEY_CONFIG, backfillHotkeyConfig } from '../src/utils/hotkeys'
-import type { HotkeyConfig } from '../src/types/hotkeys'
+import { DEFAULT_HOTKEY_CONFIG } from '../src/utils/hotkeys'
 
 describe('DEFAULT_HOTKEY_CONFIG', () => {
   test('default bindings are unique outside the dialog category', () => {
@@ -20,34 +19,5 @@ describe('DEFAULT_HOTKEY_CONFIG', () => {
     expect(binding.key).toBe('u')
     expect([...binding.modifiers].sort()).toEqual(['ctrl', 'shift'])
     expect(binding.enabled).toBe(true)
-  })
-})
-
-describe('backfillHotkeyConfig', () => {
-  test('adds actions missing from a persisted config', () => {
-    const persisted = { ...DEFAULT_HOTKEY_CONFIG } as Partial<HotkeyConfig>
-    delete persisted['ui.toggleUsageIndicator']
-
-    const result = backfillHotkeyConfig(persisted)
-
-    expect(result['ui.toggleUsageIndicator']).toEqual(
-      DEFAULT_HOTKEY_CONFIG['ui.toggleUsageIndicator']
-    )
-  })
-
-  test('preserves user-customized bindings for existing actions', () => {
-    const persisted: Partial<HotkeyConfig> = {
-      ...DEFAULT_HOTKEY_CONFIG,
-      'ui.toggleTheme': {
-        ...DEFAULT_HOTKEY_CONFIG['ui.toggleTheme'],
-        key: 'd',
-        enabled: false,
-      },
-    }
-
-    const result = backfillHotkeyConfig(persisted)
-
-    expect(result['ui.toggleTheme'].key).toBe('d')
-    expect(result['ui.toggleTheme'].enabled).toBe(false)
   })
 })

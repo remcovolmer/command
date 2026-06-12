@@ -1,6 +1,9 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { BrowserWindow } from 'electron'
+import { type BrowserWindow } from 'electron'
+import { createLogger } from './Logger'
+
+const log = createLogger('GitHubService')
 
 const execFileAsync = promisify(execFile)
 
@@ -39,7 +42,12 @@ export class TransientGhError extends Error {
 
 export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conflict'
 
-export const VALID_GIT_EVENTS: readonly GitEvent[] = ['pr-merged', 'pr-opened', 'checks-passed', 'merge-conflict'] as const
+export const VALID_GIT_EVENTS: readonly GitEvent[] = [
+  'pr-merged',
+  'pr-opened',
+  'checks-passed',
+  'merge-conflict',
+] as const
 
 export interface PREventContext {
   number: number
@@ -95,8 +103,10 @@ export class GitHubService {
       const { stdout } = await execFileAsync(
         'gh',
         [
-          'pr', 'view',
-          '--json', 'number,title,state,url,headRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,additions,deletions,changedFiles',
+          'pr',
+          'view',
+          '--json',
+          'number,title,state,url,headRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,additions,deletions,changedFiles',
         ],
         {
           cwd: projectPath,
@@ -120,13 +130,19 @@ export class GitHubService {
         statusCheckRollup: (data.statusCheckRollup ?? []).map((c: Record<string, string>) => ({
           name: c.name ?? c.context ?? 'unknown',
           state: c.status ?? c.state ?? '',
-          bucket: c.bucket ?? (
-            c.status === 'COMPLETED'
-              ? (c.conclusion === 'SUCCESS' || c.conclusion === 'SKIPPED' || c.conclusion === 'NEUTRAL' ? 'pass' : 'fail')
-              : c.state === 'SUCCESS' ? 'pass'
-              : c.state === 'FAILURE' || c.state === 'ERROR' ? 'fail'
-              : 'pending'
-          ),
+          bucket:
+            c.bucket ??
+            (c.status === 'COMPLETED'
+              ? c.conclusion === 'SUCCESS' ||
+                c.conclusion === 'SKIPPED' ||
+                c.conclusion === 'NEUTRAL'
+                ? 'pass'
+                : 'fail'
+              : c.state === 'SUCCESS'
+                ? 'pass'
+                : c.state === 'FAILURE' || c.state === 'ERROR'
+                  ? 'fail'
+                  : 'pending'),
         })),
         additions: data.additions,
         deletions: data.deletions,
@@ -142,12 +158,16 @@ export class GitHubService {
       if (stderr.includes('no pull requests found') || stderr.includes('Could not resolve')) {
         return { noPR: true, lastUpdated: Date.now() }
       }
-      const message = stderr.trim() || (error instanceof Error ? error.message : 'Failed to fetch PR status')
+      const message =
+        stderr.trim() || (error instanceof Error ? error.message : 'Failed to fetch PR status')
       throw new TransientGhError(message)
     }
   }
 
-  async getPRForBranch(projectPath: string, branchName: string): Promise<{ url: string; number: number } | null> {
+  async getPRForBranch(
+    projectPath: string,
+    branchName: string
+  ): Promise<{ url: string; number: number } | null> {
     try {
       const { stdout } = await execFileAsync(
         'gh',
@@ -189,36 +209,32 @@ export class GitHubService {
     }
 
     // Merge without --delete-branch to avoid failure when a worktree uses the branch
-    await execFileAsync(
-      'gh',
-      ['pr', 'merge', prNumber.toString(), '--squash'],
-      {
-        cwd: projectPath,
-        timeout: 30_000,
-        windowsHide: true,
-        env: { ...process.env, GH_PAGER: '' },
-      }
-    )
+    await execFileAsync('gh', ['pr', 'merge', prNumber.toString(), '--squash'], {
+      cwd: projectPath,
+      timeout: 30_000,
+      windowsHide: true,
+      env: { ...process.env, GH_PAGER: '' },
+    })
 
     // Best-effort: delete remote branch (GitHub may have already done this)
     if (branchName) {
       try {
-        await execFileAsync(
-          'git',
-          ['push', 'origin', '--delete', branchName],
-          { cwd: projectPath, timeout: 15_000, windowsHide: true }
-        )
+        await execFileAsync('git', ['push', 'origin', '--delete', branchName], {
+          cwd: projectPath,
+          timeout: 15_000,
+          windowsHide: true,
+        })
       } catch {
         // Already deleted or no permission — fine
       }
 
       // Best-effort: delete local branch (will fail if worktree uses it — that's OK)
       try {
-        await execFileAsync(
-          'git',
-          ['branch', '-D', branchName],
-          { cwd: projectPath, timeout: 10_000, windowsHide: true }
-        )
+        await execFileAsync('git', ['branch', '-D', branchName], {
+          cwd: projectPath,
+          timeout: 10_000,
+          windowsHide: true,
+        })
       } catch {
         // Branch in use by worktree — will be cleaned up when worktree is removed
       }
@@ -259,7 +275,11 @@ export class GitHubService {
 
   stopPollingByPathPrefix(pathPrefix: string) {
     for (const [key, entry] of this.pollingMap) {
-      if (entry.path === pathPrefix || entry.path.startsWith(pathPrefix + '/') || entry.path.startsWith(pathPrefix + '\\')) {
+      if (
+        entry.path === pathPrefix ||
+        entry.path.startsWith(pathPrefix + '/') ||
+        entry.path.startsWith(pathPrefix + '\\')
+      ) {
         this.stopPolling(key)
       }
     }
@@ -291,7 +311,9 @@ export class GitHubService {
 
   // Previous state tracking for event detection
   private previousStates = new Map<string, PRStatus>()
-  private prEventCallbacks: Array<(projectPath: string, event: GitEvent, prContext: PREventContext) => void> = []
+  private prEventCallbacks: Array<
+    (projectPath: string, event: GitEvent, prContext: PREventContext) => void
+  > = []
 
   private async pollOnce(key: string, projectPath: string) {
     if (this.activeRequests >= MAX_CONCURRENT) return
@@ -313,8 +335,8 @@ export class GitHubService {
           this.emitPREvent(projectPath, 'pr-merged', prContext)
         }
         // Detect checks passing
-        const prevAllPass = prev.statusCheckRollup?.every(c => c.bucket === 'pass') ?? false
-        const currAllPass = status.statusCheckRollup?.every(c => c.bucket === 'pass') ?? false
+        const prevAllPass = prev.statusCheckRollup?.every((c) => c.bucket === 'pass') ?? false
+        const currAllPass = status.statusCheckRollup?.every((c) => c.bucket === 'pass') ?? false
         if (!prevAllPass && currAllPass && (status.statusCheckRollup?.length ?? 0) > 0) {
           this.emitPREvent(projectPath, 'checks-passed', prContext)
         }
@@ -355,11 +377,19 @@ export class GitHubService {
 
   private emitPREvent(projectPath: string, event: GitEvent, prContext: PREventContext) {
     for (const cb of this.prEventCallbacks) {
-      try { cb(projectPath, event, prContext) } catch { /* listener error */ }
+      try {
+        cb(projectPath, event, prContext)
+      } catch (err) {
+        // PR events surface once per poll-detected transition, so an
+        // unconditional warn cannot spam the log.
+        log.warn('PR event listener threw:', err)
+      }
     }
   }
 
-  onPREvent(callback: (projectPath: string, event: GitEvent, prContext: PREventContext) => void): () => void {
+  onPREvent(
+    callback: (projectPath: string, event: GitEvent, prContext: PREventContext) => void
+  ): () => void {
     this.prEventCallbacks.push(callback)
     return () => {
       const idx = this.prEventCallbacks.indexOf(callback)

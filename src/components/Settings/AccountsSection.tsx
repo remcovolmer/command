@@ -46,12 +46,15 @@ export function AccountsSection() {
     }
   }, [editingProfileId, editingName, updateProfile])
 
-  const handleOpenEnvEditor = useCallback(async (profileId: string) => {
-    const keys = await getProfileEnvKeys(profileId)
-    // We only know the keys, not values (security). Start with empty values.
-    setEnvPairs(keys.map(key => ({ key, value: '' })))
-    setEnvEditorProfileId(profileId)
-  }, [getProfileEnvKeys])
+  const handleOpenEnvEditor = useCallback(
+    async (profileId: string) => {
+      const keys = await getProfileEnvKeys(profileId)
+      // We only know the keys, not values (security). Start with empty values.
+      setEnvPairs(keys.map((key) => ({ key, value: '' })))
+      setEnvEditorProfileId(profileId)
+    },
+    [getProfileEnvKeys]
+  )
 
   const handleApplyVertexTemplate = useCallback(() => {
     setEnvPairs(Object.entries(VERTEX_TEMPLATE).map(([key, value]) => ({ key, value })))
@@ -59,9 +62,11 @@ export function AccountsSection() {
 
   const handleSaveEnvVars = useCallback(async () => {
     if (!envEditorProfileId) return
-    const emptyKeys = envPairs.filter(p => p.key.trim() && !p.value).map(p => p.key.trim())
+    const emptyKeys = envPairs.filter((p) => p.key.trim() && !p.value).map((p) => p.key.trim())
     if (emptyKeys.length > 0) {
-      const proceed = window.confirm(`The following keys have empty values and will be removed:\n\n${emptyKeys.join('\n')}\n\nContinue?`)
+      const proceed = window.confirm(
+        `The following keys have empty values and will be removed:\n\n${emptyKeys.join('\n')}\n\nContinue?`
+      )
       if (!proceed) return
     }
     const vars: Record<string, string> = {}
@@ -81,15 +86,15 @@ export function AccountsSection() {
   }, [envEditorProfileId, envPairs, setProfileEnvVars, clearProfileEnvVars])
 
   const handleAddEnvPair = useCallback(() => {
-    setEnvPairs(prev => [...prev, { key: '', value: '' }])
+    setEnvPairs((prev) => [...prev, { key: '', value: '' }])
   }, [])
 
   const handleRemoveEnvPair = useCallback((index: number) => {
-    setEnvPairs(prev => prev.filter((_, i) => i !== index))
+    setEnvPairs((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
   const handleEnvPairChange = useCallback((index: number, field: 'key' | 'value', val: string) => {
-    setEnvPairs(prev => prev.map((p, i) => i === index ? { ...p, [field]: val } : p))
+    setEnvPairs((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: val } : p)))
   }, [])
 
   return (
@@ -98,8 +103,8 @@ export function AccountsSection() {
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-1">Account Profiles</h3>
         <p className="text-xs text-muted-foreground">
-          Manage profiles with environment variables for Vertex AI, Bedrock, or custom API configurations.
-          Assign profiles to projects in General settings.
+          Manage profiles with environment variables for Vertex AI, Bedrock, or custom API
+          configurations. Assign profiles to projects in General settings.
         </p>
       </div>
 
@@ -121,7 +126,7 @@ export function AccountsSection() {
             >
               None
             </button>
-            {profiles.map(profile => (
+            {profiles.map((profile) => (
               <button
                 key={profile.id}
                 onClick={() => setActiveProfile(profile.id)}
@@ -140,12 +145,14 @@ export function AccountsSection() {
 
       {/* Profile list */}
       <div className="space-y-2">
-        {profiles.map(profile => (
+        {profiles.map((profile) => (
           <div key={profile.id} className="rounded-lg border border-border">
             {/* Profile header */}
             <div
               className="flex items-center gap-3 p-4 cursor-pointer"
-              onClick={() => setExpandedProfileId(expandedProfileId === profile.id ? null : profile.id)}
+              onClick={() =>
+                setExpandedProfileId(expandedProfileId === profile.id ? null : profile.id)
+              }
             >
               {expandedProfileId === profile.id ? (
                 <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -193,7 +200,11 @@ export function AccountsSection() {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (window.confirm(`Delete profile "${profile.name}"? This will remove all encrypted environment variables and reset projects using this profile.`)) {
+                  if (
+                    window.confirm(
+                      `Delete profile "${profile.name}"? This will remove all encrypted environment variables and reset projects using this profile.`
+                    )
+                  ) {
                     removeProfile(profile.id)
                   }
                 }}
@@ -267,7 +278,10 @@ export function AccountsSection() {
       {/* Env var editor dialog */}
       {envEditorProfileId && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setEnvEditorProfileId(null)} />
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setEnvEditorProfileId(null)}
+          />
           <div className="relative bg-background rounded-lg border border-border p-6 max-w-lg w-full shadow-xl max-h-[80vh] overflow-y-auto">
             <h3 className="text-sm font-semibold text-foreground mb-1">Environment Variables</h3>
             <p className="text-xs text-muted-foreground mb-4">

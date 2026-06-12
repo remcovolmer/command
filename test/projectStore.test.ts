@@ -1,8 +1,21 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 
+// Captures the partialize option passed to persist so the persist contract is testable
+const persistCapture = vi.hoisted(() => ({
+  partialize: undefined as
+    | ((state: Record<string, unknown>) => Record<string, unknown>)
+    | undefined,
+}))
+
 // Mock zustand persist middleware to bypass localStorage
 vi.mock('zustand/middleware', () => ({
-  persist: (fn: any) => fn,
+  persist: (
+    fn: unknown,
+    options?: { partialize?: (state: Record<string, unknown>) => Record<string, unknown> }
+  ) => {
+    persistCapture.partialize = options?.partialize
+    return fn
+  },
 }))
 
 // Hoisted spy so the usage side effect is inspectable across getElectronAPI calls
@@ -14,7 +27,12 @@ const { usageSetEnabledMock } = vi.hoisted(() => ({
 vi.mock('../src/utils/electron', () => ({
   getElectronAPI: () => ({
     terminal: { create: vi.fn(), close: vi.fn() },
-    project: { list: vi.fn(), update: vi.fn(), reorder: vi.fn(), setActiveWatcher: vi.fn().mockResolvedValue(undefined) },
+    project: {
+      list: vi.fn(),
+      update: vi.fn(),
+      reorder: vi.fn(),
+      setActiveWatcher: vi.fn().mockResolvedValue(undefined),
+    },
     worktree: { list: vi.fn() },
     fs: { readDirectory: vi.fn() },
     usage: { setEnabled: usageSetEnabledMock, onUpdate: vi.fn() },
@@ -22,9 +40,13 @@ vi.mock('../src/utils/electron', () => ({
 }))
 
 import { useProjectStore } from '../src/stores/projectStore'
+import { DEFAULT_HOTKEY_CONFIG, mergeMissingHotkeyDefaults } from '../src/utils/hotkeys'
+import type { HotkeyAction, HotkeyConfig } from '../src/types/hotkeys'
 import type { TerminalSession } from '../src/types'
 
-function makeTerminal(overrides: Partial<TerminalSession> & { id: string; projectId: string }): TerminalSession {
+function makeTerminal(
+  overrides: Partial<TerminalSession> & { id: string; projectId: string }
+): TerminalSession {
   return {
     state: 'done',
     lastActivity: Date.now(),
@@ -49,6 +71,7 @@ describe('projectStore activeCenterTabId', () => {
       activeSidecarTerminalId: {},
       worktrees: {},
       editorTabs: {},
+      collapsedProjects: {},
     })
   })
 
@@ -328,7 +351,15 @@ describe('projectStore activeCenterTabId', () => {
         activeTerminalId: 'term-1',
         activeCenterTabId: 'term-1',
         activeProjectId: 'proj-1',
-        worktrees: { 'wt-1': { id: 'wt-1', projectId: 'proj-1', name: 'feature', path: '/wt1', branch: 'feature' } },
+        worktrees: {
+          'wt-1': {
+            id: 'wt-1',
+            projectId: 'proj-1',
+            name: 'feature',
+            path: '/wt1',
+            branch: 'feature',
+          },
+        },
       })
 
       useProjectStore.getState().removeWorktree('wt-1')
@@ -357,7 +388,15 @@ describe('projectStore activeCenterTabId', () => {
             projectId: 'proj-1',
           },
         },
-        worktrees: { 'wt-1': { id: 'wt-1', projectId: 'proj-1', name: 'feature', path: '/wt1', branch: 'feature' } },
+        worktrees: {
+          'wt-1': {
+            id: 'wt-1',
+            projectId: 'proj-1',
+            name: 'feature',
+            path: '/wt1',
+            branch: 'feature',
+          },
+        },
       })
 
       useProjectStore.getState().removeWorktree('wt-1')
@@ -378,7 +417,15 @@ describe('projectStore activeCenterTabId', () => {
         activeCenterTabId: 'term-1',
         activeProjectId: 'proj-1',
         sidecarTerminals: { 'proj-1': ['sidecar-1'] },
-        worktrees: { 'wt-1': { id: 'wt-1', projectId: 'proj-1', name: 'feature', path: '/wt1', branch: 'feature' } },
+        worktrees: {
+          'wt-1': {
+            id: 'wt-1',
+            projectId: 'proj-1',
+            name: 'feature',
+            path: '/wt1',
+            branch: 'feature',
+          },
+        },
       })
 
       useProjectStore.getState().removeWorktree('wt-1')
@@ -386,6 +433,116 @@ describe('projectStore activeCenterTabId', () => {
       const state = useProjectStore.getState()
       expect(state.activeTerminalId).toBeNull()
       expect(state.activeCenterTabId).toBeNull()
+    })
+  })
+
+  describe('collapsedProjects', () => {
+    test('toggleProjectCollapsed adds the entry, second call removes it', () => {
+      useProjectStore.getState().toggleProjectCollapsed('proj-1')
+      expect(useProjectStore.getState().collapsedProjects['proj-1']).toBe(true)
+
+      useProjectStore.getState().toggleProjectCollapsed('proj-1')
+      expect(useProjectStore.getState().collapsedProjects['proj-1']).toBeUndefined()
+    })
+
+    test('toggleProjectCollapsed is a no-op for workspace projects', () => {
+      useProjectStore.setState({
+        projects: [{ id: 'ws-1', name: 'Workspace', path: '/ws1', type: 'workspace' }],
+      })
+
+      useProjectStore.getState().toggleProjectCollapsed('ws-1')
+
+      // Workspaces render without a collapse affordance; no dead state written
+      expect(useProjectStore.getState().collapsedProjects['ws-1']).toBeUndefined()
+    })
+
+    test('toggleProjectCollapsed leaves other entries untouched', () => {
+      useProjectStore.setState({ collapsedProjects: { 'proj-2': true } })
+
+      useProjectStore.getState().toggleProjectCollapsed('proj-1')
+
+      const state = useProjectStore.getState()
+      expect(state.collapsedProjects['proj-1']).toBe(true)
+      expect(state.collapsedProjects['proj-2']).toBe(true)
+    })
+
+    test('setActiveProject auto-expands the target project in the same update', () => {
+      useProjectStore.setState({ collapsedProjects: { 'proj-1': true, 'proj-2': true } })
+
+      useProjectStore.getState().setActiveProject('proj-1')
+
+      const state = useProjectStore.getState()
+      expect(state.activeProjectId).toBe('proj-1')
+      expect(state.collapsedProjects['proj-1']).toBeUndefined()
+      // Other collapsed projects stay collapsed
+      expect(state.collapsedProjects['proj-2']).toBe(true)
+    })
+
+    test('removeProject cleans up the collapsedProjects entry', () => {
+      useProjectStore.setState({
+        projects: [
+          { id: 'proj-1', name: 'Project 1', path: '/proj1' },
+          { id: 'proj-2', name: 'Project 2', path: '/proj2' },
+        ],
+        collapsedProjects: { 'proj-1': true, 'proj-2': true },
+      })
+
+      useProjectStore.getState().removeProject('proj-1')
+
+      const state = useProjectStore.getState()
+      expect(state.collapsedProjects['proj-1']).toBeUndefined()
+      expect(state.collapsedProjects['proj-2']).toBe(true)
+    })
+
+    test('partialize persists collapsedProjects', () => {
+      useProjectStore.setState({ collapsedProjects: { 'proj-1': true } })
+
+      expect(persistCapture.partialize).toBeDefined()
+      const persisted = persistCapture.partialize!(
+        useProjectStore.getState() as unknown as Record<string, unknown>
+      )
+      expect(persisted.collapsedProjects).toEqual({ 'proj-1': true })
+    })
+  })
+
+  describe('hotkey config backfill (mergeMissingHotkeyDefaults)', () => {
+    // The persist middleware is mocked, so onRehydrateStorage never runs here;
+    // the backfill is a pure helper tested directly (onRehydrateStorage calls it).
+    test('adds missing actions with their default binding', () => {
+      const { 'sidebar.toggleProjectCollapse': _omitted, ...rest } = DEFAULT_HOTKEY_CONFIG
+      const persisted = rest as HotkeyConfig
+
+      const merged = mergeMissingHotkeyDefaults(persisted)
+
+      expect(merged['sidebar.toggleProjectCollapse']).toEqual(
+        DEFAULT_HOTKEY_CONFIG['sidebar.toggleProjectCollapse']
+      )
+      // Every default action is present after the merge
+      for (const action of Object.keys(DEFAULT_HOTKEY_CONFIG) as HotkeyAction[]) {
+        expect(merged[action]).toBeDefined()
+      }
+    })
+
+    test('leaves existing user customizations untouched', () => {
+      const customized: HotkeyConfig = {
+        ...DEFAULT_HOTKEY_CONFIG,
+        'terminal.new': {
+          ...DEFAULT_HOTKEY_CONFIG['terminal.new'],
+          key: 'y',
+          modifiers: ['ctrl', 'alt'],
+        },
+      }
+      const { 'sidebar.toggleProjectCollapse': _omitted, ...rest } = customized
+      const persisted = rest as HotkeyConfig
+
+      const merged = mergeMissingHotkeyDefaults(persisted)
+
+      expect(merged['terminal.new'].key).toBe('y')
+      expect(merged['terminal.new'].modifiers).toEqual(['ctrl', 'alt'])
+    })
+
+    test('returns the same reference when nothing is missing', () => {
+      expect(mergeMissingHotkeyDefaults(DEFAULT_HOTKEY_CONFIG)).toBe(DEFAULT_HOTKEY_CONFIG)
     })
   })
 
@@ -433,7 +590,14 @@ describe('projectStore activeCenterTabId', () => {
     test('a fresh setPRStatus clears stale/error from prior state', () => {
       useProjectStore.setState({
         prStatus: {
-          'wt-1': { noPR: false, number: 1, state: 'OPEN', stale: true, error: 'prev error', lastUpdated: 0 },
+          'wt-1': {
+            noPR: false,
+            number: 1,
+            state: 'OPEN',
+            stale: true,
+            error: 'prev error',
+            lastUpdated: 0,
+          },
         },
       })
 

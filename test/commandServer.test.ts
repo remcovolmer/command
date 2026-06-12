@@ -1,6 +1,22 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, test, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import http from 'node:http'
-import { CommandServer, type CommandResponse, type RouteHandler } from '../electron/main/services/CommandServer'
+
+// Capture the server's scoped logger for request-logging assertions
+const loggerSpies = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}))
+vi.mock('../electron/main/services/Logger', () => ({
+  createLogger: () => loggerSpies,
+}))
+
+import {
+  CommandServer,
+  type CommandResponse,
+  type RouteHandler,
+} from '../electron/main/services/CommandServer'
 
 /** Make an HTTP request to the CommandServer and return parsed response */
 function request(options: {
@@ -42,7 +58,7 @@ function request(options: {
             reject(new Error(`Failed to parse response: ${raw}`))
           }
         })
-      },
+      }
     )
 
     req.on('error', reject)
@@ -279,34 +295,36 @@ describe('CommandServer', () => {
       server.route('POST', '/test/parse', async () => ({ ok: true }))
 
       // Send raw invalid JSON
-      const res = await new Promise<{ statusCode: number; body: CommandResponse }>((resolve, reject) => {
-        const req = http.request(
-          {
-            hostname: '127.0.0.1',
-            port: server.getPort()!,
-            path: '/test/parse',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${server.getToken()}`,
+      const res = await new Promise<{ statusCode: number; body: CommandResponse }>(
+        (resolve, reject) => {
+          const req = http.request(
+            {
+              hostname: '127.0.0.1',
+              port: server.getPort()!,
+              path: '/test/parse',
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${server.getToken()}`,
+              },
             },
-          },
-          (httpRes) => {
-            const chunks: Buffer[] = []
-            httpRes.on('data', (chunk: Buffer) => chunks.push(chunk))
-            httpRes.on('end', () => {
-              const raw = Buffer.concat(chunks).toString('utf-8')
-              resolve({
-                statusCode: httpRes.statusCode ?? 0,
-                body: JSON.parse(raw) as CommandResponse,
+            (httpRes) => {
+              const chunks: Buffer[] = []
+              httpRes.on('data', (chunk: Buffer) => chunks.push(chunk))
+              httpRes.on('end', () => {
+                const raw = Buffer.concat(chunks).toString('utf-8')
+                resolve({
+                  statusCode: httpRes.statusCode ?? 0,
+                  body: JSON.parse(raw) as CommandResponse,
+                })
               })
-            })
-          },
-        )
-        req.on('error', reject)
-        req.write('{not valid json}')
-        req.end()
-      })
+            }
+          )
+          req.on('error', reject)
+          req.write('{not valid json}')
+          req.end()
+        }
+      )
 
       expect(res.statusCode).toBe(400)
       expect(res.body.ok).toBe(false)
@@ -321,34 +339,36 @@ describe('CommandServer', () => {
       })
 
       // Send POST with no body
-      const res = await new Promise<{ statusCode: number; body: CommandResponse }>((resolve, reject) => {
-        const req = http.request(
-          {
-            hostname: '127.0.0.1',
-            port: server.getPort()!,
-            path: '/test/empty',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${server.getToken()}`,
-              'Content-Length': '0',
+      const res = await new Promise<{ statusCode: number; body: CommandResponse }>(
+        (resolve, reject) => {
+          const req = http.request(
+            {
+              hostname: '127.0.0.1',
+              port: server.getPort()!,
+              path: '/test/empty',
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${server.getToken()}`,
+                'Content-Length': '0',
+              },
             },
-          },
-          (httpRes) => {
-            const chunks: Buffer[] = []
-            httpRes.on('data', (chunk: Buffer) => chunks.push(chunk))
-            httpRes.on('end', () => {
-              const raw = Buffer.concat(chunks).toString('utf-8')
-              resolve({
-                statusCode: httpRes.statusCode ?? 0,
-                body: JSON.parse(raw) as CommandResponse,
+            (httpRes) => {
+              const chunks: Buffer[] = []
+              httpRes.on('data', (chunk: Buffer) => chunks.push(chunk))
+              httpRes.on('end', () => {
+                const raw = Buffer.concat(chunks).toString('utf-8')
+                resolve({
+                  statusCode: httpRes.statusCode ?? 0,
+                  body: JSON.parse(raw) as CommandResponse,
+                })
               })
-            })
-          },
-        )
-        req.on('error', reject)
-        req.end()
-      })
+            }
+          )
+          req.on('error', reject)
+          req.end()
+        }
+      )
 
       expect(res.statusCode).toBe(200)
       expect(receivedBody).toEqual({})
@@ -357,34 +377,36 @@ describe('CommandServer', () => {
     test('array body returns 400', async () => {
       server.route('POST', '/test/array', async () => ({ ok: true }))
 
-      const res = await new Promise<{ statusCode: number; body: CommandResponse }>((resolve, reject) => {
-        const req = http.request(
-          {
-            hostname: '127.0.0.1',
-            port: server.getPort()!,
-            path: '/test/array',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${server.getToken()}`,
+      const res = await new Promise<{ statusCode: number; body: CommandResponse }>(
+        (resolve, reject) => {
+          const req = http.request(
+            {
+              hostname: '127.0.0.1',
+              port: server.getPort()!,
+              path: '/test/array',
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${server.getToken()}`,
+              },
             },
-          },
-          (httpRes) => {
-            const chunks: Buffer[] = []
-            httpRes.on('data', (chunk: Buffer) => chunks.push(chunk))
-            httpRes.on('end', () => {
-              const raw = Buffer.concat(chunks).toString('utf-8')
-              resolve({
-                statusCode: httpRes.statusCode ?? 0,
-                body: JSON.parse(raw) as CommandResponse,
+            (httpRes) => {
+              const chunks: Buffer[] = []
+              httpRes.on('data', (chunk: Buffer) => chunks.push(chunk))
+              httpRes.on('end', () => {
+                const raw = Buffer.concat(chunks).toString('utf-8')
+                resolve({
+                  statusCode: httpRes.statusCode ?? 0,
+                  body: JSON.parse(raw) as CommandResponse,
+                })
               })
-            })
-          },
-        )
-        req.on('error', reject)
-        req.write('[1, 2, 3]')
-        req.end()
-      })
+            }
+          )
+          req.on('error', reject)
+          req.write('[1, 2, 3]')
+          req.end()
+        }
+      )
 
       expect(res.statusCode).toBe(400)
       expect(res.body.ok).toBe(false)
@@ -441,6 +463,53 @@ describe('CommandServer', () => {
       } finally {
         await temp.stop()
       }
+    })
+  })
+
+  // --- Request logging ---
+
+  describe('request logging', () => {
+    test('a handled request produces exactly one debug line with method, path, status and duration', async () => {
+      server.setDeps({
+        terminalManager: {} as never,
+        projectPersistence: {} as never,
+        worktreeService: {} as never,
+        githubService: {} as never,
+        mainWindow: {} as never,
+      })
+      server.route('GET', '/test/log-probe', async () => ({ ok: true }))
+      loggerSpies.debug.mockClear()
+
+      const res = await request({
+        port: server.getPort()!,
+        method: 'GET',
+        path: '/test/log-probe?with=query',
+        token: server.getToken(),
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(loggerSpies.debug).toHaveBeenCalledTimes(1)
+      // Method, path (query stripped), status, duration in ms
+      expect(loggerSpies.debug).toHaveBeenCalledWith(
+        expect.stringMatching(/^GET \/test\/log-probe 200 \d+ms$/)
+      )
+    })
+
+    test('failed requests are logged with their error status', async () => {
+      loggerSpies.debug.mockClear()
+
+      const res = await request({
+        port: server.getPort()!,
+        method: 'GET',
+        path: '/test/does-not-exist',
+        token: server.getToken(),
+      })
+
+      expect(res.statusCode).toBe(404)
+      expect(loggerSpies.debug).toHaveBeenCalledTimes(1)
+      expect(loggerSpies.debug).toHaveBeenCalledWith(
+        expect.stringMatching(/^GET \/test\/does-not-exist 404 \d+ms$/)
+      )
     })
   })
 })

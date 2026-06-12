@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>feat: Sidebar design overhaul — kleurdiscipline, attention-rail, PR-badge en inklapbare projecten</title>
+<style>
+  :root {
+    --ink: #1f2430; --ink-soft: #5a6072; --ink-faint: #9aa0ae;
+    --accent: #d9603a; --accent-soft: #fdeee7; --line: #e8e3da; --paper: #faf7f2;
+    --green: #3a9e5f; --green-soft: #e7f5ec; --amber: #b07a1f; --amber-soft: #fbf3e3;
+    --red: #b6442f; --red-soft: #f9e6e2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: #fff; color: var(--ink); font-size: 15px; line-height: 1.55; }
+  .page { max-width: 920px; margin: 0 auto; padding: 44px 32px 72px; }
+  .prose { max-width: 72ch; }
+
+  .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 8px; }
+  h1 { font-size: 25px; font-weight: 700; line-height: 1.3; margin-bottom: 14px; }
+  header.doc-meta dl { display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 13px; margin-bottom: 8px; }
+  header.doc-meta dt { color: var(--ink-faint); text-transform: uppercase; font-size: 10.5px; letter-spacing: .08em; font-weight: 600; }
+  header.doc-meta dd { color: var(--ink); }
+  header.doc-meta .pair { display: flex; gap: 7px; align-items: baseline; }
+
+  section { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--line); }
+  h2 { font-size: 19px; font-weight: 700; margin-bottom: 14px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 18px 0 8px; }
+  p { margin-bottom: 10px; color: var(--ink); }
+  p.muted, li.muted { color: var(--ink-soft); }
+  ul, ol { margin: 0 0 12px 22px; }
+  li { margin-bottom: 6px; }
+  code { font-family: Consolas, "Cascadia Code", monospace; font-size: 12.5px; background: #f1ede4; padding: 1px 5px; border-radius: 4px; color: #8a4a2b; }
+  a { color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0 16px; }
+  th { text-align: left; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); padding: 7px 10px; border-bottom: 2px solid var(--line); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .idcell { white-space: nowrap; font-weight: 700; color: var(--ink-soft); }
+
+  .ktd { background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 13px 16px; margin-bottom: 10px; }
+  .ktd b { display: block; margin-bottom: 3px; }
+  .ktd p { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
+  .ktd .idchip { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+  article.unit { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  article.unit > h3 { display: flex; align-items: center; gap: 10px; margin: 0; padding: 13px 16px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 14.5px; }
+  .uchip { background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 10px; flex-shrink: 0; }
+  article.unit .ubody { padding: 13px 16px; }
+  article.unit dl.strip { display: grid; grid-template-columns: 110px 1fr; gap: 5px 14px; font-size: 13px; margin-bottom: 10px; }
+  article.unit dt { color: var(--ink-faint); text-transform: uppercase; font-size: 10.5px; letter-spacing: .07em; font-weight: 700; padding-top: 2px; }
+  article.unit dd { color: var(--ink); }
+  details { border-top: 1px dashed var(--line); padding: 8px 0 2px; }
+  details summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); padding: 3px 0; }
+  details[open] summary { color: var(--accent); }
+  details .dbody { padding: 8px 2px 6px; font-size: 13.5px; }
+  details .dbody ul { margin-bottom: 4px; }
+  details .dbody li { margin-bottom: 4px; color: var(--ink); }
+
+  .callout { background: var(--amber-soft); border: 1px solid #ecd9ad; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin: 8px 0; }
+  .callout .ce { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--amber); display: block; margin-bottom: 3px; }
+  .scope-card { border: 1px solid var(--line); border-radius: 9px; padding: 12px 16px; margin-bottom: 10px; font-size: 13.5px; }
+  .scope-card .ce { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 5px; }
+  .scope-in { background: var(--green-soft); border-color: #cfe8d8; } .scope-in .ce { color: var(--green); }
+  .scope-def { background: var(--paper); } .scope-def .ce { color: var(--ink-faint); }
+  .risk { border: 1px solid var(--line); border-radius: 9px; padding: 12px 16px; margin-bottom: 10px; font-size: 13.5px; background: var(--red-soft); border-color: #efd2cb; }
+  .risk .ce { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--red); display: block; margin-bottom: 4px; }
+  .risk.mitigated { background: var(--paper); border-color: var(--line); } .risk.mitigated .ce { color: var(--ink-faint); }
+
+  footer.composition-signal { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-faint); }
+  .svgwrap { margin: 14px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc-meta">
+  <div class="eyebrow">Implementatieplan</div>
+  <h1>feat: Sidebar design overhaul — kleurdiscipline, attention-rail, PR-badge en inklapbare projecten</h1>
+  <dl>
+    <div class="pair"><dt>type</dt><dd>feat</dd></div>
+    <div class="pair"><dt>date</dt><dd><time datetime="2026-06-10">2026-06-10</time></dd></div>
+    <div class="pair"><dt>origin</dt><dd><code>docs/review/2026-06-10-sidebar-design-verbetering.html</code></dd></div>
+    <div class="pair"><dt>preview</dt><dd><code>docs/review/2026-06-10-sidebar-eindresultaat-preview.html</code></dd></div>
+  </dl>
+</header>
+
+<section id="summary">
+  <h2>Summary</h2>
+  <div class="prose">
+    <p>Vijf renderer-only ingrepen maken de sidebar scanbaar: kleur exclusief voor urgentie, één-regel chatrijen, een oranje attention-rail aan de linkerrand, PR-metadata samengevouwen tot één statusbadge met een grijs-maar-klikbare merge-knop bij falende checks, en handmatig inklapbare projecten met gepersiste state en status-rollup. Vijf los landbare units; main-process en IPC blijven onaangeraakt.</p>
+  </div>
+</section>
+
+<section id="problem-frame">
+  <h2>Problem Frame</h2>
+  <div class="prose">
+    <p>De design review van 10 juni stelde vast dat de sidebar — het commandocentrum van de app — zijn kernfunctie verliest: "welke chat heeft mij nú nodig?" is niet in één oogopslag te beantwoorden. Rood staat op zes betekenisloze plekken, chatrijen kosten twee regels voor één regel informatie, de status-dot van 6px staat buiten de scanlijn van het oog, de PR-regel toont zeven micro-elementen op 10px, en bij 5+ projecten is de lijst ~3 schermen hoog zonder inklap-mogelijkheid. De gebruiker heeft de review en de gecombineerde eindresultaat-preview bevestigd, met twee expliciete keuzes: merge-knop grijs maar klikbaar bij falende checks (niet alle checks zijn blocking), en handmatig inklappen met auto-expand van het actieve project.</p>
+  </div>
+</section>
+
+<section id="requirements">
+  <h2>Requirements</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Unit</th></tr></thead>
+    <tbody>
+      <tr id="r1"><td class="idcell">R1.</td><td>Sidebar-iconen en metadata zijn neutraal; kleur is gereserveerd voor status: oranje exclusief voor <code>permission</code>/<code>question</code>, groen voor <code>done</code>/mergeable. Statuskleuren staan als CSS-variabelen in zowel <code>:root</code> als <code>.dark</code> en zijn leesbaar in alle drie de theme-modes.</td><td>U1</td></tr>
+      <tr id="r2"><td class="idcell">R2.</td><td>Chatrijen zijn één regel hoog. De summary-regel rendert alleen voor de actieve chat; bij overige chats is de summary bereikbaar via tooltip.</td><td>U2</td></tr>
+      <tr id="r3"><td class="idcell">R3.</td><td>Chats en worktrees in <code>permission</code>- of <code>question</code>-state tonen een 3px oranje balk op de linkerrand plus subtiele rijtint, met pulse-animatie. <code>question</code> en <code>permission</code> worden identiek behandeld. <code>busy</code>/<code>done</code> blijven een dot rechts.</td><td>U3</td></tr>
+      <tr id="r4"><td class="idcell">R4.</td><td>De PR-regel toont een PR-nummer-chip plus één samengestelde statusbadge (prioriteit: conflict &gt; CI-fail &gt; pending &gt; review &gt; klaar). Diffstat en losse check-namen verhuizen naar een hover-popover.</td><td>U4</td></tr>
+      <tr id="r5"><td class="idcell">R5.</td><td>De merge-knop is groen bij all-green, grijs maar klikbaar bij falende of lopende checks (bevestigingsdialoog met warning blijft), en afwezig bij stale data, conflicts of no-PR. <code>isMerging</code>-gedrag en de volgorde in <code>handleMerge</code> blijven ongewijzigd.</td><td>U4</td></tr>
+      <tr id="r6"><td class="idcell">R6.</td><td>Projecten zijn handmatig inklapbaar via een chevron; het selecteren van een project klapt het automatisch uit. Ingeklapte projecten tonen een teller-chip en de hoogste-prioriteit kindstatus als dot (<code>question</code>/<code>permission</code> &gt; <code>done</code> &gt; <code>busy</code>).</td><td>U5</td></tr>
+      <tr id="r7"><td class="idcell">R7.</td><td>Collapse-state wordt per project gepersist, opgeruimd bij projectverwijdering, en is bedienbaar via een nieuwe hotkey die ook voor bestaande gebruikers (met persisted hotkey-config) werkt. Hotkey gedocumenteerd in de CLAUDE.md-tabel.</td><td>U5</td></tr>
+      <tr id="r8"><td class="idcell">R8.</td><td>Geen wijzigingen aan main-process of IPC. <code>npm test</code> draait groen inclusief nieuwe tests.</td><td>alle</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="key-technical-decisions">
+  <h2>Key Technical Decisions</h2>
+  <div class="ktd" id="ktd1"><b><span class="idchip">KTD1.</span>Nieuwe predicate <code>isAttentionState</code> (permission | question) — geen hergebruik van <code>isInputState</code></b><p><code>isInputState</code> bevat ook <code>done</code> (groen knipperen). De rail is urgentie-only; een aparte predicate voorkomt dat done-chats een oranje rail krijgen en houdt bestaand knippergedrag elders intact.</p></div>
+  <div class="ktd" id="ktd2"><b><span class="idchip">KTD2.</span><code>STATE_TEXT_COLORS</code>/<code>STATE_DOT_COLORS</code> maps blijven bestaan; de sidebar stopt ze alleen op iconen toe te passen</b><p>De maps worden ook geconsumeerd door <code>TerminalTabBar</code> en <code>SessionsPanel</code>. Door de map-inhoud niet te wijzigen maar de toepassing op sidebar-iconen te verwijderen, blijft de blast radius beperkt tot de sidebar.</p></div>
+  <div class="ktd" id="ktd3"><b><span class="idchip">KTD3.</span>Statuskleuren als CSS-variabelen (<code>--status-attention</code>, <code>--status-done</code>, <code>--status-busy</code>) in <code>:root</code> én <code>.dark</code></b><p>De light-mode highlight-bug (PR #89) ontstond doordat één waarde over beide themes werd hergebruikt. Nieuwe rail-, tint- en dot-kleuren krijgen per theme een waarde, conform de CLAUDE.md-conventie "alle kleuren via CSS-variabelen".</p></div>
+  <div class="ktd" id="ktd4"><b><span class="idchip">KTD4.</span>Badge-prioriteit en status-rollup als pure functies in <code>src/utils/</code></b><p><code>getPRBadge(prStatus)</code> en <code>getProjectRollupState(terminals)</code> zijn direct unit-testbaar zonder mocks (patroon: <code>test/terminalPool.test.ts</code>), en vormen één bron voor twee renderings (rail en rollup lezen dezelfde states).</p></div>
+  <div class="ktd" id="ktd5"><b><span class="idchip">KTD5.</span>Collapse-logica atomair in één store-action; hotkey en klik delen die actie</b><p>De <code>Ctrl+Shift+I</code>-bug (hotkey-handler week af van click-handler, "selected but invisible") leert: gedrag zoals auto-expand bij activatie hoort ín de Zustand-action, niet in de aanroepers. <code>setActiveProject</code> verwijdert zelf de collapse-entry van het doelproject.</p></div>
+  <div class="ktd" id="ktd6"><b><span class="idchip">KTD6.</span><code>collapsedProjects: Record&lt;string, true&gt;</code> als additief persisted veld; hotkey met default-fallback</b><p>Keyed record i.p.v. array (O(1) lookup in render-hot selectors; les uit PR #84). Additieve velden hydrateren veilig zonder migratie. Persisted <code>hotkeyConfig</code> mist nieuwe acties bij bestaande gebruikers — de handler gebruikt het bestaande fallback-patroon <code>hotkeyConfig[a] ?? DEFAULT_HOTKEY_CONFIG[a]</code> (precedent: <code>dialog.dismissTopmostToast</code>).</p></div>
+  <div class="ktd" id="ktd7"><b><span class="idchip">KTD7.</span>Stale PR-data blijft non-klikbaar en gedimd; de renderer voegt géén state-deduplicatie toe</b><p>PR #127 introduceerde <code>prStatus.stale</code> precies omdat mergen tegen verouderde check-resultaten destructief is — de grijze knop geldt alleen voor <em>live</em> falende checks. En de hook+watcher (PR #129/#50) bezitten alle dedup/staleness-logica voor terminal-states; renderer-side debouncing of timestamp-filtering zou die fixes regressen.</p></div>
+</section>
+
+<section id="high-level-technical-design">
+  <h2>High-Level Technical Design</h2>
+  <h3>Status → visuele behandeling (één bron, drie renderings)</h3>
+  <p class="muted prose">Alle drie de oppervlakken (chatrij, worktree-rij, project-rollup) lezen dezelfde <code>terminal.state</code> uit de store; de mapping bepaalt per oppervlak de behandeling.</p>
+  <table>
+    <thead><tr><th>State</th><th>Chatrij / worktree-rij</th><th>Project-rollup (ingeklapt)</th><th>Kleurbron</th></tr></thead>
+    <tbody>
+      <tr><td><code>permission</code>, <code>question</code></td><td>Oranje rail links + rijtint + pulse, chip "wacht op jou"</td><td>Oranje dot (hoogste prioriteit)</td><td><code>--status-attention</code></td></tr>
+      <tr><td><code>done</code></td><td>Groene dot rechts (geen rail)</td><td>Groene dot (2e prioriteit)</td><td><code>--status-done</code></td></tr>
+      <tr><td><code>busy</code></td><td>Grijze dot rechts</td><td>Grijze dot (3e prioriteit)</td><td><code>--status-busy</code></td></tr>
+      <tr><td><code>stopped</code></td><td>Geen dot (huidig gedrag, ongewijzigd)</td><td>Geen bijdrage aan rollup</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <h3>PR-badge prioriteitsketen</h3>
+  <p class="muted prose">Eén badge per PR-regel; de eerste conditie die waar is wint. De merge-knop is een aparte beslissing die op de badge-uitkomst en <code>stale</code> gate.</p>
+  <div class="svgwrap">
+    <svg viewBox="0 0 860 150" width="100%" role="img" aria-label="PR-badge prioriteitsketen">
+      <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa0ae"/></marker></defs>
+      <!-- chain -->
+      <g font-family="Segoe UI, sans-serif" font-size="12">
+        <rect x="8" y="18" width="120" height="40" rx="8" fill="#f9e6e2" stroke="#efd2cb"/><text x="68" y="36" text-anchor="middle" fill="#b6442f" font-weight="700">conflict?</text><text x="68" y="50" text-anchor="middle" fill="#b6442f">badge: conflict</text>
+        <rect x="178" y="18" width="120" height="40" rx="8" fill="#f9e6e2" stroke="#efd2cb"/><text x="238" y="36" text-anchor="middle" fill="#b6442f" font-weight="700">check faalt?</text><text x="238" y="50" text-anchor="middle" fill="#b6442f">badge: CI ✗</text>
+        <rect x="348" y="18" width="120" height="40" rx="8" fill="#fbf3e3" stroke="#ecd9ad"/><text x="408" y="36" text-anchor="middle" fill="#b07a1f" font-weight="700">check loopt?</text><text x="408" y="50" text-anchor="middle" fill="#b07a1f">badge: pending</text>
+        <rect x="518" y="18" width="120" height="40" rx="8" fill="#fbf3e3" stroke="#ecd9ad"/><text x="578" y="36" text-anchor="middle" fill="#b07a1f" font-weight="700">review open?</text><text x="578" y="50" text-anchor="middle" fill="#b07a1f">badge: review</text>
+        <rect x="688" y="18" width="120" height="40" rx="8" fill="#e7f5ec" stroke="#cfe8d8"/><text x="748" y="36" text-anchor="middle" fill="#3a9e5f" font-weight="700">anders</text><text x="748" y="50" text-anchor="middle" fill="#3a9e5f">badge: ✓ klaar</text>
+        <line x1="128" y1="38" x2="176" y2="38" stroke="#9aa0ae" marker-end="url(#arr)"/>
+        <line x1="298" y1="38" x2="346" y2="38" stroke="#9aa0ae" marker-end="url(#arr)"/>
+        <line x1="468" y1="38" x2="516" y2="38" stroke="#9aa0ae" marker-end="url(#arr)"/>
+        <line x1="638" y1="38" x2="686" y2="38" stroke="#9aa0ae" marker-end="url(#arr)"/>
+        <text x="152" y="30" text-anchor="middle" fill="#9aa0ae" font-size="10">nee</text>
+        <text x="322" y="30" text-anchor="middle" fill="#9aa0ae" font-size="10">nee</text>
+        <text x="492" y="30" text-anchor="middle" fill="#9aa0ae" font-size="10">nee</text>
+        <text x="662" y="30" text-anchor="middle" fill="#9aa0ae" font-size="10">nee</text>
+        <!-- merge button row -->
+        <rect x="8" y="96" width="800" height="40" rx="8" fill="#faf7f2" stroke="#e8e3da"/>
+        <text x="24" y="120" fill="#5a6072">Merge-knop: <tspan font-weight="700" fill="#3a9e5f">groen</tspan> bij badge "klaar" · <tspan font-weight="700" fill="#6d6a5e">grijs, klikbaar</tspan> bij CI ✗ / pending · <tspan font-weight="700" fill="#b6442f">afwezig</tspan> bij conflict, stale of no-PR · disabled tijdens isMerging</text>
+      </g>
+    </svg>
+  </div>
+  <p class="prose muted">In prose: <code>getPRBadge</code> evalueert conflict → CI-fail → pending → review → klaar, in die volgorde. De merge-knop rendert groen bij "klaar", grijs-klikbaar bij CI-fail of pending (de bestaande <code>window.confirm</code>-warning in <code>handleMerge</code> blijft de vangrail), en rendert niet bij conflict (<code>mergeable !== 'MERGEABLE'</code>), stale data of ontbrekende PR. <code>isMerging</code> toont de bestaande disabled spinner ongeacht kleur.</p>
+</section>
+
+<section id="implementation-units">
+  <h2>Implementation Units</h2>
+
+  <article class="unit" id="u1">
+    <h3><span class="uchip">U1</span>Status-kleursysteem: tokens + attention-predicate, sidebar-metadata neutraal</h3>
+    <div class="ubody">
+      <dl class="strip">
+        <dt>Goal</dt><dd>Kleur betekent urgentie: statuskleuren als theme-bewuste CSS-variabelen, nieuwe <code>isAttentionState</code>-predicate, en sidebar-iconen/metadata ontdaan van statuskleur.</dd>
+        <dt>Requirements</dt><dd>R1</dd>
+        <dt>Dependencies</dt><dd>—</dd>
+        <dt>Files</dt><dd><code>src/utils/terminalState.ts</code>, <code>src/index.css</code>, <code>src/components/Sidebar/TerminalListItem.tsx</code>, <code>src/components/Worktree/WorktreeItem.tsx</code>, <code>test/terminalState.test.ts</code> (nieuw)</dd>
+      </dl>
+      <details><summary>Approach</summary><div class="dbody">
+        <ul>
+          <li>Voeg <code>ATTENTION_STATES = ['permission', 'question']</code> en <code>isAttentionState()</code> toe aan <code>terminalState.ts</code>; laat <code>isInputState</code>/<code>isVisibleState</code> ongemoeid (KTD1).</li>
+          <li>Definieer <code>--status-attention</code>, <code>--status-done</code>, <code>--status-busy</code> in <code>:root</code> én <code>.dark</code> in <code>index.css</code>; waarden per theme afgestemd op contrast (KTD3). Bestaande <code>STATE_DOT_COLORS</code>-map blijft qua kleurwaarde gelijkwaardig (KTD2).</li>
+          <li><code>TerminalListItem</code>: verwijder <code>STATE_TEXT_COLORS</code> van het terminal-icoon (wordt <code>text-muted-foreground</code>). <code>WorktreeItem</code>: branch-icoon van <code>text-primary</code> naar neutraal.</li>
+          <li>Normaliseer de active-row-achtergrond: worktree-rijen gebruiken <code>bg-sidebar-accent</code> waar project/chat-rijen <code>bg-[var(--sidebar-highlight)]</code> gebruiken — trek gelijk naar <code>--sidebar-highlight</code>.</li>
+        </ul>
+      </div></details>
+      <details><summary>Patterns to follow</summary><div class="dbody"><ul>
+        <li>CSS-variabelen per theme: <code>src/index.css</code> <code>:root</code> (r. 11–53) en <code>.dark</code> (r. 55–91); les uit <code>docs/solutions/code-review/system-theme-pr89-review-fixes.md</code>.</li>
+        <li>Arbitrary-value gebruik: <code>bg-[var(--sidebar-highlight)]</code> in <code>TerminalListItem.tsx:30</code>.</li>
+      </ul></div></details>
+      <details><summary>Test scenarios</summary><div class="dbody"><ul>
+        <li><code>isAttentionState('permission')</code> en <code>('question')</code> → true; <code>('done')</code>, <code>('busy')</code>, <code>('stopped')</code> → false.</li>
+        <li><code>isInputState('done')</code> blijft true (regressiecheck: bestaand contract ongewijzigd).</li>
+        <li>Visueel (handmatig, 3 theme-modes light/dark/system): iconen neutraal, dots behouden kleur, contrast leesbaar.</li>
+      </ul></div></details>
+      <details><summary>Verification</summary><div class="dbody"><ul><li>Geen <code>text-orange-*</code>/<code>text-red-*</code>/<code>text-primary</code> meer op sidebar-rij-iconen; <code>npm test</code> groen; sidebar in light én dark gecontroleerd.</li></ul></div></details>
+    </div>
+  </article>
+
+  <article class="unit" id="u2">
+    <h3><span class="uchip">U2</span>Eén-regel chatrijen: summary alleen op de actieve chat</h3>
+    <div class="ubody">
+      <dl class="strip">
+        <dt>Goal</dt><dd>Chatrijen kosten één regel; de summary rendert alleen onder de actieve chat en is elders bereikbaar via tooltip.</dd>
+        <dt>Requirements</dt><dd>R2</dd>
+        <dt>Dependencies</dt><dd>—</dd>
+        <dt>Files</dt><dd><code>src/components/Sidebar/TerminalListItem.tsx</code>, <code>test/terminalListItem.test.tsx</code> (nieuw, jsdom)</dd>
+      </dl>
+      <details><summary>Approach</summary><div class="dbody"><ul>
+        <li>Render de summary-regel (<code>TerminalListItem.tsx:45–49</code>) alleen als <code>isActive && terminal.summary</code>; geen <code>' '</code>-placeholder meer voor lege summaries.</li>
+        <li>Zet <code>title={terminal.summary}</code> op de <code>&lt;li&gt;</code> voor niet-actieve chats.</li>
+        <li>Vervang het no-op class <code>text-text-secondary</code> (bestaat niet in Tailwind-config) door <code>text-muted-foreground</code> op de summary-regel.</li>
+        <li>Blast radius gecheckt: <code>SessionsPanel</code> en <code>ProjectOverview</code> renderen summary uit eigen bronnen en zijn onaangetast.</li>
+      </ul></div></details>
+      <details><summary>Patterns to follow</summary><div class="dbody"><ul>
+        <li>Conditioneel renderen op <code>isActive</code>: precedent in <code>docs/solutions/ui-bugs/workspace-empty-state-visibility.md</code> — wijziging chirurgisch houden.</li>
+        <li>jsdom component-test: <code>test/spawnErrorToast.test.tsx</code> (docblock <code>// @vitest-environment jsdom</code> + Testing Library).</li>
+      </ul></div></details>
+      <details><summary>Test scenarios</summary><div class="dbody"><ul>
+        <li>Claude-chat, niet actief, met summary → summary-tekst niet in DOM; <code>li</code> heeft <code>title</code> met de summary.</li>
+        <li>Claude-chat, actief, met summary → summary-regel zichtbaar in DOM.</li>
+        <li>Claude-chat, actief, zonder summary → geen lege tweede regel (geen nbsp-element).</li>
+        <li><code>type: 'normal'</code> terminal → nooit een summary-regel (huidig gedrag behouden).</li>
+      </ul></div></details>
+      <details><summary>Verification</summary><div class="dbody"><ul><li>Nieuwe jsdom-test groen; visueel: ~2x meer chats in beeld bij een vol project.</li></ul></div></details>
+    </div>
+  </article>
+
+  <article class="unit" id="u3">
+    <h3><span class="uchip">U3</span>Attention-rail: linksrand-balk + rijtint voor permission/question</h3>
+    <div class="ubody">
+      <dl class="strip">
+        <dt>Goal</dt><dd>Input-states zijn perifeer zichtbaar: 3px oranje balk op de linkerrand, subtiele rijtint en pulse op de balk, identiek voor chats en worktrees.</dd>
+        <dt>Requirements</dt><dd>R3</dd>
+        <dt>Dependencies</dt><dd>U1 (tokens + predicate)</dd>
+        <dt>Files</dt><dd><code>src/components/Sidebar/TerminalListItem.tsx</code>, <code>src/components/Worktree/WorktreeItem.tsx</code>, <code>src/index.css</code>, <code>test/terminalListItem.test.tsx</code></dd>
+      </dl>
+      <div class="callout"><span class="ce">Execution note</span>Behandel <code>question</code> en <code>permission</code> strikt identiek en consumeer <code>terminal.state</code> as-is — geen renderer-side debouncing of timestamp-filtering; dedup/staleness-logica is eigendom van hook+watcher (PR #129/#50, KTD7). Verifieer na implementatie handmatig met een snel beantwoorde AskUserQuestion — dat was de case die de race verborg.</div>
+      <details><summary>Approach</summary><div class="dbody"><ul>
+        <li>Bij <code>isAttentionState(terminal.state)</code>: absolute-positioned 3px balk (kleur <code>--status-attention</code>) + rijtint (techniek: <code>color-mix(in oklch, ...)</code>, precedent <code>index.css:160</code>) + chip "wacht op jou"; rij krijgt <code>position: relative</code>.</li>
+        <li>Verplaats de pulse: balk krijgt de blink-animatie; voeg de ontbrekende <code>.state-question</code>-regel toe (valt nu terug op de gróéne default-animatie terwijl de dot oranje is) en verwijder de dode <code>.state-ready</code>-regel (<code>index.css:178–223</code>).</li>
+        <li><code>busy</code>/<code>done</code>-dots rechts blijven ongewijzigd (render via <code>isVisibleState</code> minus attention-states).</li>
+        <li>Zelfde behandeling in <code>WorktreeItem</code> rij 1 (regels 299–305) voor de gekoppelde terminal.</li>
+      </ul></div></details>
+      <details><summary>Test scenarios</summary><div class="dbody"><ul>
+        <li>State <code>permission</code> → rail-element en tint-class aanwezig; chip "wacht op jou" zichtbaar.</li>
+        <li>State <code>question</code> → exact dezelfde behandeling als <code>permission</code>.</li>
+        <li>State <code>done</code> → geen rail; groene dot rechts aanwezig. State <code>busy</code> → geen rail; grijze dot.</li>
+        <li>WorktreeItem met terminal in <code>question</code> → rail aanwezig op de worktree-rij.</li>
+      </ul></div></details>
+      <details><summary>Verification</summary><div class="dbody"><ul><li>Tests groen; handmatige check: AskUserQuestion in een chat → oranje rail pulseert in de sidebar, ook bij snel antwoorden; in light en dark leesbaar.</li></ul></div></details>
+    </div>
+  </article>
+
+  <article class="unit" id="u4">
+    <h3><span class="uchip">U4</span>Samengestelde PR-badge + grijs-klikbare merge-knop</h3>
+    <div class="ubody">
+      <dl class="strip">
+        <dt>Goal</dt><dd>Eén badge vat conflict/CI/review samen; diffstat en check-namen verhuizen naar een popover; merge-knop groen bij all-green, grijs-klikbaar bij falende/lopende checks, afwezig bij stale/conflict/no-PR.</dd>
+        <dt>Requirements</dt><dd>R4, R5</dd>
+        <dt>Dependencies</dt><dd>U1 (chip-kleuren)</dd>
+        <dt>Files</dt><dd><code>src/utils/prBadge.ts</code> (nieuw), <code>src/components/Worktree/WorktreeItem.tsx</code>, <code>test/prBadge.test.ts</code> (nieuw)</dd>
+      </dl>
+      <div class="callout"><span class="ce">Execution note</span>Presentationeel werk: <code>handleMerge</code> (terminal-close vóór worktree-remove; EBUSY-les), <code>isMerging</code>-spinner en de <code>showMergeButton</code>-gate op <code>!prStatus.stale</code> blijven byte-voor-byte qua gedrag. Stale = gedimde rij, géén merge-knop — grijs-klikbaar geldt uitsluitend voor live falende checks (KTD7).</div>
+      <details><summary>Approach</summary><div class="dbody"><ul>
+        <li>Pure functie <code>getPRBadge(prStatus)</code> → <code>{ kind: 'conflict' | 'ci-fail' | 'pending' | 'review' | 'ready', label }</code>, prioriteit per de HTD-keten. Vervangt <code>CIStatusIcon</code>-icoon, conflict-warning en <code>ReviewBadge</code> in de rij (<code>WorktreeItem.tsx:333–379</code>).</li>
+        <li>PR-nummer wordt neutrale chip (klikbaar, opent PR — bestaand <code>handleOpenPR</code>); diffstat-chip vervalt uit de rij en verhuist samen met de per-check-lijst naar de hover-popover (hergebruik het bestaande popover-patroon uit <code>CIStatusIcon</code>, conventie <code>bg-popover border-border rounded-md shadow-lg</code>).</li>
+        <li><code>MergeButton</code>: kleur grijs (neutraal token) bij fail/pending i.p.v. rood/geel; groen alleen bij all-pass; render-conditie ongewijzigd (<code>showMergeButton</code>). De <code>title</code> blijft de falende/lopende check-namen noemen.</li>
+        <li>Catch-pad voor <code>getPRStatus</code>-rejects (refresh-knop) blijft bestaan; PR-rij blijft gemount bij poll-fouten (geen flicker — dat was de bug van PR #127).</li>
+      </ul></div></details>
+      <details><summary>Test scenarios</summary><div class="dbody"><ul>
+        <li><code>getPRBadge</code>: conflicting + falende checks → <code>conflict</code> (conflict wint); falende check zonder conflict → <code>ci-fail</code>; alleen pending → <code>pending</code>; checks pass + <code>CHANGES_REQUESTED</code> → <code>review</code>; alles groen + approved/geen review → <code>ready</code>; lege check-lijst → <code>ready</code>-pad zonder crash.</li>
+        <li>Merge-knop varianten: all-pass → groen; fail of pending → grijs én <code>onMerge</code> vuurt bij klik; <code>isMerging</code> → disabled spinner; <code>stale: true</code> → knop niet gerenderd; <code>mergeable: 'CONFLICTING'</code> → knop niet gerenderd.</li>
+        <li>Popover bevat diffstat (+/−) en per-check naam+status.</li>
+      </ul></div></details>
+      <details><summary>Verification</summary><div class="dbody"><ul><li><code>test/prBadge.test.ts</code> groen; handmatig: worktree met falende CI toont grijze klikbare knop met confirm-warning; stale rij gedimd zonder knop.</li></ul></div></details>
+    </div>
+  </article>
+
+  <article class="unit" id="u5">
+    <h3><span class="uchip">U5</span>Inklapbare projecten: chevron, rollup-dot, persist en hotkey</h3>
+    <div class="ubody">
+      <dl class="strip">
+        <dt>Goal</dt><dd>Projecten handmatig inklapbaar; ingeklapt project toont teller-chip + hoogste-prioriteit kindstatus; state gepersist; bediening via klik en nieuwe hotkey.</dd>
+        <dt>Requirements</dt><dd>R6, R7</dd>
+        <dt>Dependencies</dt><dd>U1 (rollup leest dezelfde tokens/predicate)</dd>
+        <dt>Files</dt><dd><code>src/stores/projectStore.ts</code>, <code>src/utils/projectRollup.ts</code> (nieuw), <code>src/components/Sidebar/SortableProjectItem.tsx</code>, <code>src/utils/hotkeys.ts</code>, <code>src/types/hotkeys.ts</code>, <code>src/App.tsx</code>, <code>CLAUDE.md</code>, <code>test/projectStore.test.ts</code>, <code>test/projectRollup.test.ts</code> (nieuw)</dd>
+      </dl>
+      <details><summary>Approach</summary><div class="dbody"><ul>
+        <li>Store: <code>collapsedProjects: Record&lt;string, true&gt;</code> + <code>toggleProjectCollapsed(projectId)</code>; toevoegen aan <code>partialize</code> (r. 1634–1656); opruimen in <code>removeProject</code> (naast <code>expandedPaths</code>-cleanup, r. 1092–1104). <code>setActiveProject</code> verwijdert de entry van het doelproject in dezelfde <code>set</code>-call (auto-expand, KTD5). Additief veld — geen migratie nodig (KTD6).</li>
+        <li>Rollup: <code>getProjectRollupState(terminals)</code> → <code>'attention' | 'done' | 'busy' | null</code> over directe terminals + worktree-terminals van het project; <code>stopped</code> telt niet mee.</li>
+        <li><code>SortableProjectItem</code>: chevron-knop vóór het projecticoon (kopieer het inactive-section-precedent: <code>ChevronRight</code> + <code>rotate-90</code> + <code>aria-expanded</code>, <code>SortableProjectList.tsx:215–228</code>); <code>e.stopPropagation()</code> tegen dnd-drag (zoals bestaande knoppen, r. 189–222). Ingeklapt: children niet renderen, teller-chip (aantal chats + worktrees) + rollup-dot; <code>data-project-id</code> blijft op de <code>li</code> (scroll-into-view, <code>Sidebar.tsx:92–94</code>).</li>
+        <li>Inklappen van het actieve project is toegestaan: alleen sidebar-rijen verdwijnen; center-area en terminal-pool zijn onaangetast (pool leeft op store-state, niet op sidebar-DOM).</li>
+        <li>Hotkey: actie <code>sidebar.toggleProjectCollapse</code> (<code>Ctrl+Shift+P</code>, vrij) — toggle voor het actieve project; registreren in type-union, <code>DEFAULT_HOTKEY_CONFIG</code>, handler in <code>App.tsx</code> met het fallback-patroon (<code>App.tsx:415–416</code> als voorbeeld), en de CLAUDE.md-tabel (sectie Sidebar).</li>
+      </ul></div></details>
+      <details><summary>Patterns to follow</summary><div class="dbody"><ul>
+        <li>Persisted membership-set: <code>expandedPaths</code>-patroon (keyed record, cleanup bij remove) — <code>docs/solutions/ui-bugs/file-explorer-worktree-awareness.md</code>.</li>
+        <li>Store-action met samengesteld gedrag: <code>toggleInactiveSectionCollapsed</code> (r. 541–566) — <code>docs/solutions/logic-errors/hotkey-handler-missing-auto-switch-behavior.md</code>.</li>
+        <li>Store-tests: <code>test/projectStore.test.ts</code> (persist-mock, <code>makeTerminal</code>-factory, <code>setState</code>-reset).</li>
+      </ul></div></details>
+      <details><summary>Test scenarios</summary><div class="dbody"><ul>
+        <li><code>toggleProjectCollapsed(id)</code> voegt entry toe; tweede aanroep verwijdert hem.</li>
+        <li><code>setActiveProject(id)</code> op een ingeklapt project verwijdert de collapse-entry (auto-expand) in dezelfde state-update.</li>
+        <li><code>removeProject(id)</code> ruimt de <code>collapsedProjects</code>-entry op.</li>
+        <li><code>partialize</code>-output bevat <code>collapsedProjects</code> (persist-contract).</li>
+        <li>Rollup: <code>[busy, done, question]</code> → attention; <code>[busy, done]</code> → done; <code>[busy]</code> → busy; <code>[]</code> en <code>[stopped]</code> → null; <code>permission</code> en <code>question</code> equivalent.</li>
+        <li>Hotkey-fallback: handler werkt met een persisted config zónder de nieuwe actie (default-binding gebruikt).</li>
+        <li>Handmatig: chevron-klik sleept het project niet (dnd-activatie 8px); ingeklapt project met wachtende chat toont oranje rollup-dot.</li>
+      </ul></div></details>
+      <details><summary>Verification</summary><div class="dbody"><ul><li>Store- en rollup-tests groen; collapse-state overleeft app-herstart; <code>Ctrl+Shift+P</code> werkt voor bestaande persisted configs; CLAUDE.md-tabel bijgewerkt.</li></ul></div></details>
+    </div>
+  </article>
+</section>
+
+<section id="scope-boundaries">
+  <h2>Scope Boundaries</h2>
+  <div class="scope-card scope-in"><span class="ce">In scope</span>Renderer-only wijzigingen aan sidebar-componenten, <code>terminalState</code>/nieuwe utils, <code>index.css</code>-tokens, store-veld + hotkey. De gedeelde kleurmaps blijven gelijkwaardig zodat <code>TerminalTabBar</code> en <code>SessionsPanel</code> visueel ongewijzigd blijven.</div>
+  <div class="scope-card scope-def"><span class="ce">Deferred to follow-up work</span>
+    <ul>
+      <li>Workspaces-sectie inklapbaar maken (zelfde patroon, apart besluit — workspaces hebben bewust een eigen rendering).</li>
+      <li>Hardcoded statuskleuren in <code>TerminalTabBar</code>/<code>SessionsPanel</code>/<code>SidecarTerminalPanel</code> migreren naar de nieuwe <code>--status-*</code>-tokens.</li>
+      <li><code>/ce-compound</code>-doc voor het stale-PR-gedrag van PR #127 (capture-gap, gesignaleerd door learnings-research).</li>
+      <li>Auto-collapse van niet-actieve projecten (gebruiker koos expliciet handmatig; eventueel later als setting).</li>
+    </ul>
+  </div>
+  <div class="scope-card scope-def"><span class="ce">Non-goals</span>Geen wijzigingen aan main-process, IPC, hook/watcher-pipeline, merge-flow-volgorde, ProjectOverview of file explorer. Geen nieuw theming-systeem — alleen additieve tokens.</div>
+</section>
+
+<section id="risks-dependencies">
+  <h2>Risks &amp; Dependencies</h2>
+  <div class="risk"><span class="ce">Risico · open</span><b>Chevron vs. drag-handle.</b> De hele project-header is dnd-drag-handle (<code>{...listeners}</code> gespreid). Een chevron-knop zonder correcte event-stop maakt inklappen onbetrouwbaar of sleept per ongeluk. Mitigatie in U5: zelfde stop-propagation-aanpak als de bestaande Plus/X-knoppen + handmatige dnd-check in verificatie.</div>
+  <div class="risk mitigated"><span class="ce">Risico · gemitigeerd</span><b>Attention-pipeline regressie.</b> De rail bouwt op een race-gevoelige pipeline (PR #129/#50). Gemitigeerd door KTD7 (renderer voegt geen dedup toe) en de expliciete handmatige verificatie met snel beantwoorde AskUserQuestion in U3.</div>
+  <div class="risk mitigated"><span class="ce">Risico · gemitigeerd</span><b>Stale-merge regressie.</b> Grijs-klikbaar mag het PR #127-gedrag niet uithollen. Gemitigeerd door de ongewijzigde <code>showMergeButton</code>-gate + expliciete stale-testscenario's in U4.</div>
+  <div class="risk mitigated"><span class="ce">Risico · gemitigeerd</span><b>Hotkey onzichtbaar voor bestaande gebruikers.</b> Persisted <code>hotkeyConfig</code> bevat nieuwe acties niet. Gemitigeerd door het fallback-patroon (KTD6) + testscenario in U5.</div>
+</section>
+
+<section id="sources-research">
+  <h2>Sources &amp; Research</h2>
+  <ul>
+    <li>Origin: <a href="https://github.com/remcovolmer/command/blob/main/docs/review/2026-06-10-sidebar-design-verbetering.html"><code>docs/review/2026-06-10-sidebar-design-verbetering.html</code></a> — design review met de 5 ingrepen; bevestigde preview: <a href="https://github.com/remcovolmer/command/blob/main/docs/review/2026-06-10-sidebar-eindresultaat-preview.html"><code>docs/review/2026-06-10-sidebar-eindresultaat-preview.html</code></a></li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/integration-issues/askuserquestion-question-state-async-hook-race.md"><code>docs/solutions/integration-issues/askuserquestion-question-state-async-hook-race.md</code></a> — input-state race; constraints voor U3</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/logic-errors/hotkey-handler-missing-auto-switch-behavior.md"><code>docs/solutions/logic-errors/hotkey-handler-missing-auto-switch-behavior.md</code></a> — collapse-logica in één store-action (U5)</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/ui-bugs/file-explorer-worktree-awareness.md"><code>docs/solutions/ui-bugs/file-explorer-worktree-awareness.md</code></a> — persisted record-pattern + cleanup (U5)</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/runtime-errors/ebusy-worktree-removal-terminal-handles.md"><code>docs/solutions/runtime-errors/ebusy-worktree-removal-terminal-handles.md</code></a> — merge-flow ordering niet aanraken (U4)</li>
+    <li><a href="https://github.com/remcovolmer/command/commit/8bb8fa5">commit <code>8bb8fa5</code> (PR #127)</a> — stale PR-gedrag; gate voor de merge-knop (U4, KTD7)</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-02-16-feat-collapsible-inactive-projects-section-plan.md"><code>docs/plans/2026-02-16-feat-collapsible-inactive-projects-section-plan.md</code></a> — chevron/collapse-precedent (U5)</li>
+    <li>Code-ankers: <code>src/utils/terminalState.ts</code> (state-maps), <code>src/index.css:178–223</code> (indicator-animaties; ontbrekende <code>.state-question</code>), <code>src/stores/projectStore.ts</code> (partialize r. 1634–1656, removeProject-cleanup r. 1092–1104), <code>src/App.tsx:415–416</code> (hotkey-fallback-precedent), <code>src/components/Sidebar/SortableProjectList.tsx:215–228</code> (chevron-precedent)</li>
+  </ul>
+</section>
+
+<footer class="composition-signal">Samengesteld 2026-06-10 door ce-plan vanuit <code>docs/review/2026-06-10-sidebar-design-verbetering.html</code> (design review, door gebruiker bevestigd incl. keuzes: merge-knop grijs-klikbaar, handmatig inklappen) en repo/learnings-research.</footer>
+
+</div>
+</body>
+</html>

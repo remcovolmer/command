@@ -117,9 +117,10 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             onMouseEnter={() => setFocusedIndex(index)}
             className={`
               w-full text-left px-3 py-1.5 text-sm flex items-center justify-between
-              ${item.variant === 'destructive'
-                ? 'text-destructive hover:bg-destructive/10'
-                : 'text-popover-foreground hover:bg-accent hover:text-accent-foreground'
+              ${
+                item.variant === 'destructive'
+                  ? 'text-destructive hover:bg-destructive/10'
+                  : 'text-popover-foreground hover:bg-accent hover:text-accent-foreground'
               }
               ${isFocused ? (item.variant === 'destructive' ? 'bg-destructive/10' : 'bg-accent text-accent-foreground') : ''}
               transition-colors

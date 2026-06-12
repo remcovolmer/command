@@ -87,19 +87,26 @@ export function UpdateNotification() {
         <div className="flex items-start gap-3">
           <div className="text-red-400">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <div className="flex-1">
             <p className="font-medium">Update failed</p>
             <p className="text-sm text-red-200 mt-1">{error}</p>
           </div>
-          <button
-            onClick={handleDismiss}
-            className="text-red-300 hover:text-white"
-          >
+          <button onClick={handleDismiss} className="text-red-300 hover:text-white">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -114,12 +121,19 @@ export function UpdateNotification() {
         <div className="flex items-start gap-3">
           <div className="text-blue-400">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
             </svg>
           </div>
           <div className="flex-1">
             <p className="font-medium">Update available</p>
-            <p className="text-sm text-blue-200 mt-1">Version {updateInfo.version} is ready to download</p>
+            <p className="text-sm text-blue-200 mt-1">
+              Version {updateInfo.version} is ready to download
+            </p>
             <div className="flex gap-2 mt-3">
               <button
                 onClick={handleDownload}
@@ -150,7 +164,12 @@ export function UpdateNotification() {
         <div className="flex items-start gap-3">
           <div className="text-blue-400 animate-pulse">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
             </svg>
           </div>
           <div className="flex-1">
@@ -161,7 +180,9 @@ export function UpdateNotification() {
                 style={{ width: `${percent}%` }}
               />
             </div>
-            <p className="text-xs text-blue-300 mt-1">{percent}% - {speed} MB/s</p>
+            <p className="text-xs text-blue-300 mt-1">
+              {percent}% - {speed} MB/s
+            </p>
           </div>
         </div>
       </div>
@@ -175,7 +196,12 @@ export function UpdateNotification() {
         <div className="flex items-start gap-3">
           <div className="text-green-400">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
           <div className="flex-1">
