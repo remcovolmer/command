@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Requirements — Pinnable projects (vervangt workspaces)</title>
+<style>
+  :root {
+    --ink: #1a1f2e;
+    --muted: #5b6678;
+    --faint: #8b95a7;
+    --line: #e3e7ee;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --accent: #4f46e5;
+    --accent-soft: #eef0fe;
+    --green: #0f9d6e;
+    --green-soft: #e6f6ef;
+    --amber: #c2870b;
+    --amber-soft: #fdf4e1;
+    --red: #d1453b;
+    --red-soft: #fcebe9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.55;
+    font-size: 15px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 28px 96px; }
+  header.doc {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 20px;
+    margin-bottom: 36px;
+  }
+  .eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 14px; letter-spacing: -.01em; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    background: var(--green-soft); color: var(--green);
+  }
+
+  h2 {
+    font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--faint); margin: 44px 0 6px;
+  }
+  .action-title {
+    font-size: 21px; font-weight: 650; line-height: 1.32; letter-spacing: -.01em;
+    margin: 0 0 18px; color: var(--ink);
+  }
+  p { margin: 0 0 14px; }
+  .lead { font-size: 16px; color: var(--ink); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px 24px; margin: 16px 0;
+  }
+
+  /* SCR strip */
+  .scr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 18px 0 8px; }
+  .scr > div { border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: var(--card); }
+  .scr h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+  .scr .s { color: var(--muted); } .scr .s h4 { color: var(--faint); }
+  .scr .c h4 { color: var(--red); } .scr .c { border-color: #f0d4d1; background: var(--red-soft); }
+  .scr .r h4 { color: var(--green); } .scr .r { border-color: #cdeede; background: var(--green-soft); }
+  .scr p { margin: 0; font-size: 13.5px; }
+
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
+  td.yes { color: var(--green); font-weight: 600; }
+  td.no { color: var(--red); font-weight: 600; }
+  tr.gone td { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--red); }
+
+  /* before/after */
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+  .ba .col { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .ba .col h4 { margin: 0; padding: 10px 14px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .ba .before h4 { background: var(--red-soft); color: var(--red); }
+  .ba .after  h4 { background: var(--green-soft); color: var(--green); }
+  .mono {
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px; white-space: pre; padding: 14px; margin: 0;
+    color: var(--ink); overflow-x: auto;
+  }
+
+  ol.req { list-style: none; counter-reset: r; padding: 0; margin: 14px 0; }
+  ol.req > li {
+    counter-increment: r; position: relative; padding: 14px 16px 14px 52px;
+    border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; background: var(--card);
+  }
+  ol.req > li::before {
+    content: counter(r); position: absolute; left: 14px; top: 13px;
+    width: 26px; height: 26px; border-radius: 7px; background: var(--accent-soft);
+    color: var(--accent); font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.req b { font-weight: 650; }
+  ol.req .note { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  code {
+    font-family: "SF Mono", ui-monospace, Consolas, monospace; font-size: 12.5px;
+    background: #eef0f4; padding: 1px 6px; border-radius: 5px; color: #2d3550;
+  }
+
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .box { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: var(--card); }
+  .box.in  { border-left: 3px solid var(--green); }
+  .box.out { border-left: 3px solid var(--faint); }
+  .box h4 { margin: 0 0 10px; font-size: 14px; }
+  .box ul { margin: 0; padding-left: 18px; } .box li { margin-bottom: 6px; font-size: 13.5px; }
+
+  .callout {
+    border-left: 3px solid var(--amber); background: var(--amber-soft);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; font-size: 13.5px;
+  }
+  .callout b { color: var(--amber); }
+
+  ul.touch { list-style: none; padding: 0; margin: 8px 0; }
+  ul.touch li { padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; display: flex; gap: 10px; }
+  ul.touch li:last-child { border-bottom: 0; }
+  ul.touch .path { color: var(--accent); font-family: "SF Mono", ui-monospace, Consolas, monospace; font-size: 12.5px; min-width: 230px; }
+
+  .crit { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; font-size: 14px; }
+  .crit .chk { color: var(--green); font-weight: 700; flex-shrink: 0; }
+
+  footer.doc { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--faint); }
+
+  @media (max-width: 760px) {
+    .scr, .ba, .cols2 { grid-template-columns: 1fr; }
+    ul.touch li { flex-direction: column; gap: 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <p class="eyebrow">Requirements · Command</p>
+    <h1>Pinnable projects vervangen het workspace-type</h1>
+    <div class="meta">
+      <span><b>Datum:</b> 2026-06-10</span>
+      <span><b>Branch:</b> feat/pin-project</span>
+      <span><b>Scope:</b> Deep — feature</span>
+      <span><b>Status:</b> <span class="pill">Klaar voor planning</span></span>
+    </div>
+  </header>
+
+  <!-- ───────────────────────── SAMENVATTING ───────────────────────── -->
+  <section>
+    <h2>Samenvatting</h2>
+    <p class="action-title">Pinnen wordt een vlag op elk project; het workspace-type — dat positie en feature-set onterecht koppelde — verdwijnt.</p>
+    <p class="lead">Vandaag is <code>workspace</code> één van drie project-types, dat tegelijk twee losse dingen regelt: <em>bovenaan-vastgezet staan</em> én <em>een uitgeklede feature-set</em>. Die koppeling klopt niet. We splitsen ze: <b>pinnen</b> wordt een orthogonale eigenschap die elk project naar een eigen sectie bovenaan tilt, terwijl het <b>type</b> (<code>project</code> of <code>code</code>) blijft bepalen welke tools het project heeft. Een gepind code-project houdt dus z'n worktrees en git-tab — iets wat vandaag onmogelijk is.</p>
+  </section>
+
+  <!-- ───────────────────────── PROBLEEM (SCR) ───────────────────────── -->
+  <section>
+    <h2>Probleem</h2>
+    <p class="action-title">Het workspace-type dwingt een valse keuze af: wil je iets bovenaan, dan lever je dev-tools in.</p>
+    <div class="scr">
+      <div class="s">
+        <h4>Situatie</h4>
+        <p>Command kent drie project-types. <code>workspace</code> staat altijd bovenaan in een eigen sectie, met ster en altijd-zichtbare chats.</p>
+      </div>
+      <div class="c">
+        <h4>Complicatie</h4>
+        <p>"Bovenaan staan" zit vastgeklonken aan het type. Een <code>code</code>-project met worktrees en git kun je niet bovenaan pinnen zonder die tools te verliezen. Het type doet twee dingen tegelijk.</p>
+      </div>
+      <div class="r">
+        <h4>Resolutie</h4>
+        <p>Maak pinnen een losse vlag. Positie en feature-set worden onafhankelijk: elk project — <code>project</code> óf <code>code</code> — is pinbaar en behoudt z'n eigen gedrag.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── WAT WE BOUWEN ───────────────────────── -->
+  <section>
+    <h2>Wat we bouwen</h2>
+    <p class="action-title">Twee assen vervangen drie types: een type-as (feature-set) en een pin-as (positie).</p>
+
+    <div class="ba">
+      <div class="col before">
+        <h4>Nu — type bepaalt alles</h4>
+        <pre class="mono">type: 'workspace' | 'project' | 'code'
+
+★ workspace  → bovenaan + uitgekleed
+  project    → in lijst + files/Claude
+  code       → in lijst + full dev tools
+
+positie & tools zijn gekoppeld</pre>
+      </div>
+      <div class="col after">
+        <h4>Straks — pin staat los van type</h4>
+        <pre class="mono">type:   'project' | 'code'
+pinned: true | false
+
+PINNED
+  ★ 💻 command     code: worktrees + git
+  ★ 📁 klant-docs  project: files + Claude
+PROJECTS
+  💻 andere-repo
+  📁 losse-notes</pre>
+      </div>
+    </div>
+
+    <p>De feature-set per type verandert <b>niet</b>. Wat verandert is dat de pin-eigenschap er los bovenop komt en dat elk type pinbaar wordt:</p>
+
+    <table>
+      <thead>
+        <tr><th>Eigenschap</th><th>project</th><th>code</th><th>workspace</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>File explorer + Claude chats</td><td class="yes">✓</td><td class="yes">✓</td><td>✓</td></tr>
+        <tr><td>Git-tab + sidecar shell</td><td class="no">✗</td><td class="yes">✓</td><td>✓</td></tr>
+        <tr><td>Worktrees + GitHub-menu</td><td class="no">✗</td><td class="yes">✓</td><td>✗</td></tr>
+        <tr><td><b>Pinbaar (nieuw)</b></td><td class="yes">✓</td><td class="yes">✓</td><td>n.v.t.</td></tr>
+        <tr class="gone"><td>Bestaat als type</td><td>✓</td><td>✓</td><td>verwijderd</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:var(--muted)">Het datamodel-detail (exacte veldnaam, hergebruik van de bestaande <code>sortOrder</code> voor volgorde binnen de pinned-sectie) is een planning-beslissing. Conceptueel: één pin-vlag op <code>Project</code>, volgorde via bestaande sorteer-infra.</p>
+  </section>
+
+  <!-- ───────────────────────── REQUIREMENTS ───────────────────────── -->
+  <section>
+    <h2>Functionele requirements</h2>
+    <p class="action-title">Pinnen is overal beschikbaar, persistent, en laat het type-gedrag volledig intact.</p>
+    <ol class="req">
+      <li><b>Pin is een eigenschap van elk project</b>, onafhankelijk van het type. Zowel <code>project</code>- als <code>code</code>-projecten kunnen gepind worden.
+        <span class="note">Een gepind code-project behoudt worktrees, git-tab, sidecar en GitHub-menu volledig.</span></li>
+      <li><b>Een eigen "Pinned"-sectie bovenaan de sidebar</b> toont alle gepinde projecten. De sectie is alleen zichtbaar bij ≥1 pin (zoals de huidige Workspaces-sectie).</li>
+      <li><b>Gepinde projecten renderen via de bestaande <code>SortableProjectItem</code></b> — niet via een apart codepad. Daardoor erven ze automatisch alle type-specifieke UI (worktree-knop, git, indicatoren).</li>
+      <li><b>Drie manieren om te (de)pinnen:</b> een ster-toggle bij hover op de project-rij, een rechtsklik-actie "Pin to top" / "Unpin", en een hotkey <code>Ctrl+Shift+P</code> voor het actieve project.
+        <span class="note">Hotkey toevoegen aan <code>src/utils/hotkeys.ts</code> + handler in <code>src/App.tsx</code> + documenteren in CLAUDE.md, conform de hotkey-vereiste.</span></li>
+      <li><b>Volgorde binnen de Pinned-sectie is herordenbaar via drag-and-drop</b>, consistent met de bestaande sorteerbare projectenlijst.</li>
+      <li><b>De pin-status persisteert</b> over herstart van de app (opgeslagen in <code>userData/projects.json</code> via <code>ProjectPersistence</code>).</li>
+      <li><b>Eenmalige migratie:</b> bij het laden converteert elk bestaand <code>type:'workspace'</code>-project naar <code>type:'project'</code> + gepind, zonder verlies van naam, pad of settings.</li>
+    </ol>
+  </section>
+
+  <!-- ───────────────────────── BEWUSTE GEVOLGEN ───────────────────────── -->
+  <section>
+    <h2>Bewust geaccepteerde gevolgen</h2>
+    <p class="action-title">Twee gedragsveranderingen zijn bewust gekozen — beide bevestigd.</p>
+    <div class="callout">
+      <p style="margin:0 0 8px"><b>1 · Always-expanded terminals vervalt.</b> Workspaces tonen hun chats nu altijd uitgeklapt onder het project. Gepinde projecten gedragen zich straks als normale projecten: chats zijn zichtbaar wanneer het project actief is. Dit volgt rechtstreeks uit "pin = puur positie + marker".</p>
+      <p style="margin:0"><b>2 · De special-case workspace-rendering wordt verwijderd.</b> Het aparte, vereenvoudigde render-blok in <code>src/components/Sidebar/Sidebar.tsx</code> (~80 regels) verdwijnt; gepinde projecten gebruiken het reguliere <code>SortableProjectItem</code>-pad. Netto een vereenvoudiging, geen behoud.</p>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── MIGRATIE ───────────────────────── -->
+  <section>
+    <h2>Migratie</h2>
+    <p class="action-title">Bestaande workspaces worden gepinde projecten — intentie-match boven capability-match.</p>
+    <div class="card">
+      <pre class="mono">workspace 'klant-docs'
+   → type:   'project'      (files + Claude)
+   → pinned: true
+   behoudt:  file explorer, Claude chats, naam, pad, settings
+   verliest: git-tab + sidecar  (die workspaces nu toevallig hadden)</pre>
+      <p style="margin:8px 0 0;font-size:13.5px;color:var(--muted)">Gekozen boven <code>→ code</code> omdat de bedoeling van een workspace "pinned overview" was, niet "full dev tools". Heeft een gemigreerd project later tóch git/worktrees nodig, dan is het type achteraf aan te passen — dat valt buiten deze scope.</p>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── SCOPE ───────────────────────── -->
+  <section>
+    <h2>Scope-grenzen</h2>
+    <p class="action-title">We bouwen de pin-mechaniek; het ooit-bedoelde workspace-dashboard komt níét terug.</p>
+    <div class="cols2">
+      <div class="box in">
+        <h4>✓ In scope</h4>
+        <ul>
+          <li>Pin-vlag op <code>Project</code> + persistentie</li>
+          <li>Pinned-sectie bovenaan, conditioneel zichtbaar</li>
+          <li>Pin/unpin via ster, context-menu én hotkey</li>
+          <li>Drag-reorder binnen de pinned-sectie</li>
+          <li>Eenmalige workspace→project-migratie</li>
+          <li>Verwijderen workspace-type + special-case render</li>
+          <li>Pin-bewuste ordening/fallback in store & App</li>
+        </ul>
+      </div>
+      <div class="box out">
+        <h4>○ Bewust buiten scope</h4>
+        <ul>
+          <li>Dashboard / dagstart-overview (oude workspace-ambitie)</li>
+          <li>Limiet/cap op aantal pins — ongelimiteerd</li>
+          <li>Pin-sync over meerdere devices</li>
+          <li>Type wijzigen via de UI (apart vraagstuk)</li>
+          <li>Aparte visuele "overview"-render voor gepinde projecten</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── RAAKVLAKKEN ───────────────────────── -->
+  <section>
+    <h2>Raakvlakken (voor planning)</h2>
+    <p class="action-title">De wijziging is geconcentreerd in het type-model, de sidebar-render en de persistentie.</p>
+    <ul class="touch">
+      <li><span class="path">src/types/index.ts</span><span><code>ProjectType</code> → <code>'project' | 'code'</code>; pin-veld op <code>Project</code>.</span></li>
+      <li><span class="path">src/components/Sidebar/Sidebar.tsx</span><span>Special-case workspace-blok verwijderen; pinned-sectie o.b.v. de pin-vlag, gerenderd met <code>SortableProjectItem</code>.</span></li>
+      <li><span class="path">src/components/Sidebar/SortableProjectItem.tsx</span><span>Ster-toggle in hover-acties; context-menu-item Pin/Unpin.</span></li>
+      <li><span class="path">src/components/Project/AddProjectDialog.tsx</span><span>Workspace-optie uit de type-keuze halen (nog 2 types).</span></li>
+      <li><span class="path">src/stores/projectStore.ts</span><span>Pin-aware fallback rond regel 553–556 (nu <code>type === 'workspace'</code>); pin-toggle-actie.</span></li>
+      <li><span class="path">src/App.tsx</span><span>Visuele ordening (regel 58–72): workspaces→pinned in de project-volgorde.</span></li>
+      <li><span class="path">electron/main/services/ProjectPersistence.ts</span><span>Eenmalige migratie workspace→project+pinned bij load.</span></li>
+      <li><span class="path">src/utils/hotkeys.ts</span><span>Nieuwe actie <code>Ctrl+Shift+P</code> (pin/unpin actief project).</span></li>
+    </ul>
+  </section>
+
+  <!-- ───────────────────────── SUCCESCRITERIA ───────────────────────── -->
+  <section>
+    <h2>Succescriteria</h2>
+    <div class="card">
+      <div class="crit"><span class="chk">✓</span><span>Nul referenties naar <code>'workspace'</code> als <code>ProjectType</code> in de codebase; <code>type</code> kent nog twee waarden.</span></div>
+      <div class="crit"><span class="chk">✓</span><span>Elk bestaand workspace-project verschijnt na migratie gepind als <code>project</code>, zonder verlies van naam, pad of settings.</span></div>
+      <div class="crit"><span class="chk">✓</span><span>Een <code>code</code>-project kan gepind worden én behoudt worktrees + git-tab + GitHub-menu.</span></div>
+      <div class="crit"><span class="chk">✓</span><span>Pin/unpin werkt via alle drie de paden (ster, context-menu, hotkey) en blijft behouden na herstart.</span></div>
+      <div class="crit"><span class="chk">✓</span><span>Het special-case workspace-render-blok in <code>Sidebar.tsx</code> is verwijderd; gepinde projecten gebruiken <code>SortableProjectItem</code>.</span></div>
+      <div class="crit"><span class="chk">✓</span><span><code>npm test</code> en lint groen; bestaande tests voor <code>projectStore</code> aangepast aan het nieuwe model.</span></div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── OPEN PUNTEN ───────────────────────── -->
+  <section>
+    <h2>Open punten voor planning</h2>
+    <ul style="margin:8px 0;padding-left:20px;font-size:14px">
+      <li><b>Hotkey-conflictcheck:</b> verifieer dat <code>Ctrl+Shift+P</code> vrij is binnen de bestaande 42 hotkey-acties; kies anders een alternatief.</li>
+      <li><b>Exacte vorm van de pin-vlag</b> (<code>pinned: boolean</code> vs <code>pinnedAt: number</code>) en of within-section volgorde de bestaande <code>sortOrder</code> hergebruikt — beslissen in <code>/ce-plan</code>.</li>
+    </ul>
+  </section>
+
+  <footer class="doc">
+    Requirements-document · Command · feat/pin-project · 2026-06-10 · Volgende stap: <b>/ce-plan</b> voor de implementatie-aanpak.
+  </footer>
+
+</div>
+</body>
+</html>
