@@ -206,6 +206,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl + Shift + I` | Toggle inactive projects section |
+| `Ctrl + Alt + P` | Pin or unpin the active project |
 
 ### UI & Settings
 | Shortcut | Action |

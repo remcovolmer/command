@@ -11,13 +11,14 @@ import {
   Coins,
   AlertTriangle,
   ChevronRight,
+  Star,
 } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getProjectRollupState } from '../../utils/projectRollup'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
 import { TerminalListItem } from './TerminalListItem'
-import { ContextMenu } from './ContextMenu'
+import { ContextMenu, type ContextMenuEntry } from './ContextMenu'
 import { getElectronAPI } from '../../utils/electron'
 
 interface SortableProjectItemProps {
@@ -67,6 +68,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const hasVertexConfig = useProjectStore((s) => s.projectVertexConfigs[project.id] ?? false)
   const isCollapsed = useProjectStore((s) => s.collapsedProjects[project.id] ?? false)
   const toggleProjectCollapsed = useProjectStore((s) => s.toggleProjectCollapsed)
+  const togglePinProject = useProjectStore((s) => s.togglePinProject)
   const hasMismatch = useProjectStore((s) => {
     const authMode = project.settings?.authMode ?? 'subscription'
     const profileId = project.settings?.profileId
@@ -91,7 +93,13 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     setContextMenu({ x: e.clientX, y: e.clientY })
   }, [])
 
-  const contextMenuItems = [
+  const contextMenuItems: ContextMenuEntry[] = [
+    {
+      label: project.pinned ? 'Unpin' : 'Pin to top',
+      shortcut: 'Ctrl+Alt+P',
+      onClick: () => togglePinProject(project.id),
+    },
+    { type: 'separator' },
     {
       label: 'Open in File Explorer',
       onClick: () => getElectronAPI().shell.openPath(project.path),
@@ -237,6 +245,17 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              togglePinProject(project.id)
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="p-1 rounded hover:bg-border"
+            title={project.pinned ? 'Unpin' : 'Pin to top'}
+          >
+            <Star className={`w-3.5 h-3.5 ${project.pinned ? 'fill-primary text-primary' : ''}`} />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation()

@@ -204,6 +204,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       updates: Partial<Pick<Project, 'name' | 'settings'>>
     ): Promise<Project | null> => ipcRenderer.invoke('project:update', id, updates),
 
+    setPinned: (id: string, pinned: boolean): Promise<Project | null> =>
+      ipcRenderer.invoke('project:setPinned', id, pinned),
+
     selectFolder: (): Promise<string | null> => ipcRenderer.invoke('project:select-folder'),
 
     reorder: (projectIds: string[]): Promise<Project[]> =>

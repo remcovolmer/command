@@ -54,21 +54,23 @@ function App() {
     return unsubscribe
   }, [api])
 
-  // Helper to get visual order of projects (workspaces → active regular → inactive regular)
+  // Helper to get visual order of projects (pinned → active → inactive)
   // When inactiveSectionCollapsed, inactive projects are skipped from keyboard navigation
   const getProjectVisualOrder = useCallback(() => {
     const { projects, terminals, inactiveSectionCollapsed } = useProjectStore.getState()
     if (projects.length === 0) return []
 
     const terminalValues = Object.values(terminals)
-    const workspaces = projects.filter((p) => p.type === 'workspace')
-    const regular = projects.filter((p) => p.type !== 'workspace')
-    const activeRegular = regular.filter((p) => terminalValues.some((t) => t.projectId === p.id))
+    const pinned = projects.filter((p) => p.pinned)
+    const unpinned = projects.filter((p) => !p.pinned)
+    const activeUnpinned = unpinned.filter((p) => terminalValues.some((t) => t.projectId === p.id))
     if (inactiveSectionCollapsed) {
-      return [...workspaces, ...activeRegular]
+      return [...pinned, ...activeUnpinned]
     }
-    const inactiveRegular = regular.filter((p) => !terminalValues.some((t) => t.projectId === p.id))
-    return [...workspaces, ...activeRegular, ...inactiveRegular]
+    const inactiveUnpinned = unpinned.filter(
+      (p) => !terminalValues.some((t) => t.projectId === p.id)
+    )
+    return [...pinned, ...activeUnpinned, ...inactiveUnpinned]
   }, [])
 
   // Helper to switch to terminal by index (1-9)
@@ -392,6 +394,12 @@ function App() {
       const { activeProjectId, toggleProjectCollapsed } = useProjectStore.getState()
       if (!activeProjectId) return
       toggleProjectCollapsed(activeProjectId)
+    },
+
+    'sidebar.pinProject': () => {
+      const { activeProjectId, togglePinProject } = useProjectStore.getState()
+      if (!activeProjectId) return
+      togglePinProject(activeProjectId)
     },
 
     // UI & Settings

@@ -71,7 +71,7 @@ interface PersistedState {
   activeProfileId: string | null
 }
 
-const STATE_VERSION = 6
+const STATE_VERSION = 7
 
 export class ProjectPersistence {
   private stateFilePath: string
@@ -219,6 +219,23 @@ export class ProjectPersistence {
       })
     }
 
+    // Migrate from version 6 to 7: replace the 'workspace' project type with a
+    // pinned flag. Pinning is now orthogonal to type, so ex-workspaces become
+    // pinned 'project's. Idempotent: only rewrites projects still typed 'workspace'.
+    if (oldState.version === 6) {
+      const migratedProjects = oldState.projects.map((p) =>
+        (p.type as string) === 'workspace' ? { ...p, type: 'project' as const, pinned: true } : p
+      )
+      return this.migrateState({
+        version: 7,
+        projects: migratedProjects,
+        worktrees: oldState.worktrees ?? {},
+        sessions: oldState.sessions ?? [],
+        profiles: oldState.profiles ?? [],
+        activeProfileId: oldState.activeProfileId ?? null,
+      })
+    }
+
     // Default migration: ensure all fields exist
     return {
       version: STATE_VERSION,
@@ -267,6 +284,7 @@ export class ProjectPersistence {
       type,
       createdAt: Date.now(),
       sortOrder: this.state.projects.length,
+      pinned: false,
     }
 
     this.state.projects.push(project)
@@ -294,6 +312,16 @@ export class ProjectPersistence {
     if (project) {
       if ('name' in updates && typeof updates.name === 'string') project.name = updates.name
       if ('settings' in updates) project.settings = updates.settings
+      this.saveState()
+      return project
+    }
+    return null
+  }
+
+  setProjectPinned(id: string, pinned: boolean): Project | null {
+    const project = this.state.projects.find((p) => p.id === id)
+    if (project) {
+      project.pinned = pinned
       this.saveState()
       return project
     }
