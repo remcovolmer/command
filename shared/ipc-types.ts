@@ -206,6 +206,23 @@ export interface PRStatus {
   stale?: boolean
 }
 
+// Plan-usage types (pushed by UsageService via usage:update)
+export interface UsageWindow {
+  utilization: number
+  resetsAt: string
+}
+
+export interface UsageData {
+  status: 'ok' | 'unavailable'
+  fiveHour?: UsageWindow
+  sevenDay?: UsageWindow
+  sevenDaySonnet?: UsageWindow
+  extraUsage?: {
+    usedCredits: number
+    currency: string
+  }
+}
+
 // Task types
 export interface TaskItem {
   id: string // Generated: `${filePath}:${lineNumber}`

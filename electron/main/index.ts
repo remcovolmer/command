@@ -25,6 +25,7 @@ import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
 import { installClaudeHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
 import { GitHubService, type GitEvent, VALID_GIT_EVENTS } from './services/GitHubService'
+import { UsageService } from './services/UsageService'
 import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
@@ -233,6 +234,7 @@ let worktreeService: WorktreeService | null = null
 let hookWatcher: ClaudeHookWatcher | null = null
 let updateService: UpdateService | null = null
 let githubService: GitHubService | null = null
+let usageService: UsageService | null = null
 let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
 let automationService: AutomationService | null = null
@@ -357,6 +359,8 @@ async function createWindow() {
   worktreeService = new WorktreeService()
   githubService = new GitHubService()
   githubService.setWindow(win)
+  usageService = new UsageService()
+  usageService.setWindow(win)
   // Resolve CLI directory: packaged apps use resourcesPath, dev uses compiled output
   const cliDir = app.isPackaged
     ? path.join(process.resourcesPath, 'cli')
@@ -411,12 +415,14 @@ async function createWindow() {
       .catch((err) => automationLog.error('Worktree GC failed:', err))
   })
 
-  // Pause/resume GitHub polling on focus/blur
+  // Pause/resume GitHub and usage polling on focus/blur
   win.on('blur', () => {
     githubService?.pauseAllPolling()
+    usageService?.pause()
   })
   win.on('focus', () => {
     githubService?.resumeAllPolling()
+    usageService?.resume()
   })
 
   // Make all links open with the browser, not with the application
@@ -1185,6 +1191,14 @@ ipcMain.handle('github:stop-polling', async (_event, key: string) => {
   githubService!.stopPolling(key)
 })
 
+// IPC Handler for plan-usage polling
+ipcMain.handle('usage:set-enabled', async (_event, enabled: boolean) => {
+  if (typeof enabled !== 'boolean') {
+    throw new Error('Invalid enabled flag')
+  }
+  usageService?.setEnabled(enabled)
+})
+
 // IPC Handlers for Worktree operations
 ipcMain.handle(
   'worktree:create',
@@ -1551,6 +1565,7 @@ ipcMain.handle('update:install', async () => {
   terminalManager?.destroy()
   hookWatcher?.destroy()
   githubService?.destroy()
+  usageService?.destroy()
   await fileWatcherService?.stopAll().catch(() => {})
   await automationService?.destroy().catch(() => {})
 
@@ -1760,6 +1775,7 @@ app.on('before-quit', () => {
   sessionIndexService?.destroy()
   hookWatcher?.destroy()
   githubService?.destroy()
+  usageService?.destroy()
   terminalManager?.destroy()
 })
 

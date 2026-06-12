@@ -78,6 +78,7 @@ export type HotkeyAction =
   | 'ui.toggleTheme'
   | 'ui.showShortcuts'
   | 'ui.cycleClaudeMode'
+  | 'ui.toggleUsageIndicator'
   // Dialogs
   | 'dialog.close'
   | 'dialog.confirm'

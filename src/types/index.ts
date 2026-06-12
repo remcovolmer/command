@@ -26,6 +26,8 @@ export type {
   GitBranchListItem,
   PRCheckStatus,
   PRStatus,
+  UsageWindow,
+  UsageData,
   TaskItem,
   TaskSection,
   TasksData,
@@ -60,6 +62,7 @@ import type {
   GitCommitDetail,
   GitBranchListItem,
   PRStatus,
+  UsageData,
   TasksData,
   TaskUpdate,
   TaskMove,
@@ -362,6 +365,10 @@ export interface ElectronAPI {
     stopPolling: (key: string) => Promise<void>
     onPRStatusUpdate: (callback: (key: string, status: PRStatus) => void) => Unsubscribe
     onPRStatusStale: (callback: (key: string, error: string) => void) => Unsubscribe
+  }
+  usage: {
+    setEnabled: (enabled: boolean) => Promise<void>
+    onUpdate: (callback: (data: UsageData) => void) => Unsubscribe
   }
   update: {
     check: () => Promise<UpdateCheckResult>

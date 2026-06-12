@@ -19,6 +19,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   const projectVertexConfigs = useProjectStore((s) => s.projectVertexConfigs)
   const theme = useProjectStore((s) => s.theme)
   const setTheme = useProjectStore((s) => s.setTheme)
+  const showUsageIndicator = useProjectStore((s) => s.showUsageIndicator)
+  const toggleUsageIndicator = useProjectStore((s) => s.toggleUsageIndicator)
   const confirmedModeKeys = useProjectStore((s) => s.confirmedModeKeys)
   const addConfirmedModeKey = useProjectStore((s) => s.addConfirmedModeKey)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
@@ -137,6 +139,39 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 {option}
               </button>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Usage indicator section */}
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-1">Usage Indicator</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Show Claude plan usage in the sidebar footer.
+        </p>
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <span className="text-sm font-medium text-foreground">Show usage indicator</span>
+              <p className="text-xs text-muted-foreground mt-1">
+                5-hour window with reset time; weekly limits and extra usage on hover. Hidden
+                automatically when no Claude Code credentials are found.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={showUsageIndicator}
+              onClick={toggleUsageIndicator}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                showUsageIndicator ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                  showUsageIndicator ? 'translate-x-[18px]' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
         </div>
       </div>

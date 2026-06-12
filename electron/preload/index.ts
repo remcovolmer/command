@@ -24,6 +24,7 @@ import type {
   TerminalType,
   UncaughtErrorEvent,
   Unsubscribe,
+  UsageData,
   UpdateAvailableInfo,
   UpdateCheckResult,
   UpdateDownloadedInfo,
@@ -56,6 +57,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'update:error',
   'github:pr-status-update',
   'github:pr-status-stale',
+  'usage:update',
   'fs:watch:changes',
   'fs:watch:error',
   'automation:run-started',
@@ -470,6 +472,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         callback(key, error)
       ipcRenderer.on('github:pr-status-stale', handler)
       return () => ipcRenderer.removeListener('github:pr-status-stale', handler)
+    },
+  },
+
+  // Plan-usage indicator
+  usage: {
+    setEnabled: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke('usage:set-enabled', enabled),
+
+    onUpdate: (callback: (data: UsageData) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, data: UsageData) => callback(data)
+      ipcRenderer.on('usage:update', handler)
+      return () => ipcRenderer.removeListener('usage:update', handler)
     },
   },
 

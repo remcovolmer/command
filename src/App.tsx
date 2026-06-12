@@ -408,6 +408,9 @@ function App() {
       const nextMode = modeOrder[(modeOrder.indexOf(currentMode) + 1) % modeOrder.length]
       updateProject(activeProjectId, { settings: { ...project.settings, claudeMode: nextMode } })
     },
+    'ui.toggleUsageIndicator': () => {
+      useProjectStore.getState().toggleUsageIndicator()
+    },
   })
 
   // Close dialog with Escape

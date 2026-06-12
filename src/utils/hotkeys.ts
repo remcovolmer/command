@@ -341,6 +341,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'ui',
     enabled: true,
   },
+  'ui.toggleUsageIndicator': {
+    key: 'u',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle usage indicator',
+    category: 'ui',
+    enabled: true,
+  },
 
   // Dialogs
   'dialog.close': {
