@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sidebar Polish — Requirements (2026-06-12)</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --fg: #e6e8ec;
+    --muted: #9aa2af;
+    --muted-2: #6b7280;
+    --primary: #f97362;       /* salmon accent, matches app highlight */
+    --primary-soft: rgba(249,115,98,0.12);
+    --green: #34d399;
+    --gray-dot: #9aa2af;
+    --amber: #fbbf24;
+    --danger: #f87171;
+    --radius: 10px;
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 28px 80px; }
+  header.doc { border-bottom: 1px solid var(--border); padding-bottom: 22px; margin-bottom: 32px; }
+  .eyebrow { color: var(--primary); font-weight: 600; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { font-size: 28px; margin: 8px 0 6px; letter-spacing: -.01em; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .meta code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  h2 { font-size: 19px; margin: 40px 0 14px; letter-spacing: -.01em; }
+  h3 { font-size: 15px; margin: 26px 0 6px; }
+  p { margin: 8px 0; }
+  .scr { display: grid; grid-template-columns: 92px 1fr; gap: 4px 16px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+  .scr dt { color: var(--primary); font-weight: 600; font-size: 13px; }
+  .scr dd { margin: 0 0 10px; font-size: 14px; }
+  .scr dd:last-child { margin-bottom: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  td code, p code, li code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-size: 12px; color: #cdd3dd; }
+  .item { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 22px 18px; margin: 18px 0; }
+  .item .title { display: flex; align-items: baseline; gap: 10px; }
+  .item .num { color: var(--primary); font-weight: 700; font-size: 13px; background: var(--primary-soft); border-radius: 6px; padding: 2px 9px; }
+  .item h3 { margin: 18px 0 4px; }
+  ul.crit { margin: 6px 0 0; padding-left: 18px; }
+  ul.crit li { margin: 3px 0; font-size: 13.5px; }
+  .files { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .files strong { color: var(--fg); font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+  .tag.must { background: rgba(248,113,113,.14); color: var(--danger); }
+  .tag.flag { background: rgba(251,191,36,.14); color: var(--amber); }
+  .tag.tiny { background: rgba(52,211,153,.14); color: var(--green); }
+
+  /* mockup */
+  .mockups { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 14px 0; }
+  @media (max-width: 720px){ .mockups { grid-template-columns: 1fr; } .scr { grid-template-columns: 1fr; } }
+  .mock { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .mock .cap { font-size: 12px; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+  .mock .cap .lbl { font-weight: 600; }
+  .mock .body { padding: 10px 8px; font-size: 13px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; }
+  .row.active { background: var(--primary-soft); }
+  .row .ic { width: 14px; text-align: center; color: var(--muted); flex: 0 0 auto; }
+  .row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .acts { display: flex; gap: 4px; color: var(--muted-2); }
+  .row .acts span { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; background: var(--panel-2); font-size: 11px; }
+  .row .dot { width: 7px; height: 7px; border-radius: 999px; flex: 0 0 auto; }
+  .dot.green { background: var(--green); }
+  .dot.gray { background: var(--gray-dot); }
+  .sub { padding-left: 22px; }
+  .sub .row { padding: 4px 8px; }
+  .wt { color: var(--muted); }
+  .pr { font-size: 10px; color: var(--muted-2); padding-left: 30px; margin: -2px 0 4px; }
+  .pr .conflict { color: var(--danger); }
+  .toggle { color: var(--muted); font-size: 12px; padding: 6px 8px 4px 26px; cursor: default; }
+  .ctx { margin-top: 6px; border: 1px dashed var(--border); border-radius: 7px; padding: 6px 8px; font-size: 12px; }
+  .ctx .h { color: var(--muted-2); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+  .ctx .mi { padding: 3px 6px; border-radius: 5px; }
+  .ctx .mi.del { color: var(--danger); }
+  .strike { text-decoration: line-through; opacity: .4; }
+  .callout { background: var(--panel-2); border-left: 3px solid var(--primary); border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 14px 0; font-size: 13.5px; }
+  .callout strong { color: var(--fg); }
+  ol.steps { padding-left: 20px; }
+  ol.steps li { margin: 6px 0; font-size: 14px; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <div class="eyebrow">Requirements · Brainstorm</div>
+    <h1>Sidebar polish — vier gerichte verbeteringen</h1>
+    <div class="meta">
+      2026-06-12 · branch <code>fix/polish-sidebar</code> · scope: Lightweight–Standard ·
+      volgt op de sidebar-overhaul (<code>#133</code>), pinnable projects (<code>#137</code>), usage-indicator (<code>#136</code>)
+    </div>
+  </header>
+
+  <h2>Kern (SCR)</h2>
+  <dl class="scr">
+    <dt>Situatie</dt>
+    <dd>De sidebar is recent volledig herzien: urgency-only kleur, attention-rail, pinnable projects, plan-usage in de footer. Het werkt, maar er zijn kleine fricties blijven hangen.</dd>
+    <dt>Complicatie</dt>
+    <dd>Elke project-rij toont <strong>4 hover-icons</strong> (visuele ruis). <strong>Alle worktrees</strong> worden getoond — ook die zonder draaiende Claude-sessie — wat projecten met veel branches vervuilt. En de header <strong>"Projects"</strong> is overbodig geworden nu workspaces weg zijn en de sectie-headers (Pinned/Active/Inactive) de lijst al labelen.</dd>
+    <dt>Resolutie</dt>
+    <dd>Vier afgebakende ingrepen: hover-icons terug naar 2 (pin + verwijder achter rechtermuisknop), session-loze worktrees inklappen onder een "Show inactive worktrees"-toggle, de "Projects"-header weghalen, en de usage/token-tracker betrouwbaar zichtbaar maken onderaan — die verdwijnt nu stil zodra hij geen data heeft.</dd>
+  </dl>
+
+  <h2>Wat verandert er — project-rij</h2>
+  <div class="mockups">
+    <div class="mock">
+      <div class="cap"><span class="lbl">Nu</span><span>4 icons + alle worktrees</span></div>
+      <div class="body">
+        <div class="row active">
+          <span class="ic">▾</span><span class="ic">&lt;/&gt;</span>
+          <span class="name">pascal_ai</span>
+          <span class="acts"><span>★</span><span>+</span><span>⑂</span><span>✕</span></span>
+        </div>
+        <div class="sub">
+          <div class="row"><span class="ic">›_</span><span class="name">Kun je controleren of we linear…</span><span class="dot green"></span></div>
+          <div class="row wt"><span class="ic">⑂</span><span class="name">feat-evals</span></div>
+          <div class="pr">#260 <span class="conflict">conflict</span></div>
+          <div class="row wt"><span class="ic">⑂</span><span class="name">feat-search-naar-supabase</span></div>
+          <div class="row wt"><span class="ic">⑂</span><span class="name">feat-search-naar-supabase-2</span></div>
+          <div class="pr">#185 <span class="conflict">conflict</span></div>
+          <div class="row wt active"><span class="ic">⑂</span><span class="name">feat-agent-beta</span><span class="dot gray"></span></div>
+          <div class="pr">#458 <span class="conflict">conflict</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="cap"><span class="lbl">Doel</span><span>2 icons + alleen actieve worktrees</span></div>
+      <div class="body">
+        <div class="row active">
+          <span class="ic">▾</span><span class="ic">&lt;/&gt;</span>
+          <span class="name">pascal_ai</span>
+          <span class="acts"><span>+</span><span>⑂</span></span>
+        </div>
+        <div class="sub">
+          <div class="row"><span class="ic">›_</span><span class="name">Kun je controleren of we linear…</span><span class="dot green"></span></div>
+          <div class="row wt active"><span class="ic">⑂</span><span class="name">feat-agent-beta</span><span class="dot gray"></span></div>
+          <div class="pr">#458 <span class="conflict">conflict</span></div>
+          <div class="toggle">▸ Show inactive worktrees (3)</div>
+        </div>
+        <div class="ctx">
+          <div class="h">Rechtermuisknop op project</div>
+          <div class="mi">Pin to top &nbsp; <span class="muted">Ctrl+Alt+P</span></div>
+          <div class="mi">Open in File Explorer</div>
+          <div class="mi">Open in Antigravity</div>
+          <div class="mi">Open on GitHub</div>
+          <div class="mi del">Remove project</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Requirements</h2>
+
+  <div class="item">
+    <div class="title"><span class="num">1</span><h3 style="margin-top:14px">Hover-icons van 4 naar 2; pin en verwijder achter rechtermuisknop</h3></div>
+    <p>Op hover toont een project-rij alleen nog de twee <em>creërende</em> acties: <strong>New Chat</strong> (<code>+</code>) en — voor code-projecten — <strong>New Worktree</strong> (<code>⑂</code>). <strong>Pin/Unpin</strong> staat al in het rechtermuisknop-menu; <strong>Remove project</strong> verhuist daar ook naartoe (onder een separator, <code>variant: 'destructive'</code> — al ondersteund).</p>
+    <p class="muted">Waarom geen verlies: gepinde projecten staan al in hun eigen "Pinned"-sectie, dus de ster als pin-signaal is niet nodig. Verwijderen is een zeldzame, onomkeerbare actie — hoort niet als always-visible hover-icon.</p>
+    <h3>Acceptatie</h3>
+    <ul class="crit">
+      <li>Hover op een code-project toont exact 2 action-icons; op een niet-code-project 1 (alleen New Chat).</li>
+      <li>De ster (pin) en de X (remove) zijn verdwenen uit de hover-acties.</li>
+      <li>Rechtermuisknop toont "Remove project" als laatste item, destructief gestyled, met bevestiging zoals nu (<code>handleRemoveProject</code> blijft de actie).</li>
+    </ul>
+    <div class="files"><strong>Raakt:</strong> <code>src/components/Sidebar/SortableProjectItem.tsx</code> (hover-acties + <code>contextMenuItems</code>). Geen nieuwe state. <span class="tag tiny">klein</span></div>
+  </div>
+
+  <div class="item">
+    <div class="title"><span class="num">2</span><h3 style="margin-top:14px">Inactieve worktrees inklappen onder "Show inactive worktrees (N)"</h3></div>
+    <p>Definitie: een worktree is <strong>actief</strong> als er ≥1 draaiende terminal/Claude-sessie op staat (<code>getWorktreeTerminals(id).length &gt; 0</code>); anders <strong>inactief</strong>. Binnen een uitgeklapt project worden directe chats en actieve worktrees inline getoond; inactieve worktrees vallen onder een toggle-rij <strong>"Show inactive worktrees (N)"</strong>, standaard ingeklapt.</p>
+    <p class="muted">Dit spiegelt het bestaande Active/Inactive-onderscheid op projectniveau, nu één laag dieper. De toggle-state wordt per project bewaard (zoals <code>collapsedProjects</code> / <code>inactiveSectionCollapsed</code> in de store).</p>
+    <h3>Acceptatie</h3>
+    <ul class="crit">
+      <li>Een project met 4 worktrees waarvan 1 een sessie draait toont 1 worktree inline + "Show inactive worktrees (3)".</li>
+      <li>Klikken op de toggle vouwt de 3 inactieve worktrees uit/in; staat blijft per project bewaard over restart.</li>
+      <li>Geen toggle-rij als er 0 inactieve worktrees zijn.</li>
+      <li>Directe chats (terminals zonder worktree) worden niet ingeklapt — die draaien per definitie.</li>
+      <li><span class="tag must">verplicht</span> Hotkey toegevoegd (CLAUDE.md-eis): toggle inactieve worktrees voor het actieve project — voorgesteld <code>Ctrl+Shift+J</code> (niet bezet; <code>Ctrl+Shift+I</code> is al de project-inactive-toggle). Toevoegen aan <code>DEFAULT_HOTKEY_CONFIG</code>, handler in <code>App.tsx</code>, documenteren in de shortcuts-tabel.</li>
+    </ul>
+    <div class="files"><strong>Raakt:</strong> <code>SortableProjectItem.tsx</code> (split actieve/inactieve worktrees + toggle-rij), <code>stores/projectStore.ts</code> (nieuwe per-project collapse-state + action), <code>utils/hotkeys.ts</code>, <code>App.tsx</code>, <code>CLAUDE.md</code> (shortcuts-tabel). <span class="tag flag">grootste item</span></div>
+  </div>
+
+  <div class="item">
+    <div class="title"><span class="num">3</span><h3 style="margin-top:14px">"Projects"-header verwijderen</h3></div>
+    <p>Verwijder het <code>&lt;h2&gt;Projects&lt;/h2&gt;</code>-blok (<code>Sidebar.tsx:385–390</code>). De sectie-headers Pinned/Active/Inactive labelen de lijst al, en het onderscheid waar "Projects" ooit voor stond (tegenover workspaces) bestaat niet meer.</p>
+    <h3>Acceptatie</h3>
+    <ul class="crit">
+      <li>Geen "PROJECTS"-label meer boven de lijst.</li>
+      <li>De afstand tussen de logo-header en de eerste sectie blijft bewust ogen — eventueel kleine <code>padding</code>-correctie waar het blok stond.</li>
+    </ul>
+    <div class="files"><strong>Raakt:</strong> <code>src/components/Sidebar/Sidebar.tsx</code>. <span class="tag tiny">triviaal</span></div>
+  </div>
+
+  <div class="item">
+    <div class="title"><span class="num">4</span><h3 style="margin-top:14px">Usage/token-tracker betrouwbaar zichtbaar onderaan — nooit stil verdwijnen</h3></div>
+    <p>De tracker is de plan-usage indicator uit <code>#136</code> (<code>UsageIndicator</code>, footer): 5h-window + weekly utilization van Anthropic's OAuth <code>/usage</code>-endpoint. Wiring is compleet (hotkey <code>App.tsx:419</code>, IPC <code>usage:update</code>/<code>usage:set-enabled</code>, store-subscription op rehydration) en het endpoint geeft geldige data terug voor dit account (geverifieerd: 200 OK met <code>five_hour</code>+<code>seven_day</code>). Toch is hij onzichtbaar, want <code>UsageIndicator</code> returnt <strong><code>null</code></strong> zodra de toggle uit staat, er geen <code>usageData</code> is, óf <code>status !== 'ok'</code> — geen spoor, niet te onderscheiden van "verwijderd".</p>
+    <h3>Wijziging (optie A — minimaal, gekozen)</h3>
+    <ul class="crit">
+      <li>Zolang de indicator <em>aan</em> staat maar (nog) geen bruikbare data heeft, render een gedimde "Usage · unavailable"-regel i.p.v. <code>null</code> — zo is hij altijd aanwezig onderaan en zelf-verklarend.</li>
+      <li>Zodra data binnenkomt wisselt de regel naar de normale balk. Dit dubbelt als diagnose: placeholder zichtbaar = data-flow-probleem; helemaal niks = toggle staat uit.</li>
+      <li>"Toggle uit" blijft bewust verbergen — daar is de toggle voor. Herstellen via Settings → General (<code>GeneralSection.tsx:164</code>) of <code>Ctrl+Shift+U</code>.</li>
+      <li>Geen herinrichting van de balk-styling in deze ronde (dat was optie B, niet gekozen).</li>
+    </ul>
+    <p class="muted"><strong>Over "Ctrl+Shift+U doet niks":</strong> hotkey is wél gewireld. Meest waarschijnlijk slokt een gefocuste terminal de toets op, óf de toggle staat al aan maar <code>usageData</code> blijft <code>null</code> in de renderer. Optie A maakt dat laatste meteen zichtbaar.</p>
+    <div class="files"><strong>Raakt:</strong> <code>src/components/Sidebar/UsageIndicator.tsx</code> (early-return vervangen door placeholder-render). Geen IPC/store-wijziging. <span class="tag tiny">klein</span></div>
+  </div>
+
+  <h2>Buiten scope (non-goals)</h2>
+  <ul class="crit">
+    <li>Footer, usage-indicator, attention-rail en PR-badges blijven ongewijzigd.</li>
+    <li>De project-niveau Pinned/Active/Inactive-split blijft zoals hij is.</li>
+    <li>Geen per-sessie token-counter (tokens per chat) — Claude Code levert die data niet via de hooks/state die we lezen; buiten bereik.</li>
+    <li>De Recent Sessions-lijst (afgesloten sessies, hervatbaar) blijft in Project Overview — niet naar de sidebar verplaatst.</li>
+    <li>New Chat / New Worktree-gedrag verandert niet — alleen welke icons zichtbaar zijn.</li>
+  </ul>
+
+  <h2>Outstanding questions</h2>
+  <table>
+    <tr><th>Vraag</th><th>Default als niet beantwoord</th></tr>
+    <tr>
+      <td>Geldt de "inactive worktrees"-toggle alleen voor het actieve project, of voor elk uitgeklapt project met inactieve worktrees?</td>
+      <td>Elk uitgeklapt project — de logica hangt aan worktree-activiteit, niet aan project-active-ness. Consistenter en simpeler.</td>
+    </tr>
+    <tr>
+      <td>Verbergt het inklappen ook PR-status (conflict/#458) van die worktrees — is dat erg?</td>
+      <td>Geaccepteerd. Eventueel later een rollup op de toggle-rij ("3 · 2 conflicts"). Nu niet bouwen (YAGNI).</td>
+    </tr>
+    <tr>
+      <td>Moet "toggle uit" toch een spoor achterlaten, of blijft uit = volledig weg?</td>
+      <td>Uit blijft weg (doel van de toggle). Alleen de "aan-maar-geen-data"-staat wordt zichtbaar; herstellen via Settings → General of Ctrl+Shift+U.</td>
+    </tr>
+  </table>
+
+  <div class="callout">
+    <strong>Kleinste eerste stap:</strong> item 3 (de <code>&lt;h2&gt;Projects&lt;/h2&gt;</code> weghalen) is één edit van ~5 regels en direct zichtbaar. Daarna item 4-A (UsageIndicator een zichtbare staat geven i.p.v. <code>null</code>), item 1 (icons verplaatsen, geen nieuwe state), en als laatste item 2 (de enige met nieuwe store-state + hotkey). Oplopend in omvang.
+  </div>
+
+</div>
+</body>
+</html>
