@@ -1229,6 +1229,8 @@ export const useProjectStore = create<ProjectStore>()(
           const newExpandedPaths = { ...state.expandedPaths }
           const newCollapsedProjects = { ...state.collapsedProjects }
           delete newCollapsedProjects[id]
+          const newInactiveWorktreesExpanded = { ...state.inactiveWorktreesExpanded }
+          delete newInactiveWorktreesExpanded[id]
           for (const key of cleanKeys) {
             delete newGitStatus[key]
             delete newGitStatusLoading[key]
@@ -1295,6 +1297,7 @@ export const useProjectStore = create<ProjectStore>()(
             tasksLoading: newTasksLoading,
             expandedPaths: newExpandedPaths,
             collapsedProjects: newCollapsedProjects,
+            inactiveWorktreesExpanded: newInactiveWorktreesExpanded,
             directoryCache: newDirectoryCache,
           }
         }),

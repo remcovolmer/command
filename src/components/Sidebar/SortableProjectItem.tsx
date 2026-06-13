@@ -146,11 +146,13 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   // Counter chip counts Claude chats only — sidecar 'normal' shells are not chats.
   const chatCount = terminals.filter((t) => t.type === 'claude').length
 
-  // A worktree is "active" when it has a running session; session-less worktrees
-  // (branches sitting on disk with no chat) collapse under a toggle to keep an
-  // active project's tree readable.
-  const activeWorktrees = worktrees.filter((w) => getWorktreeTerminals(w.id).length > 0)
-  const inactiveWorktrees = worktrees.filter((w) => getWorktreeTerminals(w.id).length === 0)
+  // A worktree is "active" when it has a running Claude session; branches sitting
+  // on disk with no chat (sidecar 'normal' shells don't count, matching chatCount)
+  // collapse under a toggle to keep an active project's tree readable.
+  const hasClaudeSession = (worktreeId: string) =>
+    getWorktreeTerminals(worktreeId).some((t) => t.type === 'claude')
+  const activeWorktrees = worktrees.filter((w) => hasClaudeSession(w.id))
+  const inactiveWorktrees = worktrees.filter((w) => !hasClaudeSession(w.id))
 
   const renderWorktree = (worktree: Worktree) => (
     <WorktreeItem
