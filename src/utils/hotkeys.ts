@@ -318,6 +318,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'sidebar',
     enabled: true,
   },
+  'sidebar.toggleInactiveWorktrees': {
+    key: 'j',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Show/hide inactive worktrees for the active project',
+    category: 'sidebar',
+    enabled: true,
+  },
 
   // UI & Settings
   'ui.openSettings': {

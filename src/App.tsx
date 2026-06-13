@@ -402,6 +402,12 @@ function App() {
       togglePinProject(activeProjectId)
     },
 
+    'sidebar.toggleInactiveWorktrees': () => {
+      const { activeProjectId, toggleInactiveWorktrees } = useProjectStore.getState()
+      if (!activeProjectId) return
+      toggleInactiveWorktrees(activeProjectId)
+    },
+
     // UI & Settings
     'ui.openSettings': () => setSettingsDialogOpen(true),
     'ui.toggleTheme': toggleTheme,
