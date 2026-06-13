@@ -514,6 +514,52 @@ describe('projectStore activeCenterTabId', () => {
     })
   })
 
+  describe('inactiveWorktreesExpanded', () => {
+    test('toggleInactiveWorktrees adds the entry, second call removes it', () => {
+      useProjectStore.getState().toggleInactiveWorktrees('proj-1')
+      expect(useProjectStore.getState().inactiveWorktreesExpanded['proj-1']).toBe(true)
+
+      useProjectStore.getState().toggleInactiveWorktrees('proj-1')
+      expect(useProjectStore.getState().inactiveWorktreesExpanded['proj-1']).toBeUndefined()
+    })
+
+    test('toggleInactiveWorktrees leaves other entries untouched', () => {
+      useProjectStore.setState({ inactiveWorktreesExpanded: { 'proj-2': true } })
+
+      useProjectStore.getState().toggleInactiveWorktrees('proj-1')
+
+      const state = useProjectStore.getState()
+      expect(state.inactiveWorktreesExpanded['proj-1']).toBe(true)
+      expect(state.inactiveWorktreesExpanded['proj-2']).toBe(true)
+    })
+
+    test('removeProject cleans up the inactiveWorktreesExpanded entry', () => {
+      useProjectStore.setState({
+        projects: [
+          { id: 'proj-1', name: 'Project 1', path: '/proj1' },
+          { id: 'proj-2', name: 'Project 2', path: '/proj2' },
+        ],
+        inactiveWorktreesExpanded: { 'proj-1': true, 'proj-2': true },
+      })
+
+      useProjectStore.getState().removeProject('proj-1')
+
+      const state = useProjectStore.getState()
+      expect(state.inactiveWorktreesExpanded['proj-1']).toBeUndefined()
+      expect(state.inactiveWorktreesExpanded['proj-2']).toBe(true)
+    })
+
+    test('partialize persists inactiveWorktreesExpanded', () => {
+      useProjectStore.setState({ inactiveWorktreesExpanded: { 'proj-1': true } })
+
+      expect(persistCapture.partialize).toBeDefined()
+      const persisted = persistCapture.partialize!(
+        useProjectStore.getState() as unknown as Record<string, unknown>
+      )
+      expect(persisted.inactiveWorktreesExpanded).toEqual({ 'proj-1': true })
+    })
+  })
+
   describe('hotkey config backfill (mergeMissingHotkeyDefaults)', () => {
     // The persist middleware is mocked, so onRehydrateStorage never runs here;
     // the backfill is a pure helper tested directly (onRehydrateStorage calls it).

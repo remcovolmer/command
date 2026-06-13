@@ -141,6 +141,11 @@ interface ProjectStore {
   collapsedProjects: Record<string, true>
   toggleProjectCollapsed: (projectId: string) => void
 
+  // Per-project "show inactive worktrees" state (persisted). Absent = inactive
+  // worktrees hidden (default); present = expanded.
+  inactiveWorktreesExpanded: Record<string, true>
+  toggleInactiveWorktrees: (projectId: string) => void
+
   // Sidecar terminal state (per context: worktreeId or projectId)
   sidecarTerminals: Record<string, string[]> // contextKey -> terminalId[]
   sidecarTerminalCollapsed: boolean
@@ -640,6 +645,21 @@ export const useProjectStore = create<ProjectStore>()(
             next[projectId] = true
           }
           return { collapsedProjects: next }
+        }),
+
+      // Per-project "show inactive worktrees" toggle. Worktrees with no running
+      // session are hidden by default; this expands them. Click handler and
+      // hotkey both call this single action so behavior cannot drift.
+      inactiveWorktreesExpanded: {},
+      toggleInactiveWorktrees: (projectId) =>
+        set((state) => {
+          const next = { ...state.inactiveWorktreesExpanded }
+          if (next[projectId]) {
+            delete next[projectId]
+          } else {
+            next[projectId] = true
+          }
+          return { inactiveWorktreesExpanded: next }
         }),
 
       // Sidecar terminal state
@@ -1209,6 +1229,8 @@ export const useProjectStore = create<ProjectStore>()(
           const newExpandedPaths = { ...state.expandedPaths }
           const newCollapsedProjects = { ...state.collapsedProjects }
           delete newCollapsedProjects[id]
+          const newInactiveWorktreesExpanded = { ...state.inactiveWorktreesExpanded }
+          delete newInactiveWorktreesExpanded[id]
           for (const key of cleanKeys) {
             delete newGitStatus[key]
             delete newGitStatusLoading[key]
@@ -1275,6 +1297,7 @@ export const useProjectStore = create<ProjectStore>()(
             tasksLoading: newTasksLoading,
             expandedPaths: newExpandedPaths,
             collapsedProjects: newCollapsedProjects,
+            inactiveWorktreesExpanded: newInactiveWorktreesExpanded,
             directoryCache: newDirectoryCache,
           }
         }),
@@ -1801,6 +1824,8 @@ export const useProjectStore = create<ProjectStore>()(
         inactiveSectionCollapsed: state.inactiveSectionCollapsed,
         // Per-project collapse state (additive field, hydrates safely without migration)
         collapsedProjects: state.collapsedProjects,
+        // Per-project show-inactive-worktrees state (additive, hydrates safely)
+        inactiveWorktreesExpanded: state.inactiveWorktreesExpanded,
         // Theme state
         theme: state.theme,
         // Hotkey configuration

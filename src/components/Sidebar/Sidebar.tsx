@@ -275,8 +275,7 @@ export function Sidebar() {
     addProject(project)
   }
 
-  const handleRemoveProject = async (e: React.MouseEvent, projectId: string) => {
-    e.stopPropagation()
+  const handleRemoveProject = async (projectId: string) => {
     try {
       await api.project.remove(projectId)
       removeProject(projectId)
@@ -382,15 +381,9 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* Projects Section */}
-        <div className="px-3 py-2">
-          <h2 className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] px-3 mb-2">
-            Projects
-          </h2>
-        </div>
-
-        {/* Project List */}
-        <div ref={projectScrollRef} className="flex-1 overflow-y-auto sidebar-scroll px-3">
+        {/* Project List — section headers (Pinned/Active/Inactive) label the list;
+            no standalone "Projects" header now that workspaces are gone. */}
+        <div ref={projectScrollRef} className="flex-1 overflow-y-auto sidebar-scroll px-3 pt-1">
           {projects.length === 0 ? (
             <div className="px-3 py-8 text-center">
               <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />

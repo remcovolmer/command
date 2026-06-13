@@ -5,13 +5,11 @@ import { motion, useReducedMotion } from 'motion/react'
 import {
   Plus,
   FolderOpen,
-  X,
   GitBranch,
   Code,
   Coins,
   AlertTriangle,
   ChevronRight,
-  Star,
 } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
@@ -33,7 +31,7 @@ interface SortableProjectItemProps {
   activeTerminalId: string | null
   isDragging: boolean
   onSelect: (projectId: string) => void
-  onRemove: (e: React.MouseEvent, projectId: string) => void
+  onRemove: (projectId: string) => void
   onCreateTerminal: (projectId: string, worktreeId?: string) => void
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
@@ -69,6 +67,10 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const isCollapsed = useProjectStore((s) => s.collapsedProjects[project.id] ?? false)
   const toggleProjectCollapsed = useProjectStore((s) => s.toggleProjectCollapsed)
   const togglePinProject = useProjectStore((s) => s.togglePinProject)
+  const showInactiveWorktrees = useProjectStore(
+    (s) => s.inactiveWorktreesExpanded[project.id] ?? false
+  )
+  const toggleInactiveWorktrees = useProjectStore((s) => s.toggleInactiveWorktrees)
   const hasMismatch = useProjectStore((s) => {
     const authMode = project.settings?.authMode ?? 'subscription'
     const profileId = project.settings?.profileId
@@ -125,6 +127,12 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           },
         ]
       : []),
+    { type: 'separator' },
+    {
+      label: 'Remove project',
+      variant: 'destructive',
+      onClick: () => onRemove(project.id),
+    },
   ]
 
   // Show empty state for active project when there are no terminals
@@ -137,6 +145,27 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
   // Counter chip counts Claude chats only — sidecar 'normal' shells are not chats.
   const chatCount = terminals.filter((t) => t.type === 'claude').length
+
+  // A worktree is "active" when it has a running Claude session; branches sitting
+  // on disk with no chat (sidecar 'normal' shells don't count, matching chatCount)
+  // collapse under a toggle to keep an active project's tree readable.
+  const hasClaudeSession = (worktreeId: string) =>
+    getWorktreeTerminals(worktreeId).some((t) => t.type === 'claude')
+  const activeWorktrees = worktrees.filter((w) => hasClaudeSession(w.id))
+  const inactiveWorktrees = worktrees.filter((w) => !hasClaudeSession(w.id))
+
+  const renderWorktree = (worktree: Worktree) => (
+    <WorktreeItem
+      key={worktree.id}
+      worktree={worktree}
+      projectPath={project.path}
+      terminals={getWorktreeTerminals(worktree.id)}
+      activeTerminalId={activeTerminalId}
+      onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
+      onSelectTerminal={onSelectTerminal}
+      onRemove={() => onRemoveWorktree(worktree.id)}
+    />
+  )
 
   return (
     <motion.li
@@ -243,19 +272,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           </span>
         )}
 
-        {/* Actions */}
+        {/* Actions — pin and remove live in the right-click menu to keep this row clean */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              togglePinProject(project.id)
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-border"
-            title={project.pinned ? 'Unpin' : 'Pin to top'}
-          >
-            <Star className={`w-3.5 h-3.5 ${project.pinned ? 'fill-primary text-primary' : ''}`} />
-          </button>
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -280,14 +298,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               <GitBranch className="w-3.5 h-3.5" />
             </button>
           )}
-          <button
-            onClick={(e) => onRemove(e, project.id)}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-border"
-            title="Remove Project"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
 
@@ -309,20 +319,34 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             </ul>
           )}
 
-          {/* Worktrees - hidden for inactive projects unless selected */}
-          {(!isInactive || isActive) &&
-            worktrees.map((worktree) => (
-              <WorktreeItem
-                key={worktree.id}
-                worktree={worktree}
-                projectPath={project.path}
-                terminals={getWorktreeTerminals(worktree.id)}
-                activeTerminalId={activeTerminalId}
-                onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
-                onSelectTerminal={onSelectTerminal}
-                onRemove={() => onRemoveWorktree(worktree.id)}
-              />
-            ))}
+          {/* Worktrees - hidden for inactive projects unless selected. Active
+              worktrees (with a running session) show inline; session-less ones
+              collapse under a "Show inactive worktrees" toggle. */}
+          {(!isInactive || isActive) && (
+            <>
+              {activeWorktrees.map(renderWorktree)}
+              {inactiveWorktrees.length > 0 && (
+                <>
+                  <button
+                    onClick={() => toggleInactiveWorktrees(project.id)}
+                    aria-expanded={showInactiveWorktrees}
+                    className="ml-6 flex items-center gap-1 pl-3 pr-3 py-1 w-full text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                  >
+                    <ChevronRight
+                      aria-hidden="true"
+                      className={`w-3 h-3 transition-transform duration-150 ${showInactiveWorktrees ? 'rotate-90' : ''}`}
+                    />
+                    <span>
+                      {showInactiveWorktrees
+                        ? 'Hide inactive worktrees'
+                        : `Show inactive worktrees (${inactiveWorktrees.length})`}
+                    </span>
+                  </button>
+                  {showInactiveWorktrees && inactiveWorktrees.map(renderWorktree)}
+                </>
+              )}
+            </>
+          )}
 
           {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
           {showEmptyState && (

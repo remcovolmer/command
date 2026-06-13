@@ -36,12 +36,33 @@ export function UsageIndicator() {
   // onMouseLeave can fire, so without this the popover would reappear
   // open when the indicator returns. Render-time state adjustment per the
   // React "storing information from previous renders" pattern.
-  const hidden = !showUsageIndicator || !usageData || usageData.status !== 'ok'
-  if (hidden && hovered) {
+  const hasData = Boolean(usageData && usageData.status === 'ok')
+
+  // Reset hover when the bar (the only part with a popover) isn't shown: the div
+  // unmounts before onMouseLeave can fire, so without this the popover would
+  // reappear open when data returns. Render-time state adjustment per the React
+  // "storing information from previous renders" pattern.
+  if (!hasData && hovered) {
     setHovered(false)
   }
 
-  if (!showUsageIndicator || !usageData || usageData.status !== 'ok') return null
+  // Toggled off is an intentional hide — render nothing.
+  if (!showUsageIndicator) return null
+
+  // Enabled but no usable data yet: show a muted placeholder instead of nothing,
+  // so the indicator stays present in the footer and "off" remains
+  // distinguishable from "no data". Swaps to the live bar once data arrives.
+  if (!usageData || usageData.status !== 'ok') {
+    return (
+      <div
+        className="mb-1.5 flex items-center gap-2"
+        title="Usage data unavailable — retrying"
+      >
+        <div className="flex-1 h-1 rounded-full bg-muted" />
+        <span className="text-[10px] text-muted-foreground/50 shrink-0">usage n/a</span>
+      </div>
+    )
+  }
 
   const fiveHour = usageData.fiveHour
   const week = usageData.sevenDay
