@@ -32,7 +32,7 @@ interface SortableProjectListProps {
   activeProjectId: string | null
   activeTerminalId: string | null
   onSelect: (projectId: string) => void
-  onRemove: (e: React.MouseEvent, projectId: string) => void
+  onRemove: (projectId: string) => void
   onCreateTerminal: (projectId: string, worktreeId?: string) => void
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void

@@ -275,8 +275,7 @@ export function Sidebar() {
     addProject(project)
   }
 
-  const handleRemoveProject = async (e: React.MouseEvent, projectId: string) => {
-    e.stopPropagation()
+  const handleRemoveProject = async (projectId: string) => {
     try {
       await api.project.remove(projectId)
       removeProject(projectId)

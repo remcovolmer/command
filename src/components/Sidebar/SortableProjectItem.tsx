@@ -5,13 +5,11 @@ import { motion, useReducedMotion } from 'motion/react'
 import {
   Plus,
   FolderOpen,
-  X,
   GitBranch,
   Code,
   Coins,
   AlertTriangle,
   ChevronRight,
-  Star,
 } from 'lucide-react'
 import type { Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
@@ -33,7 +31,7 @@ interface SortableProjectItemProps {
   activeTerminalId: string | null
   isDragging: boolean
   onSelect: (projectId: string) => void
-  onRemove: (e: React.MouseEvent, projectId: string) => void
+  onRemove: (projectId: string) => void
   onCreateTerminal: (projectId: string, worktreeId?: string) => void
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
@@ -125,6 +123,12 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           },
         ]
       : []),
+    { type: 'separator' },
+    {
+      label: 'Remove project',
+      variant: 'destructive',
+      onClick: () => onRemove(project.id),
+    },
   ]
 
   // Show empty state for active project when there are no terminals
@@ -243,19 +247,8 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           </span>
         )}
 
-        {/* Actions */}
+        {/* Actions — pin and remove live in the right-click menu to keep this row clean */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              togglePinProject(project.id)
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-border"
-            title={project.pinned ? 'Unpin' : 'Pin to top'}
-          >
-            <Star className={`w-3.5 h-3.5 ${project.pinned ? 'fill-primary text-primary' : ''}`} />
-          </button>
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -280,14 +273,6 @@ export const SortableProjectItem = memo(function SortableProjectItem({
               <GitBranch className="w-3.5 h-3.5" />
             </button>
           )}
-          <button
-            onClick={(e) => onRemove(e, project.id)}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-border"
-            title="Remove Project"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
 
