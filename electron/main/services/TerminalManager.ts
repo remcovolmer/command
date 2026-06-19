@@ -8,6 +8,7 @@ import { type ClaudeHookWatcher } from './ClaudeHookWatcher'
 import { SpawnError } from './errors'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
 import { createLogger } from './Logger'
+import { deriveShellSpec } from '../utils/shell'
 
 const log = createLogger('TerminalManager')
 
@@ -111,7 +112,7 @@ export class TerminalManager {
     }
 
     const id = randomUUID()
-    const shell = this.getShell()
+    const { shell, args: shellArgs, env: shellEnv } = deriveShellSpec(this.getShell(), process.platform)
 
     // Build env with Command Center vars injected
     const env: Record<string, string> = {}
@@ -142,6 +143,10 @@ export class TerminalManager {
     const existingPath = env.PATH || env.Path || ''
     env.PATH = this.cliDir + path.delimiter + existingPath
 
+    // Shell-specific env (e.g. CHERE_INVOKING for a Git Bash login shell so it
+    // keeps the spawn cwd instead of cd-ing to $HOME). Empty for other shells.
+    Object.assign(env, shellEnv)
+
     // Apply caller-provided overrides last
     if (options.envOverrides) {
       Object.assign(env, options.envOverrides)
@@ -171,7 +176,7 @@ export class TerminalManager {
     // route through the global uncaughtException handler (see CrashLogger).
     let ptyProcess: pty.IPty
     try {
-      ptyProcess = pty.spawn(shell, [], {
+      ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols: 80,
         rows: 24,
@@ -764,6 +769,9 @@ export class TerminalManager {
     }
   }
 
+  // Resolve the shell executable path. Args/env for the shell are derived
+  // separately by deriveShellSpec (see ../utils/shell) so that logic stays
+  // unit-testable without electron/node-pty.
   private getShell(): string {
     // Allow override via environment variable
     if (process.env.COMMAND_CENTER_SHELL) {
