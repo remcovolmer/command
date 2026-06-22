@@ -13,6 +13,47 @@ export interface PRCheckStatus {
   bucket: string
 }
 
+function checkBucket(c: Record<string, string>): string {
+  if (c.bucket) return c.bucket
+  if (c.status === 'COMPLETED') {
+    return c.conclusion === 'SUCCESS' || c.conclusion === 'SKIPPED' || c.conclusion === 'NEUTRAL'
+      ? 'pass'
+      : 'fail'
+  }
+  return c.state === 'SUCCESS'
+    ? 'pass'
+    : c.state === 'FAILURE' || c.state === 'ERROR'
+      ? 'fail'
+      : 'pending'
+}
+
+/**
+ * GitHub keeps every check run on the head commit — re-runs and workflows that
+ * trigger on multiple events (e.g. push + pull_request) leave several runs that
+ * share a name. `statusCheckRollup` returns all of them, so mapping 1:1 renders
+ * each CI job two or three times and lets a stale failed run mask a newer
+ * passing one. Collapse to one entry per (name, workflow), keeping the most
+ * recent run by completion/start time.
+ */
+function dedupeChecks(raw: Array<Record<string, string>>): PRCheckStatus[] {
+  const latest = new Map<string, { check: PRCheckStatus; ts: string }>()
+  for (const c of raw) {
+    const name = c.name ?? c.context ?? 'unknown'
+    const key = `${name}\u0000${c.workflowName ?? ''}`
+    const ts = c.completedAt ?? c.startedAt ?? c.createdAt ?? ''
+    const existing = latest.get(key)
+    // Map.set on an existing key updates the value but preserves the original
+    // insertion position, so survivors keep first-appearance order.
+    if (!existing || ts > existing.ts) {
+      latest.set(key, {
+        check: { name, state: c.status ?? c.state ?? '', bucket: checkBucket(c) },
+        ts,
+      })
+    }
+  }
+  return Array.from(latest.values(), (v) => v.check)
+}
+
 export interface PRStatus {
   noPR: boolean
   number?: number
@@ -127,23 +168,9 @@ export class GitHubService {
         mergeable: data.mergeable,
         mergeStateStatus: data.mergeStateStatus,
         reviewDecision: data.reviewDecision,
-        statusCheckRollup: (data.statusCheckRollup ?? []).map((c: Record<string, string>) => ({
-          name: c.name ?? c.context ?? 'unknown',
-          state: c.status ?? c.state ?? '',
-          bucket:
-            c.bucket ??
-            (c.status === 'COMPLETED'
-              ? c.conclusion === 'SUCCESS' ||
-                c.conclusion === 'SKIPPED' ||
-                c.conclusion === 'NEUTRAL'
-                ? 'pass'
-                : 'fail'
-              : c.state === 'SUCCESS'
-                ? 'pass'
-                : c.state === 'FAILURE' || c.state === 'ERROR'
-                  ? 'fail'
-                  : 'pending'),
-        })),
+        statusCheckRollup: dedupeChecks(
+          (data.statusCheckRollup ?? []) as Array<Record<string, string>>
+        ),
         additions: data.additions,
         deletions: data.deletions,
         changedFiles: data.changedFiles,
