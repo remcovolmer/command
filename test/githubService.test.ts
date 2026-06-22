@@ -85,6 +85,109 @@ describe('GitHubService.getPRStatus', () => {
     expect(status.error).toBeUndefined()
   })
 
+  test('deduplicates checks by name+workflow, keeping the most recent run', async () => {
+    setStub(async () => ({
+      stdout: JSON.stringify({
+        number: 1,
+        state: 'OPEN',
+        statusCheckRollup: [
+          {
+            name: 'cleanup',
+            workflowName: 'CI',
+            status: 'COMPLETED',
+            conclusion: 'FAILURE',
+            startedAt: '2026-01-01T10:00:00Z',
+            completedAt: '2026-01-01T10:05:00Z',
+          },
+          {
+            name: 'cleanup',
+            workflowName: 'CI',
+            status: 'COMPLETED',
+            conclusion: 'SUCCESS',
+            startedAt: '2026-01-01T11:00:00Z',
+            completedAt: '2026-01-01T11:05:00Z',
+          },
+        ],
+      }),
+      stderr: '',
+    }))
+
+    const status = await service.getPRStatus('/project')
+
+    // A stale failed run must not survive next to the newer passing run, and it
+    // must not leave the name showing twice.
+    expect(status.statusCheckRollup).toHaveLength(1)
+    expect(status.statusCheckRollup?.[0]).toEqual({
+      name: 'cleanup',
+      state: 'COMPLETED',
+      bucket: 'pass',
+    })
+  })
+
+  test('keeps the latest run regardless of array order', async () => {
+    setStub(async () => ({
+      stdout: JSON.stringify({
+        number: 1,
+        state: 'OPEN',
+        statusCheckRollup: [
+          // Newer (passing) run listed first; older (failing) run second.
+          {
+            name: 'cleanup',
+            workflowName: 'CI',
+            status: 'COMPLETED',
+            conclusion: 'SUCCESS',
+            completedAt: '2026-01-01T11:05:00Z',
+          },
+          {
+            name: 'cleanup',
+            workflowName: 'CI',
+            status: 'COMPLETED',
+            conclusion: 'FAILURE',
+            completedAt: '2026-01-01T10:05:00Z',
+          },
+        ],
+      }),
+      stderr: '',
+    }))
+
+    const status = await service.getPRStatus('/project')
+
+    expect(status.statusCheckRollup).toHaveLength(1)
+    expect(status.statusCheckRollup?.[0].bucket).toBe('pass')
+  })
+
+  test('keeps same-named checks from different workflows', async () => {
+    setStub(async () => ({
+      stdout: JSON.stringify({
+        number: 1,
+        state: 'OPEN',
+        statusCheckRollup: [
+          {
+            name: 'deploy',
+            workflowName: 'Backend',
+            status: 'COMPLETED',
+            conclusion: 'SUCCESS',
+            completedAt: '2026-01-01T10:05:00Z',
+          },
+          {
+            name: 'deploy',
+            workflowName: 'Frontend',
+            status: 'COMPLETED',
+            conclusion: 'SUCCESS',
+            completedAt: '2026-01-01T10:05:00Z',
+          },
+        ],
+      }),
+      stderr: '',
+    }))
+
+    const status = await service.getPRStatus('/project')
+
+    // Distinct workflows that happen to share a job name are genuinely
+    // different checks — both must survive.
+    expect(status.statusCheckRollup).toHaveLength(2)
+  })
+
   test('returns noPR=true when gh reports no pull requests', async () => {
     setStub(async () => {
       throw ghError('no pull requests found for branch "feature/thing"\n')
