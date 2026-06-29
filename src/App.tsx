@@ -166,11 +166,9 @@ function App() {
     },
 
     'nav.projectOverview': () => {
-      const { activeProjectId, setActiveTerminal, setActiveCenterTab } = useProjectStore.getState()
+      const { activeProjectId, setProjectOverviewVisible } = useProjectStore.getState()
       if (!activeProjectId) return
-      // Deselect terminal to trigger project overview panel
-      setActiveTerminal(null)
-      setActiveCenterTab(null)
+      setProjectOverviewVisible(true)
     },
 
     // Terminal operations
@@ -338,28 +336,33 @@ function App() {
 
     // Editor
     'editor.closeTab': () => {
-      const { activeCenterTabId, editorTabs } = useProjectStore.getState()
-      if (activeCenterTabId && editorTabs[activeCenterTabId]) {
-        closeEditorTab(activeCenterTabId)
+      const { activeTerminalId, activeContentTabId, editorTabs } = useProjectStore.getState()
+      const tabId = activeContentTabId[activeTerminalId ?? '']
+      if (tabId && editorTabs[tabId]) {
+        closeEditorTab(tabId)
       }
     },
     'editor.nextTab': () => {
-      const { editorTabs, activeCenterTabId, setActiveCenterTab } = useProjectStore.getState()
-      const tabs = Object.values(editorTabs)
+      const { editorTabs, activeTerminalId, activeContentTabId, setActiveContentTab } =
+        useProjectStore.getState()
+      const chatId = activeTerminalId ?? ''
+      const tabs = Object.values(editorTabs).filter((t) => t.terminalId === chatId)
       if (tabs.length === 0) return
 
-      const currentIndex = tabs.findIndex((t) => t.id === activeCenterTabId)
+      const currentIndex = tabs.findIndex((t) => t.id === activeContentTabId[chatId])
       const nextIndex = (currentIndex + 1) % tabs.length
-      setActiveCenterTab(tabs[nextIndex].id)
+      setActiveContentTab(tabs[nextIndex].id)
     },
     'editor.previousTab': () => {
-      const { editorTabs, activeCenterTabId, setActiveCenterTab } = useProjectStore.getState()
-      const tabs = Object.values(editorTabs)
+      const { editorTabs, activeTerminalId, activeContentTabId, setActiveContentTab } =
+        useProjectStore.getState()
+      const chatId = activeTerminalId ?? ''
+      const tabs = Object.values(editorTabs).filter((t) => t.terminalId === chatId)
       if (tabs.length === 0) return
 
-      const currentIndex = tabs.findIndex((t) => t.id === activeCenterTabId)
+      const currentIndex = tabs.findIndex((t) => t.id === activeContentTabId[chatId])
       const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
-      setActiveCenterTab(tabs[prevIndex].id)
+      setActiveContentTab(tabs[prevIndex].id)
     },
     'editor.save': () => {
       // Editor save is handled by CodeEditor component via Monaco

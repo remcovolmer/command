@@ -83,10 +83,11 @@ interface ProjectStore {
 
   // Editor tab state (includes both file editor and diff tabs)
   editorTabs: Record<string, CenterTab> // tabId -> EditorTab | DiffTab
-  activeCenterTabId: string | null // can be terminal or editor tab (type derived from lookup)
-  // Per-chat active content tab (chatId -> active content tab id). Foundation for
-  // the second panel; the '' key holds content opened without an active chat.
+  // Per-chat active content tab (chatId -> active content tab id). Rendered by the
+  // second panel; the '' key holds content opened without an active chat.
   activeContentTabId: Record<string, string | null>
+  // Show the project overview in place of the chat (hotkey/sidebar toggled)
+  projectOverviewVisible: boolean
 
   // Hotkey configuration
   hotkeyConfig: HotkeyConfig
@@ -124,8 +125,8 @@ interface ProjectStore {
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
-  setActiveCenterTab: (id: string | null) => void
   setActiveContentTab: (tabId: string) => void
+  setProjectOverviewVisible: (visible: boolean) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -351,8 +352,8 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Editor tab state
       editorTabs: {},
-      activeCenterTabId: null,
       activeContentTabId: {},
+      projectOverviewVisible: false,
 
       // Hotkey configuration
       hotkeyConfig: DEFAULT_HOTKEY_CONFIG,
@@ -486,7 +487,6 @@ export const useProjectStore = create<ProjectStore>()(
           const existing = Object.values(state.editorTabs).find((t) => t.filePath === filePath)
           if (existing) {
             return {
-              activeCenterTabId: existing.id,
               activeContentTabId: {
                 ...state.activeContentTabId,
                 [existing.terminalId]: existing.id,
@@ -512,7 +512,6 @@ export const useProjectStore = create<ProjectStore>()(
           }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
-            activeCenterTabId: id,
             activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
@@ -522,15 +521,6 @@ export const useProjectStore = create<ProjectStore>()(
           const removed = state.editorTabs[tabId]
           const newTabs = { ...state.editorTabs }
           delete newTabs[tabId]
-          let newActiveId = state.activeCenterTabId
-          if (state.activeCenterTabId === tabId) {
-            const remaining = Object.values(newTabs)
-            if (remaining.length > 0) {
-              newActiveId = remaining[remaining.length - 1].id
-            } else {
-              newActiveId = state.activeTerminalId
-            }
-          }
           // Per-chat content map: if the closed tab was its chat's active content,
           // fall back to another content tab of the same chat, else null.
           const newContent = { ...state.activeContentTabId }
@@ -541,7 +531,6 @@ export const useProjectStore = create<ProjectStore>()(
           }
           return {
             editorTabs: newTabs,
-            activeCenterTabId: newActiveId,
             activeContentTabId: newContent,
           }
         }),
@@ -572,23 +561,16 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
-      setActiveCenterTab: (id) =>
-        set((state) => ({
-          activeCenterTabId: id,
-          // If it's a terminal, also update activeTerminalId
-          ...(id && state.terminals[id] ? { activeTerminalId: id } : {}),
-        })),
-
       setActiveContentTab: (tabId) =>
         set((state) => {
           const tab = state.editorTabs[tabId]
           if (!tab) return state
           return {
             activeContentTabId: { ...state.activeContentTabId, [tab.terminalId]: tabId },
-            // Keep the legacy pointer in sync so the current rendering follows selection.
-            activeCenterTabId: tabId,
           }
         }),
+
+      setProjectOverviewVisible: (visible) => set({ projectOverviewVisible: visible }),
 
       // Hotkey actions
       updateHotkey: (action, binding) =>
@@ -1047,7 +1029,6 @@ export const useProjectStore = create<ProjectStore>()(
           )
           if (existing) {
             return {
-              activeCenterTabId: existing.id,
               activeContentTabId: {
                 ...state.activeContentTabId,
                 [existing.terminalId]: existing.id,
@@ -1068,7 +1049,6 @@ export const useProjectStore = create<ProjectStore>()(
           }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
-            activeCenterTabId: id,
             activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
@@ -1085,7 +1065,6 @@ export const useProjectStore = create<ProjectStore>()(
           )
           if (existing) {
             return {
-              activeCenterTabId: existing.id,
               activeContentTabId: {
                 ...state.activeContentTabId,
                 [existing.terminalId]: existing.id,
@@ -1100,7 +1079,8 @@ export const useProjectStore = create<ProjectStore>()(
           const newTabs = { ...state.editorTabs }
           if (projectTabs.length >= MAX_EDITOR_TABS) {
             // Remove oldest non-active tab
-            const toRemove = projectTabs.find((t) => t.id !== state.activeCenterTabId)
+            const activeContentId = state.activeContentTabId[state.activeTerminalId ?? ''] ?? null
+            const toRemove = projectTabs.find((t) => t.id !== activeContentId)
             if (toRemove) delete newTabs[toRemove.id]
           }
           const id = `wt-diff-${crypto.randomUUID()}`
@@ -1115,7 +1095,6 @@ export const useProjectStore = create<ProjectStore>()(
           }
           return {
             editorTabs: { ...newTabs, [id]: tab },
-            activeCenterTabId: id,
             activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
@@ -1133,10 +1112,6 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
           if (!changed) return state
-          const newActiveId =
-            state.activeCenterTabId && newTabs[state.activeCenterTabId]
-              ? state.activeCenterTabId
-              : null
           // Drop per-chat content pointers to removed tabs; recompute per chat.
           const newContent = { ...state.activeContentTabId }
           for (const [chatId, activeId] of Object.entries(newContent)) {
@@ -1145,7 +1120,7 @@ export const useProjectStore = create<ProjectStore>()(
               newContent[chatId] = chatTabs.length > 0 ? chatTabs[chatTabs.length - 1].id : null
             }
           }
-          return { editorTabs: newTabs, activeCenterTabId: newActiveId, activeContentTabId: newContent }
+          return { editorTabs: newTabs, activeContentTabId: newContent }
         }),
 
       // Discard confirmation actions
@@ -1315,17 +1290,6 @@ export const useProjectStore = create<ProjectStore>()(
             state.activeTerminalId && newTerminals[state.activeTerminalId]
               ? state.activeTerminalId
               : null
-          // Fix activeCenterTabId: check both terminals and remaining editor tabs
-          let newActiveCenterTabId = state.activeCenterTabId
-          if (
-            state.activeProjectId === id ||
-            (newActiveCenterTabId &&
-              !newTerminals[newActiveCenterTabId] &&
-              !newEditorTabs[newActiveCenterTabId])
-          ) {
-            newActiveCenterTabId = newActiveTerminalId
-          }
-
           return {
             projects: newProjects,
             terminals: newTerminals,
@@ -1334,7 +1298,6 @@ export const useProjectStore = create<ProjectStore>()(
             activeSidecarTerminalId: newActiveSidecar,
             activeProjectId: newActiveProjectId,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveCenterTabId,
             activeContentTabId: newActiveContentTabId,
             editorTabs: newEditorTabs,
             gitStatus: newGitStatus,
@@ -1373,7 +1336,6 @@ export const useProjectStore = create<ProjectStore>()(
             activeProjectId: id,
             collapsedProjects: newCollapsedProjects,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveTerminalId,
             directoryCache: {},
             // Clear ephemeral file explorer state to prevent cross-project operations
             fileExplorerSelectedPath: null,
@@ -1427,7 +1389,7 @@ export const useProjectStore = create<ProjectStore>()(
           terminals: { ...state.terminals, [terminal.id]: terminal },
           activeProjectId: terminal.projectId,
           activeTerminalId: terminal.id,
-          activeCenterTabId: terminal.id,
+          projectOverviewVisible: false,
         })),
 
       removeTerminal: (id) =>
@@ -1436,24 +1398,16 @@ export const useProjectStore = create<ProjectStore>()(
           const removedTerminal = newTerminals[id]
           delete newTerminals[id]
 
-          // Update active terminal and center tab if needed
+          // Update active terminal if needed
           let newActiveTerminalId = state.activeTerminalId
-          let newActiveCenterTabId = state.activeCenterTabId
 
-          if (state.activeTerminalId === id || state.activeCenterTabId === id) {
+          if (state.activeTerminalId === id) {
             const visible = getVisibleTerminals(
               newTerminals,
               state.sidecarTerminals,
               removedTerminal?.projectId ?? ''
             )
-            const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
-
-            if (state.activeTerminalId === id) {
-              newActiveTerminalId = fallbackTerminalId
-            }
-            if (state.activeCenterTabId === id) {
-              newActiveCenterTabId = fallbackTerminalId
-            }
+            newActiveTerminalId = visible.length > 0 ? visible[0].id : null
           }
 
           // Clean stale ID from sidecarTerminals
@@ -1480,7 +1434,6 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveCenterTabId,
             activeContentTabId: newActiveContentTabId,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
@@ -1564,12 +1517,12 @@ export const useProjectStore = create<ProjectStore>()(
       setActiveTerminal: (id) =>
         set((state) => {
           if (id === null) {
-            return { activeTerminalId: null, activeCenterTabId: null }
+            return { activeTerminalId: null }
           }
 
           const terminal = state.terminals[id]
           if (!terminal) {
-            return { activeTerminalId: id, activeCenterTabId: id }
+            return { activeTerminalId: id, projectOverviewVisible: false }
           }
 
           // Als terminal in ander project zit, wissel ook van project
@@ -1577,11 +1530,11 @@ export const useProjectStore = create<ProjectStore>()(
             return {
               activeProjectId: terminal.projectId,
               activeTerminalId: id,
-              activeCenterTabId: id,
+              projectOverviewVisible: false,
             }
           }
 
-          return { activeTerminalId: id, activeCenterTabId: id }
+          return { activeTerminalId: id, projectOverviewVisible: false }
         }),
 
       getProjectTerminals: (projectId) => {
@@ -1670,30 +1623,20 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
-          // Update active terminal and center tab if they were in the removed worktree
+          // Update active terminal if it was in the removed worktree
           let newActiveTerminalId = state.activeTerminalId
-          let newActiveCenterTabId = state.activeCenterTabId
           const activeTerminalGone = state.activeTerminalId && !newTerminals[state.activeTerminalId]
-          const activeCenterGone =
-            state.activeCenterTabId &&
-            !newTerminals[state.activeCenterTabId] &&
-            !newEditorTabs[state.activeCenterTabId]
-
-          if (activeTerminalGone || activeCenterGone) {
+          if (activeTerminalGone) {
             const visible = getVisibleTerminals(
               newTerminals,
               newSidecarTerminals,
               removedWorktree?.projectId ?? ''
             )
-            const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
-
-            if (activeTerminalGone) {
-              newActiveTerminalId = fallbackTerminalId
-            }
-            if (activeCenterGone) {
-              newActiveCenterTabId = fallbackTerminalId
-            }
+            newActiveTerminalId = visible.length > 0 ? visible[0].id : null
           }
+          // Clean per-chat content pointers for removed worktree chats
+          const newActiveContentTabId = { ...state.activeContentTabId }
+          for (const tid of removedTerminalIds) delete newActiveContentTabId[tid]
 
           return {
             worktrees: newWorktrees,
@@ -1709,7 +1652,7 @@ export const useProjectStore = create<ProjectStore>()(
             expandedPaths: newExpandedPaths,
             directoryCache: newDirectoryCache,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveCenterTabId,
+            activeContentTabId: newActiveContentTabId,
           }
         }),
 

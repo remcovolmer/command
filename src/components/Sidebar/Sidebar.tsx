@@ -47,7 +47,7 @@ export function Sidebar() {
   const {
     setActiveProject,
     setActiveTerminal,
-    setActiveCenterTab,
+    setProjectOverviewVisible,
     addProject,
     removeProject,
     addTerminal,
@@ -64,7 +64,7 @@ export function Sidebar() {
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
       setActiveTerminal: s.setActiveTerminal,
-      setActiveCenterTab: s.setActiveCenterTab,
+      setProjectOverviewVisible: s.setProjectOverviewVisible,
       addProject: s.addProject,
       removeProject: s.removeProject,
       addTerminal: s.addTerminal,
@@ -404,7 +404,7 @@ export function Sidebar() {
               onSelect={(projectId) => {
                 if (projectId === activeProjectId) {
                   // Clicking the already-active project toggles to overview
-                  setActiveCenterTab(null)
+                  setProjectOverviewVisible(true)
                 } else {
                   setActiveProject(projectId)
                 }
