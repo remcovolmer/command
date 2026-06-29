@@ -90,6 +90,7 @@ describe('projectStore activeCenterTabId', () => {
       activeSidecarTerminalId: {},
       worktrees: {},
       editorTabs: {},
+      activeContentTabId: {},
       collapsedProjects: {},
     })
   })
@@ -110,6 +111,76 @@ describe('projectStore activeCenterTabId', () => {
       expect(ids).toContain('term-1')
       expect(ids).toContain('term-2')
       expect(ids).not.toContain('sidecar-1')
+    })
+  })
+
+  describe('per-chat content tabs', () => {
+    test('openEditorTab scopes the tab to the active chat', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      useProjectStore.getState().openEditorTab('/p/a.ts', 'a.ts', 'proj-1')
+      const s = useProjectStore.getState()
+      const tab = Object.values(s.editorTabs)[0]
+      expect(tab.terminalId).toBe('chat-A')
+      expect(s.activeContentTabId['chat-A']).toBe(tab.id)
+    })
+
+    test('each chat keeps its own active content tab', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      useProjectStore.getState().openEditorTab('/p/a.ts', 'a.ts', 'proj-1')
+      const aTabId = useProjectStore.getState().activeContentTabId['chat-A']
+
+      useProjectStore.setState({ activeTerminalId: 'chat-B' })
+      useProjectStore.getState().openEditorTab('/p/b.ts', 'b.ts', 'proj-1')
+
+      const s = useProjectStore.getState()
+      expect(s.activeContentTabId['chat-A']).toBe(aTabId)
+      expect(s.activeContentTabId['chat-B']).not.toBe(aTabId)
+      const bTab = Object.values(s.editorTabs).find((t) => t.id === s.activeContentTabId['chat-B'])
+      expect(bTab?.terminalId).toBe('chat-B')
+    })
+
+    test('closeEditorTab falls back within the same chat, then to null', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      useProjectStore.getState().openEditorTab('/p/a.ts', 'a.ts', 'proj-1')
+      useProjectStore.getState().openEditorTab('/p/b.ts', 'b.ts', 'proj-1')
+
+      const active = useProjectStore.getState().activeContentTabId['chat-A']
+      useProjectStore.getState().closeEditorTab(active!)
+
+      let s = useProjectStore.getState()
+      const remaining = Object.values(s.editorTabs)
+      expect(remaining.length).toBe(1)
+      expect(s.activeContentTabId['chat-A']).toBe(remaining[0].id)
+
+      useProjectStore.getState().closeEditorTab(remaining[0].id)
+      s = useProjectStore.getState()
+      expect(s.activeContentTabId['chat-A']).toBeNull()
+    })
+
+    test('setActiveContentTab updates only the owning chat', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      useProjectStore.getState().openEditorTab('/p/a.ts', 'a.ts', 'proj-1')
+      useProjectStore.getState().openEditorTab('/p/b.ts', 'b.ts', 'proj-1')
+
+      const firstTab = Object.values(useProjectStore.getState().editorTabs).find(
+        (t) => t.fileName === 'a.ts'
+      )!
+      useProjectStore.getState().setActiveContentTab(firstTab.id)
+      expect(useProjectStore.getState().activeContentTabId['chat-A']).toBe(firstTab.id)
+    })
+
+    test('removeTerminal clears its chat content pointer', () => {
+      const t = makeTerminal({ id: 'chat-A', projectId: 'proj-1' })
+      useProjectStore.setState({
+        terminals: { 'chat-A': t },
+        activeTerminalId: 'chat-A',
+        activeProjectId: 'proj-1',
+      })
+      useProjectStore.getState().openEditorTab('/p/a.ts', 'a.ts', 'proj-1')
+      expect(useProjectStore.getState().activeContentTabId['chat-A']).toBeTruthy()
+
+      useProjectStore.getState().removeTerminal('chat-A')
+      expect(useProjectStore.getState().activeContentTabId['chat-A']).toBeUndefined()
     })
   })
 

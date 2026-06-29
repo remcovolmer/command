@@ -84,6 +84,9 @@ interface ProjectStore {
   // Editor tab state (includes both file editor and diff tabs)
   editorTabs: Record<string, CenterTab> // tabId -> EditorTab | DiffTab
   activeCenterTabId: string | null // can be terminal or editor tab (type derived from lookup)
+  // Per-chat active content tab (chatId -> active content tab id). Foundation for
+  // the second panel; the '' key holds content opened without an active chat.
+  activeContentTabId: Record<string, string | null>
 
   // Hotkey configuration
   hotkeyConfig: HotkeyConfig
@@ -122,6 +125,7 @@ interface ProjectStore {
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
   setActiveCenterTab: (id: string | null) => void
+  setActiveContentTab: (tabId: string) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -348,6 +352,7 @@ export const useProjectStore = create<ProjectStore>()(
       // Editor tab state
       editorTabs: {},
       activeCenterTabId: null,
+      activeContentTabId: {},
 
       // Hotkey configuration
       hotkeyConfig: DEFAULT_HOTKEY_CONFIG,
@@ -476,10 +481,17 @@ export const useProjectStore = create<ProjectStore>()(
       // Editor tab actions
       openEditorTab: (filePath, fileName, projectId) =>
         set((state) => {
+          const chatId = state.activeTerminalId ?? ''
           // Check if already open
           const existing = Object.values(state.editorTabs).find((t) => t.filePath === filePath)
           if (existing) {
-            return { activeCenterTabId: existing.id }
+            return {
+              activeCenterTabId: existing.id,
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
           }
           // Enforce tab limit
           const projectTabCount = Object.values(state.editorTabs).filter(
@@ -496,15 +508,18 @@ export const useProjectStore = create<ProjectStore>()(
             fileName,
             isDirty: false,
             projectId,
+            terminalId: chatId,
           }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
             activeCenterTabId: id,
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
 
       closeEditorTab: (tabId) =>
         set((state) => {
+          const removed = state.editorTabs[tabId]
           const newTabs = { ...state.editorTabs }
           delete newTabs[tabId]
           let newActiveId = state.activeCenterTabId
@@ -516,9 +531,18 @@ export const useProjectStore = create<ProjectStore>()(
               newActiveId = state.activeTerminalId
             }
           }
+          // Per-chat content map: if the closed tab was its chat's active content,
+          // fall back to another content tab of the same chat, else null.
+          const newContent = { ...state.activeContentTabId }
+          if (removed && newContent[removed.terminalId] === tabId) {
+            const chatTabs = Object.values(newTabs).filter((t) => t.terminalId === removed.terminalId)
+            newContent[removed.terminalId] =
+              chatTabs.length > 0 ? chatTabs[chatTabs.length - 1].id : null
+          }
           return {
             editorTabs: newTabs,
             activeCenterTabId: newActiveId,
+            activeContentTabId: newContent,
           }
         }),
 
@@ -554,6 +578,17 @@ export const useProjectStore = create<ProjectStore>()(
           // If it's a terminal, also update activeTerminalId
           ...(id && state.terminals[id] ? { activeTerminalId: id } : {}),
         })),
+
+      setActiveContentTab: (tabId) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab) return state
+          return {
+            activeContentTabId: { ...state.activeContentTabId, [tab.terminalId]: tabId },
+            // Keep the legacy pointer in sync so the current rendering follows selection.
+            activeCenterTabId: tabId,
+          }
+        }),
 
       // Hotkey actions
       updateHotkey: (action, binding) =>
@@ -1002,6 +1037,7 @@ export const useProjectStore = create<ProjectStore>()(
       // Diff tab actions
       openDiffTab: (filePath, fileName, commitHash, parentHash, projectId, oldPath) =>
         set((state) => {
+          const chatId = state.activeTerminalId ?? ''
           // Check if already open with same commit+file
           const existing = Object.values(state.editorTabs).find(
             (t) =>
@@ -1010,7 +1046,13 @@ export const useProjectStore = create<ProjectStore>()(
               t.filePath === filePath
           )
           if (existing) {
-            return { activeCenterTabId: existing.id }
+            return {
+              activeCenterTabId: existing.id,
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
           }
           const id = `diff-${crypto.randomUUID()}`
           const tab: DiffTab = {
@@ -1021,16 +1063,19 @@ export const useProjectStore = create<ProjectStore>()(
             commitHash,
             parentHash,
             projectId,
+            terminalId: chatId,
             ...(oldPath ? { oldPath } : {}),
           }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
             activeCenterTabId: id,
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
 
       openWorkingTreeDiffTab: (filePath, fileName, diffKind, projectId) =>
         set((state) => {
+          const chatId = state.activeTerminalId ?? ''
           // Check if already open with same file+diffKind
           const existing = Object.values(state.editorTabs).find(
             (t) =>
@@ -1039,7 +1084,13 @@ export const useProjectStore = create<ProjectStore>()(
               t.filePath === filePath
           )
           if (existing) {
-            return { activeCenterTabId: existing.id }
+            return {
+              activeCenterTabId: existing.id,
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
           }
           // Enforce MAX_EDITOR_TABS
           const MAX_EDITOR_TABS = 15
@@ -1060,10 +1111,12 @@ export const useProjectStore = create<ProjectStore>()(
             fileName,
             diffKind,
             projectId,
+            terminalId: chatId,
           }
           return {
             editorTabs: { ...newTabs, [id]: tab },
             activeCenterTabId: id,
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
 
@@ -1084,7 +1137,15 @@ export const useProjectStore = create<ProjectStore>()(
             state.activeCenterTabId && newTabs[state.activeCenterTabId]
               ? state.activeCenterTabId
               : null
-          return { editorTabs: newTabs, activeCenterTabId: newActiveId }
+          // Drop per-chat content pointers to removed tabs; recompute per chat.
+          const newContent = { ...state.activeContentTabId }
+          for (const [chatId, activeId] of Object.entries(newContent)) {
+            if (activeId && !newTabs[activeId]) {
+              const chatTabs = Object.values(newTabs).filter((t) => t.terminalId === chatId)
+              newContent[chatId] = chatTabs.length > 0 ? chatTabs[chatTabs.length - 1].id : null
+            }
+          }
+          return { editorTabs: newTabs, activeCenterTabId: newActiveId, activeContentTabId: newContent }
         }),
 
       // Discard confirmation actions
@@ -1202,6 +1263,9 @@ export const useProjectStore = create<ProjectStore>()(
           for (const [tabId, tab] of Object.entries(newEditorTabs)) {
             if (tab.projectId === id) delete newEditorTabs[tabId]
           }
+          // Clean per-chat content pointers for the removed project's chats
+          const newActiveContentTabId = { ...state.activeContentTabId }
+          for (const tid of removedTerminalIds) delete newActiveContentTabId[tid]
 
           // Clean per-project/worktree keyed state
           const newGitStatus = { ...state.gitStatus }
@@ -1271,6 +1335,7 @@ export const useProjectStore = create<ProjectStore>()(
             activeProjectId: newActiveProjectId,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveCenterTabId,
+            activeContentTabId: newActiveContentTabId,
             editorTabs: newEditorTabs,
             gitStatus: newGitStatus,
             gitStatusLoading: newGitStatusLoading,
@@ -1409,10 +1474,14 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
+          const newActiveContentTabId = { ...state.activeContentTabId }
+          delete newActiveContentTabId[id]
+
           return {
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveCenterTabId,
+            activeContentTabId: newActiveContentTabId,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
           }

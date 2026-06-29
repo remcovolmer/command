@@ -99,6 +99,9 @@ export interface EditorTab {
   fileName: string
   isDirty: boolean
   projectId: string
+  // Owning chat (terminal) id. Content tabs are scoped per-chat; '' when opened
+  // without an active chat. Consumed by the second panel (per-chat content).
+  terminalId: string
   isDeletedExternally?: boolean
 }
 
@@ -112,6 +115,7 @@ export interface DiffTab {
   parentHash: string // empty string for initial commits
   oldPath?: string // original path for renamed files (used to fetch parent commit content)
   projectId: string
+  terminalId: string
 }
 
 // Working tree diff tab (for viewing uncommitted changes)
@@ -122,6 +126,7 @@ export interface WorkingTreeDiffTab {
   fileName: string
   diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted'
   projectId: string
+  terminalId: string
 }
 
 // Union of all center tab types
