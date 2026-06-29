@@ -370,6 +370,10 @@ function App() {
       const event = new CustomEvent('editor-save-request')
       window.dispatchEvent(event)
     },
+    'browser.open': () => {
+      const { activeProjectId, openBrowserTab } = useProjectStore.getState()
+      if (activeProjectId) openBrowserTab(activeProjectId)
+    },
 
     // Sidebar
     'sidebar.toggleInactive': () => {

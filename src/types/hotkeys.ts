@@ -66,6 +66,7 @@ export type HotkeyAction =
   | 'editor.nextTab'
   | 'editor.previousTab'
   | 'editor.save'
+  | 'browser.open'
   // Worktree
   | 'worktree.create'
   // Sidebar

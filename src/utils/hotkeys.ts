@@ -272,6 +272,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'editor',
     enabled: true,
   },
+  'browser.open': {
+    key: 'b',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Open browser tab',
+    category: 'editor',
+    enabled: true,
+  },
 
   // Worktree
   'worktree.create': {

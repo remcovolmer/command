@@ -172,8 +172,6 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 |----------|--------|
 | `Ctrl + T` | New terminal |
 | `Ctrl + W` | Close terminal |
-| `Ctrl + \` | Add to split view |
-| `Ctrl + Shift + \` | Remove from split view |
 | `Alt + 1-9` | Go to terminal 1-9 |
 
 ### File Explorer
@@ -197,6 +195,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + Tab` | Next editor tab |
 | `Ctrl + Shift + Tab` | Previous editor tab |
 | `Ctrl + S` | Save file |
+| `Ctrl + Shift + B` | Open browser tab |
 
 ### Worktree
 | Shortcut | Action |
