@@ -36,6 +36,16 @@ export function BrowserTab({ url, isActive, onUrlChange }: BrowserTabProps) {
     setInput(next)
   }
 
+  // allow-same-origin only for the user's own localhost dev app. For file:// and
+  // anything else, omit it so a framed page can't reach window.parent.electronAPI
+  // (bridge-escape defense — mirrors HtmlPreview's stricter sandbox). In the
+  // packaged file:// build, a file:// iframe with allow-same-origin would be
+  // same-origin with the app shell.
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/i.test(url)
+  const sandbox = isLocalhost
+    ? 'allow-scripts allow-forms allow-modals allow-popups allow-same-origin'
+    : 'allow-scripts allow-forms allow-modals allow-popups'
+
   return (
     <div
       className="absolute inset-0 flex flex-col bg-background"
@@ -71,7 +81,7 @@ export function BrowserTab({ url, isActive, onUrlChange }: BrowserTabProps) {
         src={url}
         title="Browser"
         className="flex-1 w-full border-0 bg-white"
-        sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
+        sandbox={sandbox}
       />
     </div>
   )

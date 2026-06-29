@@ -374,6 +374,9 @@ function App() {
       const { activeProjectId, openBrowserTab } = useProjectStore.getState()
       if (activeProjectId) openBrowserTab(activeProjectId)
     },
+    'shell.toggle': () => {
+      useProjectStore.getState().toggleShellDrawer()
+    },
 
     // Sidebar
     'sidebar.toggleInactive': () => {

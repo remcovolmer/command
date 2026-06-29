@@ -33,22 +33,11 @@ export function ActivityRail() {
   )
   const hasShells = shellCount > 0
   const shellCollapsed = useProjectStore((s) => s.sidecarTerminalCollapsed)
-  const setShellCollapsed = useProjectStore((s) => s.setSidecarTerminalCollapsed)
-  const createSidecarTerminal = useProjectStore((s) => s.createSidecarTerminal)
+  const toggleShellDrawer = useProjectStore((s) => s.toggleShellDrawer)
   const openBrowserTab = useProjectStore((s) => s.openBrowserTab)
 
   const handleOpenBrowser = () => {
     if (activeProjectId) openBrowserTab(activeProjectId)
-  }
-
-  const handleShellToggle = () => {
-    if (!shellContextKey || !activeProjectId) return
-    if (hasShells) {
-      setShellCollapsed(!shellCollapsed)
-    } else {
-      // No shell yet — create one (the drawer appears with its tab).
-      createSidecarTerminal(shellContextKey, activeProjectId, activeWorktree?.id ?? undefined)
-    }
   }
 
   const handleClick = (tab: ExplorerTab) => {
@@ -95,7 +84,7 @@ export function ActivityRail() {
 
       {/* Shell-drawer toggle at the foot of the rail */}
       <button
-        onClick={handleShellToggle}
+        onClick={toggleShellDrawer}
         title={hasShells ? `${shellCount} shell${shellCount === 1 ? '' : 's'}` : 'Open shell'}
         className={`relative mt-auto w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
           hasShells && !shellCollapsed

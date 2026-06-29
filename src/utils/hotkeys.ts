@@ -77,6 +77,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'terminal',
     enabled: true,
   },
+  'shell.toggle': {
+    key: '\\',
+    modifiers: ['ctrl'],
+    description: 'Toggle shell drawer',
+    category: 'terminal',
+    enabled: true,
+  },
   'terminal.goTo1': {
     key: '1',
     modifiers: ['alt'],

@@ -172,6 +172,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 |----------|--------|
 | `Ctrl + T` | New terminal |
 | `Ctrl + W` | Close terminal |
+| `Ctrl + \` | Toggle shell drawer |
 | `Alt + 1-9` | Go to terminal 1-9 |
 
 ### File Explorer

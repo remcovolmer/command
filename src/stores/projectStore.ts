@@ -164,6 +164,7 @@ interface ProjectStore {
   registerSidecarTerminal: (contextKey: string, terminal: TerminalSession) => void
   closeSidecarTerminal: (contextKey: string, terminalId: string) => void
   setSidecarTerminalCollapsed: (collapsed: boolean) => void
+  toggleShellDrawer: () => void
   setActiveSidecarTerminal: (contextKey: string, id: string | null) => void
   getSidecarTerminals: (contextKey: string) => TerminalSession[]
 
@@ -776,6 +777,21 @@ export const useProjectStore = create<ProjectStore>()(
 
       setSidecarTerminalCollapsed: (collapsed) => set({ sidecarTerminalCollapsed: collapsed }),
 
+      toggleShellDrawer: () => {
+        const state = get()
+        if (!state.activeProjectId) return
+        const term = state.activeTerminalId ? state.terminals[state.activeTerminalId] : null
+        const worktreeId = term?.worktreeId ?? null
+        const contextKey = worktreeId ?? state.activeProjectId
+        const shells = state.sidecarTerminals[contextKey] ?? []
+        if (shells.length > 0) {
+          set({ sidecarTerminalCollapsed: !state.sidecarTerminalCollapsed })
+        } else {
+          // No shell yet — create one (the drawer appears with its tab).
+          void state.createSidecarTerminal(contextKey, state.activeProjectId, worktreeId ?? undefined)
+        }
+      },
+
       setActiveSidecarTerminal: (contextKey, id) =>
         set((state) => ({
           activeSidecarTerminalId: {
@@ -1363,6 +1379,7 @@ export const useProjectStore = create<ProjectStore>()(
             activeProjectId: id,
             collapsedProjects: newCollapsedProjects,
             activeTerminalId: newActiveTerminalId,
+            projectOverviewVisible: false,
             directoryCache: {},
             // Clear ephemeral file explorer state to prevent cross-project operations
             fileExplorerSelectedPath: null,
@@ -1458,10 +1475,18 @@ export const useProjectStore = create<ProjectStore>()(
           const newActiveContentTabId = { ...state.activeContentTabId }
           delete newActiveContentTabId[id]
 
+          // Close the removed chat's content tabs — they're scoped to it, so
+          // leaving them would orphan unreachable tabs in editorTabs.
+          const newEditorTabs = { ...state.editorTabs }
+          for (const [tabId, tab] of Object.entries(newEditorTabs)) {
+            if (tab.terminalId === id) delete newEditorTabs[tabId]
+          }
+
           return {
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
             activeContentTabId: newActiveContentTabId,
+            editorTabs: newEditorTabs,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
           }
@@ -1774,6 +1799,11 @@ export const useProjectStore = create<ProjectStore>()(
         // safety net for the pre-hydration window.
         if (state?.hotkeyConfig) {
           state.hotkeyConfig = mergeMissingHotkeyDefaults(state.hotkeyConfig)
+        }
+        // Drop the removed split-view `layouts` slice from older persisted state
+        // (split-view was removed; the key is now dead and otherwise lingers).
+        if (state && 'layouts' in state) {
+          delete (state as Record<string, unknown>).layouts
         }
         // Migrate expandedPaths from old string[] format to Record<string, true>
         if (state?.expandedPaths) {
