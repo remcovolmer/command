@@ -566,23 +566,39 @@ export function parseKeyEvent(
 }
 
 /**
- * Backfill defaults for actions missing from a persisted hotkey config.
+ * Reconcile a persisted hotkey config against the current action set.
  *
- * Persisted configs from existing users predate newly added actions; without
- * this, a new action is active (via the lookup fallback in useHotkeys) but
- * invisible in Settings, the Ctrl+/ overlay and conflict detection — all of
- * which iterate the persisted config. Called from onRehydrateStorage in
- * projectStore.ts. Existing user customizations are left untouched.
+ * Two directions, both required because persisted configs drift from the code:
+ * - Backfill actions added after the config was persisted; without this a new
+ *   action is active (via the lookup fallback in useHotkeys) but invisible in
+ *   Settings, the Ctrl+/ overlay and conflict detection — all of which iterate
+ *   the persisted config.
+ * - Prune actions removed since the config was persisted (e.g. the split-view
+ *   hotkeys dropped in 0.21.0). A lingering unknown action reaches HotkeyRow,
+ *   which dereferences DEFAULT_HOTKEY_CONFIG[action].key and throws on
+ *   `undefined`, white-screening the whole Settings dialog.
+ *
+ * Called from onRehydrateStorage in projectStore.ts. Existing user
+ * customizations for actions that still exist are left untouched.
  */
 export function mergeMissingHotkeyDefaults(config: HotkeyConfig): HotkeyConfig {
   let changed = false
   const merged = { ...config }
+
   for (const action of Object.keys(DEFAULT_HOTKEY_CONFIG) as HotkeyAction[]) {
     if (!merged[action]) {
       merged[action] = DEFAULT_HOTKEY_CONFIG[action]
       changed = true
     }
   }
+
+  for (const action of Object.keys(merged)) {
+    if (!(action in DEFAULT_HOTKEY_CONFIG)) {
+      delete (merged as Record<string, HotkeyBinding>)[action]
+      changed = true
+    }
+  }
+
   return changed ? merged : config
 }
 
