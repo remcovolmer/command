@@ -105,15 +105,11 @@ export class TerminalPool {
    */
   getEvictionCandidate(
     terminals: Record<string, TerminalSession>,
-    activeTerminalId: string | null,
-    splitTerminalIds: string[]
+    activeTerminalId: string | null
   ): string | null {
-    const splitSet = new Set(splitTerminalIds)
-
     const candidates = this.lruOrder.filter((id) => {
       if (this.evictedSet.has(id)) return false
       if (id === activeTerminalId) return false
-      if (splitSet.has(id)) return false
       const terminal = terminals[id]
       if (!terminal) return false
       if (terminal.type === 'normal') return false // Sidecar terminals are lightweight — never evict

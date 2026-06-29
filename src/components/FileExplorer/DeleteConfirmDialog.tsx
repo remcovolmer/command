@@ -42,9 +42,10 @@ export function DeleteConfirmDialog({ entry, projectId, contextKey }: DeleteConf
       const state = useProjectStore.getState()
       const tabsToClose = Object.values(state.editorTabs).filter(
         (tab) =>
-          tab.filePath === entry.path ||
-          tab.filePath.startsWith(entry.path + '\\') ||
-          tab.filePath.startsWith(entry.path + '/')
+          tab.type !== 'browser' &&
+          (tab.filePath === entry.path ||
+            tab.filePath.startsWith(entry.path + '\\') ||
+            tab.filePath.startsWith(entry.path + '/'))
       )
       for (const tab of tabsToClose) {
         state.closeEditorTab(tab.id)

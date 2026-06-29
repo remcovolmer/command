@@ -72,7 +72,7 @@ describe('TerminalPool', () => {
       pool.touch('d')
       terminals.d = makeTerminal()
 
-      const candidate = pool.getEvictionCandidate(terminals, 'd', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'd')
       // b is least recently used (order: d, a, c, b)
       expect(candidate).toBe('b')
     })
@@ -141,7 +141,7 @@ describe('TerminalPool', () => {
         d: makeTerminal(),
       }
 
-      const candidate = pool.getEvictionCandidate(terminals, 'd', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'd')
       expect(candidate).toBe('a') // least recently used
     })
 
@@ -154,23 +154,8 @@ describe('TerminalPool', () => {
         b: makeTerminal(),
       }
 
-      const candidate = pool.getEvictionCandidate(terminals, 'a', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'a')
       expect(candidate).toBe('b')
-    })
-
-    test('excludes split terminals', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
-
-      const terminals: Record<string, TerminalSession> = {
-        a: makeTerminal(),
-        b: makeTerminal(),
-        c: makeTerminal(),
-      }
-
-      const candidate = pool.getEvictionCandidate(terminals, 'c', ['a'])
-      expect(candidate).toBe('b') // a is split, c is active, only b available
     })
 
     test('excludes protected states (busy, permission, question)', () => {
@@ -184,7 +169,7 @@ describe('TerminalPool', () => {
         c: makeTerminal({ state: 'done' }),
       }
 
-      const candidate = pool.getEvictionCandidate(terminals, 'c', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'c')
       expect(candidate).toBeNull() // a and b are protected, c is active
     })
 
@@ -199,7 +184,7 @@ describe('TerminalPool', () => {
         c: makeTerminal({ state: 'done' }),
       }
 
-      const candidate = pool.getEvictionCandidate(terminals, 'c', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'c')
       expect(candidate).toBe('b') // stopped preferred
     })
 
@@ -217,7 +202,7 @@ describe('TerminalPool', () => {
         c: makeTerminal(),
       }
 
-      const candidate = pool.getEvictionCandidate(terminals, 'c', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'c')
       expect(candidate).toBe('b') // a is evicted, skipped
     })
 
@@ -232,7 +217,7 @@ describe('TerminalPool', () => {
         c: makeTerminal({ type: 'claude' }),
       }
 
-      const candidate = pool.getEvictionCandidate(terminals, 'c', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'c')
       expect(candidate).toBe('b') // a is sidecar (protected), b is the only claude candidate
     })
 
@@ -247,7 +232,7 @@ describe('TerminalPool', () => {
         c: makeTerminal({ type: 'claude' }),
       }
 
-      const candidate = pool.getEvictionCandidate(terminals, 'c', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'c')
       expect(candidate).toBeNull() // only sidecar terminals available, all protected
     })
 
@@ -256,7 +241,7 @@ describe('TerminalPool', () => {
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal(),
       }
-      const candidate = pool.getEvictionCandidate(terminals, 'a', [])
+      const candidate = pool.getEvictionCandidate(terminals, 'a')
       expect(candidate).toBeNull()
     })
   })

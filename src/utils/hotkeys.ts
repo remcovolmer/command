@@ -77,17 +77,10 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'terminal',
     enabled: true,
   },
-  'terminal.split': {
+  'shell.toggle': {
     key: '\\',
     modifiers: ['ctrl'],
-    description: 'Add terminal to split view',
-    category: 'terminal',
-    enabled: true,
-  },
-  'terminal.unsplit': {
-    key: '\\',
-    modifiers: ['ctrl', 'shift'],
-    description: 'Remove from split view',
+    description: 'Toggle shell drawer',
     category: 'terminal',
     enabled: true,
   },
@@ -283,6 +276,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     key: 's',
     modifiers: ['ctrl'],
     description: 'Save current file',
+    category: 'editor',
+    enabled: true,
+  },
+  'browser.open': {
+    key: 'b',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Open browser tab',
     category: 'editor',
     enabled: true,
   },

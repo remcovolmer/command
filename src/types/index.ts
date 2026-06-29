@@ -99,6 +99,9 @@ export interface EditorTab {
   fileName: string
   isDirty: boolean
   projectId: string
+  // Owning chat (terminal) id. Content tabs are scoped per-chat; '' when opened
+  // without an active chat. Consumed by the second panel (per-chat content).
+  terminalId: string
   isDeletedExternally?: boolean
 }
 
@@ -112,6 +115,7 @@ export interface DiffTab {
   parentHash: string // empty string for initial commits
   oldPath?: string // original path for renamed files (used to fetch parent commit content)
   projectId: string
+  terminalId: string
 }
 
 // Working tree diff tab (for viewing uncommitted changes)
@@ -122,10 +126,21 @@ export interface WorkingTreeDiffTab {
   fileName: string
   diffKind: 'staged' | 'unstaged' | 'untracked' | 'deleted'
   projectId: string
+  terminalId: string
+}
+
+// Browser tab (iframe-based; loads local HTML and the user's own localhost app).
+// Distinct from HtmlPreview (srcdoc file preview) — this navigates a real URL.
+export interface BrowserTab {
+  id: string
+  type: 'browser'
+  url: string
+  projectId: string
+  terminalId: string
 }
 
 // Union of all center tab types
-export type CenterTab = EditorTab | DiffTab | WorkingTreeDiffTab
+export type CenterTab = EditorTab | DiffTab | WorkingTreeDiffTab | BrowserTab
 
 // File watcher types
 export const FILE_WATCH_EVENT_TYPES = [
@@ -193,23 +208,10 @@ export interface AutomationRun {
   prNumber?: number
 }
 
-// Layout types
-export type SplitDirection = 'horizontal' | 'vertical'
-
-export interface TerminalLayout {
-  projectId: string
-  // Terminal IDs currently shown in split view (2-3 terminals side by side)
-  // Empty array or single item = no split, just tabs
-  splitTerminalIds: string[]
-  // Percentages for each split pane (should match splitTerminalIds length)
-  splitSizes: number[]
-}
-
 // App state
 export interface AppState {
   projects: Project[]
   terminals: Record<string, TerminalSession>
-  layouts: Record<string, TerminalLayout>
   activeProjectId: string | null
   activeTerminalId: string | null
 }

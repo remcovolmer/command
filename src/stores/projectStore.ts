@@ -4,7 +4,6 @@ import type {
   Project,
   TerminalSession,
   TerminalState,
-  TerminalLayout,
   FileSystemEntry,
   GitStatus,
   Worktree,
@@ -14,6 +13,7 @@ import type {
   EditorTab,
   DiffTab,
   WorkingTreeDiffTab,
+  BrowserTab,
   GitCommit,
   GitCommitLog,
   CenterTab,
@@ -47,7 +47,6 @@ interface ProjectStore {
   // State
   projects: Project[]
   terminals: Record<string, TerminalSession>
-  layouts: Record<string, TerminalLayout>
   activeProjectId: string | null
   activeTerminalId: string | null
 
@@ -85,7 +84,11 @@ interface ProjectStore {
 
   // Editor tab state (includes both file editor and diff tabs)
   editorTabs: Record<string, CenterTab> // tabId -> EditorTab | DiffTab
-  activeCenterTabId: string | null // can be terminal or editor tab (type derived from lookup)
+  // Per-chat active content tab (chatId -> active content tab id). Rendered by the
+  // second panel; the '' key holds content opened without an active chat.
+  activeContentTabId: Record<string, string | null>
+  // Show the project overview in place of the chat (hotkey/sidebar toggled)
+  projectOverviewVisible: boolean
 
   // Hotkey configuration
   hotkeyConfig: HotkeyConfig
@@ -123,7 +126,8 @@ interface ProjectStore {
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
-  setActiveCenterTab: (id: string | null) => void
+  setActiveContentTab: (tabId: string) => void
+  setProjectOverviewVisible: (visible: boolean) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -160,6 +164,7 @@ interface ProjectStore {
   registerSidecarTerminal: (contextKey: string, terminal: TerminalSession) => void
   closeSidecarTerminal: (contextKey: string, terminalId: string) => void
   setSidecarTerminalCollapsed: (collapsed: boolean) => void
+  toggleShellDrawer: () => void
   setActiveSidecarTerminal: (contextKey: string, id: string | null) => void
   getSidecarTerminals: (contextKey: string) => TerminalSession[]
 
@@ -228,6 +233,8 @@ interface ProjectStore {
     projectId: string
   ) => void
   closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
+  openBrowserTab: (projectId: string) => void
+  setBrowserTabUrl: (tabId: string, url: string) => void
 
   // Discard confirmation state
   discardingFiles: { files: string[]; isUntracked: boolean } | null
@@ -274,12 +281,6 @@ interface ProjectStore {
   getProjectWorktrees: (projectId: string) => Worktree[]
   loadWorktrees: (projectId: string) => Promise<void>
 
-  // Layout actions
-  getLayout: (projectId: string) => TerminalLayout | null
-  addToSplit: (projectId: string, terminalId: string) => void
-  removeFromSplit: (projectId: string, terminalId: string) => void
-  setSplitSizes: (projectId: string, sizes: number[]) => void
-
   // Initialization
   loadProjects: () => Promise<void>
 }
@@ -299,7 +300,6 @@ export const useProjectStore = create<ProjectStore>()(
       // Initial state
       projects: [],
       terminals: {},
-      layouts: {},
       activeProjectId: null,
       activeTerminalId: null,
 
@@ -356,7 +356,8 @@ export const useProjectStore = create<ProjectStore>()(
 
       // Editor tab state
       editorTabs: {},
-      activeCenterTabId: null,
+      activeContentTabId: {},
+      projectOverviewVisible: false,
 
       // Hotkey configuration
       hotkeyConfig: DEFAULT_HOTKEY_CONFIG,
@@ -485,10 +486,18 @@ export const useProjectStore = create<ProjectStore>()(
       // Editor tab actions
       openEditorTab: (filePath, fileName, projectId) =>
         set((state) => {
+          const chatId = state.activeTerminalId ?? ''
           // Check if already open
-          const existing = Object.values(state.editorTabs).find((t) => t.filePath === filePath)
+          const existing = Object.values(state.editorTabs).find(
+            (t) => t.type !== 'browser' && t.filePath === filePath
+          )
           if (existing) {
-            return { activeCenterTabId: existing.id }
+            return {
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
           }
           // Enforce tab limit
           const projectTabCount = Object.values(state.editorTabs).filter(
@@ -505,29 +514,30 @@ export const useProjectStore = create<ProjectStore>()(
             fileName,
             isDirty: false,
             projectId,
+            terminalId: chatId,
           }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
-            activeCenterTabId: id,
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
 
       closeEditorTab: (tabId) =>
         set((state) => {
+          const removed = state.editorTabs[tabId]
           const newTabs = { ...state.editorTabs }
           delete newTabs[tabId]
-          let newActiveId = state.activeCenterTabId
-          if (state.activeCenterTabId === tabId) {
-            const remaining = Object.values(newTabs)
-            if (remaining.length > 0) {
-              newActiveId = remaining[remaining.length - 1].id
-            } else {
-              newActiveId = state.activeTerminalId
-            }
+          // Per-chat content map: if the closed tab was its chat's active content,
+          // fall back to another content tab of the same chat, else null.
+          const newContent = { ...state.activeContentTabId }
+          if (removed && newContent[removed.terminalId] === tabId) {
+            const chatTabs = Object.values(newTabs).filter((t) => t.terminalId === removed.terminalId)
+            newContent[removed.terminalId] =
+              chatTabs.length > 0 ? chatTabs[chatTabs.length - 1].id : null
           }
           return {
             editorTabs: newTabs,
-            activeCenterTabId: newActiveId,
+            activeContentTabId: newContent,
           }
         }),
 
@@ -557,12 +567,16 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
-      setActiveCenterTab: (id) =>
-        set((state) => ({
-          activeCenterTabId: id,
-          // If it's a terminal, also update activeTerminalId
-          ...(id && state.terminals[id] ? { activeTerminalId: id } : {}),
-        })),
+      setActiveContentTab: (tabId) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab) return state
+          return {
+            activeContentTabId: { ...state.activeContentTabId, [tab.terminalId]: tabId },
+          }
+        }),
+
+      setProjectOverviewVisible: (visible) => set({ projectOverviewVisible: visible }),
 
       // Hotkey actions
       updateHotkey: (action, binding) =>
@@ -702,7 +716,6 @@ export const useProjectStore = create<ProjectStore>()(
               [contextKey]: terminalId,
             },
             sidecarTerminalCollapsed: false,
-            fileExplorerVisible: true,
           }
         })
       },
@@ -728,7 +741,6 @@ export const useProjectStore = create<ProjectStore>()(
               [contextKey]: state.activeSidecarTerminalId[contextKey] ?? terminal.id,
             },
             sidecarTerminalCollapsed: false,
-            fileExplorerVisible: true,
           }
         })
       },
@@ -764,6 +776,21 @@ export const useProjectStore = create<ProjectStore>()(
       },
 
       setSidecarTerminalCollapsed: (collapsed) => set({ sidecarTerminalCollapsed: collapsed }),
+
+      toggleShellDrawer: () => {
+        const state = get()
+        if (!state.activeProjectId) return
+        const term = state.activeTerminalId ? state.terminals[state.activeTerminalId] : null
+        const worktreeId = term?.worktreeId ?? null
+        const contextKey = worktreeId ?? state.activeProjectId
+        const shells = state.sidecarTerminals[contextKey] ?? []
+        if (shells.length > 0) {
+          set({ sidecarTerminalCollapsed: !state.sidecarTerminalCollapsed })
+        } else {
+          // No shell yet — create one (the drawer appears with its tab).
+          void state.createSidecarTerminal(contextKey, state.activeProjectId, worktreeId ?? undefined)
+        }
+      },
 
       setActiveSidecarTerminal: (contextKey, id) =>
         set((state) => ({
@@ -1011,6 +1038,7 @@ export const useProjectStore = create<ProjectStore>()(
       // Diff tab actions
       openDiffTab: (filePath, fileName, commitHash, parentHash, projectId, oldPath) =>
         set((state) => {
+          const chatId = state.activeTerminalId ?? ''
           // Check if already open with same commit+file
           const existing = Object.values(state.editorTabs).find(
             (t) =>
@@ -1019,7 +1047,12 @@ export const useProjectStore = create<ProjectStore>()(
               t.filePath === filePath
           )
           if (existing) {
-            return { activeCenterTabId: existing.id }
+            return {
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
           }
           const id = `diff-${crypto.randomUUID()}`
           const tab: DiffTab = {
@@ -1030,16 +1063,18 @@ export const useProjectStore = create<ProjectStore>()(
             commitHash,
             parentHash,
             projectId,
+            terminalId: chatId,
             ...(oldPath ? { oldPath } : {}),
           }
           return {
             editorTabs: { ...state.editorTabs, [id]: tab },
-            activeCenterTabId: id,
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
 
       openWorkingTreeDiffTab: (filePath, fileName, diffKind, projectId) =>
         set((state) => {
+          const chatId = state.activeTerminalId ?? ''
           // Check if already open with same file+diffKind
           const existing = Object.values(state.editorTabs).find(
             (t) =>
@@ -1048,7 +1083,12 @@ export const useProjectStore = create<ProjectStore>()(
               t.filePath === filePath
           )
           if (existing) {
-            return { activeCenterTabId: existing.id }
+            return {
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
           }
           // Enforce MAX_EDITOR_TABS
           const MAX_EDITOR_TABS = 15
@@ -1058,7 +1098,8 @@ export const useProjectStore = create<ProjectStore>()(
           const newTabs = { ...state.editorTabs }
           if (projectTabs.length >= MAX_EDITOR_TABS) {
             // Remove oldest non-active tab
-            const toRemove = projectTabs.find((t) => t.id !== state.activeCenterTabId)
+            const activeContentId = state.activeContentTabId[state.activeTerminalId ?? ''] ?? null
+            const toRemove = projectTabs.find((t) => t.id !== activeContentId)
             if (toRemove) delete newTabs[toRemove.id]
           }
           const id = `wt-diff-${crypto.randomUUID()}`
@@ -1069,10 +1110,11 @@ export const useProjectStore = create<ProjectStore>()(
             fileName,
             diffKind,
             projectId,
+            terminalId: chatId,
           }
           return {
             editorTabs: { ...newTabs, [id]: tab },
-            activeCenterTabId: id,
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
           }
         }),
 
@@ -1089,11 +1131,39 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
           if (!changed) return state
-          const newActiveId =
-            state.activeCenterTabId && newTabs[state.activeCenterTabId]
-              ? state.activeCenterTabId
-              : null
-          return { editorTabs: newTabs, activeCenterTabId: newActiveId }
+          // Drop per-chat content pointers to removed tabs; recompute per chat.
+          const newContent = { ...state.activeContentTabId }
+          for (const [chatId, activeId] of Object.entries(newContent)) {
+            if (activeId && !newTabs[activeId]) {
+              const chatTabs = Object.values(newTabs).filter((t) => t.terminalId === chatId)
+              newContent[chatId] = chatTabs.length > 0 ? chatTabs[chatTabs.length - 1].id : null
+            }
+          }
+          return { editorTabs: newTabs, activeContentTabId: newContent }
+        }),
+
+      openBrowserTab: (projectId) =>
+        set((state) => {
+          const chatId = state.activeTerminalId ?? ''
+          const id = `browser-${crypto.randomUUID()}`
+          const tab: BrowserTab = {
+            id,
+            type: 'browser',
+            url: 'http://localhost:5173',
+            projectId,
+            terminalId: chatId,
+          }
+          return {
+            editorTabs: { ...state.editorTabs, [id]: tab },
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
+          }
+        }),
+
+      setBrowserTabUrl: (tabId, url) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab || tab.type !== 'browser') return state
+          return { editorTabs: { ...state.editorTabs, [tabId]: { ...tab, url } } }
         }),
 
       // Discard confirmation actions
@@ -1183,10 +1253,6 @@ export const useProjectStore = create<ProjectStore>()(
             }
           })
 
-          // Remove layout
-          const newLayouts = { ...state.layouts }
-          delete newLayouts[id]
-
           // Update active project if needed
           const newProjects = state.projects.filter((p) => p.id !== id)
           const newActiveProjectId =
@@ -1215,6 +1281,9 @@ export const useProjectStore = create<ProjectStore>()(
           for (const [tabId, tab] of Object.entries(newEditorTabs)) {
             if (tab.projectId === id) delete newEditorTabs[tabId]
           }
+          // Clean per-chat content pointers for the removed project's chats
+          const newActiveContentTabId = { ...state.activeContentTabId }
+          for (const tid of removedTerminalIds) delete newActiveContentTabId[tid]
 
           // Clean per-project/worktree keyed state
           const newGitStatus = { ...state.gitStatus }
@@ -1264,27 +1333,15 @@ export const useProjectStore = create<ProjectStore>()(
             state.activeTerminalId && newTerminals[state.activeTerminalId]
               ? state.activeTerminalId
               : null
-          // Fix activeCenterTabId: check both terminals and remaining editor tabs
-          let newActiveCenterTabId = state.activeCenterTabId
-          if (
-            state.activeProjectId === id ||
-            (newActiveCenterTabId &&
-              !newTerminals[newActiveCenterTabId] &&
-              !newEditorTabs[newActiveCenterTabId])
-          ) {
-            newActiveCenterTabId = newActiveTerminalId
-          }
-
           return {
             projects: newProjects,
             terminals: newTerminals,
             worktrees: newWorktrees,
-            layouts: newLayouts,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
             activeProjectId: newActiveProjectId,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveCenterTabId,
+            activeContentTabId: newActiveContentTabId,
             editorTabs: newEditorTabs,
             gitStatus: newGitStatus,
             gitStatusLoading: newGitStatusLoading,
@@ -1322,7 +1379,7 @@ export const useProjectStore = create<ProjectStore>()(
             activeProjectId: id,
             collapsedProjects: newCollapsedProjects,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveTerminalId,
+            projectOverviewVisible: false,
             directoryCache: {},
             // Clear ephemeral file explorer state to prevent cross-project operations
             fileExplorerSelectedPath: null,
@@ -1376,7 +1433,7 @@ export const useProjectStore = create<ProjectStore>()(
           terminals: { ...state.terminals, [terminal.id]: terminal },
           activeProjectId: terminal.projectId,
           activeTerminalId: terminal.id,
-          activeCenterTabId: terminal.id,
+          projectOverviewVisible: false,
         })),
 
       removeTerminal: (id) =>
@@ -1385,42 +1442,16 @@ export const useProjectStore = create<ProjectStore>()(
           const removedTerminal = newTerminals[id]
           delete newTerminals[id]
 
-          // Update active terminal and center tab if needed
+          // Update active terminal if needed
           let newActiveTerminalId = state.activeTerminalId
-          let newActiveCenterTabId = state.activeCenterTabId
 
-          if (state.activeTerminalId === id || state.activeCenterTabId === id) {
+          if (state.activeTerminalId === id) {
             const visible = getVisibleTerminals(
               newTerminals,
               state.sidecarTerminals,
               removedTerminal?.projectId ?? ''
             )
-            const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
-
-            if (state.activeTerminalId === id) {
-              newActiveTerminalId = fallbackTerminalId
-            }
-            if (state.activeCenterTabId === id) {
-              newActiveCenterTabId = fallbackTerminalId
-            }
-          }
-
-          // Also remove from split layout if present
-          const newLayouts = { ...state.layouts }
-          if (removedTerminal) {
-            const layout = newLayouts[removedTerminal.projectId]
-            if (layout && layout.splitTerminalIds.includes(id)) {
-              const newSplitIds = layout.splitTerminalIds.filter((tid) => tid !== id)
-              if (newSplitIds.length <= 1) {
-                delete newLayouts[removedTerminal.projectId]
-              } else {
-                newLayouts[removedTerminal.projectId] = {
-                  ...layout,
-                  splitTerminalIds: newSplitIds,
-                  splitSizes: newSplitIds.map(() => 100 / newSplitIds.length),
-                }
-              }
-            }
+            newActiveTerminalId = visible.length > 0 ? visible[0].id : null
           }
 
           // Clean stale ID from sidecarTerminals
@@ -1441,11 +1472,21 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
+          const newActiveContentTabId = { ...state.activeContentTabId }
+          delete newActiveContentTabId[id]
+
+          // Close the removed chat's content tabs — they're scoped to it, so
+          // leaving them would orphan unreachable tabs in editorTabs.
+          const newEditorTabs = { ...state.editorTabs }
+          for (const [tabId, tab] of Object.entries(newEditorTabs)) {
+            if (tab.terminalId === id) delete newEditorTabs[tabId]
+          }
+
           return {
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveCenterTabId,
-            layouts: newLayouts,
+            activeContentTabId: newActiveContentTabId,
+            editorTabs: newEditorTabs,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
           }
@@ -1528,12 +1569,12 @@ export const useProjectStore = create<ProjectStore>()(
       setActiveTerminal: (id) =>
         set((state) => {
           if (id === null) {
-            return { activeTerminalId: null, activeCenterTabId: null }
+            return { activeTerminalId: null }
           }
 
           const terminal = state.terminals[id]
           if (!terminal) {
-            return { activeTerminalId: id, activeCenterTabId: id }
+            return { activeTerminalId: id, projectOverviewVisible: false }
           }
 
           // Als terminal in ander project zit, wissel ook van project
@@ -1541,11 +1582,11 @@ export const useProjectStore = create<ProjectStore>()(
             return {
               activeProjectId: terminal.projectId,
               activeTerminalId: id,
-              activeCenterTabId: id,
+              projectOverviewVisible: false,
             }
           }
 
-          return { activeTerminalId: id, activeCenterTabId: id }
+          return { activeTerminalId: id, projectOverviewVisible: false }
         }),
 
       getProjectTerminals: (projectId) => {
@@ -1555,7 +1596,10 @@ export const useProjectStore = create<ProjectStore>()(
 
       getWorktreeTerminals: (worktreeId) => {
         const state = get()
-        return Object.values(state.terminals).filter((t) => t.worktreeId === worktreeId)
+        // Chats only — sidecar 'normal' shells live in the bottom drawer, not the sidebar.
+        return Object.values(state.terminals).filter(
+          (t) => t.worktreeId === worktreeId && t.type !== 'normal'
+        )
       },
 
       // Worktree actions
@@ -1634,30 +1678,20 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
-          // Update active terminal and center tab if they were in the removed worktree
+          // Update active terminal if it was in the removed worktree
           let newActiveTerminalId = state.activeTerminalId
-          let newActiveCenterTabId = state.activeCenterTabId
           const activeTerminalGone = state.activeTerminalId && !newTerminals[state.activeTerminalId]
-          const activeCenterGone =
-            state.activeCenterTabId &&
-            !newTerminals[state.activeCenterTabId] &&
-            !newEditorTabs[state.activeCenterTabId]
-
-          if (activeTerminalGone || activeCenterGone) {
+          if (activeTerminalGone) {
             const visible = getVisibleTerminals(
               newTerminals,
               newSidecarTerminals,
               removedWorktree?.projectId ?? ''
             )
-            const fallbackTerminalId = visible.length > 0 ? visible[0].id : null
-
-            if (activeTerminalGone) {
-              newActiveTerminalId = fallbackTerminalId
-            }
-            if (activeCenterGone) {
-              newActiveCenterTabId = fallbackTerminalId
-            }
+            newActiveTerminalId = visible.length > 0 ? visible[0].id : null
           }
+          // Clean per-chat content pointers for removed worktree chats
+          const newActiveContentTabId = { ...state.activeContentTabId }
+          for (const tid of removedTerminalIds) delete newActiveContentTabId[tid]
 
           return {
             worktrees: newWorktrees,
@@ -1673,7 +1707,7 @@ export const useProjectStore = create<ProjectStore>()(
             expandedPaths: newExpandedPaths,
             directoryCache: newDirectoryCache,
             activeTerminalId: newActiveTerminalId,
-            activeCenterTabId: newActiveCenterTabId,
+            activeContentTabId: newActiveContentTabId,
           }
         }),
 
@@ -1705,88 +1739,6 @@ export const useProjectStore = create<ProjectStore>()(
         }
       },
 
-      // Layout actions
-      getLayout: (projectId) => {
-        const state = get()
-        return state.layouts[projectId] ?? null
-      },
-
-      addToSplit: (projectId, terminalId) =>
-        set((state) => {
-          const currentLayout = state.layouts[projectId] ?? {
-            projectId,
-            splitTerminalIds: [],
-            splitSizes: [],
-          }
-
-          // Don't add if already in split or at max
-          if (
-            currentLayout.splitTerminalIds.includes(terminalId) ||
-            currentLayout.splitTerminalIds.length >= MAX_TERMINALS_PER_PROJECT
-          ) {
-            return state
-          }
-
-          const newSplitIds = [...currentLayout.splitTerminalIds, terminalId]
-          // Distribute sizes evenly
-          const newSizes = newSplitIds.map(() => 100 / newSplitIds.length)
-
-          return {
-            layouts: {
-              ...state.layouts,
-              [projectId]: {
-                projectId,
-                splitTerminalIds: newSplitIds,
-                splitSizes: newSizes,
-              },
-            },
-          }
-        }),
-
-      removeFromSplit: (projectId, terminalId) =>
-        set((state) => {
-          const currentLayout = state.layouts[projectId]
-          if (!currentLayout) return state
-
-          const newSplitIds = currentLayout.splitTerminalIds.filter((id) => id !== terminalId)
-
-          // If only one left, clear the split
-          if (newSplitIds.length <= 1) {
-            const newLayouts = { ...state.layouts }
-            delete newLayouts[projectId]
-            return { layouts: newLayouts }
-          }
-
-          // Redistribute sizes evenly
-          const newSizes = newSplitIds.map(() => 100 / newSplitIds.length)
-
-          return {
-            layouts: {
-              ...state.layouts,
-              [projectId]: {
-                projectId,
-                splitTerminalIds: newSplitIds,
-                splitSizes: newSizes,
-              },
-            },
-          }
-        }),
-
-      setSplitSizes: (projectId, sizes) =>
-        set((state) => {
-          const currentLayout = state.layouts[projectId]
-          if (!currentLayout) return state
-
-          return {
-            layouts: {
-              ...state.layouts,
-              [projectId]: {
-                ...currentLayout,
-                splitSizes: sizes,
-              },
-            },
-          }
-        }),
 
       // Initialization
       loadProjects: async () => {
@@ -1811,8 +1763,6 @@ export const useProjectStore = create<ProjectStore>()(
     {
       name: 'command-center-storage',
       partialize: (state) => ({
-        // Only persist layouts, not terminals (they need to be recreated)
-        layouts: state.layouts,
         activeProjectId: state.activeProjectId,
         // File explorer state
         fileExplorerVisible: state.fileExplorerVisible,
@@ -1849,6 +1799,11 @@ export const useProjectStore = create<ProjectStore>()(
         // safety net for the pre-hydration window.
         if (state?.hotkeyConfig) {
           state.hotkeyConfig = mergeMissingHotkeyDefaults(state.hotkeyConfig)
+        }
+        // Drop the removed split-view `layouts` slice from older persisted state
+        // (split-view was removed; the key is now dead and otherwise lingers).
+        if (state && 'layouts' in state) {
+          delete (state as Record<string, unknown>).layouts
         }
         // Migrate expandedPaths from old string[] format to Record<string, true>
         if (state?.expandedPaths) {

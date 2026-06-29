@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>feat: Tweede paneel & rechterkant-herontwerp</title>
+<style>
+  :root {
+    --ink:#1a1f2e; --muted:#5b6678; --faint:#8b95a7; --line:#e3e7ee; --bg:#f7f8fa; --card:#fff;
+    --accent:#4f46e5; --accent-soft:#eef0fe; --green:#0f9d6e; --green-soft:#e6f6ef;
+    --amber:#c2870b; --amber-soft:#fdf4e1; --red:#d1453b; --red-soft:#fcebe9;
+    --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;font-size:15px;}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 28px 96px;}
+  a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
+  code{font-family:var(--mono);font-size:.88em;background:#eef0f3;padding:1px 5px;border-radius:4px;}
+  header.doc{border-bottom:3px solid var(--accent);padding-bottom:20px;margin-bottom:8px;}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;}
+  h1{font-size:29px;line-height:1.2;margin:0 0 14px;letter-spacing:-.01em;}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted);}
+  .meta b{color:var(--ink);font-weight:600;}
+  section{border-top:1px solid var(--line);padding-top:8px;margin-top:34px;}
+  section.first{border-top:0;margin-top:24px;}
+  h2{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:18px 0 6px;}
+  .at{font-size:20px;font-weight:650;line-height:1.32;letter-spacing:-.01em;margin:0 0 16px;color:var(--ink);}
+  p{margin:0 0 13px;max-width:74ch;} .lead{font-size:16px;}
+  .grp{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);margin:24px 0 2px;}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;}
+  .id{font-family:var(--mono);font-weight:700;color:var(--accent);white-space:nowrap;}
+  /* KTD */
+  .ktd{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;background:var(--card);padding:14px 20px;margin:12px 0;}
+  .ktd h4{margin:0 0 6px;font-size:15px;} .ktd h4 .id{margin-right:8px;}
+  .ktd p{margin:0;font-size:14px;color:var(--muted);}
+  /* units */
+  nav.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 18px;}
+  nav.subnav a{font-family:var(--mono);font-size:12px;background:var(--accent-soft);border:1px solid #d6d9fb;border-radius:6px;padding:3px 9px;color:var(--accent);}
+  .phase{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);margin:22px 0 0;}
+  article.unit{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:16px 20px;margin:12px 0;}
+  article.unit h3{margin:0 0 10px;font-size:16.5px;} article.unit h3 .id{margin-right:8px;}
+  dl.strip{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0 0 8px;font-size:13.5px;}
+  dl.strip dt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;padding-top:2px;}
+  dl.strip dd{margin:0;} dl.strip dd code{font-size:.86em;}
+  .execnote{background:var(--amber-soft);border:1px solid #ecd9ad;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px;color:#7a5a08;}
+  .execnote b{color:var(--amber);}
+  details{margin:6px 0;border-top:1px solid var(--line);padding-top:6px;}
+  summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  details[open] summary{margin-bottom:8px;}
+  details ul{margin:6px 0;padding-left:20px;font-size:13.5px;} details li{margin:4px 0;}
+  details p{font-size:13.5px;}
+  .cov{font-family:var(--mono);font-size:11px;color:var(--green);font-weight:700;}
+  /* before/after + scope */
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;}
+  .ba .col{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);}
+  .ba .col h4{margin:0;padding:9px 14px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;}
+  .ba .before h4{background:var(--red-soft);color:var(--red);} .ba .after h4{background:var(--green-soft);color:var(--green);}
+  .ba .col .body{padding:12px 14px;font-size:13px;font-family:var(--mono);color:var(--muted);}
+  .scope{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;}
+  .scope .col{border:1px solid var(--line);border-radius:10px;padding:4px 18px 14px;}
+  .scope .defer{background:var(--amber-soft);border-color:#ecd9ad;} .scope .out{background:#eef1f5;}
+  .scope h4{font-size:12px;letter-spacing:.07em;text-transform:uppercase;margin:14px 0 4px;}
+  .scope .defer h4{color:var(--amber);} .scope .out h4{color:var(--muted);}
+  .scope ul{margin:0;padding-left:18px;font-size:13.5px;} .scope li{margin:5px 0;}
+  ul.tight{margin:6px 0 12px;padding-left:20px;} ul.tight li{margin:5px 0;font-size:14px;}
+  .risk{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:12px 18px;margin:10px 0;font-size:14px;}
+  .risk .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);}
+  /* svg */
+  figure{margin:16px 0;} figcaption{font-size:12.5px;color:var(--faint);margin-top:8px;}
+  .svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:14px;}
+  footer.sig{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint);}
+  footer.sig code{background:none;padding:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">Implementation Plan</p>
+  <h1>feat: Tweede paneel &amp; rechterkant-herontwerp</h1>
+  <div class="meta">
+    <span><b>title</b> feat: Tweede paneel &amp; rechterkant-herontwerp</span>
+    <span><b>type</b> feat</span>
+    <span><b>date</b> <time datetime="2026-06-29">2026-06-29</time></span>
+    <span><b>depth</b> Deep</span>
+    <span><b>origin</b> <code>docs/brainstorms/2026-06-26-tweede-paneel-redesign-requirements.html</code></span>
+  </div>
+</header>
+
+<section class="first">
+  <h2>Summary</h2>
+  <p class="lead">Herontwerp de rechterkant van Command Center tot vier zones — chat-kolom, tweede paneel (bestanden + iframe-browser), icoon-rail met auto-sluitende flyouts, en een bottom shell-drawer — waarbij het hele werkgebied (content-tabs én shell) <b>per-chat</b> gescoped is. Verwijder de split-chat. De kern-refactor splitst de huidige globale <code>activeCenterTabId</code> (die chats en editor-tabs mengt) in een actieve-chat plus een per-chat actieve content-tab.</p>
+</section>
+
+<section>
+  <h2>Problem Frame</h2>
+  <p>Het centrum mengt vandaag chats en editor-tabs onder één <code>activeCenterTabId</code>; de file explorer is een vaste rechterkolom; de split-chat werkt matig en geopende pagina's hangen aan niets vast. Je wilt per gesprek je chat, het relevante bestand en een browser tegelijk zien, en bij chat-wissel moet de rechterkant meeschakelen. Dat vraagt een nieuwe layout-topologie én een per-chat state-model — geen losse UI-tweak.</p>
+</section>
+
+<section>
+  <h2>High-Level Technical Design</h2>
+  <p class="at">De layout wordt geneste resizable-panels; de state-pivot is het per-chat scopen van content-tabs en shells.</p>
+
+  <figure>
+    <div class="svgwrap">
+      <svg viewBox="0 0 900 290" width="100%" role="img" aria-label="Geneste panel-topologie">
+        <style>
+          .b{fill:#fff;stroke:#cbd2dd;stroke-width:1.5;rx:8}
+          .g{fill:#eef0fe;stroke:#c7ccf6;stroke-width:1.5}
+          .lbl{font:600 13px -apple-system,Segoe UI,sans-serif;fill:#1a1f2e}
+          .sub{font:11px ui-monospace,Consolas,monospace;fill:#5b6678}
+          .tag{font:700 10px ui-monospace,Consolas,monospace;fill:#4f46e5}
+        </style>
+        <rect x="8" y="8" width="884" height="274" rx="10" fill="none" stroke="#c7ccf6" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="18" y="26" class="tag">Outer PanelGroup · horizontal · autoSaveId="main-layout"</text>
+        <!-- projects -->
+        <rect x="18" y="38" width="120" height="232" rx="8" fill="#fff" stroke="#cbd2dd" stroke-width="1.5"/>
+        <text x="30" y="60" class="lbl">Projecten</text>
+        <text x="30" y="78" class="sub">(ongewijzigd)</text>
+        <!-- mainstack -->
+        <rect x="150" y="38" width="640" height="232" rx="8" fill="none" stroke="#c7ccf6" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="162" y="56" class="tag">Mainstack · vertical PanelGroup</text>
+        <!-- upper -->
+        <rect x="162" y="64" width="616" height="140" rx="8" fill="none" stroke="#c7ccf6" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="174" y="82" class="tag">Upper · horizontal PanelGroup</text>
+        <rect x="174" y="90" width="250" height="104" rx="8" fill="#e6f6ef" stroke="#0f9d6e" stroke-width="1.5"/>
+        <text x="188" y="114" class="lbl">Chat-kolom</text>
+        <text x="188" y="132" class="sub">chats (tabs), altijd ≥1</text>
+        <rect x="436" y="90" width="330" height="104" rx="8" fill="#eef0fe" stroke="#4f46e5" stroke-width="1.5"/>
+        <text x="450" y="114" class="lbl">Tweede paneel</text>
+        <text x="450" y="132" class="sub">editor/diff + browser tabs</text>
+        <text x="450" y="148" class="sub">per-chat content</text>
+        <!-- shell -->
+        <rect x="162" y="212" width="616" height="50" rx="8" fill="#fdf4e1" stroke="#c2870b" stroke-width="1.5"/>
+        <text x="174" y="234" class="lbl">Shell-drawer</text>
+        <text x="174" y="252" class="sub">per-chat · toggle · spant chat + tweede paneel</text>
+        <!-- rail -->
+        <rect x="802" y="38" width="82" height="232" rx="8" fill="#fff" stroke="#cbd2dd" stroke-width="1.5"/>
+        <text x="812" y="58" class="lbl">Rail</text>
+        <text x="812" y="76" class="sub">files</text><text x="812" y="92" class="sub">git</text>
+        <text x="812" y="108" class="sub">tasks</text><text x="812" y="124" class="sub">autom.</text>
+        <text x="812" y="250" class="tag">shell⌃</text>
+      </svg>
+    </div>
+    <figcaption>Layout-topologie. De rail is full-height uiterst rechts; flyouts overlayen het tweede paneel en sluiten bij blur. Paneel-afmetingen persisteren globaal via <code>autoSaveId</code>; alleen content + shell zijn per-chat.</figcaption>
+  </figure>
+
+  <div class="ba">
+    <div class="col before"><h4>State nu</h4><div class="body">activeCenterTabId: string | null<br>&nbsp;&nbsp;→ wijst naar terminal OF editor-tab<br>editorTabs: Record&lt;tabId, CenterTab&gt;<br>&nbsp;&nbsp;(globaal, niet per-chat)<br>layouts: Record&lt;projId, {splitTerminalIds,…}&gt;<br>sidecarTerminals: Record&lt;worktree|proj, …&gt;</div></div>
+    <div class="col after"><h4>State straks</h4><div class="body">activeTerminalId = de actieve chat<br>activeContentTabId: Record&lt;chatId, tabId|null&gt;<br>CenterTab krijgt terminalId (eigenaar-chat)<br>+ tab-type 'browser'<br>layouts: verwijderd<br>sidecar* : Record&lt;chatId, …&gt; (per-chat)</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Requirements</h2>
+  <p>Overgenomen uit de origin requirements-doc; ongewijzigd van betekenis. Mapping naar units in de kolom rechts.</p>
+
+  <p class="grp">Layout &amp; navigatie</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r1">R1</td><td>Vier zones: chat-kolom, tweede paneel, icoon-rail uiterst rechts, shell-drawer onderaan.</td><td class="id">U4</td></tr>
+    <tr><td class="id" id="r2">R2</td><td>Rail met files/git/tasks/automations als iconen (boven) + shell-toggle (voet); klik opent flyout-overlay die sluit bij blur. Geen vastpinnen in v1.</td><td class="id">U6, U7</td></tr>
+    <tr><td class="id" id="r3">R3</td><td>Rail-panelen zijn worktree-gescoped: ze tonen de worktree van de actieve chat.</td><td class="id">U6</td></tr>
+  </table>
+
+  <p class="grp">Tweede paneel</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r4">R4</td><td>Tweede paneel houdt bestanden (editors/diffs) + browser vast als peer-tabs in één tabrij.</td><td class="id">U5, U8</td></tr>
+    <tr><td class="id" id="r5">R5</td><td>Een bestand openen opent het in het tweede paneel — nooit vermengd met de chat-kolom.</td><td class="id">U2, U5</td></tr>
+    <tr><td class="id" id="r6">R6</td><td>Content-tabs zijn per-chat; van chat wisselen wisselt de tabs mee.</td><td class="id">U2, U5</td></tr>
+    <tr><td class="id" id="r7">R7</td><td>Geen open content → tweede paneel klapt in, chat vult de breedte.</td><td class="id">U4, U5</td></tr>
+  </table>
+
+  <p class="grp">Browser</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r8">R8</td><td>Browser-tab laadt lokale HTML én eigen localhost-app via URL-balk, op iframe-basis.</td><td class="id">U8</td></tr>
+  </table>
+
+  <p class="grp">Shell</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r9">R9</td><td>Shell als bottom-drawer over chat + tweede paneel (niet onder projecten), te toggelen.</td><td class="id">U7</td></tr>
+    <tr><td class="id" id="r10">R10</td><td>Shells per-chat; van chat wisselen wisselt de drawer mee.</td><td class="id">U7</td></tr>
+    <tr><td class="id" id="r11">R11</td><td>Uit-beeld geraakte shell blijft op de achtergrond doordraaien (output gebufferd) en herstelt; niet gekild.</td><td class="id">U7</td></tr>
+  </table>
+
+  <p class="grp">Verwijdering</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r12">R12</td><td>Split-chat volledig verwijderd (state, acties, pool-bescherming, UI, hotkeys); altijd één chat zichtbaar per kolom.</td><td class="id">U1, U9</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Key Technical Decisions</h2>
+  <div class="ktd"><h4><span class="id">KTD1</span>Per-chat content via <code>activeContentTabId: Record&lt;chatId, tabId|null&gt;</code> + <code>terminalId</code> op elke CenterTab</h4>
+    <p>De globale <code>activeCenterTabId</code> splitst in de bestaande <code>activeTerminalId</code> (de actieve chat) plus een per-chat map naar de actieve content-tab. Een <code>terminalId</code>-veld op <code>EditorTab</code>/<code>DiffTab</code> maakt de eigenaar-chat expliciet — eenvoudiger dan een geneste record voor de close-fallback-logica. <code>chatId</code> wordt top-down ge-threaded (<code>file-explorer-worktree-awareness</code> patroon), membership-checks als <code>Record&lt;,true&gt;</code> niet arrays.</p></div>
+  <div class="ktd"><h4><span class="id">KTD2</span>Geneste resizable-panels; afmetingen globaal, content per-chat</h4>
+    <p>Outer horizontale PanelGroup (projecten | mainstack | rail), mainstack verticaal (upper | shell), upper horizontaal (chat | tweede paneel) — elk met een eigen <code>autoSaveId</code>. Paneel-<em>afmetingen</em> blijven globaal persistent via react-resizable-panels (localStorage), zoals nu; alleen de <em>inhoud</em> (content-tabs, shells) is per-chat. Voorspelbaarder dan per-chat afmetingen.</p></div>
+  <div class="ktd"><h4><span class="id">KTD3</span>Browser = nieuw tab-type met URL-balk, los van de bestaande HTML-preview</h4>
+    <p>Een nieuw <code>'browser'</code> tab-type met een <code>src</code>-gebaseerde iframe + URL-balk, dat localhost en lokale bestanden laadt. Dit is iets anders dan <code>HtmlPreview</code> (<code>srcdoc</code>-preview van een geopend <code>.html</code>); beide bestaan naast elkaar als tabs. Externe SaaS is uitgesloten (iframe-blokkering); de structuur laat een latere echte webview toe (vereist <code>webviewTag</code> of <code>WebContentsView</code>).</p></div>
+  <div class="ktd"><h4><span class="id">KTD4</span>Split-removal ontmantelt de pool-split-bescherming, behoudt de rest van het LRU-patroon</h4>
+    <p>Verwijder <code>layouts</code>, <code>addToSplit</code>/<code>removeFromSplit</code>/<code>setSplitSizes</code> en de split-uitzondering in <code>terminalPool</code>'s eviction. Behoud de callback-registry en de restore-after-subscribe-volgorde — alleen de <code>isSplitPanel</code>-check vervalt. Bescherming voor <code>busy</code>/<code>permission</code>/<code>question</code> + actieve chat blijft (zie <code>terminal-lru-pooling</code>).</p></div>
+  <div class="ktd"><h4><span class="id">KTD5</span>Verborgen panelen/terminals: <code>visibility:hidden</code> + <code>pointer-events:none</code>, nooit <code>display:none</code></h4>
+    <p>Load-bearing: xterm's scrollbar/viewport-sync gebruikt <code>requestAnimationFrame</code> dat onder <code>display:none</code> wordt geknepen, waardoor <code>FitAddon.fit()</code> een no-op wordt (zie <code>chat-scrollbar-disappears-fitaddon</code>). Geldt voor de flyout, de bottom-drawer en het ingeklapte/inactieve tweede paneel — mounted houden, visibility togglen.</p></div>
+  <div class="ktd"><h4><span class="id">KTD6</span>Persisted-state migratie in <code>onRehydrateStorage</code> met version-guard</h4>
+    <p>Verwijder <code>layouts</code> uit de <code>partialize</code> (oude waarde wordt genegeerd); migreer <code>sidecarTerminalCollapsed</code> van globale boolean naar per-chat record; bump de persist-versie. <code>editorTabs</code> blijft ephemeral (niet gepersisteerd, heropent met de chat). Migratie draait vóór nieuwe code de state leest (zie <code>file-explorer-worktree-awareness</code>).</p></div>
+  <div class="ktd"><h4><span class="id">KTD7</span>State-side-effects in store-acties, niet in UI-handlers</h4>
+    <p>Sluiten-van-laatste-content-tab → terugvallen op de chat, en openen → activeren, gebeurt atomair binnen de Zustand-actie (één <code>set()</code>), zodat klik, hotkey en IPC hetzelfde gedrag geven (zie <code>hotkey-handler-missing-auto-switch</code>).</p></div>
+</section>
+
+<section>
+  <h2>Implementation Units</h2>
+  <nav class="subnav">
+    <a href="#u1">U1</a><a href="#u2">U2</a><a href="#u3">U3</a><a href="#u4">U4</a><a href="#u5">U5</a><a href="#u6">U6</a><a href="#u7">U7</a><a href="#u8">U8</a><a href="#u9">U9</a>
+  </nav>
+
+  <p class="phase">Fase A — Verwijdering &amp; state-fundament</p>
+
+  <article class="unit" id="u1">
+    <h3><span class="id">U1.</span>Verwijder de split-chat</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Verwijder split-view volledig zodat per chat-kolom altijd één chat zichtbaar is.</dd>
+      <dt>Requirements</dt><dd>R12</dd>
+      <dt>Dependencies</dt><dd>—</dd>
+      <dt>Files</dt><dd><code>src/types/index.ts</code> (TerminalLayout, SplitDirection), <code>src/stores/projectStore.ts</code> (layouts, addToSplit/removeFromSplit/setSplitSizes), <code>src/utils/terminalPool.ts</code> (split-eviction-check), <code>src/components/Layout/TerminalArea.tsx</code>, <code>src/components/Terminal/TerminalViewport.tsx</code>, <code>src/components/Terminal/TerminalTabBar.tsx</code>, <code>src/App.tsx</code>, <code>src/utils/hotkeys.ts</code>, <code>test/terminalPool.test.ts</code></dd>
+    </dl>
+    <div class="execnote"><b>Execution note:</b> characterization-first — draai <code>test/terminalPool.test.ts</code> en <code>test/projectStore.test.ts</code> vóór en na; bevestig dat eviction nog <code>busy</code>/<code>permission</code>/<code>question</code> + de actieve chat beschermt.</div>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Verwijder de <code>splitTerminalIds</code>-detectie in <code>TerminalArea</code>; <code>TerminalViewport</code> wordt single-pane. Schrap de <code>isSplitPanel</code>-uitzondering in <code>getEvictionCandidate()</code> maar laat de callback-registry en restore-after-subscribe-volgorde intact (KTD4). Haal de <code>terminal.split</code>/<code>terminal.unsplit</code> acties + handlers weg.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li>Pool beschermt nog de actieve chat + <code>busy</code>/<code>permission</code>/<code>question</code>; geen verwijzing meer naar split.</li>
+        <li>Geen split-UI rendert; <code>Ctrl+\</code> doet niets meer (tot herbruikt in U9).</li>
+        <li>Bestaande pool/store-tests groen na verwijderen van <code>layouts</code>.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>App start, één chat zichtbaar, geen split-affordances; testsuite groen.</p></details>
+  </article>
+
+  <article class="unit" id="u2">
+    <h3><span class="id">U2.</span>Per-chat content-tab state</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Splits <code>activeCenterTabId</code> in actieve-chat + <code>activeContentTabId</code> per chat; content-tabs krijgen een eigenaar-chat.</dd>
+      <dt>Requirements</dt><dd>R5, R6</dd>
+      <dt>Dependencies</dt><dd>U1</dd>
+      <dt>Files</dt><dd><code>src/types/index.ts</code> (terminalId op EditorTab/DiffTab), <code>src/stores/projectStore.ts</code> (activeContentTabId, openEditorTab/closeEditorTab, selectors), <code>test/projectStore.test.ts</code></dd>
+    </dl>
+    <div class="execnote"><b>Execution note:</b> test-first op de store-acties — de close→auto-switch-logica leeft in de actie (KTD7), niet in de UI.</div>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Voeg <code>activeContentTabId: Record&lt;chatId, string|null&gt;</code> toe en een <code>terminalId</code>-veld op content-tabs (KTD1). <code>openEditorTab</code> koppelt aan de actieve chat en zet diens actieve content-tab; <code>closeEditorTab</code> valt binnen de actie terug op de vorige content-tab of (leeg) op de chat. Membership via <code>Record&lt;,true&gt;</code>. <code>chatId</code> top-down threaden.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li><span class="cov">Covers AE1.</span> Chat A opent <code>App.tsx</code>+browser, chat B opent <code>store.ts</code>; wisselen toont de juiste set, terugwisselen herstelt.</li>
+        <li><span class="cov">Covers AE2.</span> Chat zonder content → <code>activeContentTabId[chat]</code> is null.</li>
+        <li>Sluiten van de laatste content-tab valt terug op de chat — identiek via klik, hotkey en IPC-pad.</li>
+        <li>Hetzelfde bestand in twee chats geeft twee onafhankelijke tabs (filter op filePath + terminalId).</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Store-tests dekken wissel/openen/sluiten; geen globale <code>activeCenterTabId</code> meer gelezen.</p></details>
+  </article>
+
+  <article class="unit" id="u3">
+    <h3><span class="id">U3.</span>Persisted-state migratie</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Migreer de gepersisteerde Zustand-shape veilig na split-removal + per-chat re-keying.</dd>
+      <dt>Requirements</dt><dd>R12 (afgeleid)</dd>
+      <dt>Dependencies</dt><dd>U1, U2</dd>
+      <dt>Files</dt><dd><code>src/stores/projectStore.ts</code> (partialize, persist-version, onRehydrateStorage), <code>test/projectStore.test.ts</code></dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Haal <code>layouts</code> uit <code>partialize</code>; migreer <code>sidecarTerminalCollapsed</code> boolean → per-chat record (default ingeklapt); bump de persist-versie en doe de transform in <code>onRehydrateStorage</code> vóór nieuwe reads (KTD6). <code>editorTabs</code> blijft ephemeral.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li>Oude persisted state met <code>layouts</code> hydrateert schoon (geen crash, layouts genegeerd).</li>
+        <li>Oude globale <code>sidecarTerminalCollapsed: boolean</code> migreert naar het record-formaat.</li>
+        <li>Version-guard draait de migratie eenmalig; tweede hydrate is een no-op.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Bestaande installatie update zonder kapotte UI; migratie-tests groen.</p></details>
+  </article>
+
+  <p class="phase">Fase B — Layout &amp; tweede paneel</p>
+
+  <article class="unit" id="u4">
+    <h3><span class="id">U4.</span>Nieuwe layout-topologie</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Herstructureer MainLayout naar vier zones met geneste resizable-panels.</dd>
+      <dt>Requirements</dt><dd>R1, R7</dd>
+      <dt>Dependencies</dt><dd>U2</dd>
+      <dt>Files</dt><dd><code>src/components/Layout/MainLayout.tsx</code>, <code>src/components/Layout/TerminalArea.tsx</code> (chat-kolom-rol), nieuw <code>src/components/Layout/SecondPanel.tsx</code> (skelet)</dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Outer horizontale PanelGroup (projecten | mainstack | rail); mainstack verticaal (upper | shell-drawer-slot); upper horizontaal (chat-kolom | tweede paneel) — elk een eigen <code>autoSaveId</code> (KTD2). Tweede paneel collapst (collapsedSize 0) wanneer de actieve chat geen content heeft, zoals het bestaande <code>fileExplorerVisible</code>/<code>ImperativePanelHandle</code>-patroon. <code>TerminalArea</code> rendert nu alleen de chat-kolom.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li>Vier zones renderen; chat-kolom links altijd zichtbaar.</li>
+        <li><span class="cov">Covers AE2.</span> Actieve chat zonder content → tweede paneel ingeklapt, chat vult de breedte.</li>
+        <li>Resize van zones persisteert over herstart (globale autoSaveId).</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Visuele topologie matcht de origin-wireframe; panelen resizen en persisteren.</p></details>
+  </article>
+
+  <article class="unit" id="u5">
+    <h3><span class="id">U5.</span>Tweede paneel — content-host</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Render de content-tabs van de actieve chat (editor/diff + browser) met een per-chat tabrij.</dd>
+      <dt>Requirements</dt><dd>R4, R5, R6, R7</dd>
+      <dt>Dependencies</dt><dd>U2, U4</dd>
+      <dt>Files</dt><dd><code>src/components/Layout/SecondPanel.tsx</code>, nieuwe content-tabbar (afgeleid van <code>src/components/Terminal/TerminalTabBar.tsx</code> editor-deel), hergebruik <code>src/components/Editor/EditorContainer.tsx</code></dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>De tabrij toont alleen <code>editorTabs</code> waarvan <code>terminalId === activeChatId</code> plus diens browser-tabs. Routeer via de bestaande <code>EditorContainer</code> (extensie-routing). Inactieve/ingeklapte panelen blijven mounted met <code>visibility:hidden</code> (KTD5), niet ge-unmount.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li><span class="cov">Covers AE1.</span> Tabrij toont alleen de content van de actieve chat; wisselen wisselt de rij.</li>
+        <li><span class="cov">Covers AE2.</span> Geen tabs → paneel ingeklapt.</li>
+        <li>Verbergen gebruikt <code>visibility:hidden</code> (geen <code>display:none</code>); editor-scroll blijft werken na chat-wissel.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Bestand openen verschijnt rechts bij de juiste chat; nooit in de chat-kolom.</p></details>
+  </article>
+
+  <p class="phase">Fase C — Rail, shell, browser</p>
+
+  <article class="unit" id="u6">
+    <h3><span class="id">U6.</span>Icoon-rail + auto-sluitende flyouts</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Vervang de file-explorer-kolom door een icoon-rail met flyout-overlays.</dd>
+      <dt>Requirements</dt><dd>R2, R3</dd>
+      <dt>Dependencies</dt><dd>U4</dd>
+      <dt>Files</dt><dd>nieuw <code>src/components/Layout/ActivityRail.tsx</code>, <code>src/components/FileExplorer/FileExplorer.tsx</code> (flyout-content-host), <code>src/components/FileExplorer/FileExplorerTabBar.tsx</code> (→ rail-iconen), <code>src/components/Layout/MainLayout.tsx</code></dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Rail = smalle full-height strip: files/git/tasks/automations-iconen boven, shell-toggle aan de voet. Klik opent het bijbehorende paneel (<code>FileTree</code>/<code>GitStatusPanel</code>/<code>TasksPanel</code>/<code>AutomationsPanel</code>) als overlay over het tweede paneel; blur sluit het. Panelen blijven worktree-gescoped (<code>activeWorktree?.id ?? activeProjectId</code>). Overlay verbergt met <code>visibility:hidden</code> (KTD5). <code>fileExplorerActiveTab</code> blijft de actieve-paneel-keuze.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li><span class="cov">Covers AE4.</span> Klik files-icoon → tree-flyout opent; klik in de editor → flyout sluit.</li>
+        <li>Twee chats in dezelfde worktree tonen dezelfde tree (worktree-scope, niet per-chat).</li>
+        <li>Flyout gebruikt <code>visibility:hidden</code>; geen rAF/FitAddon-no-op in git-paneel-terminal.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Rail toont vier iconen + shell-toggle; flyouts gedragen zich vluchtig.</p></details>
+  </article>
+
+  <article class="unit" id="u7">
+    <h3><span class="id">U7.</span>Bottom shell-drawer (per-chat)</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Maak van de sidecar-shell een per-chat bottom-drawer met toggle vanaf de rail-voet.</dd>
+      <dt>Requirements</dt><dd>R2, R9, R10, R11</dd>
+      <dt>Dependencies</dt><dd>U4</dd>
+      <dt>Files</dt><dd><code>src/stores/projectStore.ts</code> (sidecarTerminals/activeSidecarTerminalId/sidecarTerminalCollapsed → per-chat), nieuw/herwerkt <code>src/components/Layout/ShellDrawer.tsx</code> (uit <code>src/components/FileExplorer/SidecarTerminalPanel.tsx</code>), <code>src/components/Layout/MainLayout.tsx</code></dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Her-sleutel de sidecar-records van <code>worktree|project</code> naar <code>chatId</code>; <code>sidecarTerminalCollapsed</code> wordt per-chat. Render de drawer in de mainstack onder upper, spannend over chat + tweede paneel (niet onder projecten). Toggle via de rail-voet (R2). Verborgen/inactieve shells blijven mounted met <code>visibility:hidden</code> zodat het PTY doordraait en output buffert (R11, KTD5) — leun op het bestaande pool-buffer-mechanisme.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li><span class="cov">Covers AE3.</span> Chat A draait <code>npm run dev</code>; wissel naar B en terug → A's shell toont de gebufferde output, proces draait door.</li>
+        <li>Per-chat collapse: A open, B dicht blijft onafhankelijk.</li>
+        <li>Toggle vanaf rail-voet opent/sluit de drawer voor de actieve chat.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Shell hangt aan de chat, draait door bij wissel, en spant de juiste breedte.</p></details>
+  </article>
+
+  <article class="unit" id="u8">
+    <h3><span class="id">U8.</span>Browser-tab</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Voeg een browser-tab toe die localhost en lokale HTML in een iframe laadt.</dd>
+      <dt>Requirements</dt><dd>R4, R8</dd>
+      <dt>Dependencies</dt><dd>U5</dd>
+      <dt>Files</dt><dd><code>src/types/index.ts</code> (tab-type 'browser' in CenterTab), nieuw <code>src/components/Browser/BrowserTab.tsx</code>, <code>src/components/Editor/EditorContainer.tsx</code> of <code>SecondPanel</code> (routing van 'browser'), <code>src/stores/projectStore.ts</code> (openBrowserTab-actie)</dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Nieuw tab-type met een <code>src</code>-iframe + URL-balk + reload (KTD3) — los van <code>HtmlPreview</code> (srcdoc). Laadt <code>http://localhost:*</code> en lokale <code>.html</code>. Meerdere browser-tabs mogen naast elkaar als peers (binnen de bestaande tab-limiet). Per-chat zoals andere content-tabs (terminalId).</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li><span class="cov">Covers AE5.</span> <code>localhost:5173</code> rendert de draaiende app; lokale <code>.html</code> rendert; externe SaaS blokkeert/blijft leeg.</li>
+        <li>Meerdere browser-tabs in één chat bestaan onafhankelijk naast editor-tabs.</li>
+        <li>URL-balk + reload herladen de iframe.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Een gelanceerde dev-app is testbaar in het tweede paneel naast de relevante chat.</p></details>
+  </article>
+
+  <p class="phase">Fase D — Wiring</p>
+
+  <article class="unit" id="u9">
+    <h3><span class="id">U9.</span>Hotkeys &amp; documentatie</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Geef de nieuwe features hotkeys, verwijder de split-hotkeys, en werk de docs bij.</dd>
+      <dt>Requirements</dt><dd>R12 (afgeleid)</dd>
+      <dt>Dependencies</dt><dd>U1, U4, U5, U6, U7</dd>
+      <dt>Files</dt><dd><code>src/utils/hotkeys.ts</code> (DEFAULT_HOTKEY_CONFIG), <code>src/App.tsx</code> (handlers), <code>CLAUDE.md</code> (shortcuts-tabel)</dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Verwijder <code>terminal.split</code>/<code>terminal.unsplit</code>. Voeg toe: <code>secondPanel.toggle</code>, <code>shell.toggle</code> (voorstel <code>Ctrl+`</code>), en rail-acties (focus/cyclus of per-paneel). Herbruik <code>Ctrl+\</code> voor <code>secondPanel.toggle</code>. Registreer handlers via het bestaande <code>useHotkeys</code>-patroon met <code>getState()</code>. Werk de CLAUDE.md shortcuts-tabel bij.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li>Nieuwe acties staan in <code>DEFAULT_HOTKEY_CONFIG</code> met defaults + categorie; geen split-acties meer.</li>
+        <li>Conflict-detectie en per-actie enable/disable werken voor de nieuwe bindings.</li>
+        <li>Handlers togglen tweede paneel/shell en focussen de rail.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p><code>Ctrl+/</code> toont de bijgewerkte set; nieuwe toggles werken; docs kloppen.</p></details>
+  </article>
+</section>
+
+<section>
+  <h2>Scope Boundaries</h2>
+  <div class="scope">
+    <div class="col defer">
+      <h4>Uitgesteld (later mogelijk)</h4>
+      <ul>
+        <li>Echte Chromium-webview (<code>WebContentsView</code>/<code>&lt;webview&gt;</code>) voor externe apps, devtools, history.</li>
+        <li>Externe SaaS in de browser (Gmail/Outlook).</li>
+        <li>Vastpinnen van rail-flyouts als vaste kolom.</li>
+        <li>Persistentie van geopende editor-tabs over herstart.</li>
+      </ul>
+    </div>
+    <div class="col out">
+      <h4>Deferred to follow-up</h4>
+      <ul>
+        <li>Opruimen van eventuele dode <code>SidecarTerminalPanel</code>-resten na de ShellDrawer-migratie (aparte tidy-PR indien nodig).</li>
+        <li><code>docs/solutions</code>-learnings vastleggen (iframe-strategie, split-removal, resizable-panel-topologie) ná oplevering.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>System-Wide Impact</h2>
+  <ul class="tight">
+    <li><b>Terminal pool</b> — split-eviction-bescherming vervalt; verifieer dat actieve + <code>busy/permission/question</code> bescherming intact blijft (U1, KTD4).</li>
+    <li><b>Persisted state</b> — shape-wijziging raakt bestaande installaties; gedekt door de <code>onRehydrateStorage</code>-migratie (U3, KTD6).</li>
+    <li><b>State-keying</b> — de chat/content-splitsing raakt <code>App.tsx</code>, <code>TerminalArea</code>, <code>EditorContainer</code> en alle tabbar-handlers (U2).</li>
+    <li><b>Hotkeys &amp; docs</b> — config + CLAUDE.md shortcuts-tabel (U9).</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Risks &amp; Dependencies</h2>
+  <div class="risk"><span class="lbl">Risk · mitigated</span><p>Verwijderen van de pool-split-bescherming regresseert eviction. Mitigatie: zonder split bestaan er geen duale contexten meer; characterization-tests bevestigen dat de overige bescherming staat (U1).</p></div>
+  <div class="risk"><span class="lbl">Risk · mitigated</span><p>Shape-wijziging breekt bestaande persisted state. Mitigatie: version-guarded migratie in <code>onRehydrateStorage</code> vóór nieuwe reads (U3).</p></div>
+  <div class="risk"><span class="lbl">Risk · mitigated</span><p>xterm-renderglitches bij verbergen van panelen/shells. Mitigatie: <code>visibility:hidden</code> i.p.v. <code>display:none</code> overal (KTD5).</p></div>
+  <div class="risk"><span class="lbl">Dependency</span><p>Geneste <code>react-resizable-panels</code> PanelGroups met aparte <code>autoSaveId</code>'s; <code>node-pty</code> voor de per-chat shells.</p></div>
+</section>
+
+<section>
+  <h2>Open Questions</h2>
+  <p class="grp" style="color:var(--muted)">Defer to implementation</p>
+  <ul class="tight">
+    <li>Exacte rail-actie-vorm: één focus/cyclus-hotkey of per-paneel (<code>activity.files</code>/<code>activity.git</code>/…).</li>
+    <li>Of de content-tabbar een aparte component wordt of een variant van <code>TerminalTabBar</code>.</li>
+    <li>Of <code>ShellDrawer</code> een refactor van <code>SidecarTerminalPanel</code> is of een nieuw component dat het oude vervangt.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Sources &amp; Research</h2>
+  <ul class="tight">
+    <li>Origin requirements: <a href="https://github.com/remcovolmer/command/blob/main/docs/brainstorms/2026-06-26-tweede-paneel-redesign-requirements.html">docs/brainstorms/2026-06-26-tweede-paneel-redesign-requirements.html</a></li>
+    <li>Layout-mockup (variant A): <a href="https://github.com/remcovolmer/command/blob/main/docs/brainstorm/2026-06-26-tweede-paneel-layout-mockup.html">docs/brainstorm/2026-06-26-tweede-paneel-layout-mockup.html</a></li>
+    <li>Center-tab-model + persist: <a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts">src/stores/projectStore.ts</a></li>
+    <li>Layout-panels: <a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/MainLayout.tsx">src/components/Layout/MainLayout.tsx</a>, <a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/TerminalArea.tsx">src/components/Layout/TerminalArea.tsx</a></li>
+    <li>Pool-eviction: <a href="https://github.com/remcovolmer/command/blob/main/src/utils/terminalPool.ts">src/utils/terminalPool.ts</a></li>
+    <li>Iframe-preview: <a href="https://github.com/remcovolmer/command/blob/main/src/components/Editor/HtmlPreview.tsx">src/components/Editor/HtmlPreview.tsx</a></li>
+    <li>Learning — LRU/split: <a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/performance-issues/terminal-lru-pooling-memory-optimization.md">docs/solutions/performance-issues/terminal-lru-pooling-memory-optimization.md</a></li>
+    <li>Learning — persist-migratie + context-threading: <a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/ui-bugs/file-explorer-worktree-awareness.md">docs/solutions/ui-bugs/file-explorer-worktree-awareness.md</a></li>
+    <li>Learning — xterm <code>visibility</code> vs <code>display:none</code>: <a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/ui-bugs/chat-scrollbar-disappears-fitaddon-fit-noop.md">docs/solutions/ui-bugs/chat-scrollbar-disappears-fitaddon-fit-noop.md</a></li>
+    <li>Learning — side-effects in store-acties: <a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/logic-errors/hotkey-handler-missing-auto-switch-behavior.md">docs/solutions/logic-errors/hotkey-handler-missing-auto-switch-behavior.md</a></li>
+  </ul>
+</section>
+
+<footer class="sig">Composed 2026-06-29 by ce-plan from <code>docs/brainstorms/2026-06-26-tweede-paneel-redesign-requirements.html</code>. Current-state claims verified against the codebase at composition time.</footer>
+
+</div>
+</body>
+</html>

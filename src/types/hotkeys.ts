@@ -36,8 +36,7 @@ export type HotkeyAction =
   // Terminal operations
   | 'terminal.new'
   | 'terminal.close'
-  | 'terminal.split'
-  | 'terminal.unsplit'
+  | 'shell.toggle'
   | 'terminal.goTo1'
   | 'terminal.goTo2'
   | 'terminal.goTo3'
@@ -68,6 +67,7 @@ export type HotkeyAction =
   | 'editor.nextTab'
   | 'editor.previousTab'
   | 'editor.save'
+  | 'browser.open'
   // Worktree
   | 'worktree.create'
   // Sidebar

@@ -1,8 +1,10 @@
 import { useMemo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
+import { SecondPanel } from './SecondPanel'
 import { ProjectOverview } from '../ProjectOverview'
 import { TerminalIcon, Plus, Sparkles } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
@@ -15,16 +17,14 @@ export function TerminalArea() {
     activeTerminalId,
     terminals,
     projects,
-    layouts,
     editorTabs,
-    activeCenterTabId,
+    activeContentTabId,
+    projectOverviewVisible,
     setActiveTerminal,
     removeTerminal,
-    addToSplit,
-    removeFromSplit,
-    setSplitSizes,
-    setActiveCenterTab,
+    setActiveContentTab,
     closeEditorTab,
+    setBrowserTabUrl,
     addTerminal,
   } = useProjectStore(
     useShallow((s) => ({
@@ -32,16 +32,14 @@ export function TerminalArea() {
       activeTerminalId: s.activeTerminalId,
       terminals: s.terminals,
       projects: s.projects,
-      layouts: s.layouts,
       editorTabs: s.editorTabs,
-      activeCenterTabId: s.activeCenterTabId,
+      activeContentTabId: s.activeContentTabId,
+      projectOverviewVisible: s.projectOverviewVisible,
       setActiveTerminal: s.setActiveTerminal,
       removeTerminal: s.removeTerminal,
-      addToSplit: s.addToSplit,
-      removeFromSplit: s.removeFromSplit,
-      setSplitSizes: s.setSplitSizes,
-      setActiveCenterTab: s.setActiveCenterTab,
+      setActiveContentTab: s.setActiveContentTab,
       closeEditorTab: s.closeEditorTab,
+      setBrowserTabUrl: s.setBrowserTabUrl,
       addTerminal: s.addTerminal,
     }))
   )
@@ -57,21 +55,17 @@ export function TerminalArea() {
     [terminals, activeProjectId]
   )
 
-  // Get editor tabs for the active project
-  const projectEditorTabs = useMemo(
-    () => Object.values(editorTabs).filter((t) => t.projectId === activeProjectId),
-    [editorTabs, activeProjectId]
+  // Content tabs (editors/diffs) scoped to the active chat — the second panel.
+  const chatContentTabs = useMemo(
+    () => Object.values(editorTabs).filter((t) => t.terminalId === activeTerminalId),
+    [editorTabs, activeTerminalId]
   )
-
-  // Get current layout for the project
-  const currentLayout = activeProjectId ? layouts[activeProjectId] : null
-  const splitTerminalIds = currentLayout?.splitTerminalIds ?? []
+  const activeContentId = activeTerminalId ? (activeContentTabId[activeTerminalId] ?? null) : null
 
   const handleCreateTerminal = async () => {
     if (!activeProjectId) return
-
     await createTerminal(activeProjectId, {
-      onCreated: (terminalId) => setActiveCenterTab(terminalId),
+      onCreated: (terminalId) => setActiveTerminal(terminalId),
     })
   }
 
@@ -86,19 +80,18 @@ export function TerminalArea() {
   const handleSelectTerminal = useCallback(
     (terminalId: string) => {
       setActiveTerminal(terminalId)
-      setActiveCenterTab(terminalId)
     },
-    [setActiveTerminal, setActiveCenterTab]
+    [setActiveTerminal]
   )
 
-  const handleSelectEditor = useCallback(
+  const handleSelectContent = useCallback(
     (tabId: string) => {
-      setActiveCenterTab(tabId)
+      setActiveContentTab(tabId)
     },
-    [setActiveCenterTab]
+    [setActiveContentTab]
   )
 
-  const handleCloseEditor = useCallback(
+  const handleCloseContent = useCallback(
     (tabId: string) => {
       const tab = editorTabs[tabId]
       if (tab?.type === 'editor' && tab.isDirty) {
@@ -109,56 +102,6 @@ export function TerminalArea() {
       closeEditorTab(tabId)
     },
     [editorTabs, closeEditorTab]
-  )
-
-  const handleUnsplit = useCallback(
-    (terminalId: string) => {
-      if (!activeProjectId) return
-      removeFromSplit(activeProjectId, terminalId)
-    },
-    [activeProjectId, removeFromSplit]
-  )
-
-  const handleDropToSplit = useCallback(
-    (terminalId: string, position: 'left' | 'right') => {
-      if (!activeProjectId) return
-
-      // If there's already a split, just add to it
-      if (splitTerminalIds.length >= 2) {
-        addToSplit(activeProjectId, terminalId)
-        return
-      }
-
-      // Find a terminal to pair with (either the active one, or another one)
-      let pairTerminalId: string | null = null
-
-      if (activeTerminalId && activeTerminalId !== terminalId) {
-        pairTerminalId = activeTerminalId
-      } else {
-        const otherTerminal = projectTerminals.find((t) => t.id !== terminalId)
-        pairTerminalId = otherTerminal?.id ?? null
-      }
-
-      if (pairTerminalId) {
-        if (position === 'left') {
-          addToSplit(activeProjectId, terminalId)
-          addToSplit(activeProjectId, pairTerminalId)
-        } else {
-          addToSplit(activeProjectId, pairTerminalId)
-          addToSplit(activeProjectId, terminalId)
-        }
-      }
-    },
-    [activeProjectId, activeTerminalId, projectTerminals, splitTerminalIds.length, addToSplit]
-  )
-
-  const handleSplitSizesChange = useCallback(
-    (sizes: number[]) => {
-      if (activeProjectId) {
-        setSplitSizes(activeProjectId, sizes)
-      }
-    },
-    [activeProjectId, setSplitSizes]
   )
 
   const handleResumeSession = useCallback(
@@ -175,10 +118,9 @@ export function TerminalArea() {
           title: initialTitle || 'Resuming...',
           type: 'claude',
         })
-        setActiveCenterTab(terminalId)
       }
     },
-    [activeProjectId, api, addTerminal, setActiveCenterTab]
+    [activeProjectId, api, addTerminal]
   )
 
   // No project selected - show welcome
@@ -210,10 +152,8 @@ export function TerminalArea() {
     )
   }
 
-  // Show project overview when: no terminals/editors, OR user explicitly deselected all tabs (hotkey)
-  const showOverview =
-    (projectTerminals.length === 0 && projectEditorTabs.length === 0) ||
-    (!activeCenterTabId && projectTerminals.length > 0)
+  // Show project overview when there are no chats, or when explicitly toggled on.
+  const showOverview = projectTerminals.length === 0 || projectOverviewVisible
   if (showOverview) {
     return (
       <ProjectOverview
@@ -226,36 +166,43 @@ export function TerminalArea() {
     )
   }
 
-  // Terminals with tab bar
+  const hasContent = chatContentTabs.length > 0
+
   return (
-    <div className="h-full w-full flex flex-col bg-sidebar">
-      <TerminalTabBar
-        terminals={projectTerminals}
-        editorTabs={projectEditorTabs}
-        activeTerminalId={activeTerminalId}
-        activeCenterTabId={activeCenterTabId}
-        splitTerminalIds={splitTerminalIds}
-        onSelectTerminal={handleSelectTerminal}
-        onSelectEditor={handleSelectEditor}
-        onClose={handleCloseTerminal}
-        onCloseEditor={handleCloseEditor}
-        onUnsplit={handleUnsplit}
-        onAdd={handleCreateTerminal}
-        canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
-      />
-      <div className="flex-1 min-h-0">
-        <TerminalViewport
-          terminals={projectTerminals}
-          editorTabs={projectEditorTabs}
-          activeTerminalId={activeTerminalId}
-          activeCenterTabId={activeCenterTabId}
-          splitTerminalIds={splitTerminalIds}
-          projectId={activeProjectId!}
-          onSplitSizesChange={handleSplitSizesChange}
-          onDropToSplit={handleDropToSplit}
-          onSelect={handleSelectTerminal}
-        />
-      </div>
-    </div>
+    <PanelGroup direction="horizontal" autoSaveId="center-split">
+      {/* Chat column — always visible; fills the width when nothing is open */}
+      <Panel id="chat-col" order={1} defaultSize={55} minSize={25}>
+        <div className="h-full w-full flex flex-col bg-sidebar">
+          <TerminalTabBar
+            terminals={projectTerminals}
+            activeTerminalId={activeTerminalId}
+            onSelect={handleSelectTerminal}
+            onClose={handleCloseTerminal}
+            onAdd={handleCreateTerminal}
+            canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
+          />
+          <div className="flex-1 min-h-0">
+            <TerminalViewport terminals={projectTerminals} activeTerminalId={activeTerminalId} />
+          </div>
+        </div>
+      </Panel>
+
+      {/* Second panel — only mounted when the active chat has open content,
+          so the chat column fills the full width otherwise. */}
+      {hasContent && (
+        <>
+          <PanelResizeHandle className="w-1 transition-colors" />
+          <Panel id="second-panel" order={2} defaultSize={45} minSize={20}>
+            <SecondPanel
+              tabs={chatContentTabs}
+              activeContentId={activeContentId}
+              onSelect={handleSelectContent}
+              onClose={handleCloseContent}
+              onBrowserUrlChange={setBrowserTabUrl}
+            />
+          </Panel>
+        </>
+      )}
+    </PanelGroup>
   )
 }

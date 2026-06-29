@@ -10,7 +10,7 @@ import { useProjectStore } from '../stores/projectStore'
  *
  * Terminal removal from pool is handled by useXtermInstance on unmount.
  */
-export function useTerminalPool(activeTerminalId: string | null, splitTerminalIds: string[]) {
+export function useTerminalPool(activeTerminalId: string | null) {
   const api = useMemo(() => getElectronAPI(), [])
 
   // When active terminal changes, check if eviction is needed
@@ -26,11 +26,7 @@ export function useTerminalPool(activeTerminalId: string | null, splitTerminalId
     while (terminalPool.needsEviction() && evictionGuard++ < 20) {
       // Read current terminals from store each iteration (state may change during eviction)
       const terminals = useProjectStore.getState().terminals
-      const candidate = terminalPool.getEvictionCandidate(
-        terminals,
-        activeTerminalId,
-        splitTerminalIds
-      )
+      const candidate = terminalPool.getEvictionCandidate(terminals, activeTerminalId)
 
       if (!candidate) break
 
@@ -45,5 +41,5 @@ export function useTerminalPool(activeTerminalId: string | null, splitTerminalId
         break
       }
     }
-  }, [activeTerminalId, splitTerminalIds, api])
+  }, [activeTerminalId, api])
 }
