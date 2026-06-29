@@ -715,7 +715,6 @@ export const useProjectStore = create<ProjectStore>()(
               [contextKey]: terminalId,
             },
             sidecarTerminalCollapsed: false,
-            fileExplorerVisible: true,
           }
         })
       },
@@ -741,7 +740,6 @@ export const useProjectStore = create<ProjectStore>()(
               [contextKey]: state.activeSidecarTerminalId[contextKey] ?? terminal.id,
             },
             sidecarTerminalCollapsed: false,
-            fileExplorerVisible: true,
           }
         })
       },
@@ -1573,7 +1571,10 @@ export const useProjectStore = create<ProjectStore>()(
 
       getWorktreeTerminals: (worktreeId) => {
         const state = get()
-        return Object.values(state.terminals).filter((t) => t.worktreeId === worktreeId)
+        // Chats only — sidecar 'normal' shells live in the bottom drawer, not the sidebar.
+        return Object.values(state.terminals).filter(
+          (t) => t.worktreeId === worktreeId && t.type !== 'normal'
+        )
       },
 
       // Worktree actions

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { TerminalIcon, Plus, Globe, X } from 'lucide-react'
+import { TerminalIcon, Plus, X } from 'lucide-react'
 import type { TerminalSession } from '../../types'
 import { STATE_DOT_COLORS, isInputState } from '../../utils/terminalState'
 
@@ -9,7 +9,6 @@ interface TerminalTabBarProps {
   onSelect: (terminalId: string) => void
   onClose: (terminalId: string) => void
   onAdd: () => void
-  onOpenBrowser: () => void
   canAdd: boolean
 }
 
@@ -19,7 +18,6 @@ export function TerminalTabBar({
   onSelect,
   onClose,
   onAdd,
-  onOpenBrowser,
   canAdd,
 }: TerminalTabBarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -85,13 +83,6 @@ export function TerminalTabBar({
           <Plus className="w-4 h-4" />
         </button>
       )}
-      <button
-        onClick={onOpenBrowser}
-        className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 transition-colors"
-        title="Open browser tab"
-      >
-        <Globe className="w-4 h-4" />
-      </button>
     </div>
   )
 }

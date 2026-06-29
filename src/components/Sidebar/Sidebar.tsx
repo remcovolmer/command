@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   Plus,
   FolderOpen,
-  PanelRightOpen,
-  PanelRightClose,
   Sun,
   Moon,
   Monitor,
@@ -34,8 +32,6 @@ export function Sidebar() {
   const worktrees = useProjectStore((s) => s.worktrees)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const activeTerminalId = useProjectStore((s) => s.activeTerminalId)
-  const fileExplorerVisible = useProjectStore((s) => s.fileExplorerVisible)
-  const toggleFileExplorer = useProjectStore((s) => s.toggleFileExplorer)
   const theme = useProjectStore((s) => s.theme)
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
@@ -342,10 +338,11 @@ export function Sidebar() {
     [terminals]
   )
 
+  // Chats only — sidecar 'normal' shells live in the bottom drawer, not the sidebar.
   const getProjectDirectTerminals = useCallback(
     (projectId: string): TerminalSession[] => {
       return Object.values(terminals).filter(
-        (t) => t.projectId === projectId && t.worktreeId === null
+        (t) => t.projectId === projectId && t.worktreeId === null && t.type !== 'normal'
       )
     },
     [terminals]
@@ -353,7 +350,9 @@ export function Sidebar() {
 
   const getWorktreeTerminals = useCallback(
     (worktreeId: string): TerminalSession[] => {
-      return Object.values(terminals).filter((t) => t.worktreeId === worktreeId)
+      return Object.values(terminals).filter(
+        (t) => t.worktreeId === worktreeId && t.type !== 'normal'
+      )
     },
     [terminals]
   )
@@ -501,21 +500,6 @@ export function Sidebar() {
                 title={`Settings (${formatBinding(hotkeyConfig['ui.openSettings'])})`}
               >
                 <Settings className="w-4 h-4" />
-              </button>
-              <button
-                onClick={toggleFileExplorer}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  fileExplorerVisible
-                    ? 'bg-sidebar-accent text-primary'
-                    : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
-                }`}
-                title={`${fileExplorerVisible ? 'Hide Files' : 'Show Files'} (${formatBinding(hotkeyConfig['fileExplorer.toggle'])})`}
-              >
-                {fileExplorerVisible ? (
-                  <PanelRightClose className="w-4 h-4" />
-                ) : (
-                  <PanelRightOpen className="w-4 h-4" />
-                )}
               </button>
             </div>
           </div>

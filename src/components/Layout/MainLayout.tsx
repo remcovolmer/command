@@ -4,6 +4,7 @@ import { Sidebar } from '../Sidebar/Sidebar'
 import { TerminalArea } from './TerminalArea'
 import { FileExplorer } from '../FileExplorer/FileExplorer'
 import { ActivityRail } from './ActivityRail'
+import { ShellDrawer } from './ShellDrawer'
 import { UpdateNotification } from '../UpdateNotification'
 import { SpawnErrorToast } from '../notifications/SpawnErrorToast'
 import { UncaughtErrorToast } from '../notifications/UncaughtErrorToast'
@@ -24,8 +25,21 @@ export function MainLayout() {
       if (rail?.contains(target)) return
       setFileExplorerVisible(false)
     }
+    // Clicks inside an iframe (browser tab / HTML preview) don't bubble to the
+    // document, so also close when focus moves into an iframe in the content area.
+    const onWindowBlur = () => {
+      window.setTimeout(() => {
+        if (document.activeElement?.tagName === 'IFRAME') {
+          setFileExplorerVisible(false)
+        }
+      }, 0)
+    }
     document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
+    window.addEventListener('blur', onWindowBlur)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('blur', onWindowBlur)
+    }
   }, [fileExplorerVisible, setFileExplorerVisible])
 
   return (
@@ -43,9 +57,14 @@ export function MainLayout() {
 
           <PanelResizeHandle className="w-1 transition-colors" />
 
-          {/* Center: chat column + second panel (TerminalArea owns the inner split) */}
+          {/* Center: chat column + second panel (top) over the shell drawer (bottom) */}
           <Panel id="center" defaultSize={78} minSize={40}>
-            <TerminalArea />
+            <div className="h-full flex flex-col">
+              <div className="flex-1 min-h-0">
+                <TerminalArea />
+              </div>
+              <ShellDrawer />
+            </div>
           </Panel>
         </PanelGroup>
 

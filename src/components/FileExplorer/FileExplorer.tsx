@@ -8,7 +8,6 @@ import { AutomationsPanel } from './AutomationsPanel'
 import { SessionsPanel } from './SessionsPanel'
 import { AutomationCreateDialog } from './AutomationCreateDialog'
 import { FileExplorerTabBar } from './FileExplorerTabBar'
-import { SidecarTerminalPanel } from './SidecarTerminalPanel'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { getElectronAPI } from '../../utils/electron'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
@@ -39,31 +38,11 @@ export function FileExplorer() {
     gitContextId ? s.gitStatusLoading[gitContextId] : false
   )
 
-  // Sidecar terminal state — select ID array with shallow equality to avoid re-renders
-  // Use activeWorktree (derived from active terminal) instead of activeWorktreeId to match Files/Git
-  const sidecarContextKey = activeWorktree?.id ?? activeProjectId
-  const sidecarTerminalIds = useProjectStore(
-    useShallow((s) => (sidecarContextKey ? (s.sidecarTerminals[sidecarContextKey] ?? []) : []))
-  )
-  const terminals = useProjectStore((s) => s.terminals)
-  const sidecarTerminals = useMemo(
-    () => sidecarTerminalIds.map((id) => terminals[id]).filter(Boolean),
-    [sidecarTerminalIds, terminals]
-  )
-  const activeSidecarTerminalId = useProjectStore((s) =>
-    sidecarContextKey ? (s.activeSidecarTerminalId[sidecarContextKey] ?? null) : null
-  )
-  const sidecarTerminalCollapsed = useProjectStore((s) => s.sidecarTerminalCollapsed)
-
   // Action selectors - grouped with useShallow for consistency
   const {
     clearDirectoryCache,
     setGitStatus,
     setGitStatusLoading,
-    setSidecarTerminalCollapsed,
-    createSidecarTerminal,
-    closeSidecarTerminal,
-    setActiveSidecarTerminal,
     setGitCommitLog,
     setGitHeadHash,
     gitHeadHash,
@@ -73,10 +52,6 @@ export function FileExplorer() {
       setActiveTab: s.setFileExplorerActiveTab,
       setGitStatus: s.setGitStatus,
       setGitStatusLoading: s.setGitStatusLoading,
-      setSidecarTerminalCollapsed: s.setSidecarTerminalCollapsed,
-      createSidecarTerminal: s.createSidecarTerminal,
-      closeSidecarTerminal: s.closeSidecarTerminal,
-      setActiveSidecarTerminal: s.setActiveSidecarTerminal,
       setGitCommitLog: s.setGitCommitLog,
       setGitHeadHash: s.setGitHeadHash,
       gitHeadHash: s.gitHeadHash,
@@ -93,38 +68,6 @@ export function FileExplorer() {
   const fileTreeContextKey = activeWorktree?.id ?? activeProjectId
   // 'project' type has limited functionality (no git, no sidecar)
   const isLimitedProject = useMemo(() => activeProject?.type === 'project', [activeProject?.type])
-
-  // Auto-select first sidecar terminal when context changes
-  useEffect(() => {
-    if (
-      sidecarTerminals.length > 0 &&
-      !sidecarTerminals.find((t) => t.id === activeSidecarTerminalId)
-    ) {
-      if (sidecarContextKey) {
-        setActiveSidecarTerminal(sidecarContextKey, sidecarTerminals[0].id)
-      }
-    }
-  }, [sidecarContextKey, sidecarTerminals, activeSidecarTerminalId, setActiveSidecarTerminal])
-
-  const handleCreateTerminal = async () => {
-    if (activeProjectId && sidecarContextKey) {
-      await createSidecarTerminal(
-        sidecarContextKey,
-        activeProjectId,
-        activeWorktree?.id ?? undefined
-      )
-    }
-  }
-
-  const handleCloseTerminal = (terminalId: string) => {
-    if (sidecarContextKey) {
-      closeSidecarTerminal(sidecarContextKey, terminalId)
-    }
-  }
-
-  const handleToggleCollapse = () => {
-    setSidecarTerminalCollapsed(!sidecarTerminalCollapsed)
-  }
 
   const handleFilesRefresh = () => {
     if (activeProjectId) {
@@ -345,27 +288,6 @@ export function FileExplorer() {
           </div>
         )}
       </div>
-
-      {/* Terminal Panel - only render for code projects */}
-      {sidecarContextKey && activeProjectId && !isLimitedProject && (
-        <SidecarTerminalPanel
-          contextKey={sidecarContextKey}
-          projectId={activeProjectId}
-          worktreeId={activeWorktree?.id ?? undefined}
-          terminals={sidecarTerminals}
-          activeTerminalId={activeSidecarTerminalId}
-          isCollapsed={sidecarTerminalCollapsed}
-          onToggleCollapse={handleToggleCollapse}
-          onCreateTerminal={handleCreateTerminal}
-          onCloseTerminal={handleCloseTerminal}
-          onSelectTerminal={(id) => {
-            setActiveSidecarTerminal(sidecarContextKey, id)
-            if (sidecarTerminalCollapsed) {
-              setSidecarTerminalCollapsed(false)
-            }
-          }}
-        />
-      )}
 
       {/* Delete Confirmation Dialog */}
       {fileExplorerDeletingEntry && activeProjectId && (

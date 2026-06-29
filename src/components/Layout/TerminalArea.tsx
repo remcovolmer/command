@@ -1,11 +1,6 @@
-import { useMemo, useCallback, useEffect, useRef } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import {
-  Panel,
-  PanelGroup,
-  PanelResizeHandle,
-  type ImperativePanelHandle,
-} from 'react-resizable-panels'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
@@ -29,7 +24,6 @@ export function TerminalArea() {
     removeTerminal,
     setActiveContentTab,
     closeEditorTab,
-    openBrowserTab,
     setBrowserTabUrl,
     addTerminal,
   } = useProjectStore(
@@ -45,7 +39,6 @@ export function TerminalArea() {
       removeTerminal: s.removeTerminal,
       setActiveContentTab: s.setActiveContentTab,
       closeEditorTab: s.closeEditorTab,
-      openBrowserTab: s.openBrowserTab,
       setBrowserTabUrl: s.setBrowserTabUrl,
       addTerminal: s.addTerminal,
     }))
@@ -68,18 +61,6 @@ export function TerminalArea() {
     [editorTabs, activeTerminalId]
   )
   const activeContentId = activeTerminalId ? (activeContentTabId[activeTerminalId] ?? null) : null
-
-  // Collapse the second panel when the active chat has no open content.
-  const secondPanelRef = useRef<ImperativePanelHandle>(null)
-  useEffect(() => {
-    const panel = secondPanelRef.current
-    if (!panel) return
-    if (chatContentTabs.length > 0) {
-      panel.expand()
-    } else {
-      panel.collapse()
-    }
-  }, [chatContentTabs.length])
 
   const handleCreateTerminal = async () => {
     if (!activeProjectId) return
@@ -109,10 +90,6 @@ export function TerminalArea() {
     },
     [setActiveContentTab]
   )
-
-  const handleOpenBrowser = useCallback(() => {
-    if (activeProjectId) openBrowserTab(activeProjectId)
-  }, [activeProjectId, openBrowserTab])
 
   const handleCloseContent = useCallback(
     (tabId: string) => {
@@ -193,8 +170,8 @@ export function TerminalArea() {
 
   return (
     <PanelGroup direction="horizontal" autoSaveId="center-split">
-      {/* Chat column — always visible */}
-      <Panel id="chat-col" defaultSize={55} minSize={25}>
+      {/* Chat column — always visible; fills the width when nothing is open */}
+      <Panel id="chat-col" order={1} defaultSize={55} minSize={25}>
         <div className="h-full w-full flex flex-col bg-sidebar">
           <TerminalTabBar
             terminals={projectTerminals}
@@ -202,7 +179,6 @@ export function TerminalArea() {
             onSelect={handleSelectTerminal}
             onClose={handleCloseTerminal}
             onAdd={handleCreateTerminal}
-            onOpenBrowser={handleOpenBrowser}
             canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
           />
           <div className="flex-1 min-h-0">
@@ -211,25 +187,22 @@ export function TerminalArea() {
         </div>
       </Panel>
 
-      <PanelResizeHandle className={`w-1 transition-colors ${!hasContent ? 'hidden' : ''}`} />
-
-      {/* Second panel — opened files + browser, scoped to the active chat */}
-      <Panel
-        ref={secondPanelRef}
-        id="second-panel"
-        defaultSize={45}
-        minSize={20}
-        collapsible
-        collapsedSize={0}
-      >
-        <SecondPanel
-          tabs={chatContentTabs}
-          activeContentId={activeContentId}
-          onSelect={handleSelectContent}
-          onClose={handleCloseContent}
-          onBrowserUrlChange={setBrowserTabUrl}
-        />
-      </Panel>
+      {/* Second panel — only mounted when the active chat has open content,
+          so the chat column fills the full width otherwise. */}
+      {hasContent && (
+        <>
+          <PanelResizeHandle className="w-1 transition-colors" />
+          <Panel id="second-panel" order={2} defaultSize={45} minSize={20}>
+            <SecondPanel
+              tabs={chatContentTabs}
+              activeContentId={activeContentId}
+              onSelect={handleSelectContent}
+              onClose={handleCloseContent}
+              onBrowserUrlChange={setBrowserTabUrl}
+            />
+          </Panel>
+        </>
+      )}
     </PanelGroup>
   )
 }
