@@ -15,10 +15,15 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
   const updateHotkey = useProjectStore((s) => s.updateHotkey)
   const resetHotkey = useProjectStore((s) => s.resetHotkey)
 
+  // Defensive: a persisted config may carry an action that no longer exists in
+  // the defaults (reconciliation backstop). Never dereference an undefined
+  // default — that would throw during render and white-screen the dialog.
+  const defaultBinding = DEFAULT_HOTKEY_CONFIG[action]
   const isDefault =
-    binding.key === DEFAULT_HOTKEY_CONFIG[action].key &&
-    binding.modifiers.length === DEFAULT_HOTKEY_CONFIG[action].modifiers.length &&
-    binding.modifiers.every((m) => DEFAULT_HOTKEY_CONFIG[action].modifiers.includes(m))
+    defaultBinding !== undefined &&
+    binding.key === defaultBinding.key &&
+    binding.modifiers.length === defaultBinding.modifiers.length &&
+    binding.modifiers.every((m) => defaultBinding.modifiers.includes(m))
 
   const handleToggleEnabled = () => {
     updateHotkey(action, { enabled: !binding.enabled })
