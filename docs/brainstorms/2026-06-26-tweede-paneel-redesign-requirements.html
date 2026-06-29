@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Requirements — Tweede paneel & rechterkant-herontwerp</title>
+<style>
+  :root {
+    --ink: #1a1f2e;
+    --muted: #5b6678;
+    --faint: #8b95a7;
+    --line: #e3e7ee;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --accent: #4f46e5;
+    --accent-soft: #eef0fe;
+    --green: #0f9d6e;
+    --green-soft: #e6f6ef;
+    --amber: #c2870b;
+    --amber-soft: #fdf4e1;
+    --red: #d1453b;
+    --red-soft: #fcebe9;
+    --wf: #cbd2dd;
+    --wf-bg: #eef1f5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.55;
+    font-size: 15px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 48px 28px 96px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header.doc { border-bottom: 3px solid var(--accent); padding-bottom: 20px; margin-bottom: 36px; }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 14px; letter-spacing: -.01em; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin: 46px 0 6px; }
+  .action-title { font-size: 21px; font-weight: 650; line-height: 1.32; letter-spacing: -.01em; margin: 0 0 18px; color: var(--ink); }
+  p { margin: 0 0 14px; max-width: 72ch; }
+  .lead { font-size: 16.5px; color: var(--ink); max-width: 74ch; }
+  code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .88em; background: #eef0f3; padding: 1px 5px; border-radius: 4px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 16px 0; }
+
+  /* SCR */
+  .scr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 18px 0 8px; }
+  .scr > div { border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: var(--card); }
+  .scr h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+  .scr .s { color: var(--muted); } .scr .s h4 { color: var(--faint); }
+  .scr .c h4 { color: var(--red); } .scr .c { border-color: #f0d4d1; background: var(--red-soft); }
+  .scr .r h4 { color: var(--green); } .scr .r { border-color: #cdeede; background: var(--green-soft); }
+  .scr p { margin: 0; font-size: 13.5px; }
+
+  /* tables */
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 6px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
+  .rid { font-family: ui-monospace, Consolas, monospace; font-weight: 700; color: var(--accent); white-space: nowrap; }
+  .grp { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink); margin: 26px 0 2px; }
+
+  /* KD / AE cards */
+  .kd { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--card); padding: 16px 20px; margin: 12px 0; }
+  .kd h4 { margin: 0 0 6px; font-size: 15.5px; }
+  .kd .id { font-family: ui-monospace, Consolas, monospace; font-weight: 700; color: var(--accent); margin-right: 8px; }
+  .kd p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .ae { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 14px 18px; margin: 10px 0; font-size: 14px; }
+  .ae .id { font-family: ui-monospace, Consolas, monospace; font-weight: 700; color: var(--accent); }
+  .ae .cov { font-size: 11.5px; color: var(--faint); font-weight: 700; letter-spacing: .04em; }
+  .ae b.t { color: var(--ink); }
+
+  .flow { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 14px 18px; margin: 10px 0; font-size: 14px; }
+  .flow .id { font-family: ui-monospace, Consolas, monospace; font-weight: 700; color: var(--accent); }
+  .flow ol { margin: 8px 0 0; padding-left: 20px; } .flow li { margin: 3px 0; }
+
+  /* scope */
+  .scope { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .scope .col { border: 1px solid var(--line); border-radius: 10px; padding: 4px 18px 14px; }
+  .scope .defer { background: var(--amber-soft); border-color: #ecd9ad; }
+  .scope .out { background: var(--wf-bg); }
+  .scope h4 { font-size: 12px; letter-spacing: .07em; text-transform: uppercase; margin: 14px 0 4px; }
+  .scope .defer h4 { color: var(--amber); } .scope .out h4 { color: var(--muted); }
+  .scope ul { margin: 0; padding-left: 18px; font-size: 13.5px; } .scope li { margin: 5px 0; }
+
+  ul.req { margin: 6px 0; padding-left: 0; list-style: none; }
+  ul.tight { margin: 6px 0 14px; padding-left: 20px; } ul.tight li { margin: 5px 0; }
+
+  /* wireframe */
+  figure { margin: 18px 0; }
+  .wfcap { font-size: 12.5px; color: var(--faint); font-style: italic; margin-top: 10px; max-width: 74ch; }
+  .win { display: flex; height: 300px; border: 1px solid var(--wf); border-radius: 8px; overflow: hidden; background: #fff; font-size: 11px; color: var(--muted); }
+  .z { display: flex; flex-direction: column; border-right: 1px solid var(--wf); }
+  .zl { font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); padding: 5px 7px; border-bottom: 1px dashed var(--wf); background: var(--wf-bg); white-space: nowrap; }
+  .zb { flex: 1; padding: 7px; }
+  .box { background: var(--wf-bg); border: 1px dashed var(--wf); border-radius: 5px; }
+  .wf-proj { width: 110px; } .wf-proj .row { background: var(--wf-bg); border-radius: 4px; padding: 4px 6px; margin-bottom: 3px; }
+  .wf-proj .row.on { background: #dfe3ea; border: 1px solid var(--wf); }
+  .midstack { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .midupper { flex: 1; display: flex; min-height: 0; }
+  .wf-chat { width: 200px; border-right: 1px solid var(--wf); display: flex; flex-direction: column; }
+  .tabs { display: flex; gap: 4px; padding: 5px 6px; border-bottom: 1px solid var(--wf); }
+  .tab { background: var(--wf-bg); border: 1px dashed var(--wf); border-radius: 4px 4px 0 0; padding: 1px 7px; font-size: 9.5px; }
+  .tab.on { background: #dfe3ea; border-style: solid; color: var(--ink); }
+  .wf-chat .body { flex: 1; margin: 7px; } .wf-second { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .wf-second .body { flex: 1; margin: 7px; }
+  .shell { height: 78px; border-top: 2px solid var(--wf); display: flex; flex-direction: column; }
+  .shell .bar { padding: 4px 8px; border-bottom: 1px solid var(--wf); font-size: 9.5px; display: flex; }
+  .shell .bar .tg { margin-left: auto; }
+  .shell .body { flex: 1; margin: 6px 8px; }
+  .rail { width: 40px; align-items: center; }
+  .rail .icons { display: flex; flex-direction: column; gap: 8px; padding: 9px 0; }
+  .ic { width: 24px; height: 24px; border-radius: 5px; background: var(--wf-bg); border: 1px dashed var(--wf); display: flex; align-items: center; justify-content: center; font-size: 10px; }
+  .ic.on { background: #dfe3ea; border-style: solid; }
+  .rail .shtog { margin-top: auto; margin-bottom: 10px; border-style: solid; color: var(--accent); border-color: var(--accent); }
+  .flyout { align-self: stretch; }
+  .fly { position: relative; }
+  .flydraw { width: 130px; border-left: 2px solid var(--accent); background: #fbfbff; }
+  .flydraw .zl { color: var(--accent); border-bottom-color: var(--accent-soft); background: var(--accent-soft); }
+  .flydraw .t { font-size: 9.5px; padding: 6px 9px; line-height: 1.8; }
+
+  /* before/after */
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  .ba .col { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+  .ba .col h4 { margin: 0; padding: 9px 14px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .ba .before h4 { background: var(--red-soft); color: var(--red); }
+  .ba .after h4 { background: var(--green-soft); color: var(--green); }
+  .ba ul { margin: 0; padding: 12px 14px 14px 30px; font-size: 13.5px; } .ba li { margin: 5px 0; }
+
+  .note { background: var(--accent-soft); border: 1px solid #d6d9fb; border-radius: 10px; padding: 14px 18px; margin: 14px 0; font-size: 14px; }
+  .note b { color: var(--accent); }
+
+  footer.sig { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); }
+  footer.sig code { background: none; padding: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">Brainstorm · Requirements</p>
+  <h1>Tweede paneel & herontwerp van de rechterkant</h1>
+  <div class="meta">
+    <span><b>date</b> <time datetime="2026-06-26">2026-06-26</time></span>
+    <span><b>topic</b> tweede-paneel-redesign</span>
+    <span><b>scope</b> Deep — feature</span>
+    <span><b>app</b> Command Center (Electron + React + TS)</span>
+  </div>
+</header>
+
+<section>
+  <h2>Summary</h2>
+  <p class="lead">De rechterkant wordt heringericht zodat je per gesprek je chat, je bestanden en een browser tegelijk in beeld hebt. Een nieuw <b>tweede paneel</b> houdt geopende bestanden en een iframe-browser vast; een dunne <b>icoon-rail</b> uiterst rechts opent file explorer / git / tasks / automations als auto-sluitende flyouts; een <b>shell-drawer</b> onderaan klap je aan/uit. Het hele werkgebied — tweede-paneel-tabs én shell — is <b>per-chat gescoped</b>. De split-chat verdwijnt.</p>
+</section>
+
+<section>
+  <h2>Problem Frame</h2>
+  <p class="action-title">De huidige rechterkant dwingt schakelen waar je naast-elkaar-zien wilt, en koppelt niets aan het gesprek waar je in werkt.</p>
+  <div class="scr">
+    <div class="s">
+      <h4>Situatie</h4>
+      <p>Het centrum mengt chats en editor-tabs onder één actieve tab; de file explorer is een rechterkolom; chats kun je in twee splitsen.</p>
+    </div>
+    <div class="c">
+      <h4>Complicatie</h4>
+      <p>Je wilt chat + het relevante bestand + de app/HTML in beeld — per gesprek. De split-chat werkt niet lekker, en geopende pagina's hangen nergens aan vast, dus ze "reizen" mee tussen chats.</p>
+    </div>
+    <div class="r">
+      <h4>Resolutie</h4>
+      <p>Een tweede paneel + icoon-rail + bottom-shell, alles per-chat gescoped. Split-chat eruit; altijd één chat zichtbaar.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Layout</h2>
+  <p class="action-title">"Activity-bar rechts" (variant A): chat links, tweede paneel ernaast, icoon-rail uiterst rechts, shell-drawer onderaan.</p>
+  <figure>
+    <div class="win fly">
+      <div class="z wf-proj"><div class="zl">Projecten</div><div class="zb"><div class="row on">[project]</div><div class="row">[project]</div><div class="row">[project]</div></div></div>
+      <div class="midstack">
+        <div class="midupper">
+          <div class="wf-chat">
+            <div class="tabs"><span class="tab on">[chat A]</span><span class="tab">[chat B]</span></div>
+            <div class="body box"></div>
+          </div>
+          <div class="wf-second">
+            <div class="tabs"><span class="tab on">[bestand]</span><span class="tab">[bestand]</span><span class="tab">[browser]</span></div>
+            <div class="body box"></div>
+          </div>
+        </div>
+        <div class="shell">
+          <div class="bar">[shell] <span class="tg">· toggle onderaan rail</span></div>
+          <div class="body box"></div>
+        </div>
+      </div>
+      <div class="z flydraw"><div class="zl">files · flyout</div><div class="t">[tree]<br>&nbsp;&nbsp;[map]<br>&nbsp;&nbsp;&nbsp;&nbsp;[bestand]<br>&nbsp;&nbsp;[map]</div></div>
+      <div class="z rail"><div class="zl">rail</div><div class="icons"><div class="ic on">▢</div><div class="ic">▢</div><div class="ic">▢</div><div class="ic">▢</div></div><div class="ic shtog" title="shell toggle">⌃</div></div>
+    </div>
+    <figcaption class="wfcap">Directioneel — toont de bedoelde vorm. Kleuren, spacing, copy en exacte componenten zijn placeholders voor review, geen requirements. De files-flyout staat hier open getekend; in gebruik sluit hij weer bij blur. Het gemarkeerde icoon onderaan de rail is de shell-toggle.</figcaption>
+  </figure>
+
+  <div class="ba">
+    <div class="col before">
+      <h4>Nu</h4>
+      <ul>
+        <li>Centrum mengt chats + editor-tabs (één <code>activeCenterTabId</code>)</li>
+        <li>File explorer = vaste rechterkolom (4 tabs)</li>
+        <li>Sidecar-shells als apart rechter-paneel</li>
+        <li>Chat splitsbaar in 2 (werkt matig)</li>
+      </ul>
+    </div>
+    <div class="col after">
+      <h4>Straks</h4>
+      <ul>
+        <li>Chat-kolom (alleen chats) + tweede paneel (alleen bestanden + browser)</li>
+        <li>File explorer = icoon-rail met auto-sluitende flyouts</li>
+        <li>Shell = bottom-drawer, toggle, over chat + tweede paneel</li>
+        <li>Geen split; alles per-chat gescoped</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Key Decisions</h2>
+
+  <div class="kd">
+    <h4><span class="id">KD1</span>Layout = "activity-bar rechts" (variant A)</h4>
+    <p>Icoon-rail uiterst rechts met auto-sluitende flyouts (panel-iconen bovenaan, shell-toggle aan de voet), tweede paneel tussen chat en rail, shell als bottom-drawer. Gekozen boven een vaste explorer-kolom omdat het maximale ruimte geeft aan chat + content en aansluit bij de Codex-werkwijze.</p>
+  </div>
+  <div class="kd">
+    <h4><span class="id">KD2</span>Per-chat werkcontext</h4>
+    <p>Het hele rechts-+-onder werkgebied — tweede-paneel-tabs én shell — is gescoped op de actieve chat. De chat is de eenheid van werk: pagina's horen bij het gesprek. De rail-panelen blijven juist worktree-gescoped, want het bestandssysteem hoort bij de worktree, niet bij het gesprek.</p>
+  </div>
+  <div class="kd">
+    <h4><span class="id">KD3</span>Browser = iframe, geen Chromium-webview</h4>
+    <p>Lichtgewicht en bouwt voort op de bestaande <code>HtmlPreview</code>. Pragmatische start: lokale HTML + je eigen localhost-app werken. Externe SaaS (Gmail/Outlook) is uitgesloten omdat iframes daar geblokkeerd worden; de layout wordt zo opgezet dat een echte webview later kan instappen.</p>
+  </div>
+  <div class="kd">
+    <h4><span class="id">KD4</span>Split-chat wordt verwijderd, niet herwerkt</h4>
+    <p>De split werkt niet lekker en de behoefte ("chat + relevant scherm naast elkaar") wordt nu vervuld door het per-chat tweede paneel met altijd één zichtbare chat.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Requirements</h2>
+
+  <p class="grp">Layout &amp; navigatie</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th></tr>
+    <tr><td class="rid" id="r1">R1</td><td>De rechterkant bestaat uit vier zones: chat-kolom (links), tweede paneel, icoon-rail uiterst rechts, shell-drawer onderaan.</td></tr>
+    <tr><td class="rid" id="r2">R2</td><td>De icoon-rail bevat bovenaan file explorer, git, tasks en automations als iconen; een klik opent dat paneel als flyout-overlay over het tweede paneel, die weer sluit bij blur (geen vastpinnen in v1). Onderaan de rail zit de toggle voor de shell-drawer.</td></tr>
+    <tr><td class="rid" id="r3">R3</td><td>De rail-panelen zijn worktree-gescoped: ze tonen de worktree van de actieve chat. Twee chats in dezelfde worktree delen dezelfde tree.</td></tr>
+  </table>
+
+  <p class="grp">Tweede paneel</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th></tr>
+    <tr><td class="rid" id="r4">R4</td><td>Een tweede paneel houdt geopende bestanden (editors/diffs) en een browser vast als peer-tabs in één tabrij.</td></tr>
+    <tr><td class="rid" id="r5">R5</td><td>Een bestand openen opent het als tab in het tweede paneel — nooit vermengd met de chat-kolom.</td></tr>
+    <tr><td class="rid" id="r6">R6</td><td>De tabs van het tweede paneel zijn per-chat: elke chat onthoudt z'n eigen set open content-tabs. Van chat wisselen wisselt de tabs mee.</td></tr>
+    <tr><td class="rid" id="r7">R7</td><td>Heeft een chat geen open content, dan klapt het tweede paneel in en vult de chat-kolom de breedte.</td></tr>
+  </table>
+
+  <p class="grp">Browser</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th></tr>
+    <tr><td class="rid" id="r8">R8</td><td>De browser-tab laadt lokale HTML-bestanden én de eigen localhost-dev-app via een URL-balk, op iframe-basis.</td></tr>
+  </table>
+
+  <p class="grp">Shell</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th></tr>
+    <tr><td class="rid" id="r9">R9</td><td>Een shell opent als bottom-drawer over chat + tweede paneel (niet onder de projecten-sidebar). De drawer wordt aan/uit getoggled via een knop onderaan de icoon-rail (zie R2).</td></tr>
+    <tr><td class="rid" id="r10">R10</td><td>Shells zijn per-chat: elke chat onthoudt z'n eigen shell(s); van chat wisselen wisselt de shell-drawer mee.</td></tr>
+    <tr><td class="rid" id="r11">R11</td><td>Een shell die door een chat-wissel uit beeld raakt blijft op de achtergrond doordraaien (output gebufferd) en herstelt bij terugkeer; hij wordt niet gekild.</td></tr>
+  </table>
+
+  <p class="grp">Verwijdering</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th></tr>
+    <tr><td class="rid" id="r12">R12</td><td>De split-chat wordt volledig verwijderd (state, acties, pool-bescherming, UI, hotkeys). Per chat-kolom is altijd één chat zichtbaar; chats wisselen via tabs/hotkeys.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Key Flows</h2>
+  <div class="flow"><span class="id">F1</span> — <b>Bestand openen.</b>
+    <ol><li>Open een bestand vanuit de files-flyout of editor.</li><li>Het verschijnt als tab in het tweede paneel van de actieve chat.</li></ol>
+  </div>
+  <div class="flow"><span class="id">F2</span> — <b>Van chat wisselen (de kern).</b>
+    <ol><li>Klik een andere chat in de chat-kolom.</li><li>Het tweede paneel en de shell-drawer wisselen naar de content + shells van díe chat.</li><li>De rail-panelen volgen de worktree van de chat (gelijk als zelfde worktree).</li></ol>
+  </div>
+  <div class="flow"><span class="id">F3</span> — <b>Browser gebruiken.</b>
+    <ol><li>Open de browser-tab in het tweede paneel.</li><li>Typ een localhost-URL of open een lokaal HTML-bestand.</li><li>De pagina rendert in de iframe.</li></ol>
+  </div>
+  <div class="flow"><span class="id">F4</span> — <b>Rail-paneel openen.</b>
+    <ol><li>Klik een rail-icoon (files/git/tasks/automations).</li><li>Het paneel opent als flyout over het tweede paneel.</li><li>Klik je elders, dan sluit de flyout weer.</li></ol>
+  </div>
+</section>
+
+<section>
+  <h2>Acceptance Examples</h2>
+  <div class="ae"><span class="id">AE1</span> <span class="cov">· dekt R6</span><br>
+    Chat A heeft <code>App.tsx</code> + een browser-tab open; chat B heeft <code>store.ts</code> open. <b class="t">Wissel naar B</b> → tweede paneel toont <code>store.ts</code>. <b class="t">Wissel terug naar A</b> → <code>App.tsx</code> + browser staan er weer.</div>
+  <div class="ae"><span class="id">AE2</span> <span class="cov">· dekt R7</span><br>
+    Een chat zonder open bestanden of browser → het tweede paneel is ingeklapt en de chat-kolom vult de volle breedte.</div>
+  <div class="ae"><span class="id">AE3</span> <span class="cov">· dekt R10, R11</span><br>
+    Chat A draait <code>npm run dev</code> in z'n shell. <b class="t">Wissel naar B</b> → de drawer toont B's shell (of niets); A's <code>npm run dev</code> blijft draaien. <b class="t">Wissel terug</b> → A's shell verschijnt met de gebufferde output.</div>
+  <div class="ae"><span class="id">AE4</span> <span class="cov">· dekt R2, R3</span><br>
+    Klik het files-icoon → de tree-flyout opent over het tweede paneel. Klik in de editor → de flyout sluit. Twee chats in dezelfde worktree tonen dezelfde tree.</div>
+  <div class="ae"><span class="id">AE5</span> <span class="cov">· dekt R8</span><br>
+    Browser-tab: typ <code>localhost:5173</code> → de draaiende app rendert. Open een lokaal <code>.html</code> → het bestand rendert. Typ <code>gmail.com</code> → blokkeert/blijft leeg (buiten scope).</div>
+</section>
+
+<section>
+  <h2>Scope Boundaries</h2>
+  <div class="scope">
+    <div class="col defer">
+      <h4>Uitgesteld (later mogelijk)</h4>
+      <ul>
+        <li>Echte Chromium-webview (<code>WebContentsView</code> / <code>&lt;webview&gt;</code>) — nodig voor externe apps, devtools en history.</li>
+        <li>Externe SaaS in de browser (Gmail/Outlook).</li>
+        <li>Browser-extra's: devtools, navigatie-history, bookmarks, meerdere browser-tabs.</li>
+        <li>Vastpinnen van rail-flyouts als vaste kolom.</li>
+      </ul>
+    </div>
+    <div class="col out">
+      <h4>Buiten deze wijziging</h4>
+      <ul>
+        <li>De linker projecten-sidebar (blijft ongewijzigd).</li>
+        <li>Editor-functionaliteit zelf (talen, formatting, diff-gedrag).</li>
+        <li>Het hook/state-detectie-systeem voor chats.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Dependencies / Assumptions</h2>
+  <p>De huidige staat is geverifieerd tegen de code; deze wijziging is architecturaal, dus de relevante feiten staan hier expliciet.</p>
+  <ul class="tight">
+    <li><b>State-splitsing.</b> Vandaag delen chats en editor-tabs één <code>activeCenterTabId</code> (<a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts">src/stores/projectStore.ts</a>). Aanname: dit splitst in een actieve-chat-notie (chat-kolom) plus een per-chat actieve content-tab (tweede paneel).</li>
+    <li><b>Per-chat scoping.</b> Content-tabs en shells worden gekoppeld aan de chat-(terminal-)id i.p.v. globaal/per-project.</li>
+    <li><b>Split-removal footprint.</b> Te verwijderen: <code>TerminalLayout</code> + <code>SplitDirection</code> (<a href="https://github.com/remcovolmer/command/blob/main/src/types/index.ts">src/types/index.ts</a>), <code>layouts</code> + <code>addToSplit</code>/<code>removeFromSplit</code>/<code>setSplitSizes</code> (projectStore), split-bescherming in <a href="https://github.com/remcovolmer/command/blob/main/src/utils/terminalPool.ts">terminalPool.ts</a>, split-UI in <a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/TerminalArea.tsx">TerminalArea.tsx</a> / <a href="https://github.com/remcovolmer/command/blob/main/src/components/Terminal/TerminalTabBar.tsx">TerminalTabBar.tsx</a> / <a href="https://github.com/remcovolmer/command/blob/main/src/components/Terminal/TerminalViewport.tsx">TerminalViewport.tsx</a>, en de hotkeys in <a href="https://github.com/remcovolmer/command/blob/main/src/App.tsx">App.tsx</a>.</li>
+    <li><b>Browser-iframe.</b> De bestaande <code>HtmlPreview</code> (<a href="https://github.com/remcovolmer/command/blob/main/src/components/Editor/HtmlPreview.tsx">HtmlPreview.tsx</a>) gebruikt <code>srcdoc</code> + sandbox zonder <code>allow-same-origin</code> en is daardoor niet 1-op-1 herbruikbaar voor URL-navigatie; de browser-tab vraagt een nieuwe <code>src</code>-gebaseerde iframe met URL-balk. <code>webviewTag</code> staat niet aan in <code>webPreferences</code> (<a href="https://github.com/remcovolmer/command/blob/main/electron/main/index.ts">electron/main/index.ts</a>) — een latere webview vereist dat aanzetten of <code>WebContentsView</code>.</li>
+    <li><b>Shell vervangt sidecar.</b> De bottom-shell vervangt de huidige sidecar-shells; bestaande sidecar-state migreert naar het per-chat drawer-model. Achtergrond-buffering kan leunen op het bestaande PTY-buffer-mechanisme van de terminal-pool.</li>
+    <li><b>Hotkeys.</b> Nieuwe toggles nodig (tweede paneel, shell-drawer, rail-panelen/focus). De vrijgekomen split-hotkeys (<code>Ctrl+\</code>, <code>Ctrl+Shift+\</code>) kunnen hergebruikt worden. Conform projectconventie krijgen nieuwe features hotkeys.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Outstanding Questions</h2>
+  <p class="grp" style="color:var(--muted)">Op te lossen tijdens planning</p>
+  <ul class="tight">
+    <li>Exacte hotkey-toewijzingen (toggles + focus-cyclus over chat ↔ tweede paneel ↔ rail ↔ shell).</li>
+    <li>Persisteert de breedte van het tweede paneel per chat of globaal?</li>
+    <li>Eén browser-tab per chat, of meerdere als peers? (v1 mag minimaal blijven.)</li>
+    <li>Migratiepad voor bestaande gepersisteerde <code>layouts</code>- en sidecar-state.</li>
+    <li>Is de rail-flyout in breedte aanpasbaar?</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Sources / Research</h2>
+  <ul class="tight">
+    <li>Layout-mockup (variant A): <a href="https://github.com/remcovolmer/command/blob/main/docs/brainstorm/2026-06-26-tweede-paneel-layout-mockup.html">docs/brainstorm/2026-06-26-tweede-paneel-layout-mockup.html</a></li>
+    <li>Center-tab-model &amp; limieten: <a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts">src/stores/projectStore.ts</a> (<code>editorTabs</code>, <code>activeCenterTabId</code>, <code>MAX_EDITOR_TABS=15</code>, <code>MAX_TERMINALS_PER_PROJECT=10</code>)</li>
+    <li>Huidige drie-paneel-layout: <a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/MainLayout.tsx">src/components/Layout/MainLayout.tsx</a></li>
+    <li>Bestaande HTML-preview: <a href="https://github.com/remcovolmer/command/blob/main/src/components/Editor/HtmlPreview.tsx">src/components/Editor/HtmlPreview.tsx</a></li>
+    <li>Eerdere brainstorm (HTML-preview-editor): <a href="https://github.com/remcovolmer/command/blob/main/docs/brainstorms/2026-05-21-html-preview-editor-requirements.html">docs/brainstorms/2026-05-21-html-preview-editor-requirements.html</a></li>
+  </ul>
+</section>
+
+<footer class="sig">Composed 2026-06-26 by ce-brainstorm from chat dialogue. Current-state claims verified against the codebase at composition time.</footer>
+
+</div>
+</body>
+</html>
