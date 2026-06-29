@@ -193,23 +193,10 @@ export interface AutomationRun {
   prNumber?: number
 }
 
-// Layout types
-export type SplitDirection = 'horizontal' | 'vertical'
-
-export interface TerminalLayout {
-  projectId: string
-  // Terminal IDs currently shown in split view (2-3 terminals side by side)
-  // Empty array or single item = no split, just tabs
-  splitTerminalIds: string[]
-  // Percentages for each split pane (should match splitTerminalIds length)
-  splitSizes: number[]
-}
-
 // App state
 export interface AppState {
   projects: Project[]
   terminals: Record<string, TerminalSession>
-  layouts: Record<string, TerminalLayout>
   activeProjectId: string | null
   activeTerminalId: string | null
 }

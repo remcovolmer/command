@@ -15,14 +15,10 @@ export function TerminalArea() {
     activeTerminalId,
     terminals,
     projects,
-    layouts,
     editorTabs,
     activeCenterTabId,
     setActiveTerminal,
     removeTerminal,
-    addToSplit,
-    removeFromSplit,
-    setSplitSizes,
     setActiveCenterTab,
     closeEditorTab,
     addTerminal,
@@ -32,14 +28,10 @@ export function TerminalArea() {
       activeTerminalId: s.activeTerminalId,
       terminals: s.terminals,
       projects: s.projects,
-      layouts: s.layouts,
       editorTabs: s.editorTabs,
       activeCenterTabId: s.activeCenterTabId,
       setActiveTerminal: s.setActiveTerminal,
       removeTerminal: s.removeTerminal,
-      addToSplit: s.addToSplit,
-      removeFromSplit: s.removeFromSplit,
-      setSplitSizes: s.setSplitSizes,
       setActiveCenterTab: s.setActiveCenterTab,
       closeEditorTab: s.closeEditorTab,
       addTerminal: s.addTerminal,
@@ -62,10 +54,6 @@ export function TerminalArea() {
     () => Object.values(editorTabs).filter((t) => t.projectId === activeProjectId),
     [editorTabs, activeProjectId]
   )
-
-  // Get current layout for the project
-  const currentLayout = activeProjectId ? layouts[activeProjectId] : null
-  const splitTerminalIds = currentLayout?.splitTerminalIds ?? []
 
   const handleCreateTerminal = async () => {
     if (!activeProjectId) return
@@ -109,56 +97,6 @@ export function TerminalArea() {
       closeEditorTab(tabId)
     },
     [editorTabs, closeEditorTab]
-  )
-
-  const handleUnsplit = useCallback(
-    (terminalId: string) => {
-      if (!activeProjectId) return
-      removeFromSplit(activeProjectId, terminalId)
-    },
-    [activeProjectId, removeFromSplit]
-  )
-
-  const handleDropToSplit = useCallback(
-    (terminalId: string, position: 'left' | 'right') => {
-      if (!activeProjectId) return
-
-      // If there's already a split, just add to it
-      if (splitTerminalIds.length >= 2) {
-        addToSplit(activeProjectId, terminalId)
-        return
-      }
-
-      // Find a terminal to pair with (either the active one, or another one)
-      let pairTerminalId: string | null = null
-
-      if (activeTerminalId && activeTerminalId !== terminalId) {
-        pairTerminalId = activeTerminalId
-      } else {
-        const otherTerminal = projectTerminals.find((t) => t.id !== terminalId)
-        pairTerminalId = otherTerminal?.id ?? null
-      }
-
-      if (pairTerminalId) {
-        if (position === 'left') {
-          addToSplit(activeProjectId, terminalId)
-          addToSplit(activeProjectId, pairTerminalId)
-        } else {
-          addToSplit(activeProjectId, pairTerminalId)
-          addToSplit(activeProjectId, terminalId)
-        }
-      }
-    },
-    [activeProjectId, activeTerminalId, projectTerminals, splitTerminalIds.length, addToSplit]
-  )
-
-  const handleSplitSizesChange = useCallback(
-    (sizes: number[]) => {
-      if (activeProjectId) {
-        setSplitSizes(activeProjectId, sizes)
-      }
-    },
-    [activeProjectId, setSplitSizes]
   )
 
   const handleResumeSession = useCallback(
@@ -234,12 +172,10 @@ export function TerminalArea() {
         editorTabs={projectEditorTabs}
         activeTerminalId={activeTerminalId}
         activeCenterTabId={activeCenterTabId}
-        splitTerminalIds={splitTerminalIds}
         onSelectTerminal={handleSelectTerminal}
         onSelectEditor={handleSelectEditor}
         onClose={handleCloseTerminal}
         onCloseEditor={handleCloseEditor}
-        onUnsplit={handleUnsplit}
         onAdd={handleCreateTerminal}
         canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
       />
@@ -249,11 +185,6 @@ export function TerminalArea() {
           editorTabs={projectEditorTabs}
           activeTerminalId={activeTerminalId}
           activeCenterTabId={activeCenterTabId}
-          splitTerminalIds={splitTerminalIds}
-          projectId={activeProjectId!}
-          onSplitSizesChange={handleSplitSizesChange}
-          onDropToSplit={handleDropToSplit}
-          onSelect={handleSelectTerminal}
         />
       </div>
     </div>

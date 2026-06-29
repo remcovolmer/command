@@ -77,20 +77,6 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'terminal',
     enabled: true,
   },
-  'terminal.split': {
-    key: '\\',
-    modifiers: ['ctrl'],
-    description: 'Add terminal to split view',
-    category: 'terminal',
-    enabled: true,
-  },
-  'terminal.unsplit': {
-    key: '\\',
-    modifiers: ['ctrl', 'shift'],
-    description: 'Remove from split view',
-    category: 'terminal',
-    enabled: true,
-  },
   'terminal.goTo1': {
     key: '1',
     modifiers: ['alt'],

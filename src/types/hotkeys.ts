@@ -36,8 +36,6 @@ export type HotkeyAction =
   // Terminal operations
   | 'terminal.new'
   | 'terminal.close'
-  | 'terminal.split'
-  | 'terminal.unsplit'
   | 'terminal.goTo1'
   | 'terminal.goTo2'
   | 'terminal.goTo3'

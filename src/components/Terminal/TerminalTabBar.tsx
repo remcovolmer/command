@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { TerminalIcon, Plus, X, LayoutGrid, FileText, Circle, GitCompare } from 'lucide-react'
+import { TerminalIcon, Plus, X, FileText, Circle, GitCompare } from 'lucide-react'
 import type { TerminalSession, CenterTab } from '../../types'
 import { STATE_DOT_COLORS, isInputState } from '../../utils/terminalState'
 
@@ -8,12 +8,10 @@ interface TerminalTabBarProps {
   editorTabs: CenterTab[]
   activeTerminalId: string | null
   activeCenterTabId: string | null
-  splitTerminalIds: string[]
   onSelectTerminal: (terminalId: string) => void
   onSelectEditor: (tabId: string) => void
   onClose: (terminalId: string) => void
   onCloseEditor: (tabId: string) => void
-  onUnsplit: (terminalId: string) => void
   onAdd: () => void
   canAdd: boolean
 }
@@ -23,12 +21,10 @@ export function TerminalTabBar({
   editorTabs,
   activeTerminalId,
   activeCenterTabId,
-  splitTerminalIds,
   onSelectTerminal,
   onSelectEditor,
   onClose,
   onCloseEditor,
-  onUnsplit,
   onAdd,
   canAdd,
 }: TerminalTabBarProps) {
@@ -40,11 +36,6 @@ export function TerminalTabBar({
     const el = containerRef.current.querySelector(`[data-tab-id="${activeCenterTabId}"]`)
     el?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
   }, [activeCenterTabId])
-
-  const handleDragStart = (e: React.DragEvent, terminalId: string) => {
-    e.dataTransfer.setData('terminalId', terminalId)
-    e.dataTransfer.effectAllowed = 'move'
-  }
 
   // Derive active tab type from the ID
   const isEditorTabActive = (tabId: string) => editorTabs.some((t) => t.id === tabId)
@@ -58,14 +49,11 @@ export function TerminalTabBar({
       {/* Terminal tabs */}
       {terminals.map((terminal) => {
         const isActive = !activeIsEditor && terminal.id === (activeCenterTabId ?? activeTerminalId)
-        const isInSplit = splitTerminalIds.includes(terminal.id)
 
         return (
           <div
             key={terminal.id}
             data-tab-id={terminal.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, terminal.id)}
             onClick={() => onSelectTerminal(terminal.id)}
             className={`
               group flex items-center gap-1.5 px-2.5 py-1 rounded-lg cursor-pointer
@@ -86,18 +74,6 @@ export function TerminalTabBar({
                 isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
               }`}
             />
-            {isInSplit && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onUnsplit(terminal.id)
-                }}
-                className="p-0.5 rounded hover:bg-border transition-all"
-                title="Remove from split"
-              >
-                <LayoutGrid className="w-3 h-3 text-primary" />
-              </button>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation()

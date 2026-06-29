@@ -86,7 +86,6 @@ describe('projectStore activeCenterTabId', () => {
       activeCenterTabId: null,
       activeProjectId: null,
       projects: [],
-      layouts: {},
       sidecarTerminals: {},
       activeSidecarTerminalId: {},
       worktrees: {},

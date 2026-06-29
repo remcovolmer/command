@@ -21,8 +21,6 @@ function App() {
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
   const settingsDialogOpen = useProjectStore((s) => s.settingsDialogOpen)
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
-  const addToSplit = useProjectStore((s) => s.addToSplit)
-  const removeFromSplit = useProjectStore((s) => s.removeFromSplit)
   const closeEditorTab = useProjectStore((s) => s.closeEditorTab)
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
@@ -211,18 +209,6 @@ function App() {
 
       api.terminal.close(activeTerminalId)
       removeTerminal(activeTerminalId)
-    },
-
-    'terminal.split': () => {
-      const { activeProjectId, activeTerminalId } = useProjectStore.getState()
-      if (!activeProjectId || !activeTerminalId) return
-      addToSplit(activeProjectId, activeTerminalId)
-    },
-
-    'terminal.unsplit': () => {
-      const { activeProjectId, activeTerminalId } = useProjectStore.getState()
-      if (!activeProjectId || !activeTerminalId) return
-      removeFromSplit(activeProjectId, activeTerminalId)
     },
 
     // Terminal shortcuts Alt+1-9 (generated handlers)

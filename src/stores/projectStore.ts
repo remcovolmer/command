@@ -4,7 +4,6 @@ import type {
   Project,
   TerminalSession,
   TerminalState,
-  TerminalLayout,
   FileSystemEntry,
   GitStatus,
   Worktree,
@@ -47,7 +46,6 @@ interface ProjectStore {
   // State
   projects: Project[]
   terminals: Record<string, TerminalSession>
-  layouts: Record<string, TerminalLayout>
   activeProjectId: string | null
   activeTerminalId: string | null
 
@@ -274,12 +272,6 @@ interface ProjectStore {
   getProjectWorktrees: (projectId: string) => Worktree[]
   loadWorktrees: (projectId: string) => Promise<void>
 
-  // Layout actions
-  getLayout: (projectId: string) => TerminalLayout | null
-  addToSplit: (projectId: string, terminalId: string) => void
-  removeFromSplit: (projectId: string, terminalId: string) => void
-  setSplitSizes: (projectId: string, sizes: number[]) => void
-
   // Initialization
   loadProjects: () => Promise<void>
 }
@@ -299,7 +291,6 @@ export const useProjectStore = create<ProjectStore>()(
       // Initial state
       projects: [],
       terminals: {},
-      layouts: {},
       activeProjectId: null,
       activeTerminalId: null,
 
@@ -1183,10 +1174,6 @@ export const useProjectStore = create<ProjectStore>()(
             }
           })
 
-          // Remove layout
-          const newLayouts = { ...state.layouts }
-          delete newLayouts[id]
-
           // Update active project if needed
           const newProjects = state.projects.filter((p) => p.id !== id)
           const newActiveProjectId =
@@ -1279,7 +1266,6 @@ export const useProjectStore = create<ProjectStore>()(
             projects: newProjects,
             terminals: newTerminals,
             worktrees: newWorktrees,
-            layouts: newLayouts,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
             activeProjectId: newActiveProjectId,
@@ -1405,24 +1391,6 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
 
-          // Also remove from split layout if present
-          const newLayouts = { ...state.layouts }
-          if (removedTerminal) {
-            const layout = newLayouts[removedTerminal.projectId]
-            if (layout && layout.splitTerminalIds.includes(id)) {
-              const newSplitIds = layout.splitTerminalIds.filter((tid) => tid !== id)
-              if (newSplitIds.length <= 1) {
-                delete newLayouts[removedTerminal.projectId]
-              } else {
-                newLayouts[removedTerminal.projectId] = {
-                  ...layout,
-                  splitTerminalIds: newSplitIds,
-                  splitSizes: newSplitIds.map(() => 100 / newSplitIds.length),
-                }
-              }
-            }
-          }
-
           // Clean stale ID from sidecarTerminals
           const newSidecarTerminals = { ...state.sidecarTerminals }
           const newActiveSidecar = { ...state.activeSidecarTerminalId }
@@ -1445,7 +1413,6 @@ export const useProjectStore = create<ProjectStore>()(
             terminals: newTerminals,
             activeTerminalId: newActiveTerminalId,
             activeCenterTabId: newActiveCenterTabId,
-            layouts: newLayouts,
             sidecarTerminals: newSidecarTerminals,
             activeSidecarTerminalId: newActiveSidecar,
           }
@@ -1705,88 +1672,6 @@ export const useProjectStore = create<ProjectStore>()(
         }
       },
 
-      // Layout actions
-      getLayout: (projectId) => {
-        const state = get()
-        return state.layouts[projectId] ?? null
-      },
-
-      addToSplit: (projectId, terminalId) =>
-        set((state) => {
-          const currentLayout = state.layouts[projectId] ?? {
-            projectId,
-            splitTerminalIds: [],
-            splitSizes: [],
-          }
-
-          // Don't add if already in split or at max
-          if (
-            currentLayout.splitTerminalIds.includes(terminalId) ||
-            currentLayout.splitTerminalIds.length >= MAX_TERMINALS_PER_PROJECT
-          ) {
-            return state
-          }
-
-          const newSplitIds = [...currentLayout.splitTerminalIds, terminalId]
-          // Distribute sizes evenly
-          const newSizes = newSplitIds.map(() => 100 / newSplitIds.length)
-
-          return {
-            layouts: {
-              ...state.layouts,
-              [projectId]: {
-                projectId,
-                splitTerminalIds: newSplitIds,
-                splitSizes: newSizes,
-              },
-            },
-          }
-        }),
-
-      removeFromSplit: (projectId, terminalId) =>
-        set((state) => {
-          const currentLayout = state.layouts[projectId]
-          if (!currentLayout) return state
-
-          const newSplitIds = currentLayout.splitTerminalIds.filter((id) => id !== terminalId)
-
-          // If only one left, clear the split
-          if (newSplitIds.length <= 1) {
-            const newLayouts = { ...state.layouts }
-            delete newLayouts[projectId]
-            return { layouts: newLayouts }
-          }
-
-          // Redistribute sizes evenly
-          const newSizes = newSplitIds.map(() => 100 / newSplitIds.length)
-
-          return {
-            layouts: {
-              ...state.layouts,
-              [projectId]: {
-                projectId,
-                splitTerminalIds: newSplitIds,
-                splitSizes: newSizes,
-              },
-            },
-          }
-        }),
-
-      setSplitSizes: (projectId, sizes) =>
-        set((state) => {
-          const currentLayout = state.layouts[projectId]
-          if (!currentLayout) return state
-
-          return {
-            layouts: {
-              ...state.layouts,
-              [projectId]: {
-                ...currentLayout,
-                splitSizes: sizes,
-              },
-            },
-          }
-        }),
 
       // Initialization
       loadProjects: async () => {
@@ -1811,8 +1696,6 @@ export const useProjectStore = create<ProjectStore>()(
     {
       name: 'command-center-storage',
       partialize: (state) => ({
-        // Only persist layouts, not terminals (they need to be recreated)
-        layouts: state.layouts,
         activeProjectId: state.activeProjectId,
         // File explorer state
         fileExplorerVisible: state.fileExplorerVisible,
