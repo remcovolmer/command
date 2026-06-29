@@ -1822,15 +1822,24 @@ export const useProjectStore = create<ProjectStore>()(
         } catch {
           // Ignore if electronAPI not available (e.g., in tests)
         }
-        // Sync persisted terminal pool size to the pool singleton
-        terminalPool.setMaxSize(useProjectStore.getState().terminalPoolSize)
+        // Use the hydrated `state` param here, NOT useProjectStore.getState():
+        // this callback runs synchronously inside create() during hydration,
+        // when the useProjectStore const is still in its temporal dead zone.
+        // Touching it threw a ReferenceError that aborted the rest of this
+        // callback — which silently disabled the usage indicator (setEnabled +
+        // the usage:update subscription below never ran) and skipped the
+        // isRendererReady signal.
+        //
+        // Sync persisted terminal pool size to the pool singleton.
+        if (state) terminalPool.setMaxSize(state.terminalPoolSize)
         // Start usage polling per the persisted toggle and register the single
         // global subscription that feeds the sidebar indicator. This callback is
         // the one place the renderer subscribes to usage:update — components
-        // read usageData from the store.
+        // read usageData from the store. The onUpdate handler runs later (after
+        // init), so useProjectStore.getState() is safe there.
         try {
           const api = getElectronAPI()
-          api.usage.setEnabled(useProjectStore.getState().showUsageIndicator).catch(() => {})
+          api.usage.setEnabled(state?.showUsageIndicator ?? true).catch(() => {})
           unsubUsageUpdate?.()
           unsubUsageUpdate = api.usage.onUpdate((data) => {
             useProjectStore.getState().setUsageData(data)
