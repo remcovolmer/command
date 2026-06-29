@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { FileText, Circle, GitCompare, X } from 'lucide-react'
+import { FileText, Circle, GitCompare, Globe, X } from 'lucide-react'
 import type { CenterTab } from '../../types'
 
 interface ContentTabBarProps {
@@ -10,6 +10,7 @@ interface ContentTabBarProps {
 }
 
 function tabLabel(tab: CenterTab): string {
+  if (tab.type === 'browser') return tab.url.replace(/^https?:\/\//, '') || 'Browser'
   if (tab.type === 'diff') return `${tab.fileName} (diff)`
   if (tab.type === 'working-tree-diff') {
     const kind =
@@ -57,7 +58,9 @@ export function ContentTabBar({ tabs, activeContentId, onSelect, onClose }: Cont
               }
             `}
           >
-            {tab.type === 'diff' || tab.type === 'working-tree-diff' ? (
+            {tab.type === 'browser' ? (
+              <Globe className="w-3.5 h-3.5 flex-shrink-0 text-purple-400" />
+            ) : tab.type === 'diff' || tab.type === 'working-tree-diff' ? (
               <GitCompare className="w-3.5 h-3.5 flex-shrink-0 text-blue-400" />
             ) : (
               <FileText className="w-3.5 h-3.5 flex-shrink-0" />

@@ -29,6 +29,8 @@ export function TerminalArea() {
     removeTerminal,
     setActiveContentTab,
     closeEditorTab,
+    openBrowserTab,
+    setBrowserTabUrl,
     addTerminal,
   } = useProjectStore(
     useShallow((s) => ({
@@ -43,6 +45,8 @@ export function TerminalArea() {
       removeTerminal: s.removeTerminal,
       setActiveContentTab: s.setActiveContentTab,
       closeEditorTab: s.closeEditorTab,
+      openBrowserTab: s.openBrowserTab,
+      setBrowserTabUrl: s.setBrowserTabUrl,
       addTerminal: s.addTerminal,
     }))
   )
@@ -105,6 +109,10 @@ export function TerminalArea() {
     },
     [setActiveContentTab]
   )
+
+  const handleOpenBrowser = useCallback(() => {
+    if (activeProjectId) openBrowserTab(activeProjectId)
+  }, [activeProjectId, openBrowserTab])
 
   const handleCloseContent = useCallback(
     (tabId: string) => {
@@ -194,6 +202,7 @@ export function TerminalArea() {
             onSelect={handleSelectTerminal}
             onClose={handleCloseTerminal}
             onAdd={handleCreateTerminal}
+            onOpenBrowser={handleOpenBrowser}
             canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
           />
           <div className="flex-1 min-h-0">
@@ -218,6 +227,7 @@ export function TerminalArea() {
           activeContentId={activeContentId}
           onSelect={handleSelectContent}
           onClose={handleCloseContent}
+          onBrowserUrlChange={setBrowserTabUrl}
         />
       </Panel>
     </PanelGroup>

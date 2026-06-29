@@ -129,8 +129,18 @@ export interface WorkingTreeDiffTab {
   terminalId: string
 }
 
+// Browser tab (iframe-based; loads local HTML and the user's own localhost app).
+// Distinct from HtmlPreview (srcdoc file preview) — this navigates a real URL.
+export interface BrowserTab {
+  id: string
+  type: 'browser'
+  url: string
+  projectId: string
+  terminalId: string
+}
+
 // Union of all center tab types
-export type CenterTab = EditorTab | DiffTab | WorkingTreeDiffTab
+export type CenterTab = EditorTab | DiffTab | WorkingTreeDiffTab | BrowserTab
 
 // File watcher types
 export const FILE_WATCH_EVENT_TYPES = [

@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { ContentTabBar } from './ContentTabBar'
+import { BrowserTab } from '../Browser/BrowserTab'
 import { EditorSkeleton } from '../Editor/EditorSkeleton'
-import type { CenterTab, DiffTab, WorkingTreeDiffTab } from '../../types'
+import type { CenterTab, DiffTab, WorkingTreeDiffTab, BrowserTab as BrowserTabType } from '../../types'
 
 const EditorContainer = lazy(() =>
   import('../Editor/EditorContainer').then((m) => ({ default: m.EditorContainer }))
@@ -18,6 +19,7 @@ interface SecondPanelProps {
   activeContentId: string | null
   onSelect: (tabId: string) => void
   onClose: (tabId: string) => void
+  onBrowserUrlChange: (tabId: string, url: string) => void
 }
 
 /**
@@ -25,7 +27,13 @@ interface SecondPanelProps {
  * as content tabs. All tabs stay mounted; the active one is shown via each editor's
  * isActive prop (visibility-based, never display:none — keeps xterm/Monaco geometry valid).
  */
-export function SecondPanel({ tabs, activeContentId, onSelect, onClose }: SecondPanelProps) {
+export function SecondPanel({
+  tabs,
+  activeContentId,
+  onSelect,
+  onClose,
+  onBrowserUrlChange,
+}: SecondPanelProps) {
   if (tabs.length === 0) {
     return null
   }
@@ -52,6 +60,13 @@ export function SecondPanel({ tabs, activeContentId, onSelect, onClose }: Second
                 key={tab.id}
                 tab={tab as WorkingTreeDiffTab}
                 isActive={tab.id === activeContentId}
+              />
+            ) : tab.type === 'browser' ? (
+              <BrowserTab
+                key={tab.id}
+                url={(tab as BrowserTabType).url}
+                isActive={tab.id === activeContentId}
+                onUrlChange={(url) => onBrowserUrlChange(tab.id, url)}
               />
             ) : (
               <EditorContainer

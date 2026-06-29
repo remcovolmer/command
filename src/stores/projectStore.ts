@@ -13,6 +13,7 @@ import type {
   EditorTab,
   DiffTab,
   WorkingTreeDiffTab,
+  BrowserTab,
   GitCommit,
   GitCommitLog,
   CenterTab,
@@ -231,6 +232,8 @@ interface ProjectStore {
     projectId: string
   ) => void
   closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
+  openBrowserTab: (projectId: string) => void
+  setBrowserTabUrl: (tabId: string, url: string) => void
 
   // Discard confirmation state
   discardingFiles: { files: string[]; isUntracked: boolean } | null
@@ -484,7 +487,9 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => {
           const chatId = state.activeTerminalId ?? ''
           // Check if already open
-          const existing = Object.values(state.editorTabs).find((t) => t.filePath === filePath)
+          const existing = Object.values(state.editorTabs).find(
+            (t) => t.type !== 'browser' && t.filePath === filePath
+          )
           if (existing) {
             return {
               activeContentTabId: {
@@ -1121,6 +1126,30 @@ export const useProjectStore = create<ProjectStore>()(
             }
           }
           return { editorTabs: newTabs, activeContentTabId: newContent }
+        }),
+
+      openBrowserTab: (projectId) =>
+        set((state) => {
+          const chatId = state.activeTerminalId ?? ''
+          const id = `browser-${crypto.randomUUID()}`
+          const tab: BrowserTab = {
+            id,
+            type: 'browser',
+            url: 'http://localhost:5173',
+            projectId,
+            terminalId: chatId,
+          }
+          return {
+            editorTabs: { ...state.editorTabs, [id]: tab },
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
+          }
+        }),
+
+      setBrowserTabUrl: (tabId, url) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab || tab.type !== 'browser') return state
+          return { editorTabs: { ...state.editorTabs, [tabId]: { ...tab, url } } }
         }),
 
       // Discard confirmation actions

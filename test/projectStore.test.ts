@@ -181,6 +181,25 @@ describe('projectStore active terminal & content', () => {
       useProjectStore.getState().removeTerminal('chat-A')
       expect(useProjectStore.getState().activeContentTabId['chat-A']).toBeUndefined()
     })
+
+    test('openBrowserTab creates a per-chat browser tab and activates it', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      useProjectStore.getState().openBrowserTab('proj-1')
+      const s = useProjectStore.getState()
+      const tab = Object.values(s.editorTabs)[0]
+      expect(tab.type).toBe('browser')
+      expect(tab.terminalId).toBe('chat-A')
+      expect(s.activeContentTabId['chat-A']).toBe(tab.id)
+    })
+
+    test('setBrowserTabUrl updates the browser tab url', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      useProjectStore.getState().openBrowserTab('proj-1')
+      const tabId = Object.values(useProjectStore.getState().editorTabs)[0].id
+      useProjectStore.getState().setBrowserTabUrl(tabId, 'http://localhost:3000')
+      const tab = useProjectStore.getState().editorTabs[tabId]
+      expect(tab.type === 'browser' && tab.url).toBe('http://localhost:3000')
+    })
   })
 
   describe('removeTerminal', () => {
