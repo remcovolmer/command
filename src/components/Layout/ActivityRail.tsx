@@ -21,6 +21,13 @@ export function ActivityRail() {
   const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
   const setVisible = useProjectStore((s) => s.setFileExplorerVisible)
 
+  // Limited ('project'-type) folders have no git tab, so hide the rail's git
+  // entry for them — otherwise the icon just resolves to the files view.
+  const activeProjectType = useProjectStore(
+    (s) => s.projects.find((p) => p.id === s.activeProjectId)?.type
+  )
+  const items = activeProjectType === 'project' ? ITEMS.filter((i) => i.tab !== 'git') : ITEMS
+
   // Shell-drawer toggle state (scoped to the active chat's worktree-context).
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const activeWorktree = useProjectStore((s) => {
@@ -64,7 +71,7 @@ export function ActivityRail() {
       </button>
       <div className="w-5 h-px bg-border my-1" />
 
-      {ITEMS.map(({ tab, icon: Icon, label }) => {
+      {items.map(({ tab, icon: Icon, label }) => {
         const active = visible && activeTab === tab
         return (
           <button
