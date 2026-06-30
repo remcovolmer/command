@@ -53,9 +53,16 @@ export function ActivityRail() {
   )
   const automationUnread = useAutomationUnreadCount()
 
+  // Limited ('project'-type) projects have no git; the old tab bar hid the Git
+  // tab (and its badge) for them via showGitTab. Mirror that: no git badge here.
+  const isLimitedProject = useProjectStore((s) => {
+    const project = s.projects.find((p) => p.id === s.activeProjectId)
+    return project?.type === 'project'
+  })
+
   const counts: Record<ExplorerTab, number> = {
     files: 0,
-    git: gitChangeCount,
+    git: isLimitedProject ? 0 : gitChangeCount,
     tasks: taskNowCount,
     automations: automationUnread,
   }

@@ -1,4 +1,4 @@
-import { FolderTree, GitBranch, ListTodo, Zap, RefreshCw } from 'lucide-react'
+import { FolderTree, GitBranch, ListChecks, Zap, RefreshCw } from 'lucide-react'
 
 type ExplorerTab = 'files' | 'git' | 'tasks' | 'automations'
 
@@ -12,7 +12,7 @@ interface FileExplorerHeaderProps {
 const TAB_META: Record<ExplorerTab, { label: string; icon: typeof FolderTree }> = {
   files: { label: 'Files', icon: FolderTree },
   git: { label: 'Git', icon: GitBranch },
-  tasks: { label: 'Tasks', icon: ListTodo },
+  tasks: { label: 'Tasks', icon: ListChecks },
   automations: { label: 'Automations', icon: Zap },
 }
 

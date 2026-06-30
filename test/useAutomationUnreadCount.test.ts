@@ -91,6 +91,21 @@ describe('useAutomationUnreadCount', () => {
     await waitFor(() => expect(result.current).toBe(1))
   })
 
+  test('swallows a listRuns rejection (count stays put) and recovers on the next event', async () => {
+    listRunsMock.mockRejectedValueOnce(new Error('ipc failed'))
+    const { result } = renderHook(() => useAutomationUnreadCount())
+    // The rejected initial load must not throw; the count holds at its default.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(result.current).toBe(0)
+
+    // A later event re-fetches successfully and updates the count.
+    listRunsMock.mockResolvedValue([makeRun({ id: '1', read: false, status: 'completed' })])
+    await act(async () => {
+      completedSubs.forEach((cb) => cb(makeRun({ id: '1' })))
+    })
+    await waitFor(() => expect(result.current).toBe(1))
+  })
+
   test('unsubscribes both listeners on unmount', () => {
     listRunsMock.mockResolvedValue([])
     const { unmount } = renderHook(() => useAutomationUnreadCount())

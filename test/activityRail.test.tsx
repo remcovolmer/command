@@ -14,6 +14,7 @@ const { fakeState, setAutomationCount } = vi.hoisted(() => {
     setFileExplorerVisible: () => {},
     activeProjectId: 'proj-1' as string | null,
     activeTerminalId: null as string | null,
+    projects: [] as Array<{ id: string; type: string }>,
     terminals: {} as Record<string, { worktreeId: string | null }>,
     worktrees: {} as Record<string, { id: string }>,
     sidecarTerminals: {} as Record<string, unknown[]>,
@@ -56,17 +57,25 @@ describe('ActivityRail badges', () => {
     fakeState.fileExplorerActiveTab = 'files'
     fakeState.activeProjectId = 'proj-1'
     fakeState.activeTerminalId = null
+    fakeState.projects = []
     fakeState.gitStatus = {}
     fakeState.tasksData = {}
     fakeState._automationCount = 0
   })
   afterEach(() => cleanup())
 
-  test('no counts: no badge text on any panel icon', () => {
+  test('no counts: no numeric badge on any panel icon', () => {
     render(<ActivityRail />)
     for (const label of ['Files', 'Git', 'Tasks', 'Automations']) {
-      expect(screen.getByTitle(label).textContent).toBe('')
+      expect(within(screen.getByTitle(label)).queryByText(/^\d+$/)).toBeNull()
     }
+  })
+
+  test('suppresses the git badge for limited (project-type) projects', () => {
+    fakeState.projects = [{ id: 'proj-1', type: 'project' }]
+    fakeState.gitStatus = { 'proj-1': gitStatus(3, 0, 0, 0) }
+    render(<ActivityRail />)
+    expect(within(screen.getByTitle('Git')).queryByText(/^\d+$/)).toBeNull()
   })
 
   test('git changes badge sums staged/modified/untracked/conflicted', () => {
@@ -85,6 +94,13 @@ describe('ActivityRail badges', () => {
     setAutomationCount(2)
     render(<ActivityRail />)
     expect(within(screen.getByTitle('Automations')).getByText('2')).toBeTruthy()
+  })
+
+  test('non-limited project keeps the git badge', () => {
+    fakeState.projects = [{ id: 'proj-1', type: 'git' }]
+    fakeState.gitStatus = { 'proj-1': gitStatus(2, 1, 0, 0) }
+    render(<ActivityRail />)
+    expect(within(screen.getByTitle('Git')).getByText('3')).toBeTruthy()
   })
 
   test('files icon is never badged, even with git/task/automation activity', () => {
