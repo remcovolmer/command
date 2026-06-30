@@ -97,7 +97,7 @@ describe('ActivityRail badges', () => {
   })
 
   test('non-limited project keeps the git badge', () => {
-    fakeState.projects = [{ id: 'proj-1', type: 'git' }]
+    fakeState.projects = [{ id: 'proj-1', type: 'code' }]
     fakeState.gitStatus = { 'proj-1': gitStatus(2, 1, 0, 0) }
     render(<ActivityRail />)
     expect(within(screen.getByTitle('Git')).getByText('3')).toBeTruthy()
