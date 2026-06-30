@@ -25,19 +25,43 @@ const MAX_BATCH_SIZE = 100 // flush early if batch grows too large
 const INITIAL_RESTART_DELAY = 5000 // ms before first restart attempt
 const MAX_RESTART_ATTEMPTS = 3
 
-const IGNORE_PATTERNS = [
-  '**/node_modules/**',
-  '**/.git/**',
-  '**/dist/**',
-  '**/build/**',
-  '**/.next/**',
-  '**/coverage/**',
-  '**/__pycache__/**',
-  '**/.venv/**',
-  '**/*.log',
-  '**/.DS_Store',
-  '**/Thumbs.db',
-]
+// chokidar v4 removed glob support: the `ignored` option now only accepts a
+// path string, a RegExp, or a predicate. The old glob strings (e.g.
+// `**/node_modules/**`) silently matched nothing under v4, so the watcher
+// walked the entire tree — including every node_modules and every nested
+// worktree under .worktrees/ — pegging the main process for tens of seconds
+// on switch to a worktree-heavy project. Match by path segment (relative to
+// the watch root) so chokidar prunes the whole subtree at the directory and
+// never descends into it.
+const IGNORED_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  '.next',
+  'coverage',
+  '__pycache__',
+  '.venv',
+  '.worktrees',
+])
+
+const IGNORED_FILES = new Set(['.DS_Store', 'Thumbs.db'])
+
+/**
+ * True if `filePath` should be excluded from watching. Evaluated against the
+ * path's segments relative to `rootPath`, so a watch-root ancestor named e.g.
+ * "build" cannot accidentally exclude the whole project. The root itself is
+ * never ignored. chokidar v4 calls this for directories too, so returning true
+ * for a directory prunes its entire subtree before descent.
+ */
+export function isIgnoredPath(filePath: string, rootPath: string): boolean {
+  const rel = path.relative(rootPath, filePath)
+  if (!rel || rel.startsWith('..')) return false // the root itself, or outside it
+  const segments = rel.split(/[\\/]/).filter(Boolean)
+  const basename = segments[segments.length - 1] ?? ''
+  if (IGNORED_FILES.has(basename) || basename.endsWith('.log')) return true
+  return segments.some((segment) => IGNORED_DIRS.has(segment))
+}
 
 /**
  * Validate that a path is safe to watch (not a root or system directory).
@@ -105,7 +129,7 @@ export class FileWatcherService {
     try {
       const watcher = watch(projectPath, {
         ignoreInitial: true,
-        ignored: IGNORE_PATTERNS,
+        ignored: (p: string) => isIgnoredPath(p, projectPath),
         followSymlinks: false,
         atomic: true,
         ignorePermissionErrors: true,
