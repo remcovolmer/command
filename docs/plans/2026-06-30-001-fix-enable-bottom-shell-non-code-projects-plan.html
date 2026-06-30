@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enable Bottom Shell for Non-Coding Projects - Plan</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #fbfcfd;
+    --text: #14181f;
+    --muted: #5b6573;
+    --border: #e2e6ec;
+    --border-strong: #cfd5de;
+    --accent: #0f766e;
+    --accent-text: #0b5b54;
+    --accent-soft: #e6f3f1;
+    --ok: #15803d;
+    --ok-soft: #e7f4ea;
+    --warn: #b45309;
+    --warn-soft: #fbf0e1;
+    --code-bg: #eef1f4;
+    --radius: 10px;
+    --maxw: 920px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116;
+      --surface: #161a21;
+      --surface-2: #1b1f27;
+      --text: #e6e9ee;
+      --muted: #9aa4b2;
+      --border: #282e38;
+      --border-strong: #353c48;
+      --accent: #2dd4bf;
+      --accent-text: #5eead4;
+      --accent-soft: #133b37;
+      --ok: #4ade80;
+      --ok-soft: #16331f;
+      --warn: #fbbf24;
+      --warn-soft: #3a2c12;
+      --code-bg: #1f2630;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 40px 24px 72px;
+  }
+  p, li { max-width: 72ch; }
+  h1, h2, h3 { line-height: 1.25; font-weight: 680; letter-spacing: -0.01em; }
+  h1 { font-size: 1.9rem; margin: 0 0 6px; }
+  h2 { font-size: 1.3rem; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--border-strong); }
+  h3 { font-size: 1.05rem; margin: 0 0 8px; }
+  a { color: var(--accent-text); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 0.86em; background: var(--code-bg); padding: 0.1em 0.4em; border-radius: 5px; }
+  strong { color: inherit; }
+  .eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 650; margin: 0 0 4px; }
+  .header { margin-bottom: 26px; }
+  .meta-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.74rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); }
+  .chip.accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-text); }
+  .chip.ok { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+  nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin: 0 0 30px; }
+  nav.toc ul { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; }
+  nav.toc li { max-width: none; }
+  nav.toc a { font-size: 0.86rem; font-weight: 550; color: var(--muted); }
+  nav.toc a:hover { color: var(--accent-text); }
+  section { margin: 0 0 36px; }
+  .lead { font-size: 1.04rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  .table-wrap { overflow-x: auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  td:first-child { white-space: nowrap; font-weight: 600; color: var(--accent-text); }
+  .group-label { font-size: 0.82rem; font-weight: 680; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin: 18px 0 6px; }
+  .idchip { display: inline-block; font-family: ui-monospace, monospace; font-size: 0.78rem; font-weight: 700; color: var(--accent-text); background: var(--accent-soft); padding: 2px 8px; border-radius: 6px; }
+  article.unit { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin: 0 0 14px; }
+  article.unit > h3 { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  dl.unit-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 10px; font-size: 0.92rem; }
+  dl.unit-meta dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 650; padding-top: 2px; }
+  dl.unit-meta dd { margin: 0; }
+  dl.unit-meta dd { max-width: 72ch; }
+  details { border-top: 1px dashed var(--border-strong); margin-top: 8px; padding-top: 8px; }
+  details > summary { cursor: pointer; font-size: 0.8rem; font-weight: 650; color: var(--accent-text); list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: "▸ "; }
+  details[open] > summary::before { content: "▾ "; }
+  details .body { padding: 8px 2px 4px; }
+  details ul, details ol { margin: 4px 0; padding-left: 20px; }
+  .callout { border-radius: var(--radius); padding: 12px 16px; margin: 10px 0; }
+  .callout.warn { background: var(--warn-soft); }
+  .callout.accent { background: var(--accent-soft); }
+  .callout .eyebrow { color: inherit; opacity: 0.85; }
+  .scope-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .scope-cols { grid-template-columns: 1fr; } }
+  .scope { border-radius: var(--radius); padding: 14px 16px; }
+  .scope.in { background: var(--ok-soft); }
+  .scope.out { background: var(--code-bg); }
+  .scope.defer { background: var(--warn-soft); }
+  .scope h4 { margin: 0 0 8px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope ul { margin: 0; padding-left: 18px; font-size: 0.9rem; }
+  /* before / after diagram */
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 8px 0 4px; }
+  @media (max-width: 720px) { .ba { grid-template-columns: 1fr; } }
+  .ba .panel { border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface-2); padding: 14px; }
+  .ba .panel h4 { margin: 0 0 10px; font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase; }
+  .ba .panel.before h4 { color: var(--warn); }
+  .ba .panel.after h4 { color: var(--ok); }
+  .rail { display: flex; flex-direction: column; gap: 5px; align-items: stretch; }
+  .rail .ico { font-size: 0.82rem; padding: 5px 9px; border-radius: 7px; background: var(--surface); border: 1px solid var(--border); }
+  .rail .ico.dead { border-color: var(--warn); color: var(--warn); text-decoration: line-through; }
+  .rail .ico.gone { border-style: dashed; opacity: 0.45; }
+  .rail .ico.shell { border-color: var(--accent); color: var(--accent-text); }
+  .flow { font-size: 0.84rem; margin-top: 12px; color: var(--muted); }
+  .flow .step { display: block; padding: 2px 0; }
+  .flow .bad { color: var(--warn); font-weight: 600; }
+  .flow .good { color: var(--ok); font-weight: 600; }
+  footer.composition-signal { margin-top: 48px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 0.78rem; color: var(--muted); }
+  .none-note { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="header">
+    <p class="eyebrow">Implementation Plan · fix</p>
+    <h1 id="top">Enable Bottom Shell for Non-Coding Projects - Plan</h1>
+    <p class="lead">Render the bottom shell drawer for <code>type: 'project'</code> ("Files + Claude") folders, and hide the now-phantom git icon from the activity rail for them — without turning on git or any other Code-only tooling.</p>
+    <div class="meta-strip">
+      <span class="chip">type: fix</span>
+      <span class="chip">date: 2026-06-30</span>
+      <span class="chip accent">artifact_contract: ce-unified-plan/v1</span>
+      <span class="chip ok">artifact_readiness: implementation-ready</span>
+      <span class="chip">product_contract_source: ce-plan-bootstrap</span>
+      <span class="chip">execution: code</span>
+      <span class="chip">depth: lightweight</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Plan sections">
+    <ul>
+      <li><a href="#goal-capsule">Goal Capsule</a></li>
+      <li><a href="#product-contract">Product Contract</a></li>
+      <li><a href="#planning-contract">Planning Contract</a></li>
+      <li><a href="#implementation-units">Implementation Units</a></li>
+      <li><a href="#verification-contract">Verification Contract</a></li>
+      <li><a href="#definition-of-done">Definition of Done</a></li>
+      <li><a href="#sources">Sources &amp; References</a></li>
+    </ul>
+  </nav>
+
+  <!-- ============ GOAL CAPSULE ============ -->
+  <section id="goal-capsule">
+    <h2>Goal Capsule</h2>
+    <div class="card">
+      <p><strong>Objective.</strong> Let folders added as the lightweight <code>'project'</code> type use the bottom shell drawer exactly as <code>'code'</code> projects do, and remove the leftover git affordance (the rail icon) that contradicts those folders' "no git" identity.</p>
+      <p><strong>Authority hierarchy.</strong> Confirmed scope (shell only; git stays off) &gt; this plan &gt; repo conventions. Do not collapse the two project types or enable other Code-only tooling.</p>
+      <p><strong>Stop conditions.</strong> Stop and surface if enabling the shell drawer would require touching the git tab's content gating, the PTY spawn path, or session-restore logic — none of those should be in this change. Stop if hiding the git rail icon breaks the rail for <code>'code'</code> projects.</p>
+      <p><strong>Execution profile.</strong> Small, low-risk renderer-only change across three files plus two component tests. No main-process, IPC, or persistence changes.</p>
+    </div>
+  </section>
+
+  <!-- ============ PRODUCT CONTRACT ============ -->
+  <section id="product-contract">
+    <h2>Product Contract</h2>
+
+    <h3>Summary</h3>
+    <p>FleetView projects come in two types: <code>'project'</code> (labelled "Files + Claude", the lightweight "limited" type) and <code>'code'</code> (full dev tools). The bottom shell drawer — the per-context plain-shell panel toggled from the activity-rail foot and <code>Ctrl + \</code> — is suppressed for <code>'project'</code> folders by a single render guard. This plan removes that guard so the shell drawer works for those folders, and hides the git icon from the activity rail for them so the surface matches the "no git" decision. Git tab content and all other Code-only tooling stay off.</p>
+
+    <h3 id="product-requirements">Problem Frame</h3>
+    <p>Three things are wrong for a <code>'project'</code>-type folder today, all stemming from the shell being half-wired:</p>
+    <ul>
+      <li>The shell drawer never renders — <code>ShellDrawer</code> returns <code>null</code> when the active project's <code>type === 'project'</code>.</li>
+      <li>The rail shell toggle and <code>Ctrl + \</code> are <em>not</em> gated, so triggering them calls <code>createSidecarTerminal</code> and spawns a real PTY that the drawer then refuses to show — an invisible, unclosable shell.</li>
+      <li>The git icon still appears in the activity rail, but clicking it just opens the file-explorer flyout on the Files tab (the explorer forces <code>git → files</code> for limited projects). A control that resolves to something other than its label.</li>
+    </ul>
+
+    <h3>Requirements</h3>
+    <p class="group-label">Bottom shell</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td id="r1">R1.</td><td>The bottom shell drawer renders for <code>type: 'project'</code> folders, the same as for <code>'code'</code> projects, whenever a shell exists for the active context and the drawer is expanded.</td></tr>
+          <tr><td id="r2">R2.</td><td>The rail shell toggle and <code>Ctrl + \</code> open a <em>visible</em> shell on <code>'project'</code> folders — no PTY is left spawned-but-unrendered.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="group-label">Git surface consistency &amp; quality</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td id="r3">R3.</td><td>The git icon is hidden from the activity rail for <code>'project'</code> folders, so the rail offers no git entry that silently resolves to the Files view.</td></tr>
+          <tr><td id="r4">R4.</td><td>Git functionality stays disabled for <code>'project'</code> folders (the git tab content remains off), and no other Code-only tooling is newly enabled. Only the shell is turned on and only the git rail icon is removed.</td></tr>
+          <tr><td id="r5">R5.</td><td>No dead code or stale copy: the unused project-type lookups are removed from <code>ShellDrawer</code>, and the comment describing the limited type no longer claims "no sidecar".</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Scope Boundaries</h3>
+    <div class="scope-cols">
+      <div class="scope in">
+        <h4>In scope</h4>
+        <ul>
+          <li>Render the bottom shell drawer for <code>'project'</code> folders.</li>
+          <li>Hide the git icon from the rail for <code>'project'</code> folders.</li>
+          <li>Fix stale comment copy.</li>
+        </ul>
+      </div>
+      <div class="scope out">
+        <h4>Out of scope (confirmed)</h4>
+        <ul>
+          <li>Full <code>'code'</code>-project parity: git tab content, and any other Code-only tooling.</li>
+          <li>Files / Tasks / Automations rail entries — unchanged.</li>
+          <li>Main-process, IPC, or session-restore changes.</li>
+        </ul>
+      </div>
+      <div class="scope defer">
+        <h4>Deferred / optional</h4>
+        <ul>
+          <li>Updating the Add Project dialog description ("Files + Claude") to mention the shell — product copy, not required to ship.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PLANNING CONTRACT ============ -->
+  <section id="planning-contract">
+    <h2>Planning Contract</h2>
+
+    <h3>Key Technical Decisions</h3>
+    <div class="card" style="margin-bottom:12px;">
+      <p><span class="idchip">KTD1</span> &nbsp;<strong>Remove the gate, don't invert it.</strong> The store action (<code>createSidecarTerminal</code>), the <code>shell.toggle</code> hotkey, the rail toggle, and the main-process PTY spawn are all already type-agnostic. The render guard in <code>ShellDrawer</code> is the single source of the restriction, so deleting it (and its now-unused <code>projects</code> / <code>activeProject</code> / <code>isLimitedProject</code> lookups) is the whole behavior change for the shell. This also incidentally fixes the invisible-shell dead state (R2), because the already-spawned PTY now renders.</p>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <p><span class="idchip">KTD2</span> &nbsp;<strong>Hide git from the rail by filtering its item list; keep the explorer fallback.</strong> Filter out the <code>git</code> entry in <code>ActivityRail</code> when the active project's <code>type === 'project'</code>. Leave <code>FileExplorer</code>'s existing <code>activeTab === 'git' ? 'files'</code> coercion in place as a defensive net — it still guards persisted/stale state (e.g. a folder whose last tab was git before this change, or a code-then-project edge). Removing both at once would be the only way a limited project could show git content, so the fallback stays.</p>
+    </div>
+    <div class="card">
+      <p><span class="idchip">KTD3</span> &nbsp;<strong>Hold the limited-type identity.</strong> Only the shell is enabled and only the git icon is removed. Tasks, Automations, and Files rail entries are untouched. Full parity with the <code>'code'</code> type is explicitly not pursued, so the two types remain distinct.</p>
+    </div>
+
+    <h3 style="margin-top:24px;">High-Level Technical Design</h3>
+    <p>The two coupled changes both make the <code>'project'</code>-type surface consistent: turn the shell on, take the phantom git control off. Before/after for a <code>'project'</code> folder:</p>
+    <div class="ba">
+      <div class="panel before">
+        <h4>Before</h4>
+        <div class="rail">
+          <span class="ico">Files</span>
+          <span class="ico dead">Git</span>
+          <span class="ico">Tasks</span>
+          <span class="ico">Automations</span>
+          <span class="ico shell">Shell ⌗</span>
+        </div>
+        <div class="flow">
+          <span class="step">Git icon present, but click →</span>
+          <span class="step bad">flyout opens on Files (label lies)</span>
+          <span class="step" style="margin-top:8px;">Shell toggle / Ctrl+\ →</span>
+          <span class="step">createSidecarTerminal → PTY spawns →</span>
+          <span class="step bad">ShellDrawer returns null → invisible, unclosable shell</span>
+        </div>
+      </div>
+      <div class="panel after">
+        <h4>After</h4>
+        <div class="rail">
+          <span class="ico">Files</span>
+          <span class="ico gone">Git (removed)</span>
+          <span class="ico">Tasks</span>
+          <span class="ico">Automations</span>
+          <span class="ico shell">Shell ⌗</span>
+        </div>
+        <div class="flow">
+          <span class="step">No git icon — rail matches "no git" identity</span>
+          <span class="step" style="margin-top:8px;">Shell toggle / Ctrl+\ →</span>
+          <span class="step">createSidecarTerminal → PTY spawns →</span>
+          <span class="step good">ShellDrawer renders → visible shell with tabs</span>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:0.86rem;color:var(--muted);">Git tab <em>content</em> stays disabled in both states; only the rail entry point is removed. The explorer's <code>git → files</code> coercion (KTD2) keeps stale state safe even with the icon gone.</p>
+  </section>
+
+  <!-- ============ IMPLEMENTATION UNITS ============ -->
+  <section id="implementation-units">
+    <h2>Implementation Units</h2>
+
+    <article class="unit">
+      <h3><span class="idchip" id="u1">U1</span> Render the bottom shell drawer for Project-type folders</h3>
+      <dl class="unit-meta">
+        <dt>Goal</dt><dd>Remove the render guard so the shell drawer shows for <code>type: 'project'</code> folders; eliminate the invisible-shell dead state.</dd>
+        <dt>Requirements</dt><dd>R1, R2</dd>
+        <dt>Dependencies</dt><dd>None</dd>
+        <dt>Files</dt><dd><code>src/components/Layout/ShellDrawer.tsx</code>, <code>test/shellDrawer.test.tsx</code> (new)</dd>
+      </dl>
+      <details>
+        <summary>Approach</summary>
+        <div class="body">
+          <ul>
+            <li>Change the early return from <code>if (!contextKey || !activeProjectId || isLimitedProject) return null</code> to <code>if (!contextKey || !activeProjectId) return null</code>.</li>
+            <li>Delete the now-unused <code>isLimitedProject</code> const, the <code>activeProject</code> lookup, and the <code>projects</code> selector (avoids unused-variable lint/tsc errors per R5). Keep <code>activeProjectId</code> — still used by the create handler.</li>
+            <li>Update the component doc comment: drop "Renders nothing for limited projects" — it now renders nothing only when there is no active context.</li>
+            <li>No change to the no-shell / collapsed guard (<code>sidecarTerminals.length === 0 || sidecarTerminalCollapsed</code>): the drawer still appears only once a shell exists and is expanded, identical to code-project behavior.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Test scenarios</summary>
+        <div class="body">
+          <p style="font-size:0.86rem;color:var(--muted);margin:0 0 6px;">Mock <code>SidecarTerminalPanel</code> to a stub (it mounts xterm, which is heavy under jsdom) and assert the gate, not the terminal render. Header: <code>// @vitest-environment jsdom</code>; seed state via <code>useProjectStore.setState</code>; <code>cleanup()</code> in <code>afterEach</code>.</p>
+          <ul>
+            <li><strong>Covers R1.</strong> Limited project (<code>type: 'project'</code>) + one registered sidecar terminal for the project context + not collapsed → the stubbed panel is in the DOM (drawer renders).</li>
+            <li><strong>Regression.</strong> Code project (<code>type: 'code'</code>) + one sidecar + not collapsed → panel renders (no regression for the existing path).</li>
+            <li><strong>Edge.</strong> Limited project + zero shells → drawer renders <code>null</code> (unchanged: drawer only shows when a shell exists).</li>
+            <li><strong>Edge.</strong> Limited project + one shell + <code>sidecarTerminalCollapsed: true</code> → drawer renders <code>null</code>.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Patterns to follow &amp; verification</summary>
+        <div class="body">
+          <p><strong>Patterns:</strong> <code>test/terminalListItem.test.tsx</code> and <code>test/spawnErrorToast.test.tsx</code> for the jsdom + Testing Library + zustand-store-seeding pattern.</p>
+          <p><strong>Verification:</strong> New test passes; adding a Project-type folder and pressing <code>Ctrl + \</code> shows a working shell; switching to a Code project still shows its shell.</p>
+        </div>
+      </details>
+    </article>
+
+    <article class="unit">
+      <h3><span class="idchip" id="u2">U2</span> Hide the git icon from the activity rail for Project-type folders</h3>
+      <dl class="unit-meta">
+        <dt>Goal</dt><dd>Remove the git entry from the activity rail when the active project is <code>type: 'project'</code>, so no control resolves to the wrong view.</dd>
+        <dt>Requirements</dt><dd>R3, R4</dd>
+        <dt>Dependencies</dt><dd>None (independent of U1)</dd>
+        <dt>Files</dt><dd><code>src/components/Layout/ActivityRail.tsx</code>, <code>test/activityRail.test.tsx</code> (new)</dd>
+      </dl>
+      <details>
+        <summary>Approach</summary>
+        <div class="body">
+          <ul>
+            <li>Read the active project's type with a primitive-returning selector, e.g. <code>useProjectStore((s) =&gt; s.projects.find(p =&gt; p.id === s.activeProjectId)?.type)</code> (returns a string/undefined, so no new-object re-render churn).</li>
+            <li>Derive the rendered list: <code>const items = isLimitedProject ? ITEMS.filter(i =&gt; i.tab !== 'git') : ITEMS</code>; map over <code>items</code> instead of the module-level <code>ITEMS</code>.</li>
+            <li>Leave the browser button and the shell-drawer foot toggle unchanged — both already work for limited projects.</li>
+            <li>Do <strong>not</strong> remove <code>FileExplorer</code>'s <code>git → files</code> coercion (KTD2 — defensive net for persisted state).</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Test scenarios</summary>
+        <div class="body">
+          <p style="font-size:0.86rem;color:var(--muted);margin:0 0 6px;">jsdom + Testing Library; rail buttons carry <code>title={label}</code>, so query by title.</p>
+          <ul>
+            <li><strong>Covers R3.</strong> Active project <code>type: 'project'</code> → no element with title "Git"; Files, Tasks, Automations titles still present.</li>
+            <li><strong>Covers R4 / Regression.</strong> Active project <code>type: 'code'</code> → the "Git" entry is present (limited-only hiding).</li>
+            <li><strong>Edge.</strong> No active project (<code>activeProjectId: null</code>) → renders without throwing; git entry treated as for a non-limited project (or absent rail context) per the selector's <code>undefined</code> path. Pin the expected behavior in the test.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Verification</summary>
+        <div class="body">
+          <p>New test passes; on a Project-type folder the rail shows no git icon; on a Code project the git icon is present and opens the git tab.</p>
+        </div>
+      </details>
+    </article>
+
+    <article class="unit">
+      <h3><span class="idchip" id="u3">U3</span> Fix stale "no sidecar" comment copy</h3>
+      <dl class="unit-meta">
+        <dt>Goal</dt><dd>Make the limited-type comment accurate after the shell is enabled.</dd>
+        <dt>Requirements</dt><dd>R5</dd>
+        <dt>Dependencies</dt><dd>U1 (the behavior the comment describes)</dd>
+        <dt>Files</dt><dd><code>src/components/FileExplorer/FileExplorer.tsx</code></dd>
+      </dl>
+      <details>
+        <summary>Approach &amp; test expectation</summary>
+        <div class="body">
+          <ul>
+            <li>Update the comment near the <code>isLimitedProject</code> definition from <code>'project' type has limited functionality (no git, no sidecar)</code> to reflect reality, e.g. <code>'project' type has no git tab (files, Claude, and shell are available)</code>.</li>
+            <li>No logic change in this file — the git-tab gating (<code>showGitTab={!isLimitedProject}</code>, <code>activeTab === 'git' ? 'files'</code>) stays exactly as is.</li>
+          </ul>
+          <p><strong>Test expectation: none</strong> — comment-only, no behavioral change.</p>
+        </div>
+      </details>
+    </article>
+  </section>
+
+  <!-- ============ VERIFICATION CONTRACT ============ -->
+  <section id="verification-contract">
+    <h2>Verification Contract</h2>
+    <div class="card">
+      <ul>
+        <li><strong>New tests:</strong> <code>npm run test -- test/shellDrawer.test.tsx test/activityRail.test.tsx</code> — green.</li>
+        <li><strong>Full suite:</strong> <code>npm run test</code> — no regressions (the <code>pretest</code> build runs automatically).</li>
+        <li><strong>Type + build:</strong> <code>npm run build</code> — TypeScript strict passes (confirms no unused locals left behind in <code>ShellDrawer</code>).</li>
+        <li><strong>Lint:</strong> ESLint clean (the PostToolUse lint-fix hook handles auto-fixable issues; no unused imports/vars).</li>
+        <li><strong>Manual smoke:</strong> Add a folder as a <em>Project</em> type → rail shows no git icon; <code>Ctrl + \</code> (or the rail shell toggle) opens a visible shell that can be created/closed; the git tab is unreachable. Switch to a <em>Code</em> project → git icon present, git tab works, shell works.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ DEFINITION OF DONE ============ -->
+  <section id="definition-of-done">
+    <h2>Definition of Done</h2>
+    <div class="card">
+      <p><strong>Global</strong></p>
+      <ul>
+        <li>R1–R5 satisfied: shell drawer renders for Project-type folders; the toggle/hotkey open a visible (not invisible) shell; git icon removed from the rail for those folders; git tab content and other Code-only tooling unchanged; no dead code or stale comment copy.</li>
+        <li><code>npm run test</code> and <code>npm run build</code> both pass; ESLint clean.</li>
+        <li>No experimental/abandoned code left in the diff; the change touches only the three named source files and two new test files.</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Per unit</strong></p>
+      <ul>
+        <li><strong>U1</strong> — guard removed, unused lookups deleted, doc comment updated, <code>shellDrawer.test.tsx</code> green.</li>
+        <li><strong>U2</strong> — git entry filtered for limited projects, code projects unaffected, <code>activityRail.test.tsx</code> green.</li>
+        <li><strong>U3</strong> — comment is accurate; no logic changed in <code>FileExplorer.tsx</code>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ SOURCES ============ -->
+  <section id="sources">
+    <h2>Sources &amp; References</h2>
+    <ul>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/ShellDrawer.tsx">src/components/Layout/ShellDrawer.tsx</a> — the <code>isLimitedProject</code> render guard (the single shell gate).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/ActivityRail.tsx">src/components/Layout/ActivityRail.tsx</a> — <code>ITEMS</code> list (git entry, ungated) and the shell-drawer foot toggle.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/FileExplorer.tsx">src/components/FileExplorer/FileExplorer.tsx</a> — <code>isLimitedProject</code>, <code>showGitTab</code>, and the <code>git → files</code> coercion / stale comment.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts">src/stores/projectStore.ts</a> — <code>createSidecarTerminal</code>, <code>toggleShellDrawer</code> (both type-agnostic).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Project/AddProjectDialog.tsx">src/components/Project/AddProjectDialog.tsx</a> — <code>PROJECT_TYPE_OPTIONS</code> ("Project: Files + Claude" copy).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/shared/ipc-types.ts">shared/ipc-types.ts</a> — <code>ProjectType = 'project' | 'code'</code>.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/test/terminalListItem.test.tsx">test/terminalListItem.test.tsx</a>, <a href="https://github.com/remcovolmer/command/blob/main/test/spawnErrorToast.test.tsx">test/spawnErrorToast.test.tsx</a> — jsdom component-test pattern.</li>
+    </ul>
+  </section>
+
+  <footer class="composition-signal">
+    Composed 2026-06-30 by ce-plan (solo invocation; product_contract_source: ce-plan-bootstrap). No upstream brainstorm; scope confirmed in-session (shell only, git stays off; git rail icon hidden).
+  </footer>
+
+</div>
+</body>
+</html>
