@@ -43,7 +43,7 @@ export function Sidebar() {
   const {
     setActiveProject,
     setActiveTerminal,
-    setProjectOverviewVisible,
+    toggleProjectCollapsed,
     addProject,
     removeProject,
     addTerminal,
@@ -60,7 +60,7 @@ export function Sidebar() {
     useShallow((s) => ({
       setActiveProject: s.setActiveProject,
       setActiveTerminal: s.setActiveTerminal,
-      setProjectOverviewVisible: s.setProjectOverviewVisible,
+      toggleProjectCollapsed: s.toggleProjectCollapsed,
       addProject: s.addProject,
       removeProject: s.removeProject,
       addTerminal: s.addTerminal,
@@ -382,7 +382,10 @@ export function Sidebar() {
 
         {/* Project List — section headers (Pinned/Active/Inactive) label the list;
             no standalone "Projects" header now that workspaces are gone. */}
-        <div ref={projectScrollRef} className="flex-1 overflow-y-auto sidebar-scroll px-3 pt-1">
+        <div
+          ref={projectScrollRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll px-3 pt-1"
+        >
           {projects.length === 0 ? (
             <div className="px-3 py-8 text-center">
               <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
@@ -402,8 +405,9 @@ export function Sidebar() {
               activeTerminalId={activeTerminalId}
               onSelect={(projectId) => {
                 if (projectId === activeProjectId) {
-                  // Clicking the already-active project toggles to overview
-                  setProjectOverviewVisible(true)
+                  // Clicking the already-active project toggles its sidebar collapse.
+                  // (Project overview is still reachable via its hotkey.)
+                  toggleProjectCollapsed(projectId)
                 } else {
                   setActiveProject(projectId)
                 }

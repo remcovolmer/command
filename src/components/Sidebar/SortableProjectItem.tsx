@@ -65,8 +65,14 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
   const hasVertexConfig = useProjectStore((s) => s.projectVertexConfigs[project.id] ?? false)
   const isCollapsed = useProjectStore((s) => s.collapsedProjects[project.id] ?? false)
+  // Inactive-section projects expand by selection: they render no children until
+  // selected, so an unselected one is effectively collapsed regardless of the
+  // manual flag. Active/pinned projects keep the manual collapse state.
+  const effectiveCollapsed = isInactive ? !isActive || isCollapsed : isCollapsed
   const toggleProjectCollapsed = useProjectStore((s) => s.toggleProjectCollapsed)
   const togglePinProject = useProjectStore((s) => s.togglePinProject)
+  const setActiveProject = useProjectStore((s) => s.setActiveProject)
+  const setProjectOverviewVisible = useProjectStore((s) => s.setProjectOverviewVisible)
   const showInactiveWorktrees = useProjectStore(
     (s) => s.inactiveWorktreesExpanded[project.id] ?? false
   )
@@ -96,6 +102,15 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   }, [])
 
   const contextMenuItems: ContextMenuEntry[] = [
+    {
+      label: 'Show overview',
+      shortcut: 'Ctrl+Shift+O',
+      onClick: () => {
+        // Overview renders for the active project, so activate it first if needed.
+        if (!isActive) setActiveProject(project.id)
+        setProjectOverviewVisible(true)
+      },
+    },
     {
       label: project.pinned ? 'Unpin' : 'Pin to top',
       shortcut: 'Ctrl+Alt+P',
@@ -145,6 +160,17 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
   // Counter chip counts Claude chats only — sidecar 'normal' shells are not chats.
   const chatCount = terminals.filter((t) => t.type === 'claude').length
+
+  // Collapsed-summary count. Inactive projects have no chats by definition, so the
+  // "0" chat indicator is noise — show only the worktree count when known, else
+  // nothing. Active/pinned projects show "chats · worktrees" (or just chats).
+  const collapsedCount = isInactive
+    ? worktrees.length > 0
+      ? `${worktrees.length}`
+      : null
+    : worktrees.length > 0
+      ? `${chatCount} · ${worktrees.length}`
+      : `${chatCount}`
 
   // A worktree is "active" when it has a running Claude session; branches sitting
   // on disk with no chat (sidecar 'normal' shells don't count, matching chatCount)
@@ -206,45 +232,59 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           }
         `}
       >
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleProjectCollapsed(project.id)
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          aria-expanded={!isCollapsed}
-          className="p-0.5 -ml-1.5 rounded hover:bg-border flex-shrink-0"
-          title={isCollapsed ? 'Expand project' : 'Collapse project'}
-        >
-          <ChevronRight
-            aria-hidden="true"
-            className={`w-3 h-3 transition-transform duration-150 ${!isCollapsed ? 'rotate-90' : ''}`}
-          />
-        </button>
         {project.type === 'code' ? (
           <Code className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
         ) : (
           <FolderOpen className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
         )}
-        <span className="flex-1 text-sm truncate" title={project.path}>
+        {/* Name grows to fill the row so it truncates as late as possible; the
+            chevron and right-side cluster are pushed to the right edge. */}
+        <span className="flex-1 text-sm truncate min-w-0" title={project.path}>
           {project.name}
         </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            // Inactive projects expand via selection; an unselected one has no
+            // manual collapse state worth toggling, so the chevron selects it.
+            if (isInactive && !isActive) {
+              onSelect(project.id)
+            } else {
+              toggleProjectCollapsed(project.id)
+            }
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-expanded={!effectiveCollapsed}
+          className="p-0.5 rounded hover:bg-border flex-shrink-0"
+          title={effectiveCollapsed ? 'Expand project' : 'Collapse project'}
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`w-3 h-3 transition-transform duration-150 ${!effectiveCollapsed ? 'rotate-90' : ''}`}
+          />
+        </button>
 
         {/* Collapsed summary: counter chip + highest-priority child status dot.
             Worktrees load lazily, so the worktree segment only shows once known (> 0)
             — a 0 would lie for never-visited projects. */}
-        {isCollapsed && (
+        {isCollapsed && (collapsedCount || rollupState) && (
           <span
             className="flex items-center gap-1.5 flex-shrink-0"
-            title={`${chatCount} chat${chatCount === 1 ? '' : 's'}${
-              worktrees.length > 0
-                ? ` · ${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`
-                : ''
-            }`}
+            title={
+              isInactive
+                ? `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`
+                : `${chatCount} chat${chatCount === 1 ? '' : 's'}${
+                    worktrees.length > 0
+                      ? ` · ${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`
+                      : ''
+                  }`
+            }
           >
-            <span className="text-[11px] tabular-nums text-muted-foreground bg-muted rounded-full px-1.5 py-px">
-              {worktrees.length > 0 ? `${chatCount} · ${worktrees.length}` : chatCount}
-            </span>
+            {collapsedCount && (
+              <span className="text-[11px] tabular-nums text-muted-foreground bg-muted rounded-full px-1.5 py-px">
+                {collapsedCount}
+              </span>
+            )}
             {rollupState && (
               <span
                 className={`w-2 h-2 rounded-full flex-shrink-0 ${rollupState === 'attention' ? 'attention-pulse' : ''}`}
@@ -272,15 +312,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           </span>
         )}
 
-        {/* Actions — pin and remove live in the right-click menu to keep this row clean */}
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Actions — pin and remove live in the right-click menu to keep this row
+            clean. Hidden (not just transparent) until hover so they reserve no
+            width, letting the name run full-width. Kept compact (p-0.5) so they are
+            no taller than the text line — appearing on hover then doesn't grow the
+            row height, which would otherwise nudge the row's content down. */}
+        <div className="hidden group-hover:flex items-center gap-0.5">
           <button
             onClick={(e) => {
               e.stopPropagation()
               onCreateTerminal(project.id)
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-border"
+            className="p-0.5 rounded hover:bg-border"
             title="New Chat"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -292,7 +336,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                 onCreateWorktree(project.id)
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              className="p-1 rounded hover:bg-border"
+              className="p-0.5 rounded hover:bg-border"
               title="New Worktree"
             >
               <GitBranch className="w-3.5 h-3.5" />
@@ -302,7 +346,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       </div>
 
       {/* Expanded children: chats, worktrees and empty state */}
-      {!isCollapsed && (
+      {!effectiveCollapsed && (
         <>
           {/* Direct Chats (not in worktree) */}
           {directTerminals.length > 0 && (
@@ -319,10 +363,15 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             </ul>
           )}
 
-          {/* Worktrees - hidden for inactive projects unless selected. Active
-              worktrees (with a running session) show inline; session-less ones
-              collapse under a "Show inactive worktrees" toggle. */}
-          {(!isInactive || isActive) && (
+          {/* Worktrees. An inactive-section project has no running sessions, so the
+              active/inactive split is meaningless — show all its worktrees inline.
+              (This block only renders when expanded, which for an inactive project
+              already implies it is selected.) Active/pinned projects show
+              session-bearing worktrees inline and collapse session-less ones under a
+              "Show inactive worktrees" toggle to keep the tree readable. */}
+          {isInactive ? (
+            worktrees.map(renderWorktree)
+          ) : (
             <>
               {activeWorktrees.map(renderWorktree)}
               {inactiveWorktrees.length > 0 && (

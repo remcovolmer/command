@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sidebar — Inactive Collapse & Worktrees (2026-06-30)</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --fg: #e6e8ec;
+    --muted: #9aa2af;
+    --muted-2: #6b7280;
+    --primary: #f97362;       /* salmon accent, matches app highlight */
+    --primary-soft: rgba(249,115,98,0.12);
+    --green: #34d399;
+    --gray-dot: #9aa2af;
+    --amber: #fbbf24;
+    --danger: #f87171;
+    --radius: 10px;
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 28px 80px; }
+  header.doc { border-bottom: 1px solid var(--border); padding-bottom: 22px; margin-bottom: 32px; }
+  .eyebrow { color: var(--primary); font-weight: 600; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { font-size: 28px; margin: 8px 0 6px; letter-spacing: -.01em; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .meta code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  h2 { font-size: 19px; margin: 44px 0 14px; letter-spacing: -.01em; }
+  h3 { font-size: 15px; margin: 26px 0 6px; }
+  p { margin: 8px 0; }
+  .scr { display: grid; grid-template-columns: 104px 1fr; gap: 4px 16px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+  .scr dt { color: var(--primary); font-weight: 600; font-size: 13px; }
+  .scr dd { margin: 0 0 10px; font-size: 14px; }
+  .scr dd:last-child { margin-bottom: 0; }
+  td code, p code, li code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-size: 12px; color: #cdd3dd; }
+  .item { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 22px 20px; margin: 18px 0; }
+  .item .title { display: flex; align-items: baseline; gap: 10px; margin-top: 18px; }
+  .item .num { color: var(--primary); font-weight: 700; font-size: 13px; background: var(--primary-soft); border-radius: 6px; padding: 2px 9px; }
+  .item .title h3 { margin: 0; font-size: 16px; }
+  ul.crit { margin: 6px 0 0; padding-left: 18px; }
+  ul.crit li { margin: 4px 0; font-size: 13.5px; }
+  .files { font-size: 12.5px; color: var(--muted); margin-top: 14px; }
+  .files strong { color: var(--fg); font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+  .tag.must { background: rgba(248,113,113,.14); color: var(--danger); }
+  .tag.tiny { background: rgba(52,211,153,.14); color: var(--green); }
+  .lead { color: var(--muted); font-size: 14.5px; max-width: 70ch; }
+
+  /* callout */
+  .note { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--primary); border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13.5px; }
+  .note .h { color: var(--primary); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+  .note.amber { border-left-color: var(--amber); }
+  .note.amber .h { color: var(--amber); }
+
+  /* mockup */
+  .mockups { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 16px 0 4px; }
+  @media (max-width: 720px){ .mockups { grid-template-columns: 1fr; } .scr { grid-template-columns: 1fr; } }
+  .mock { background: #12151c; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .mock .cap { font-size: 12px; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+  .mock .cap .lbl { font-weight: 600; }
+  .mock .cap .lbl.bad { color: var(--danger); }
+  .mock .cap .lbl.good { color: var(--green); }
+  .mock .body { padding: 10px 8px; font-size: 13px; }
+  .sect { font-size: 10px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .1em; padding: 6px 10px 4px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; }
+  .row.active { background: var(--primary-soft); }
+  .row .chev { width: 12px; text-align: center; color: var(--muted-2); flex: 0 0 auto; font-size: 11px; }
+  .row .ic { width: 14px; text-align: center; color: var(--muted); flex: 0 0 auto; }
+  .row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .chip { font-size: 10px; color: var(--muted); background: var(--panel-2); border-radius: 999px; padding: 1px 7px; }
+  .sub { padding-left: 18px; border-left: 1px solid var(--border); margin-left: 14px; }
+  .sub .row { padding: 4px 8px; }
+  .wt { color: var(--muted); }
+  .wt .ic { color: var(--muted-2); }
+  .toggle { color: var(--muted-2); font-size: 12px; padding: 5px 8px 4px 22px; }
+  .toggle .chev { display: inline-block; width: 12px; }
+  .legend { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
+  .legend b { color: var(--fg); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <div class="eyebrow">Brainstorm · Requirements</div>
+  <h1>Sidebar: eerlijke collapse-indicator &amp; worktrees voor inactive projecten</h1>
+  <p class="meta">
+    2026-06-30 · Scope: <strong>Lightweight</strong> (drie gerichte UI-aanpassingen) ·
+    Eén bestand: <code>src/components/Sidebar/SortableProjectItem.tsx</code>
+  </p>
+</header>
+
+<p class="lead">
+  Drie kleine aanpassingen aan de project-rij in de sidebar. <b>Req 1 &amp; 2</b> repareren inconsistenties
+  rond de <b>Inactive</b>-sectie — de UI toont daar iets anders dan wat er feitelijk gebeurt. <b>Req 3</b> is
+  een layout-tweak: chevron achter de naam, icon naar links. Geen nieuwe functionaliteit, één bestand.
+</p>
+
+<dl class="scr">
+  <dt>Situation</dt>
+  <dd>De sidebar splitst projecten in <b>Pinned / Active / Inactive</b>. Een project staat in Inactive
+      zodra het geen draaiende sessies heeft. Selecteren is orthogonaal: een Inactive-project kun je
+      wél selecteren (het blijft dan in de Inactive-sectie staan).</dd>
+  <dt>Complication</dt>
+  <dd>Voor Inactive-projecten liegen twee indicatoren. <b>(1)</b> Een niet-geselecteerd Inactive-project
+      toont geen children, maar de collapse-chevron staat op "uitgeklapt". <b>(2)</b> Selecteer je een
+      Inactive-project, dan verdwijnen al z'n worktrees achter "Show inactive worktrees (N)" — terwijl
+      die splitsing voor een sessieloos project niets betekent.</dd>
+  <dt>Resolution</dt>
+  <dd>Voor Inactive-projecten wordt uitklappen <b>door selectie</b> aangestuurd, en de chevron weerspiegelt
+      dat. En een geselecteerd Inactive-project toont z'n worktrees <b>direct inline</b>, zonder toggle.
+      Active/Pinned blijven ongewijzigd.</dd>
+</dl>
+
+<div class="note">
+  <div class="h">Eén ontwerpbeslissing — genomen, corrigeerbaar</div>
+  Voor Inactive-projecten geldt: <b>selecteren = uitklappen</b>. Een niet-geselecteerd Inactive-project is
+  ingeklapt (chevron ▸); selecteren klapt het uit (chevron ▾, worktrees inline). Een geselecteerd
+  Inactive-project kun je daarna nog handmatig inklappen via de chevron. Dit volgt rechtstreeks uit jouw
+  tweede punt (geselecteerd → worktrees zichtbaar), dus beide fixes delen hetzelfde model. Zeg het als je
+  liever wilt dat selecteren en uitklappen los van elkaar staan.
+</div>
+
+<!-- ───────────────────────── REQ 1 ───────────────────────── -->
+<h2>Requirement 1 — Collapse-indicator weerspiegelt de werkelijkheid</h2>
+<div class="item">
+  <div class="title">
+    <span class="num">1</span>
+    <h3>Een niet-geselecteerd Inactive-project toont een ingeklapte chevron</h3>
+    <span class="tag must">must</span>
+  </div>
+
+  <p class="legend">
+    Vandaag: <code>isCollapsed = collapsedProjects[id] ?? false</code> → standaard "uitgeklapt", dus de
+    chevron staat op ▾ (geroteerd). Maar de children van een niet-geselecteerd Inactive-project worden
+    sowieso niet gerenderd (geen sessies; worktree-blok is gegate op selectie). De indicator klopt dus niet
+    met wat je ziet.
+  </p>
+
+  <div class="mockups">
+    <div class="mock">
+      <div class="cap"><span class="lbl bad">Nu</span><span>chevron zegt "open", niets eronder</span></div>
+      <div class="body">
+        <div class="sect">Inactive</div>
+        <div class="row"><span class="chev">▾</span><span class="ic">📁</span><span class="name">legacy-api</span><span class="chip">0 · 3</span></div>
+        <div class="row"><span class="chev">▾</span><span class="ic">📁</span><span class="name">marketing-site</span><span class="chip">0 · 1</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="cap"><span class="lbl good">Straks</span><span>ingeklapt = ingeklapte chevron</span></div>
+      <div class="body">
+        <div class="sect">Inactive</div>
+        <div class="row"><span class="chev">▸</span><span class="ic">📁</span><span class="name">legacy-api</span><span class="chip">0 · 3</span></div>
+        <div class="row"><span class="chev">▸</span><span class="ic">📁</span><span class="name">marketing-site</span><span class="chip">0 · 1</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Acceptatiecriteria</h3>
+  <ul class="crit">
+    <li>Inactive-sectie + <b>niet geselecteerd</b>: chevron wijst naar rechts (▸), <code>aria-expanded={false}</code>, title "Expand project".</li>
+    <li>Een Inactive-project <b>selecteren</b> klapt het uit (chevron ▾) en toont z'n worktrees (zie Req 2).</li>
+    <li>Een geselecteerd Inactive-project kan daarna nog handmatig ingeklapt worden via de chevron-knop.</li>
+    <li><b>Geen wijziging</b> voor de Active- en Pinned-secties: die blijven puur op <code>collapsedProjects</code> draaien.</li>
+  </ul>
+
+  <p class="files"><strong>Mechanisme:</strong> een "effectief ingeklapt"-waarde die voor Inactive-projecten
+    neerkomt op <code>niet-geselecteerd OF handmatig ingeklapt</code>, gebruikt voor zowel de chevron als
+    het children-blok. Exacte vorm = implementatie (ce-plan / ce-work).</p>
+</div>
+
+<!-- ───────────────────────── REQ 2 ───────────────────────── -->
+<h2>Requirement 2 — Geen "Show inactive worktrees" voor Inactive-projecten</h2>
+<div class="item">
+  <div class="title">
+    <span class="num">2</span>
+    <h3>Een geselecteerd Inactive-project toont al z'n worktrees direct inline</h3>
+    <span class="tag must">must</span>
+  </div>
+
+  <p class="legend">
+    De toggle bestaat om de boom van een <b>actief</b> project leesbaar te houden: worktrees mét sessie inline,
+    sessieloze eronder vouwen. Een Inactive-project heeft per definitie <b>nul</b> sessies → álle worktrees
+    zijn "inactive" → de toggle verbergt precies datgene waarvoor je het project net selecteerde.
+  </p>
+
+  <div class="mockups">
+    <div class="mock">
+      <div class="cap"><span class="lbl bad">Nu</span><span>alles verstopt achter een toggle</span></div>
+      <div class="body">
+        <div class="sect">Inactive</div>
+        <div class="row active"><span class="chev">▾</span><span class="ic">📁</span><span class="name">legacy-api</span><span class="chip">0 · 3</span></div>
+        <div class="sub">
+          <div class="toggle"><span class="chev">▸</span> Show inactive worktrees (3)</div>
+        </div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="cap"><span class="lbl good">Straks</span><span>worktrees meteen zichtbaar</span></div>
+      <div class="body">
+        <div class="sect">Inactive</div>
+        <div class="row active"><span class="chev">▾</span><span class="ic">📁</span><span class="name">legacy-api</span><span class="chip">0 · 3</span></div>
+        <div class="sub">
+          <div class="row wt"><span class="ic">⑂</span><span class="name">feature/auth</span></div>
+          <div class="row wt"><span class="ic">⑂</span><span class="name">fix/handle-inactive</span></div>
+          <div class="row wt"><span class="ic">⑂</span><span class="name">chore/cleanup</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Acceptatiecriteria</h3>
+  <ul class="crit">
+    <li>Geselecteerd Inactive-project met N worktrees → alle N direct inline, <b>geen</b> "Show inactive worktrees"-knop.</li>
+    <li>Active- en Pinned-projecten: <b>ongewijzigd</b> — worktrees mét sessie inline, sessieloze onder de toggle.</li>
+    <li>De per-project toggle-state (<code>inactiveWorktreesExpanded</code>) blijft bestaan voor Active-projecten; alleen niet meer getoond bij Inactive.</li>
+  </ul>
+</div>
+
+<!-- ───────────────────────── REQ 3 ───────────────────────── -->
+<h2>Requirement 3 — Chevron achter de naam, icon naar links</h2>
+<div class="item">
+  <div class="title">
+    <span class="num">3</span>
+    <h3>De project-icon is het meest linkse element; de chevron volgt direct op de naam</h3>
+    <span class="tag tiny">layout</span>
+  </div>
+
+  <p class="legend">
+    Vandaag staat de chevron vooraan, wat de project-icon naar rechts duwt. Door de chevron achter de naam te
+    zetten wordt de icon (de identiteit van het project) het meest linkse, prominentste element en wordt de
+    chevron een control. Gekozen variant: chevron <b>hugt de naamtekst</b> — positie verschuift met naamlengte
+    (bewust geaccepteerde rafelige rechterrand), tellertje/indicatoren/hover-acties blijven rechts.
+  </p>
+
+  <div class="mockups">
+    <div class="mock">
+      <div class="cap"><span class="lbl bad">Nu</span><span>chevron vooraan, icon ingesprongen</span></div>
+      <div class="body">
+        <div class="sect">Active</div>
+        <div class="row"><span class="chev">▾</span><span class="ic">📁</span><span class="name">command</span></div>
+        <div class="sub"><div class="row wt"><span class="ic">⑂</span><span class="name">feature/auth</span></div></div>
+        <div class="row"><span class="chev">▸</span><span class="ic">📁</span><span class="name">legacy-api</span><span class="chip">0·3</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="cap"><span class="lbl good">Straks</span><span>icon links, chevron achter naam</span></div>
+      <div class="body">
+        <div class="sect">Active</div>
+        <div class="row"><span class="ic">📁</span><span class="name" style="flex:0 1 auto">command</span><span class="chev">▾</span></div>
+        <div class="sub"><div class="row wt"><span class="ic">⑂</span><span class="name">feature/auth</span></div></div>
+        <div class="row"><span class="ic">📁</span><span class="name" style="flex:0 1 auto">legacy-api</span><span class="chev">▸</span><span class="name"></span><span class="chip">0·3</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Acceptatiecriteria</h3>
+  <ul class="crit">
+    <li>Rij-volgorde: <code>icon → naam → chevron → (spacer) → tellertje → indicatoren → hover-acties</code>.</li>
+    <li>De icon staat op de linkermarge van de rij; de negatieve marge die de chevron vooraan trok vervalt.</li>
+    <li>Naam blijft afkappen (<code>truncate</code>) bij smalle sidebar; de chevron blijft altijd zichtbaar direct erachter.</li>
+    <li>Geldt voor <b>alle</b> projecten (Pinned / Active / Inactive); chevron blijft een klikbare collapse-control.</li>
+    <li>Klik je de chevron van een niet-geselecteerd Inactive-project, dan selecteert (= uitklapt) dat project — geen dode knop.</li>
+  </ul>
+
+  <p class="files"><strong>Let op:</strong> de sectie-koppen (Pinned/Active/Inactive) en de "Show inactive
+    worktrees"-knop houden hun chevron <em>links</em> — andere hiërarchie-laag. Bewuste, kleine inconsistentie.</p>
+</div>
+
+<!-- ───────────────────────── SCOPE ───────────────────────── -->
+<h2>Scope-grens</h2>
+<div class="note amber">
+  <div class="h">Bewust buiten scope</div>
+  Een <b>gepind</b> project zónder sessies valt buiten de Inactive-sectie en houdt dus de "Show inactive
+  worktrees"-toggle — ook al is die daar net zo zinloos. Jouw verzoek ging specifiek over de Inactive-sectie;
+  pinnen is zeldzaam en bewust. We gaten op "staat in Inactive", niet op "heeft geen actieve worktrees".
+  Wil je het breder (toggle alleen tonen zodra er écht actieve én inactieve worktrees naast elkaar staan),
+  dan is dat een aparte, iets grotere wijziging — zeg het en we nemen 'm mee.
+</div>
+
+<p class="files">
+  <strong>Te raken:</strong> <code>src/components/Sidebar/SortableProjectItem.tsx</code> (alleen render-logica;
+  geen store-wijzigingen, geen nieuwe state). &nbsp;
+  <strong>Niet raken:</strong> <code>SortableProjectList.tsx</code>, <code>projectStore.ts</code>.
+</p>
+
+</div>
+</body>
+</html>
