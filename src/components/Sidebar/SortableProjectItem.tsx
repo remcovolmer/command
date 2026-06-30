@@ -155,19 +155,20 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const showEmptyState =
     isActive && terminals.length === 0 && (project.type !== 'code' || worktrees.length === 0)
 
-  // Highest-priority child status, shown as a dot on the collapsed header
-  const rollupState = isCollapsed ? getProjectRollupState(terminals) : null
+  // Highest-priority child status, shown as a dot on the collapsed header. Keyed
+  // on effectiveCollapsed (like the chevron and children) so all collapse-driven
+  // renders agree; for inactive projects `terminals` is empty -> rollup is null.
+  const rollupState = effectiveCollapsed ? getProjectRollupState(terminals) : null
 
   // Counter chip counts Claude chats only — sidecar 'normal' shells are not chats.
   const chatCount = terminals.filter((t) => t.type === 'claude').length
 
-  // Collapsed-summary count. Inactive projects have no chats by definition, so the
-  // "0" chat indicator is noise — show only the worktree count when known, else
-  // nothing. Active/pinned projects show "chats · worktrees" (or just chats).
+  // Collapsed-summary count. Inactive projects (0 chats by definition) show no chip:
+  // the "0" is noise, and a worktree count would render inconsistently since
+  // worktrees load lazily (only previously-selected projects would have one).
+  // Active/pinned projects show "chats · worktrees" (or just chats).
   const collapsedCount = isInactive
-    ? worktrees.length > 0
-      ? `${worktrees.length}`
-      : null
+    ? null
     : worktrees.length > 0
       ? `${chatCount} · ${worktrees.length}`
       : `${chatCount}`
@@ -267,18 +268,14 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         {/* Collapsed summary: counter chip + highest-priority child status dot.
             Worktrees load lazily, so the worktree segment only shows once known (> 0)
             — a 0 would lie for never-visited projects. */}
-        {isCollapsed && (collapsedCount || rollupState) && (
+        {effectiveCollapsed && (collapsedCount || rollupState) && (
           <span
             className="flex items-center gap-1.5 flex-shrink-0"
-            title={
-              isInactive
-                ? `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`
-                : `${chatCount} chat${chatCount === 1 ? '' : 's'}${
-                    worktrees.length > 0
-                      ? ` · ${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`
-                      : ''
-                  }`
-            }
+            title={`${chatCount} chat${chatCount === 1 ? '' : 's'}${
+              worktrees.length > 0
+                ? ` · ${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`
+                : ''
+            }`}
           >
             {collapsedCount && (
               <span className="text-[11px] tabular-nums text-muted-foreground bg-muted rounded-full px-1.5 py-px">
