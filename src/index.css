@@ -193,6 +193,17 @@ body {
   overflow-y: scroll !important;
 }
 
+/* Hide the scrollbar on the Claude Code chat terminal only. The native
+   scrollbar is overlapped by xterm's full-width screen canvas and is redundant
+   for a TUI — wheel/trackpad scrolling still works. Scoped via the
+   chat-terminal marker class so sidecar terminals keep their scrollbar. */
+.chat-terminal .xterm-viewport {
+  scrollbar-width: none; /* Firefox */
+}
+.chat-terminal .xterm-viewport::-webkit-scrollbar {
+  display: none; /* Chromium/Electron */
+}
+
 /* Notification indicator animations - Simplified Claude Code states (4 states) */
 
 /* Default animation (fallback) - green glow */

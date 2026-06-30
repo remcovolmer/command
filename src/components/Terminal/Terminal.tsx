@@ -19,7 +19,7 @@ export function Terminal({ id, isActive }: TerminalProps) {
   return (
     <div
       ref={containerRef}
-      className="terminal-container absolute inset-0 bg-sidebar"
+      className="terminal-container chat-terminal absolute inset-0 bg-sidebar"
       style={{
         // Use visibility (not display:none) so inactive terminals keep their layout
         // dimensions. display:none zeroes the layout, which throttles xterm's

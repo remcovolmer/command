@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fix: Chat-terminal-scrollbar verbergen tegen overlap - Plan</title>
+<style>
+  :root {
+    --ink:#1a1f2e; --muted:#5b6678; --faint:#8b95a7; --line:#e3e7ee; --bg:#f7f8fa; --card:#fff;
+    --accent:#4f46e5; --accent-soft:#eef0fe; --green:#0f9d6e; --green-soft:#e6f6ef;
+    --amber:#c2870b; --amber-soft:#fdf4e1; --red:#d1453b; --red-soft:#fcebe9;
+    --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;font-size:15px;}
+  .wrap{max-width:900px;margin:0 auto;padding:48px 28px 96px;}
+  a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
+  code{font-family:var(--mono);font-size:.88em;background:#eef0f3;padding:1px 5px;border-radius:4px;}
+  header.doc{border-bottom:3px solid var(--accent);padding-bottom:20px;margin-bottom:8px;}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;}
+  h1{font-size:28px;line-height:1.2;margin:0 0 14px;letter-spacing:-.01em;}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted);}
+  .meta b{color:var(--ink);font-weight:600;}
+  nav.toc{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 4px;}
+  nav.toc a{font-size:12px;background:var(--accent-soft);border:1px solid #d6d9fb;border-radius:6px;padding:3px 10px;color:var(--accent);}
+  section{border-top:1px solid var(--line);padding-top:8px;margin-top:34px;}
+  section.first{border-top:0;margin-top:24px;}
+  h2{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:18px 0 10px;}
+  p{margin:0 0 13px;max-width:74ch;} .lead{font-size:16px;}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;}
+  .id{font-family:var(--mono);font-weight:700;color:var(--accent);white-space:nowrap;}
+  /* KTD */
+  .ktd{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;background:var(--card);padding:14px 20px;margin:12px 0;}
+  .ktd h4{margin:0 0 6px;font-size:15px;} .ktd h4 .id{margin-right:8px;}
+  .ktd p{margin:0;font-size:14px;color:var(--muted);}
+  /* units */
+  article.unit{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:16px 20px;margin:12px 0;}
+  article.unit h3{margin:0 0 10px;font-size:16.5px;} article.unit h3 .id{margin-right:8px;}
+  dl.strip{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0 0 8px;font-size:13.5px;}
+  dl.strip dt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;padding-top:2px;}
+  dl.strip dd{margin:0;} dl.strip dd code{font-size:.86em;}
+  details{margin:6px 0;border-top:1px solid var(--line);padding-top:6px;}
+  summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  details[open] summary{margin-bottom:8px;}
+  details ul{margin:6px 0;padding-left:20px;font-size:13.5px;} details li{margin:4px 0;}
+  details p{font-size:13.5px;margin:6px 0;}
+  .note{background:var(--green-soft);border:1px solid #bfe6d3;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px;color:#0c6b4d;}
+  .note b{color:var(--green);}
+  /* before/after */
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;}
+  .ba .col{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);}
+  .ba .col h4{margin:0;padding:9px 14px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;}
+  .ba .before h4{background:var(--red-soft);color:var(--red);} .ba .after h4{background:var(--green-soft);color:var(--green);}
+  .ba .col .body{padding:12px 14px;font-size:12.5px;font-family:var(--mono);color:var(--muted);white-space:pre-wrap;line-height:1.5;}
+  /* scope */
+  .scope{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;}
+  .scope .col{border:1px solid var(--line);border-radius:10px;padding:4px 18px 14px;}
+  .scope .keep{background:var(--green-soft);border-color:#bfe6d3;} .scope .out{background:#eef1f5;}
+  .scope h4{font-size:12px;letter-spacing:.07em;text-transform:uppercase;margin:14px 0 4px;}
+  .scope .keep h4{color:var(--green);} .scope .out h4{color:var(--muted);}
+  .scope ul{margin:0;padding-left:18px;font-size:13.5px;} .scope li{margin:5px 0;}
+  ul.tight{margin:6px 0 12px;padding-left:20px;} ul.tight li{margin:5px 0;font-size:14px;}
+  ul.tight li code{font-size:.86em;}
+  /* svg */
+  figure{margin:16px 0;} figcaption{font-size:12.5px;color:var(--faint);margin-top:8px;}
+  .svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:14px;}
+  footer.sig{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint);}
+  footer.sig code{background:none;padding:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">Implementation Plan</p>
+  <h1>fix: Chat-terminal-scrollbar verbergen tegen overlap</h1>
+  <div class="meta">
+    <span><b>title</b> fix: Chat-terminal-scrollbar verbergen tegen overlap - Plan</span>
+    <span><b>type</b> fix</span>
+    <span><b>date</b> <time datetime="2026-06-30">2026-06-30</time></span>
+    <span><b>depth</b> Lightweight</span>
+    <span><b>artifact_contract</b> ce-unified-plan/v1</span>
+    <span><b>artifact_readiness</b> implementation-ready</span>
+    <span><b>product_contract_source</b> ce-plan-bootstrap</span>
+    <span><b>execution</b> code</span>
+  </div>
+  <nav class="toc">
+    <a href="#goal-capsule">Goal Capsule</a>
+    <a href="#product-contract">Product Contract</a>
+    <a href="#planning-contract">Planning Contract</a>
+    <a href="#implementation-units">Implementation Units</a>
+    <a href="#verification-contract">Verification Contract</a>
+    <a href="#definition-of-done">Definition of Done</a>
+  </nav>
+</header>
+
+<section class="first" id="goal-capsule">
+  <h2>Goal Capsule</h2>
+  <p class="lead"><b>Doel:</b> verberg de zichtbare scrollbar alleen op de chat-terminal (waar Claude Code draait) zodat de terminal-inhoud hem niet langer overlapt, terwijl scrollen via muiswiel/trackpad blijft werken. De sidecar-terminals blijven ongewijzigd.</p>
+  <p><b>Gezag:</b> bevestigde gebruikerskeuze (alleen chat-terminal; scrollbar verbergen, niet stylen) is leidend. Repo-conventies en het bestaande terminal-scrollgedrag (PR&nbsp;#38) overrulen losse implementatiedetails. <b>Stop-condities:</b> klaar wanneer de scrollbar op de chat-terminal onzichtbaar is, de sidecar-terminal zijn scrollbar behoudt, wiel-scroll blijft werken en de bestaande testsuite groen blijft. Stop en meld als de wijziging onverwacht het scroll-naar-onder-gedrag of de breedte-fit raakt, of de sidecar toch beïnvloedt.</p>
+</section>
+
+<section id="product-contract">
+  <h2>Product Contract</h2>
+
+  <h2 style="margin-top:22px">Summary</h2>
+  <p class="lead">De Claude Code-chatterminal toont een geforceerde, ongestylede <em>native</em> scrollbar die door de terminal-inhoud wordt overlapt. De chat- en sidecar-terminals delen vandaag exact dezelfde class <code>terminal-container</code>, dus een regelwijziging op die class raakt beide. Geef daarom de chat-terminal een eigen marker-class (<code>chat-terminal</code>) en verberg de scrollbar gescoped daarop — exact het patroon dat de app al gebruikt in <code>.scroll-hidden</code>. Wiel-/trackpad-scrollen blijft werken; het verwijderen van de scrollbar-goot geeft de TUI de volle breedte en lost de overlap aan de rechterrand op. De sidecar-terminals houden hun huidige scrollbar.</p>
+
+  <h2 style="margin-top:22px">Problem Frame</h2>
+  <p>Op de gedeelde regel <code>.terminal-container .xterm-viewport</code> staat <code>overflow-y: scroll !important</code> — bewust toegevoegd in PR&nbsp;#38 om een ánder probleem te fixen: de scrollbar die verdween bij een Claude-statuswissel. Die regel forceert de <em>native</em> browserscrollbar (op Windows breed en dekkend) en die wordt nergens gestyled. In de xterm-DOM ligt <code>.xterm-screen</code> (het WebGL-/tekstcanvas) op volle breedte vóór <code>.xterm-viewport</code>, waar de scrollbar getekend wordt. Het canvas dekt daardoor de rechterrand van de scrollbar af — precies wat de screenshot toont. Omdat Claude Code een TUI is die zelf zijn weergave beheert, voegt een zichtbare scrollbar weinig toe; muiswiel/trackpad scrollt sowieso. Het probleem speelt op de chat-terminal; de fix moet daar gescoped blijven en de sidecar niet raken.</p>
+
+  <h2 style="margin-top:22px" id="product-requirements">Requirements</h2>
+  <table>
+    <thead><tr><th style="width:48px">ID</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td class="id" id="r1">R1.</td><td>De chat-terminal (waar Claude Code draait) toont geen zichtbare scrollbar die door terminal-inhoud overlapt kan worden.</td></tr>
+      <tr><td class="id" id="r2">R2.</td><td>Verticaal scrollen door de scrollback van de chat-terminal blijft werken via muiswiel en trackpad.</td></tr>
+      <tr><td class="id" id="r3">R3.</td><td>De chat-terminal-inhoud gebruikt de volle beschikbare breedte (geen gereserveerde scrollbar-goot), zodat de Claude Code-TUI aan de rechterrand niet wordt afgekapt of overlapt.</td></tr>
+      <tr><td class="id" id="r4">R4.</td><td>De sidecar-terminals blijven ongewijzigd: ze behouden hun huidige scrollbar en scrollgedrag.</td></tr>
+      <tr><td class="id" id="r5">R5.</td><td>De fix mag het eerdere scroll-sync-gedrag (PR&nbsp;#38) niet regresseren: het opnieuw fitten bij statuswissels blijft intact en scroll-naar-onder werkt na een tabwissel of statuswissel.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:22px">Scope Boundaries</h2>
+  <div class="scope">
+    <div class="col keep">
+      <h4>In scope</h4>
+      <ul>
+        <li>Alleen de chat-terminal: een nieuwe marker-class <code>chat-terminal</code> in <code>src/components/Terminal/Terminal.tsx</code> + een daarop gescopede scrollbar-verberg-regel in <code>src/index.css</code>.</li>
+      </ul>
+    </div>
+    <div class="col out">
+      <h4>Buiten scope · alternatieven niet gekozen</h4>
+      <ul>
+        <li>Sidecar-terminals (<code>SidecarTerminalPanel.tsx</code>) — scrollbar blijft zoals nu.</li>
+        <li>Een slanke, gestylede 5px-scrollbar met z-order-fix — afgewezen t.g.v. verbergen; fragieler tegen de WebGL-canvas-overlap.</li>
+        <li>De gedeelde regel <code>.terminal-container .xterm-viewport</code>, de re-fit-logica in <code>useXtermInstance.ts</code> en de app-scrollbars (<code>.main-scroll</code> / <code>.sidebar-scroll</code>) blijven ongewijzigd.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="planning-contract">
+  <h2>Planning Contract</h2>
+
+  <h2 style="margin-top:22px">Root cause &amp; aanpak</h2>
+  <p>De overlap is een laag-/z-order-kwestie binnen xterm: de scrollbar hoort bij de <em>viewport</em>-laag eronder, het tekstcanvas ligt op volle breedte erbovenop. De scrollbar verbergen verwijdert tegelijk de goot, waardoor het canvas niet meer concurreert met de scrollbar en de TUI de volle breedte krijgt. Omdat chat en sidecar dezelfde class delen, wordt het verbergen gescoped op een eigen <code>chat-terminal</code>-class zodat de sidecar buiten schot blijft.</p>
+
+  <figure>
+    <div class="svgwrap">
+      <svg viewBox="0 0 880 230" width="100%" role="img" aria-label="xterm laag-stapeling op de chat-terminal: waarom het tekstcanvas de native scrollbar overlapt">
+        <style>
+          .ttl{font:700 12px ui-monospace,Consolas,monospace;fill:#d1453b}
+          .lbl{font:600 12.5px -apple-system,Segoe UI,sans-serif;fill:#1a1f2e}
+          .sub{font:11px ui-monospace,Consolas,monospace;fill:#5b6678}
+          .bad{font:700 11px -apple-system,Segoe UI,sans-serif;fill:#d1453b}
+        </style>
+        <text x="20" y="22" class="ttl">VOOR &#183; chat-terminal</text>
+        <rect x="20" y="32" width="420" height="180" rx="8" fill="#fff" stroke="#cbd2dd" stroke-width="1.5"/>
+        <text x="32" y="50" class="sub">.xterm</text>
+        <rect x="36" y="60" width="388" height="140" rx="5" fill="#f3f4f8" stroke="#d6d9e2" stroke-width="1"/>
+        <text x="46" y="76" class="sub">.xterm-viewport (laag eronder)</text>
+        <rect x="398" y="64" width="22" height="132" rx="3" fill="#b7bdca"/>
+        <text x="409" y="208" class="sub" text-anchor="middle">native</text>
+        <rect x="46" y="92" width="374" height="92" rx="5" fill="#4f46e5" fill-opacity="0.14" stroke="#4f46e5" stroke-width="1.5"/>
+        <text x="58" y="112" class="lbl">.xterm-screen (canvas, vóór, volle breedte)</text>
+        <text x="58" y="130" class="sub">Claude Code TUI</text>
+        <text x="312" y="176" class="bad">dekt scrollbar af &#8594;</text>
+      </svg>
+    </div>
+    <figcaption>De native scrollbar hoort bij de viewport-laag; het volle-breedte canvas ligt ervóór en dekt hem af. Verbergen (gescoped op <code>.chat-terminal</code>) haalt de goot weg, dus het canvas vult de volle breedte schoon op en wiel/trackpad blijft scrollen — spiegelt het bestaande <code>.scroll-hidden</code>-patroon. De sidecar deelt de class niet en blijft ongewijzigd.</figcaption>
+  </figure>
+
+  <h2 style="margin-top:26px">Key Technical Decisions</h2>
+
+  <div class="ktd">
+    <h4><span class="id" id="ktd1">KTD1.</span>Verbergen via CSS, niet door scrollen uit te zetten</h4>
+    <p>Voeg <code>scrollbar-width: none</code> toe en een <code>::-webkit-scrollbar { display: none }</code>-regel. Dat verwijdert alleen de visuele track — xterm's overflow-scroll blijft actief, dus wiel/trackpad scrollt nog. Identiek aan de bestaande <code>.scroll-hidden</code>-utility in <code>src/index.css</code> (regels 162–168).</p>
+  </div>
+  <div class="ktd">
+    <h4><span class="id" id="ktd2">KTD2.</span>Scope op een eigen <code>chat-terminal</code>-class, niet op de gedeelde regel</h4>
+    <p>Chat- en sidecar-terminal renderen vandaag met dezelfde className <code>terminal-container</code> (zie <code>Terminal.tsx</code> en <code>SidecarTerminalPanel.tsx</code>). Een wijziging op <code>.terminal-container .xterm-viewport</code> zou beide raken. Voeg daarom een marker-class <code>chat-terminal</code> toe in <code>Terminal.tsx</code> en scope de verberg-regel op <code>.chat-terminal .xterm-viewport</code>. Gekozen boven het meeliften op het bestaande <code>data-terminal-active</code>-attribuut: een expliciete class benoemt de intentie en breekt niet als de sidecar-markup later verandert.</p>
+  </div>
+  <div class="ktd">
+    <h4><span class="id" id="ktd3">KTD3.</span>Behoud <code>overflow-y: scroll !important</code> — niet terug naar <code>auto</code></h4>
+    <p>De chat-terminal houdt de class <code>terminal-container</code>, dus de bestaande <code>overflow-y: scroll !important</code> blijft van toepassing en hoeft niet aangeraakt. De verborgen scrollbar maakt het oorspronkelijke PR&nbsp;#38-symptoom (flikkerend verdwijnen) sowieso irrelevant, en <code>scroll</code> houdt het scrollcontainer-gedrag stabiel. Bijeffect van het verbergen: zonder zichtbare scrollbar vervalt de goot-reservering, dus de WebGL-<code>.xterm-screen</code> concurreert niet meer met de scrollbar en de TUI herfit naar de volle breedte — dat lost de overlap én de rechterrand-afkapping op.</p>
+  </div>
+</section>
+
+<section id="implementation-units">
+  <h2>Implementation Units</h2>
+
+  <article class="unit" id="u1">
+    <h3><span class="id">U1.</span>Verberg de scrollbar op de chat-terminal (marker-class + gescopede CSS)</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Verwijder de zichtbare native scrollbar alleen op de chat-terminal terwijl wiel-/trackpad-scroll blijft werken; hef de overlap en rechterrand-afkapping op. Sidecar ongemoeid.</dd>
+      <dt>Requirements</dt><dd>R1, R2, R3, R4, R5</dd>
+      <dt>Dependencies</dt><dd>geen</dd>
+      <dt>Files</dt><dd><code>src/components/Terminal/Terminal.tsx</code> (marker-class) · <code>src/index.css</code> (gescopede verberg-regel, naast het bestaande <code>.terminal-container .xterm-viewport</code>-blok rond regel 192)</dd>
+    </dl>
+    <div class="ba">
+      <div class="col before">
+        <h4>Voor</h4>
+        <div class="body">// Terminal.tsx
+className="terminal-container absolute inset-0 bg-sidebar"
+
+/* index.css */
+.terminal-container .xterm-viewport {
+  overflow-y: scroll !important;
+}</div>
+      </div>
+      <div class="col after">
+        <h4>Na</h4>
+        <div class="body">// Terminal.tsx
+className="terminal-container chat-terminal absolute inset-0 bg-sidebar"
+
+/* index.css — gedeelde regel blijft ongemoeid */
+.terminal-container .xterm-viewport {
+  overflow-y: scroll !important;
+}
+/* alleen de chat-terminal verbergt de scrollbar */
+.chat-terminal .xterm-viewport {
+  scrollbar-width: none;        /* Firefox */
+}
+.chat-terminal .xterm-viewport::-webkit-scrollbar {
+  display: none;                /* Chromium/Electron */
+}</div>
+      </div>
+    </div>
+    <div class="note"><b>Geen JS-gedragswijziging.</b> Alleen een class-naam wordt toegevoegd in <code>Terminal.tsx</code>; de <code>safeFit</code>/<code>syncScrollArea</code>-logica in <code>useXtermInstance.ts</code> blijft ongemoeid en houdt het scrollgebied gesynchroniseerd (scroll-naar-onder, cols/rows).</div>
+    <details>
+      <summary>Approach &amp; Patterns</summary>
+      <p><b>Approach:</b> voeg <code>chat-terminal</code> toe aan de className van de chat-terminal-container in <code>Terminal.tsx</code> (de sidecar in <code>SidecarTerminalPanel.tsx</code> krijgt die class níét). Voeg in <code>index.css</code> twee regels toe die op <code>.chat-terminal .xterm-viewport</code> scopen — laat de bestaande gedeelde regel staan (KTD3). In Electron is <code>::-webkit-scrollbar { display: none }</code> de operatieve regel; <code>scrollbar-width: none</code> is onschadelijk en houdt de regel volledig.</p>
+      <p><b>Patterns to follow:</b> de <code>.scroll-hidden</code>-utility in dezelfde file (regels 162–168) gebruikt exact dit patroon — spiegel het.</p>
+    </details>
+    <details>
+      <summary>Test scenarios &amp; Verification</summary>
+      <p><b>Test expectation: none</b> — CSS-/markup-only visuele wijziging zonder testbare gedragslogica (alleen een class-naam erbij). Verificatie via de Verification Contract (handmatige visuele check + bestaande suite voor non-regressie).</p>
+      <p><b>Verification:</b> geen zichtbare scrollbar op de chat-terminal; sidecar-terminal toont nog wél zijn scrollbar; wiel/trackpad scrollt de chat-scrollback tot boven en onder; Claude-TUI gebruikt de volle breedte zonder rechterrand-overlap/afkapping; na een tabwissel en een Claude-statuswissel (done) werkt scroll-naar-onder nog.</p>
+    </details>
+  </article>
+</section>
+
+<section id="verification-contract">
+  <h2>Verification Contract</h2>
+  <ul class="tight">
+    <li><code>npm run test</code> — bevestig dat de bestaande Vitest-suites (<code>TerminalPool</code>, <code>projectStore</code>) groen blijven. Er verandert geen logica; dit is de non-regressie-gate per workflowregel.</li>
+    <li><code>npm run build</code> — schone TypeScript-/Vite-build (CSS + één className, maar bevestig geen breuk).</li>
+    <li><b>Handmatig in <code>npm run dev</code>:</b> open een chat met een lange Claude-conversatie → geen zichtbare scrollbar, geen overlap, volle-breedte TUI; wiel-scroll omhoog/omlaag bereikt top en bodem; open daarna een sidecar-terminal en bevestig dat die zijn scrollbar nog tóónt (R4); trigger een statuswissel (Claude → done) en een tabwissel en bevestig dat scroll-naar-onder blijft werken (R5).</li>
+  </ul>
+</section>
+
+<section id="definition-of-done">
+  <h2>Definition of Done</h2>
+  <ul class="tight">
+    <li><b>Globaal:</b> scrollbar onzichtbaar op de chat-terminal (R1); wiel-/trackpad-scroll werkt (R2); geen rechterrand-overlap/afkapping, TUI op volle breedte (R3); sidecar-terminal ongewijzigd met zichtbare scrollbar (R4); geen regressie in scroll-sync na status-/tabwissel (R5); bestaande tests + build groen; geen achtergebleven experimentele code.</li>
+    <li><b>U1:</b> <code>chat-terminal</code>-class toegevoegd in <code>Terminal.tsx</code>; de gescopede CSS toegevoegd in <code>src/index.css</code>; de gedeelde <code>.terminal-container</code>-regel en <code>useXtermInstance.ts</code> ongewijzigd; handmatige verificatie uit de Verification Contract geslaagd.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Sources &amp; Research</h2>
+  <ul class="tight">
+    <li>Gedeelde container-class: <a href="https://github.com/remcovolmer/command/blob/main/src/components/Terminal/Terminal.tsx">src/components/Terminal/Terminal.tsx</a> en <a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/SidecarTerminalPanel.tsx">src/components/FileExplorer/SidecarTerminalPanel.tsx</a> gebruiken beide <code>terminal-container</code> — vandaar de marker-class-aanpak.</li>
+    <li>Geforceerde scrollbar-regel: <a href="https://github.com/remcovolmer/command/blob/main/src/index.css">src/index.css</a> regels 192–194 (<code>.xterm-viewport</code>) en 162–168 (<code>.scroll-hidden</code>, het te spiegelen patroon).</li>
+    <li>Waarom <code>overflow-y: scroll</code> bestaat — eerdere fix: <a href="https://github.com/remcovolmer/command/pull/38">PR&nbsp;#38</a> en <a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-02-15-fix-scrollbar-disappears-on-state-change-plan.md">docs/plans/2026-02-15-fix-scrollbar-disappears-on-state-change-plan.md</a> (scrollbar verdween bij statuswissel; daarom de re-fit-logica in <a href="https://github.com/remcovolmer/command/blob/main/src/hooks/useXtermInstance.ts">src/hooks/useXtermInstance.ts</a> behouden).</li>
+  </ul>
+</section>
+
+<footer class="sig">
+  Composed 2026-06-30 by ce-plan &#183; solo invocation (no upstream brainstorm) &#183; source: user request + scrollbar-overlap screenshot.
+</footer>
+
+</div>
+</body>
+</html>
