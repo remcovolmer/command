@@ -7,7 +7,7 @@ import { TasksPanel } from './TasksPanel'
 import { AutomationsPanel } from './AutomationsPanel'
 import { SessionsPanel } from './SessionsPanel'
 import { AutomationCreateDialog } from './AutomationCreateDialog'
-import { FileExplorerTabBar } from './FileExplorerTabBar'
+import { FileExplorerHeader } from './FileExplorerHeader'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { getElectronAPI } from '../../utils/electron'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
@@ -22,7 +22,6 @@ export function FileExplorer() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const projects = useProjectStore((s) => s.projects)
   const activeTab = useProjectStore((s) => s.fileExplorerActiveTab)
-  const setActiveTab = useProjectStore((s) => s.setFileExplorerActiveTab)
   const fileExplorerDeletingEntry = useProjectStore((s) => s.fileExplorerDeletingEntry)
 
   // Determine git context from active terminal (worktree or project root)
@@ -33,7 +32,6 @@ export function FileExplorer() {
   const gitContextId = activeWorktree?.id ?? activeProjectId
   const gitContextPath = activeWorktree?.path
 
-  const gitStatus = useProjectStore((s) => (gitContextId ? s.gitStatus[gitContextId] : null))
   const isGitLoading = useProjectStore((s) =>
     gitContextId ? s.gitStatusLoading[gitContextId] : false
   )
@@ -49,7 +47,6 @@ export function FileExplorer() {
   } = useProjectStore(
     useShallow((s) => ({
       clearDirectoryCache: s.clearDirectoryCache,
-      setActiveTab: s.setFileExplorerActiveTab,
       setGitStatus: s.setGitStatus,
       setGitStatusLoading: s.setGitStatusLoading,
       setGitCommitLog: s.setGitCommitLog,
@@ -180,46 +177,11 @@ export function FileExplorer() {
     return () => clearInterval(interval)
   }, [watcherFailed, gitContextId])
 
-  const totalGitChanges = gitStatus
-    ? gitStatus.staged.length +
-      gitStatus.modified.length +
-      gitStatus.untracked.length +
-      gitStatus.conflicted.length
-    : 0
-
-  const tasksData = useProjectStore((s) => (activeProjectId ? s.tasksData[activeProjectId] : null))
-  const taskNowCount = tasksData?.nowCount ?? 0
-
-  // Automation state
-  const [automationUnreadCount, setAutomationUnreadCount] = useState(0)
+  // Automation dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingAutomation, setEditingAutomation] = useState<
     import('../../types').Automation | null
   >(null)
-
-  // Load unread count on mount and when runs change
-  useEffect(() => {
-    const loadUnread = async () => {
-      try {
-        const runs = (await api.automation.listRuns(
-          undefined,
-          100
-        )) as import('../../types').AutomationRun[]
-        const unread = runs.filter((r) => !r.read && r.status !== 'running').length
-        setAutomationUnreadCount(unread)
-      } catch {
-        /* ignore */
-      }
-    }
-    loadUnread()
-
-    const unsubCompleted = api.automation.onRunCompleted(() => loadUnread())
-    const unsubFailed = api.automation.onRunFailed(() => loadUnread())
-    return () => {
-      unsubCompleted()
-      unsubFailed()
-    }
-  }, [api])
 
   const handleTasksRefresh = useCallback(async () => {
     if (!activeProject) return
@@ -240,16 +202,11 @@ export function FileExplorer() {
       {/* Session info - always visible */}
       <SessionsPanel />
 
-      {/* Tab Bar */}
-      <FileExplorerTabBar
+      {/* Header — panel label, branch, refresh (tab switching lives in the rail) */}
+      <FileExplorerHeader
         activeTab={isLimitedProject && activeTab === 'git' ? 'files' : activeTab}
-        onTabChange={setActiveTab}
-        gitChangeCount={totalGitChanges}
-        taskNowCount={taskNowCount}
-        automationUnreadCount={automationUnreadCount}
         isGitLoading={isGitLoading ?? false}
         onRefresh={handleRefresh}
-        showGitTab={!isLimitedProject}
         worktreeBranch={activeWorktree?.branch}
       />
 

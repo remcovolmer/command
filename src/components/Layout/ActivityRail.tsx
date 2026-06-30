@@ -1,5 +1,6 @@
 import { FolderTree, GitBranch, ListChecks, Zap, TerminalSquare, Globe } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
+import { useAutomationUnreadCount } from '../../hooks/useAutomationUnreadCount'
 
 type ExplorerTab = 'files' | 'git' | 'tasks' | 'automations'
 
@@ -36,6 +37,36 @@ export function ActivityRail() {
   const toggleShellDrawer = useProjectStore((s) => s.toggleShellDrawer)
   const openBrowserTab = useProjectStore((s) => s.openBrowserTab)
 
+  // Panel attention counts — badged on the rail icons (Files has no count).
+  const gitContextId = activeWorktree?.id ?? activeProjectId
+  const gitChangeCount = useProjectStore((s) => {
+    const status = gitContextId ? s.gitStatus[gitContextId] : null
+    return status
+      ? status.staged.length +
+          status.modified.length +
+          status.untracked.length +
+          status.conflicted.length
+      : 0
+  })
+  const taskNowCount = useProjectStore((s) =>
+    activeProjectId ? (s.tasksData[activeProjectId]?.nowCount ?? 0) : 0
+  )
+  const automationUnread = useAutomationUnreadCount()
+
+  // Limited ('project'-type) projects have no git; the old tab bar hid the Git
+  // tab (and its badge) for them via showGitTab. Mirror that: no git badge here.
+  const isLimitedProject = useProjectStore((s) => {
+    const project = s.projects.find((p) => p.id === s.activeProjectId)
+    return project?.type === 'project'
+  })
+
+  const counts: Record<ExplorerTab, number> = {
+    files: 0,
+    git: isLimitedProject ? 0 : gitChangeCount,
+    tasks: taskNowCount,
+    automations: automationUnread,
+  }
+
   const handleOpenBrowser = () => {
     if (activeProjectId) openBrowserTab(activeProjectId)
   }
@@ -66,18 +97,24 @@ export function ActivityRail() {
 
       {ITEMS.map(({ tab, icon: Icon, label }) => {
         const active = visible && activeTab === tab
+        const count = counts[tab]
         return (
           <button
             key={tab}
             onClick={() => handleClick(tab)}
             title={label}
-            className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+            className={`relative w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
               active
                 ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
                 : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
             }`}
           >
             <Icon className="w-[18px] h-[18px]" />
+            {count > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold leading-[15px] text-center">
+                {count}
+              </span>
+            )}
           </button>
         )
       })}
