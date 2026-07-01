@@ -58,10 +58,8 @@ vi.mock('../src/components/FileExplorer/AutomationCreateDialog', () => ({
 vi.mock('../src/components/FileExplorer/DeleteConfirmDialog', () => ({
   DeleteConfirmDialog: () => null,
 }))
-vi.mock('../src/components/FileExplorer/FileExplorerTabBar', () => ({
-  FileExplorerTabBar: ({ showGitTab }: { showGitTab: boolean }) => (
-    <div data-testid="tabbar" data-show-git={String(showGitTab)} />
-  ),
+vi.mock('../src/components/FileExplorer/FileExplorerHeader', () => ({
+  FileExplorerHeader: () => <div data-testid="explorer-header" />,
 }))
 
 import { useProjectStore } from '../src/stores/projectStore'
@@ -100,7 +98,6 @@ describe('FileExplorer git gating for project-type folders', () => {
     render(<FileExplorer />)
     await waitFor(() => expect(screen.getByTestId('file-tree')).toBeTruthy())
     expect(screen.queryByTestId('git-panel')).toBeNull()
-    expect(screen.getByTestId('tabbar').getAttribute('data-show-git')).toBe('false')
   })
 
   // Regression: Code-type folders still show git content and offer the git tab.
@@ -109,6 +106,5 @@ describe('FileExplorer git gating for project-type folders', () => {
     render(<FileExplorer />)
     await waitFor(() => expect(screen.getByTestId('git-panel')).toBeTruthy())
     expect(screen.queryByTestId('file-tree')).toBeNull()
-    expect(screen.getByTestId('tabbar').getAttribute('data-show-git')).toBe('true')
   })
 })

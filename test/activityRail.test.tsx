@@ -1,50 +1,119 @@
 // @vitest-environment jsdom
 
-import { describe, test, expect, vi, afterEach } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
-import type { Project, ProjectType } from '../src/types'
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
+import { cleanup, render, screen, within } from '@testing-library/react'
 
-// Bypass persist middleware (no localStorage) — same pattern as projectStore.test.ts.
-vi.mock('zustand/middleware', () => ({
-  persist: (fn: unknown) => fn,
+// The rail reads many store selectors and the automation-unread hook. Mock the
+// store with a controllable fake-state object (selectors run against it) and the
+// hook with a settable count, so the badge + git-gating logic is tested in isolation.
+const { fakeState, setAutomationCount } = vi.hoisted(() => {
+  const state = {
+    fileExplorerVisible: false,
+    fileExplorerActiveTab: 'files' as 'files' | 'git' | 'tasks' | 'automations',
+    setFileExplorerActiveTab: () => {},
+    setFileExplorerVisible: () => {},
+    activeProjectId: 'proj-1' as string | null,
+    activeTerminalId: null as string | null,
+    projects: [] as Array<{ id: string; type: string }>,
+    terminals: {} as Record<string, { worktreeId: string | null }>,
+    worktrees: {} as Record<string, { id: string }>,
+    sidecarTerminals: {} as Record<string, unknown[]>,
+    sidecarTerminalCollapsed: true,
+    toggleShellDrawer: () => {},
+    openBrowserTab: () => {},
+    gitStatus: {} as Record<
+      string,
+      { staged: unknown[]; modified: unknown[]; untracked: unknown[]; conflicted: unknown[] }
+    >,
+    tasksData: {} as Record<string, { nowCount: number }>,
+    _automationCount: 0,
+  }
+  return {
+    fakeState: state,
+    setAutomationCount: (n: number) => {
+      state._automationCount = n
+    },
+  }
+})
+
+vi.mock('../src/stores/projectStore', () => ({
+  useProjectStore: (selector: (s: typeof fakeState) => unknown) => selector(fakeState),
 }))
 
-// Store actions call getElectronAPI lazily; stub so nothing hits window.electronAPI.
-vi.mock('../src/utils/electron', () => ({
-  getElectronAPI: () => ({
-    terminal: { create: vi.fn(), close: vi.fn() },
-  }),
+vi.mock('../src/hooks/useAutomationUnreadCount', () => ({
+  useAutomationUnreadCount: () => fakeState._automationCount,
 }))
 
-import { useProjectStore } from '../src/stores/projectStore'
 import { ActivityRail } from '../src/components/Layout/ActivityRail'
 
-function makeProject(type: ProjectType): Project {
-  return { id: 'p1', name: 'Folder', path: '/folder', type, createdAt: 0, sortOrder: 0, pinned: false }
+function gitStatus(staged: number, modified: number, untracked: number, conflicted: number) {
+  const arr = (n: number) => Array.from({ length: n }, (_, i) => i)
+  return { staged: arr(staged), modified: arr(modified), untracked: arr(untracked), conflicted: arr(conflicted) }
 }
 
-function seed(type: ProjectType | null) {
-  useProjectStore.setState({
-    projects: type ? [makeProject(type)] : [],
-    activeProjectId: type ? 'p1' : null,
-    activeTerminalId: null,
-    terminals: {},
-    worktrees: {},
-    sidecarTerminals: {},
-    sidecarTerminalCollapsed: false,
-    fileExplorerVisible: false,
-    fileExplorerActiveTab: 'files',
-  })
+function resetState() {
+  fakeState.fileExplorerVisible = false
+  fakeState.fileExplorerActiveTab = 'files'
+  fakeState.activeProjectId = 'proj-1'
+  fakeState.activeTerminalId = null
+  fakeState.projects = []
+  fakeState.gitStatus = {}
+  fakeState.tasksData = {}
+  fakeState._automationCount = 0
 }
+
+beforeEach(resetState)
+afterEach(() => cleanup())
+
+describe('ActivityRail badges', () => {
+  test('no counts: no numeric badge on any panel icon', () => {
+    render(<ActivityRail />)
+    for (const label of ['Files', 'Git', 'Tasks', 'Automations']) {
+      expect(within(screen.getByTitle(label)).queryByText(/^\d+$/)).toBeNull()
+    }
+  })
+
+  test('git changes badge sums staged/modified/untracked/conflicted', () => {
+    fakeState.gitStatus = { 'proj-1': gitStatus(2, 1, 0, 0) }
+    render(<ActivityRail />)
+    expect(within(screen.getByTitle('Git')).getByText('3')).toBeTruthy()
+  })
+
+  test('tasks badge shows nowCount', () => {
+    fakeState.tasksData = { 'proj-1': { nowCount: 5 } }
+    render(<ActivityRail />)
+    expect(within(screen.getByTitle('Tasks')).getByText('5')).toBeTruthy()
+  })
+
+  test('automations badge shows the unread-hook count', () => {
+    setAutomationCount(2)
+    render(<ActivityRail />)
+    expect(within(screen.getByTitle('Automations')).getByText('2')).toBeTruthy()
+  })
+
+  test('non-limited project keeps the git badge', () => {
+    fakeState.projects = [{ id: 'proj-1', type: 'code' }]
+    fakeState.gitStatus = { 'proj-1': gitStatus(2, 1, 0, 0) }
+    render(<ActivityRail />)
+    expect(within(screen.getByTitle('Git')).getByText('3')).toBeTruthy()
+  })
+
+  test('files icon is never badged, even with git/task/automation activity', () => {
+    fakeState.gitStatus = { 'proj-1': gitStatus(4, 0, 0, 0) }
+    fakeState.tasksData = { 'proj-1': { nowCount: 5 } }
+    setAutomationCount(2)
+    render(<ActivityRail />)
+    expect(screen.getByTitle('Files').textContent).toBe('')
+  })
+})
 
 describe('ActivityRail git entry gating', () => {
-  afterEach(() => {
-    cleanup()
-  })
-
-  // R3: limited folders get no git tab, so the rail must not offer a git entry.
+  // Limited ('project'-type) folders have no git tab; since the rail is the only
+  // place tab switching lives, the Git entry is hidden entirely for them (which
+  // supersedes the old "show the icon, suppress its badge" behavior).
   test('hides the Git entry for a Project-type (limited) folder', () => {
-    seed('project')
+    fakeState.projects = [{ id: 'proj-1', type: 'project' }]
+    fakeState.gitStatus = { 'proj-1': gitStatus(3, 0, 0, 0) }
     render(<ActivityRail />)
     expect(screen.queryByTitle('Git')).toBeNull()
     // The other rail entries remain.
@@ -53,9 +122,8 @@ describe('ActivityRail git entry gating', () => {
     expect(screen.queryByTitle('Automations')).not.toBeNull()
   })
 
-  // R4 / regression: code projects keep the git entry.
   test('shows the Git entry for a Code-type project', () => {
-    seed('code')
+    fakeState.projects = [{ id: 'proj-1', type: 'code' }]
     render(<ActivityRail />)
     expect(screen.queryByTitle('Git')).not.toBeNull()
   })
@@ -63,7 +131,8 @@ describe('ActivityRail git entry gating', () => {
   // No active project → type is undefined (not 'project'), so the list is
   // unfiltered. This is unchanged from pre-fix behavior; pin it.
   test('renders the unfiltered rail when there is no active project', () => {
-    seed(null)
+    fakeState.activeProjectId = null
+    fakeState.projects = []
     render(<ActivityRail />)
     expect(screen.queryByTitle('Files')).not.toBeNull()
     expect(screen.queryByTitle('Git')).not.toBeNull()

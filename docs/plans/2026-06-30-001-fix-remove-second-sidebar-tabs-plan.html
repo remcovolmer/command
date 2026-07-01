@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remove duplicate second-sidebar tabs - Plan</title>
+<style>
+  :root {
+    --ink:#1a1f2e; --muted:#5b6678; --faint:#8b95a7; --line:#e3e7ee; --bg:#f7f8fa; --card:#fff;
+    --accent:#4f46e5; --accent-soft:#eef0fe; --green:#0f9d6e; --green-soft:#e6f6ef;
+    --amber:#c2870b; --amber-soft:#fdf4e1; --red:#d1453b; --red-soft:#fcebe9;
+    --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;font-size:15px;}
+  .wrap{max-width:940px;margin:0 auto;padding:48px 28px 96px;}
+  a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
+  code{font-family:var(--mono);font-size:.88em;background:#eef0f3;padding:1px 5px;border-radius:4px;}
+  header.doc{border-bottom:3px solid var(--accent);padding-bottom:20px;margin-bottom:8px;}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;}
+  h1{font-size:28px;line-height:1.2;margin:0 0 14px;letter-spacing:-.01em;}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted);}
+  .meta b{color:var(--ink);font-weight:600;}
+  nav.secnav{display:flex;flex-wrap:wrap;gap:6px 8px;margin:18px 0 2px;font-size:12.5px;}
+  nav.secnav a{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--muted);}
+  nav.secnav a:hover{border-color:var(--accent);color:var(--accent);text-decoration:none;}
+  section{border-top:1px solid var(--line);padding-top:8px;margin-top:34px;}
+  section.first{border-top:0;margin-top:24px;}
+  h2{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:18px 0 6px;}
+  .at{font-size:19px;font-weight:650;line-height:1.32;letter-spacing:-.01em;margin:0 0 16px;color:var(--ink);}
+  p{margin:0 0 13px;max-width:74ch;} .lead{font-size:16px;}
+  .grp{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);margin:24px 0 2px;}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;}
+  .id{font-family:var(--mono);font-weight:700;color:var(--accent);white-space:nowrap;}
+  dl.cap{display:grid;grid-template-columns:max-content 1fr;gap:5px 16px;margin:6px 0 0;font-size:14px;}
+  dl.cap dt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;padding-top:2px;}
+  dl.cap dd{margin:0;}
+  /* KTD */
+  .ktd{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;background:var(--card);padding:14px 20px;margin:12px 0;}
+  .ktd h4{margin:0 0 6px;font-size:15px;} .ktd h4 .id{margin-right:8px;}
+  .ktd p{margin:0;font-size:14px;color:var(--muted);}
+  /* units */
+  nav.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 18px;}
+  nav.subnav a{font-family:var(--mono);font-size:12px;background:var(--accent-soft);border:1px solid #d6d9fb;border-radius:6px;padding:3px 9px;color:var(--accent);}
+  article.unit{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:16px 20px;margin:12px 0;}
+  article.unit h3{margin:0 0 10px;font-size:16.5px;} article.unit h3 .id{margin-right:8px;}
+  dl.strip{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0 0 8px;font-size:13.5px;}
+  dl.strip dt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;padding-top:2px;}
+  dl.strip dd{margin:0;} dl.strip dd code{font-size:.86em;}
+  .execnote{background:var(--amber-soft);border:1px solid #ecd9ad;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px;color:#7a5a08;}
+  .execnote b{color:var(--amber);}
+  details{margin:6px 0;border-top:1px solid var(--line);padding-top:6px;}
+  summary{cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  details[open] summary{margin-bottom:8px;}
+  details ul{margin:6px 0;padding-left:20px;font-size:13.5px;} details li{margin:4px 0;}
+  details p{font-size:13.5px;}
+  /* scope */
+  .scope{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;}
+  .scope .col{border:1px solid var(--line);border-radius:10px;padding:4px 18px 14px;}
+  .scope .defer{background:var(--amber-soft);border-color:#ecd9ad;} .scope .out{background:#eef1f5;}
+  .scope h4{font-size:12px;letter-spacing:.07em;text-transform:uppercase;margin:14px 0 4px;}
+  .scope .defer h4{color:var(--amber);} .scope .out h4{color:var(--muted);}
+  .scope ul{margin:0;padding-left:18px;font-size:13.5px;} .scope li{margin:5px 0;}
+  ul.tight{margin:6px 0 12px;padding-left:20px;} ul.tight li{margin:5px 0;font-size:14px;}
+  ul.tight li b{font-weight:600;}
+  /* svg */
+  figure{margin:16px 0;} figcaption{font-size:12.5px;color:var(--faint);margin-top:8px;}
+  .svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:14px;}
+  /* dod */
+  .dod{list-style:none;padding:0;margin:8px 0;} .dod li{padding:6px 0 6px 26px;position:relative;border-bottom:1px solid var(--line);font-size:14px;}
+  .dod li:before{content:"\2713";position:absolute;left:4px;top:6px;color:var(--green);font-weight:700;}
+  footer.sig{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint);}
+  footer.sig code{background:none;padding:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="eyebrow">Implementation Plan</p>
+  <h1>Remove duplicate second-sidebar tabs - Plan</h1>
+  <div class="meta">
+    <span><b>title</b> Remove duplicate second-sidebar tabs - Plan</span>
+    <span><b>type</b> fix</span>
+    <span><b>date</b> <time datetime="2026-06-30">2026-06-30</time></span>
+    <span><b>depth</b> Standard</span>
+    <span><b>artifact_contract</b> ce-unified-plan/v1</span>
+    <span><b>artifact_readiness</b> implementation-ready</span>
+    <span><b>product_contract_source</b> ce-plan-bootstrap</span>
+    <span><b>execution</b> code</span>
+  </div>
+  <nav class="secnav">
+    <a href="#goal-capsule">Goal Capsule</a>
+    <a href="#product-contract">Product Contract</a>
+    <a href="#planning-contract">Planning Contract</a>
+    <a href="#implementation-units">Implementation Units</a>
+    <a href="#verification-contract">Verification Contract</a>
+    <a href="#definition-of-done">Definition of Done</a>
+  </nav>
+</header>
+
+<section class="first" id="goal-capsule">
+  <h2>Goal Capsule</h2>
+  <dl class="cap">
+    <dt>Objective</dt><dd>Verwijder de dubbele Files/Git/Tasks/Auto tab-rij uit de file-explorer-flyout. De rail wordt de enige tab-switcher. Verplaats de live tellers naar de rail-iconen; behoud de refresh-knop en het branch-label in een slank flyout-header.</dd>
+    <dt>Authority</dt><dd>De units hieronder zijn leidend. Bij conflict met repo-conventies (lint, types, patterns) winnen de conventies; meld een echte tegenspraak in plaats van te gokken.</dd>
+    <dt>Stop conditions</dt><dd>Geen dubbele tab-rij meer; rail-iconen tonen git/tasks/auto-counts (verborgen bij 0); refresh + branch-label behouden; <code>npm test</code> en <code>npm run build</code> groen.</dd>
+    <dt>Execution profile</dt><dd>Standard, 3 units, één PR-waardig. Geen migratie, geen IPC-wijziging, geen nieuwe hotkeys.</dd>
+    <dt>Tail</dt><dd>Implementer draait tests/build/lint en levert op via de gebruikelijke commit/PR-flow van de repo.</dd>
+  </dl>
+</section>
+
+<section id="product-contract">
+  <h2>Product Contract</h2>
+
+  <p class="grp" style="margin-top:6px">Summary</p>
+  <p class="lead">De <a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-06-29-001-feat-second-panel-redesign-plan.html">#141-redesign</a> verplaatste tab-switching naar de icoon-rail uiterst rechts, maar liet de oude <code>FileExplorerTabBar</code> in de flyout staan. Daardoor verschijnen Files/Git/Tasks/Auto nu twee keer. Dit plan verwijdert die oude tab-rij; de teller-badges verhuizen naar de rail-iconen en de refresh-knop plus het <code>Files&nbsp;&middot;&nbsp;&lt;branch&gt;</code>-label blijven behouden in een tab-loze flyout-header.</p>
+
+  <p class="grp">Problem Frame</p>
+  <p>De oude tab-rij doet meer dan tabs: hij draagt ook drie affordances die de rail vandaag niet heeft &mdash; live tellers (ongecommitte git-changes, open taken, ongelezen automation-runs), een handmatige refresh-knop, en het worktree-branch-label. Simpelweg de hele <code>FileExplorerTabBar</code> slopen verwijdert die affordances stilletjes mee. De gebruiker heeft bevestigd dat de tellers naar de rail moeten en refresh + branch-label behouden blijven.</p>
+
+  <p class="grp" id="product-requirements">Requirements</p>
+
+  <p class="grp" style="color:var(--muted);font-weight:600">Removal &amp; navigatie</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r1">R1</td><td>De Files/Git/Tasks/Auto tab-rij is weg uit de flyout; de rail is de enige tab-switcher. Geen dubbele tabs meer.</td><td class="id">U1</td></tr>
+    <tr><td class="id" id="r5">R5</td><td>Tab-switch-hotkeys (<code>Ctrl+Shift+E/G/K/A</code>) en de actief-paneel-highlight op de rail blijven onveranderd werken &mdash; ze sturen al de store, niet de tab-rij.</td><td class="id">U1</td></tr>
+  </table>
+
+  <p class="grp" style="color:var(--muted);font-weight:600">Tellers op de rail</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r2">R2</td><td>De rail-iconen tonen live counts &mdash; git-changes (Git), open taken (Tasks), ongelezen automation-runs (Automations) &mdash; verborgen wanneer de telling 0 is. Files heeft geen teller.</td><td class="id">U2, U3</td></tr>
+  </table>
+
+  <p class="grp" style="color:var(--muted);font-weight:600">Behouden affordances</p>
+  <table>
+    <tr><th>ID</th><th>Requirement</th><th>Units</th></tr>
+    <tr><td class="id" id="r3">R3</td><td>Een handmatige refresh-knop voor het actieve paneel blijft beschikbaar in de flyout (het bestaande watcher-gedreven auto-refresh blijft de primaire route).</td><td class="id">U1</td></tr>
+    <tr><td class="id" id="r4">R4</td><td>Het worktree-branch-label (<code>Files&nbsp;&middot;&nbsp;&lt;branch&gt;</code>) van de actieve chat blijft zichtbaar in de flyout-header voor de files-context.</td><td class="id">U1</td></tr>
+  </table>
+
+  <p class="grp">Scope Boundaries</p>
+  <div class="scope">
+    <div class="col defer">
+      <h4>Uitgesteld (later mogelijk)</h4>
+      <ul>
+        <li>Het kapotte branch-rijtje in <code>SessionsPanel</code> (toont nu <code>worktreeId.slice(0,8)</code> i.p.v. de branchnaam) opschonen &mdash; aparte tidy-fix.</li>
+        <li>Een teller op het Files-icoon (er is geen file-count-concept).</li>
+        <li>Branch-suffix ook op het Git-paneel (zie Open Questions).</li>
+      </ul>
+    </div>
+    <div class="col out">
+      <h4>Buiten scope</h4>
+      <ul>
+        <li>Herontwerp van de rail zelf, nieuwe panelen, of nieuwe hotkeys.</li>
+        <li>Wijzigen van tab-switch-state (<code>fileExplorerActiveTab</code>) of het worktree-scoping-model.</li>
+        <li>Wijzigen van de auto-refresh/file-watcher-logica.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="planning-contract">
+  <h2>Planning Contract</h2>
+
+  <div class="ktd"><h4><span class="id">KTD1</span>Repurpose <code>FileExplorerTabBar</code> tot tab-loze header, hernoem naar <code>FileExplorerHeader</code></h4>
+    <p>Strip de tab-<code>&lt;button&gt;</code>'s en de badge-spans; houd één slanke rij over met de actieve-paneel-titel, het <code>&middot;&nbsp;&lt;branch&gt;</code>-suffix voor files, en de refresh-knop (R3, R4). Hernoemen naar <code>FileExplorerHeader.tsx</code> houdt de naam eerlijk &mdash; één consument (<code>FileExplorer.tsx</code>), dus lage churn. De titel volgt <code>fileExplorerActiveTab</code>; de tab-switching blijft volledig in de rail + store.</p></div>
+
+  <div class="ktd"><h4><span class="id">KTD2</span>Badges op de rail hergebruiken het bestaande shell-count-pattern</h4>
+    <p>De rail heeft al een absolute-positioned count-badge voor de shell-drawer. Hergebruik die span-vorm op de Git/Tasks/Automations-iconen. Git-count en task-count zijn al in de store (<code>gitStatus[gitContextId]</code> som van staged/modified/untracked/conflicted; <code>tasksData[activeProjectId].nowCount</code>) en worden via dezelfde selectors gelezen die de rail al voor shell-context gebruikt (<code>activeWorktree?.id ?? activeProjectId</code>).</p></div>
+
+  <div class="ktd"><h4><span class="id">KTD3</span>Automation-unread verhuist naar een herbruikbare hook</h4>
+    <p>De ongelezen-automation-count leeft nu als lokale state in <code>FileExplorer</code> (<code>api.automation.listRuns</code> + <code>onRunCompleted</code>/<code>onRunFailed</code>-listeners). De rail heeft hem nodig en <code>FileExplorer</code> niet meer. Extraheer een <code>useAutomationUnreadCount()</code>-hook (conventie <code>src/hooks/useXxx.ts</code>) zodat de telling op één plek leeft en de rail hem leest. Verwijder de dode state uit <code>FileExplorer</code>.</p></div>
+
+  <p class="at" style="margin-top:24px">De verwijdering herverdeelt vier verantwoordelijkheden van één component over drie.</p>
+  <figure>
+    <div class="svgwrap">
+      <svg viewBox="0 0 900 330" width="100%" role="img" aria-label="Verantwoordelijkheden voor en na het verwijderen van de tab-rij">
+        <style>
+          .ttl{font:700 13px -apple-system,Segoe UI,sans-serif;}
+          .box{font:600 13.5px -apple-system,Segoe UI,sans-serif;fill:#1a1f2e}
+          .chip{font:12px ui-monospace,Consolas,monospace;fill:#3a4254}
+          .note{font:11px -apple-system,Segoe UI,sans-serif;fill:#8b95a7}
+        </style>
+        <!-- column headers -->
+        <text x="40" y="28" class="ttl" fill="#d1453b">VOOR</text>
+        <text x="500" y="28" class="ttl" fill="#0f9d6e">NA</text>
+
+        <!-- BEFORE: one removed box -->
+        <rect x="40" y="44" width="350" height="244" rx="10" fill="#fcebe9" stroke="#d1453b" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="60" y="72" class="box" fill="#d1453b">FileExplorerTabBar &mdash; verwijderd</text>
+        <text x="60" y="118" class="chip">&#8226; Tab-switching (Files/Git/Tasks/Auto)</text>
+        <text x="60" y="156" class="chip">&#8226; Badges: git / tasks / auto</text>
+        <text x="60" y="194" class="chip">&#8226; Refresh-knop</text>
+        <text x="60" y="232" class="chip">&#8226; Branch-label (Files &middot; &lt;branch&gt;)</text>
+        <text x="60" y="266" class="note">Eén rij die alles droeg.</text>
+
+        <!-- AFTER: three boxes -->
+        <rect x="500" y="44" width="360" height="74" rx="10" fill="#eef0fe" stroke="#4f46e5" stroke-width="1.5"/>
+        <text x="518" y="68" class="box">ActivityRail</text>
+        <text x="518" y="90" class="chip">&#8226; Tab-switching (al aanwezig)</text>
+        <text x="518" y="108" class="chip">&#8226; Badges: git / tasks / auto (nieuw)</text>
+
+        <rect x="500" y="130" width="360" height="74" rx="10" fill="#e6f6ef" stroke="#0f9d6e" stroke-width="1.5"/>
+        <text x="518" y="154" class="box">FileExplorerHeader</text>
+        <text x="518" y="176" class="chip">&#8226; Refresh-knop</text>
+        <text x="518" y="194" class="chip">&#8226; Branch-label (Files &middot; &lt;branch&gt;)</text>
+
+        <rect x="500" y="216" width="360" height="72" rx="10" fill="#fff" stroke="#cbd2dd" stroke-width="1.5"/>
+        <text x="518" y="240" class="box">useAutomationUnreadCount</text>
+        <text x="518" y="262" class="chip">&#8226; één bron voor de auto-telling</text>
+        <text x="518" y="280" class="note">gelezen door de rail (auto-badge)</text>
+      </svg>
+    </div>
+    <figcaption>Tab-switching zat al in de rail; dit plan verplaatst de badges erbij, parkeert refresh + branch in een tab-loze header, en tilt de auto-telling naar een hook.</figcaption>
+  </figure>
+</section>
+
+<section id="implementation-units">
+  <h2>Implementation Units</h2>
+  <nav class="subnav"><a href="#u1">U1</a><a href="#u2">U2</a><a href="#u3">U3</a></nav>
+
+  <article class="unit" id="u1">
+    <h3><span class="id">U1.</span>Strip de tabs &mdash; flyout-header met titel, branch &amp; refresh</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Verwijder de dubbele tab-rij; behoud refresh-knop en branch-label in een tab-loze header.</dd>
+      <dt>Requirements</dt><dd>R1, R3, R4, R5</dd>
+      <dt>Dependencies</dt><dd>&mdash;</dd>
+      <dt>Files</dt><dd><code>src/components/FileExplorer/FileExplorerTabBar.tsx</code> &rarr; hernoem naar <code>src/components/FileExplorer/FileExplorerHeader.tsx</code>; <code>src/components/FileExplorer/FileExplorer.tsx</code> (import + gebruik, badge-props laten vervallen); <code>test/fileExplorerHeader.test.tsx</code> (nieuw)</dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Schrap in de component de <code>tabs.map</code>-buttons en de badge-spans. Houd de buitenste rij + de refresh-knop. Render links de actieve-paneel-titel afgeleid van <code>activeTab</code> (Files / Git / Tasks / Automations), met <code>&middot;&nbsp;{worktreeBranch}</code> erachter wanneer <code>activeTab==='files'</code> en er een branch is (KTD1). Props krimpen tot <code>activeTab</code>, <code>worktreeBranch</code>, <code>onRefresh</code>, <code>isGitLoading</code> (voor de spin); <code>gitChangeCount</code>/<code>taskNowCount</code>/<code>automationUnreadCount</code>/<code>onTabChange</code>/<code>showGitTab</code> vervallen. In <code>FileExplorer.tsx</code>: werk de import bij, verwijder de doorgegeven badge-props; de <code>handleRefresh</code>- en <code>isGitLoading</code>-bedrading blijft staan.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li>Header rendert de titel van het actieve paneel; bij <code>files</code> + worktree toont hij <code>Files &middot; &lt;branch&gt;</code>.</li>
+        <li>Er zijn <b>geen</b> tab-switch-buttons meer in de header (geen Git/Tasks/Auto-knoppen).</li>
+        <li>Klik op refresh roept <code>onRefresh</code> aan; bij <code>git</code> + <code>isGitLoading</code> spint het icoon.</li>
+        <li>Geen badge-tellers meer in de header gerenderd.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Flyout opent via een rail-icoon zonder tweede tab-rij; refresh ververst het actieve paneel; branch zichtbaar bij files.</p></details>
+  </article>
+
+  <article class="unit" id="u2">
+    <h3><span class="id">U2.</span>Count-badges op de rail-iconen</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Toon git-, task- en automation-tellers als badges op de Git/Tasks/Automations-iconen, verborgen bij 0.</dd>
+      <dt>Requirements</dt><dd>R2</dd>
+      <dt>Dependencies</dt><dd>U3</dd>
+      <dt>Files</dt><dd><code>src/components/Layout/ActivityRail.tsx</code>; <code>test/activityRail.test.tsx</code> (nieuw)</dd>
+    </dl>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Per <code>ITEMS</code>-entry een optionele count berekenen: Git = som van <code>gitStatus[gitContextId]</code> (staged+modified+untracked+conflicted), Tasks = <code>tasksData[activeProjectId]?.nowCount ?? 0</code>, Automations = <code>useAutomationUnreadCount()</code> (U3), Files = geen. Render de badge met de bestaande shell-count-span-vorm (absolute, <code>-top-0.5 -right-0.5</code>, <code>bg-primary</code>), alleen wanneer <code>count &gt; 0</code> (KTD2). Hergebruik de al aanwezige <code>activeWorktree</code>/<code>activeProjectId</code>-selectors voor de git-context.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li>Git-icoon toont het aantal changes; badge verdwijnt wanneer de count 0 is.</li>
+        <li>Tasks-icoon toont <code>nowCount</code>; Automations-icoon toont de unread-count uit de hook.</li>
+        <li>Files-icoon krijgt nooit een badge.</li>
+        <li>Badge-vorm matcht het shell-count-pattern (zelfde span/stijl, geen one-edge accent).</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>Met openstaande changes/taken/runs verschijnen de juiste getallen op de rail; bij 0 zijn ze weg.</p></details>
+  </article>
+
+  <article class="unit" id="u3">
+    <h3><span class="id">U3.</span>Extraheer <code>useAutomationUnreadCount</code>-hook</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Verplaats de ongelezen-automation-telling naar een herbruikbare hook; verwijder de dode state uit <code>FileExplorer</code>.</dd>
+      <dt>Requirements</dt><dd>R2 (afgeleid)</dd>
+      <dt>Dependencies</dt><dd>&mdash;</dd>
+      <dt>Files</dt><dd>nieuw <code>src/hooks/useAutomationUnreadCount.ts</code>; <code>src/components/FileExplorer/FileExplorer.tsx</code> (verwijder lokale unread-state + listeners); <code>test/useAutomationUnreadCount.test.ts</code> (nieuw)</dd>
+    </dl>
+    <div class="execnote"><b>Execution note:</b> test-first op de hook &mdash; de telling-logica (filter op niet-gelezen én niet-running) is de kern; mock <code>api.automation.listRuns</code> en de run-events.</div>
+    <details><summary>Approach &amp; patterns</summary>
+      <p>Verhuis het blok uit <code>FileExplorer</code>: <code>listRuns(undefined, 100)</code>, filter <code>!r.read &amp;&amp; r.status !== 'running'</code>, en re-load op <code>onRunCompleted</code>/<code>onRunFailed</code>. De hook geeft een <code>number</code> terug en ruimt zijn listeners op bij unmount. <code>FileExplorer</code> verliest de bijbehorende <code>useState</code> + <code>useEffect</code>; de rail (U2) consumeert de hook.</p>
+    </details>
+    <details><summary>Test scenarios</summary>
+      <ul>
+        <li>Hook telt alleen runs die niet gelezen én niet running zijn.</li>
+        <li>Een <code>onRunCompleted</code>/<code>onRunFailed</code>-event triggert een herberekening.</li>
+        <li>Listeners worden bij unmount afgemeld (geen leak).</li>
+        <li><code>FileExplorer</code> rendert nog en bevat geen unread-state meer.</li>
+      </ul>
+    </details>
+    <details><summary>Verification</summary><p>De auto-badge op de rail updatet wanneer een automation-run klaar is of faalt.</p></details>
+  </article>
+</section>
+
+<section id="verification-contract">
+  <h2>Verification Contract</h2>
+  <ul class="tight">
+    <li><b><code>npm test</code></b> (vitest run) &mdash; alle bestaande tests groen plus de drie nieuwe (<code>fileExplorerHeader</code>, <code>activityRail</code>, <code>useAutomationUnreadCount</code>).</li>
+    <li><b><code>npm run build</code></b> &mdash; TypeScript strict compileert zonder fouten; geen <code>any</code>, geen ongebruikte imports na het strippen van props/state.</li>
+    <li><b>ESLint</b> &mdash; schoon (de PostToolUse lint-fix-hook leunt hierop).</li>
+    <li><b>Manueel</b> (<code>npm run dev</code>): rail-icoon opent de flyout zonder tweede tab-rij; git/tasks/auto-iconen tonen counts en verbergen ze bij 0; refresh ververst het actieve paneel; <code>Files &middot; &lt;branch&gt;</code> zichtbaar; <code>Ctrl+Shift+E/G/K/A</code> wisselt nog van paneel.</li>
+  </ul>
+</section>
+
+<section id="definition-of-done">
+  <h2>Definition of Done</h2>
+  <ul class="dod">
+    <li>De Files/Git/Tasks/Auto tab-rij is verwijderd; geen dubbele tabs in de flyout (R1).</li>
+    <li>De rail-iconen tonen live git/tasks/auto-counts, verborgen bij 0 (R2).</li>
+    <li>Refresh-knop en <code>Files &middot; &lt;branch&gt;</code>-label blijven werken in de flyout-header (R3, R4).</li>
+    <li>Tab-switch-hotkeys en rail-highlight werken onveranderd (R5).</li>
+    <li><code>FileExplorerTabBar</code> is hernoemd naar <code>FileExplorerHeader</code>; geen dode badge-/tab-code achtergebleven; de unread-state is uit <code>FileExplorer</code> naar de hook verplaatst.</li>
+    <li><code>npm test</code> + <code>npm run build</code> + ESLint groen; geen experimentele/dode-eind-code in de diff.</li>
+  </ul>
+</section>
+
+<section id="system-wide-impact">
+  <h2>System-Wide Impact</h2>
+  <ul class="tight">
+    <li><b>Tab-switch-state</b> &mdash; ongewijzigd: rail en hotkeys sturen <code>fileExplorerActiveTab</code> in de store; het verwijderen van de tab-rij raakt dat pad niet (R5).</li>
+    <li><b>Automation-unread</b> &mdash; verhuist van <code>FileExplorer</code> naar een gedeelde hook; functioneel identiek, andere bezitter (U3).</li>
+    <li><b>Geen IPC/persist-wijziging</b> &mdash; puur renderer-UI; geen store-shape-, IPC- of migratie-impact.</li>
+  </ul>
+</section>
+
+<section id="open-questions">
+  <h2>Open Questions</h2>
+  <p class="grp" style="color:var(--muted)">Defer to implementation</p>
+  <ul class="tight">
+    <li>Toont de header ook een branch-suffix bij het Git-paneel (ook worktree-gescoped), of alleen bij Files zoals nu? Default: alleen Files, parity met de oude tab-rij.</li>
+  </ul>
+</section>
+
+<section id="sources">
+  <h2>Sources &amp; Research</h2>
+  <ul class="tight">
+    <li>Upstream redesign (#141, liet de oude tab-rij staan): <a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-06-29-001-feat-second-panel-redesign-plan.html">docs/plans/2026-06-29-001-feat-second-panel-redesign-plan.html</a></li>
+    <li>Te strippen tab-rij: <a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/FileExplorerTabBar.tsx">src/components/FileExplorer/FileExplorerTabBar.tsx</a></li>
+    <li>Enige consument + refresh/branch/badge-bedrading: <a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/FileExplorer.tsx">src/components/FileExplorer/FileExplorer.tsx</a></li>
+    <li>Rail (badge-doel; shell-count-pattern): <a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/ActivityRail.tsx">src/components/Layout/ActivityRail.tsx</a></li>
+    <li>Automation-unread bron-logica: <a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/AutomationsPanel.tsx">src/components/FileExplorer/AutomationsPanel.tsx</a></li>
+    <li>Worktree-branch-veld: <a href="https://github.com/remcovolmer/command/blob/main/shared/ipc-types.ts">shared/ipc-types.ts</a> (<code>Worktree.branch</code>)</li>
+  </ul>
+</section>
+
+<footer class="sig">Composed 2026-06-30 by ce-plan from de gebruikersopdracht "remove the tabs in the second sidebar". Huidige-staat-claims geverifieerd tegen de codebase op compositietijd.</footer>
+
+</div>
+</body>
+</html>
