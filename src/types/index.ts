@@ -308,6 +308,10 @@ export interface ElectronAPI {
     openExternal: (url: string) => Promise<void>
     showItemInFolder: (filePath: string) => Promise<void>
   }
+  clipboard: {
+    writeText: (text: string) => void
+    readText: () => Promise<string>
+  }
   notification: {
     show: (title: string, body: string) => void
   }

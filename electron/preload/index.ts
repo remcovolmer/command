@@ -285,6 +285,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('shell:show-item-in-folder', filePath),
   },
 
+  // Clipboard operations — Electron-native, so copy/paste work in the packaged
+  // file:// renderer where navigator.clipboard is unavailable.
+  clipboard: {
+    writeText: (text: string): void => ipcRenderer.send('clipboard:writeText', text),
+    readText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
+  },
+
   // Notification operations
   notification: {
     show: (title: string, body: string): void => ipcRenderer.send('notification:show', title, body),

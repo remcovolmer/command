@@ -7,6 +7,7 @@ import {
   Notification,
   Menu,
   powerMonitor,
+  clipboard,
 } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -32,6 +33,7 @@ import { AutomationService } from './services/AutomationService'
 import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
 import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
+import { sanitizeClipboardText } from './utils/clipboardLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { CommandServer } from './services/CommandServer'
@@ -1444,6 +1446,21 @@ ipcMain.handle('worktree:has-changes', async (_event, worktreeId: string) => {
 // IPC Handlers for Notifications
 ipcMain.on('notification:show', (_event, title: string, body: string) => {
   new Notification({ title, body }).show()
+})
+
+// IPC Handlers for clipboard operations.
+// The renderer runs on a file:// origin in the packaged app, which is not a
+// secure context, so navigator.clipboard is unavailable/blocked there. Routing
+// copy/paste through Electron's main-process clipboard module makes it work
+// regardless of renderer origin, secure context, or permission handlers.
+ipcMain.on('clipboard:writeText', (_event, text: unknown) => {
+  const safe = sanitizeClipboardText(text)
+  if (safe === null) return
+  clipboard.writeText(safe)
+})
+
+ipcMain.handle('clipboard:readText', async () => {
+  return clipboard.readText()
 })
 
 // IPC Handlers for Shell operations

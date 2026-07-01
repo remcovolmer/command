@@ -4,6 +4,10 @@ import {
   formatOversizeMessage,
   validateTerminalWritePayload,
 } from '../electron/main/utils/terminalWriteLimits'
+import {
+  MAX_CLIPBOARD_TEXT_BYTES,
+  sanitizeClipboardText,
+} from '../electron/main/utils/clipboardLimits'
 
 /**
  * Extracted validation logic matching the IPC handler in electron/main/index.ts (line ~484):
@@ -105,6 +109,37 @@ describe('validateTerminalWritePayload', () => {
     if (!result.ok && result.reason === 'too-large') {
       expect(result.limit).toBe(3)
       expect(result.size).toBe(5)
+    }
+  })
+})
+
+describe('sanitizeClipboardText', () => {
+  test('returns the string for normal selections', () => {
+    expect(sanitizeClipboardText('hello world')).toBe('hello world')
+  })
+
+  test('returns empty string unchanged (valid, in-bounds)', () => {
+    expect(sanitizeClipboardText('')).toBe('')
+  })
+
+  test('accepts payload at the inclusive limit', () => {
+    const data = 'x'.repeat(MAX_CLIPBOARD_TEXT_BYTES)
+    expect(sanitizeClipboardText(data)).toBe(data)
+  })
+
+  test('rejects payload one char over the limit', () => {
+    const data = 'x'.repeat(MAX_CLIPBOARD_TEXT_BYTES + 1)
+    expect(sanitizeClipboardText(data)).toBeNull()
+  })
+
+  test('respects a custom limit override', () => {
+    expect(sanitizeClipboardText('hello', 3)).toBeNull()
+    expect(sanitizeClipboardText('hi', 3)).toBe('hi')
+  })
+
+  test('rejects non-string types', () => {
+    for (const input of [null, undefined, 42, true, {}, [], Buffer.from('x')]) {
+      expect(sanitizeClipboardText(input)).toBeNull()
     }
   })
 })
