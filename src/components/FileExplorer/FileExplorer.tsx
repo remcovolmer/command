@@ -63,7 +63,7 @@ export function FileExplorer() {
   // File explorer root: worktree path when active, otherwise project path
   const fileTreeRootPath = activeWorktree?.path ?? activeProject?.path
   const fileTreeContextKey = activeWorktree?.id ?? activeProjectId
-  // 'project' type has limited functionality (no git, no sidecar)
+  // 'project' type has no git tab (files, Claude, and shell are available)
   const isLimitedProject = useMemo(() => activeProject?.type === 'project', [activeProject?.type])
 
   const handleFilesRefresh = () => {

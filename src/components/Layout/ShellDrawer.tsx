@@ -6,12 +6,11 @@ import { SidecarTerminalPanel } from '../FileExplorer/SidecarTerminalPanel'
 /**
  * Bottom shell drawer. Spans the center (chat + second panel), below the work
  * area. Scoped to the active chat's worktree-context (a shell belongs to a
- * working directory). Toggled from the activity-rail foot. Renders nothing for
- * limited projects or when there is no active context.
+ * working directory). Toggled from the activity-rail foot. Renders nothing
+ * when there is no active context.
  */
 export function ShellDrawer() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
-  const projects = useProjectStore((s) => s.projects)
 
   // Context follows the active chat's worktree (or the project root).
   const activeWorktree = useProjectStore((s) => {
@@ -41,9 +40,6 @@ export function ShellDrawer() {
     }))
   )
 
-  const activeProject = projects.find((p) => p.id === activeProjectId)
-  const isLimitedProject = activeProject?.type === 'project'
-
   // Auto-select the first shell when the context changes.
   useEffect(() => {
     if (
@@ -54,7 +50,7 @@ export function ShellDrawer() {
     }
   }, [contextKey, sidecarTerminals, activeSidecarTerminalId, setActiveSidecarTerminal])
 
-  if (!contextKey || !activeProjectId || isLimitedProject) return null
+  if (!contextKey || !activeProjectId) return null
   // Keep the bottom clean: render the bar + tabs only when a shell is active and
   // expanded. Otherwise nothing shows here — only the rail-foot toggle is visible.
   if (sidecarTerminals.length === 0 || sidecarTerminalCollapsed) return null

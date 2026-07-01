@@ -53,12 +53,14 @@ export function ActivityRail() {
   )
   const automationUnread = useAutomationUnreadCount()
 
-  // Limited ('project'-type) projects have no git; the old tab bar hid the Git
-  // tab (and its badge) for them via showGitTab. Mirror that: no git badge here.
+  // Limited ('project'-type) folders have no git tab. Tab switching now lives in
+  // this rail, so hide the Git entry entirely for them (not just its badge) —
+  // otherwise the icon would open the flyout on the files view.
   const isLimitedProject = useProjectStore((s) => {
     const project = s.projects.find((p) => p.id === s.activeProjectId)
     return project?.type === 'project'
   })
+  const items = isLimitedProject ? ITEMS.filter((i) => i.tab !== 'git') : ITEMS
 
   const counts: Record<ExplorerTab, number> = {
     files: 0,
@@ -95,7 +97,7 @@ export function ActivityRail() {
       </button>
       <div className="w-5 h-px bg-border my-1" />
 
-      {ITEMS.map(({ tab, icon: Icon, label }) => {
+      {items.map(({ tab, icon: Icon, label }) => {
         const active = visible && activeTab === tab
         const count = counts[tab]
         return (
