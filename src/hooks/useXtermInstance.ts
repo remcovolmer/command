@@ -295,7 +295,9 @@ export function useXtermInstance({
       if (event.ctrlKey && event.key === 'c') {
         const selection = terminal.getSelection()
         if (selection) {
-          navigator.clipboard.writeText(selection).catch(() => {})
+          // Electron-native clipboard: navigator.clipboard is unavailable in the
+          // packaged file:// renderer, so copy silently no-ops there.
+          api.clipboard.writeText(selection)
           return false
         }
         return true
@@ -303,7 +305,7 @@ export function useXtermInstance({
 
       if (event.ctrlKey && event.key === 'v') {
         event.preventDefault()
-        navigator.clipboard
+        api.clipboard
           .readText()
           .then((text) => {
             if (text && !isDisposedRef.current) {
