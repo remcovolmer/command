@@ -148,6 +148,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     },
     {
       label: project.type === 'code' ? 'Switch to Project' : 'Switch to Code',
+      shortcut: 'Ctrl+Shift+Y',
       onClick: () =>
         updateProject(project.id, { type: project.type === 'code' ? 'project' : 'code' }),
     },
