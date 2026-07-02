@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { getPRBadge } from '../src/utils/prBadge'
+import { getPRBadge, shouldShowMergeButton } from '../src/utils/prBadge'
 import type { PRStatus, PRCheckStatus } from '../src/types'
 
 function makeCheck(bucket: 'pass' | 'fail' | 'pending', name?: string): PRCheckStatus {
@@ -123,5 +123,55 @@ describe('getPRBadge — empty or missing check list', () => {
       makePRStatus({ statusCheckRollup: [], reviewDecision: 'REVIEW_REQUIRED' })
     )
     expect(badge).toEqual({ kind: 'review', label: 'review' })
+  })
+})
+
+describe('shouldShowMergeButton — button hidden only for hard blocks', () => {
+  test('mergeable MERGEABLE, open PR shows the button', () => {
+    expect(shouldShowMergeButton(makePRStatus())).toBe(true)
+  })
+
+  test('CONFLICTING is the only mergeability that hides the button', () => {
+    expect(shouldShowMergeButton(makePRStatus({ mergeable: 'CONFLICTING' }))).toBe(false)
+  })
+
+  test('UNKNOWN mergeability still shows the button (lazy compute after push)', () => {
+    expect(shouldShowMergeButton(makePRStatus({ mergeable: 'UNKNOWN' }))).toBe(true)
+  })
+
+  test('absent mergeability shows the button (only CONFLICTING is a hard block)', () => {
+    expect(shouldShowMergeButton(makePRStatus({ mergeable: undefined }))).toBe(true)
+  })
+
+  // Regression: a transient gh failure marks the row stale (PR #127). The badge
+  // stays but the button must NOT disappear — the merge validates live via gh.
+  test('stale row with mergeable data still shows the button', () => {
+    expect(shouldShowMergeButton(makePRStatus({ stale: true }))).toBe(true)
+  })
+
+  test('stale + UNKNOWN still shows the button', () => {
+    expect(shouldShowMergeButton(makePRStatus({ stale: true, mergeable: 'UNKNOWN' }))).toBe(true)
+  })
+
+  test('stale + CONFLICTING stays hidden', () => {
+    expect(shouldShowMergeButton(makePRStatus({ stale: true, mergeable: 'CONFLICTING' }))).toBe(
+      false
+    )
+  })
+
+  test('no PR hides the button', () => {
+    expect(shouldShowMergeButton(makePRStatus({ noPR: true }))).toBe(false)
+  })
+
+  test('undefined status hides the button', () => {
+    expect(shouldShowMergeButton(undefined)).toBe(false)
+  })
+
+  test('CLOSED PR hides the button', () => {
+    expect(shouldShowMergeButton(makePRStatus({ state: 'CLOSED' }))).toBe(false)
+  })
+
+  test('MERGED PR hides the button', () => {
+    expect(shouldShowMergeButton(makePRStatus({ state: 'MERGED' }))).toBe(false)
   })
 })

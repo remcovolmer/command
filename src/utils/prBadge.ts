@@ -40,3 +40,25 @@ export function getPRBadge(prStatus: PRStatus): PRBadge | null {
 
   return { kind: 'ready', label: '✓ klaar' }
 }
+
+/**
+ * Whether the worktree PR row should offer a Merge & Squash button.
+ *
+ * Shows for any open PR that GitHub does not report as CONFLICTING. Two states
+ * that used to hide the button now qualify on purpose:
+ *   - `mergeable: 'UNKNOWN'` — GitHub computes mergeability lazily/asynchronously
+ *     and returns UNKNOWN right after a PR is created and after every push, until
+ *     the next poll resolves it. A strict `=== 'MERGEABLE'` gate made the button
+ *     vanish during that recurring window.
+ *   - `stale` — the last poll failed, so we show last-known-good data dimmed.
+ *
+ * Both are safe to offer: the merge runs `gh pr merge` against GitHub's *live*
+ * state (never the cached status here), and handleMerge's confirm dialog
+ * re-derives failing/pending-check and uncommitted-change warnings at click
+ * time. Those are the real guardrails; CONFLICTING is the only hard block.
+ */
+export function shouldShowMergeButton(prStatus: PRStatus | undefined): boolean {
+  if (!prStatus || prStatus.noPR) return false
+  if (prStatus.state !== 'OPEN') return false
+  return prStatus.mergeable !== 'CONFLICTING'
+}
