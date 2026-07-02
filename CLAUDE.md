@@ -210,6 +210,8 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + Shift + P` | Toggle collapse active project |
 | `Ctrl + Alt + P` | Pin or unpin the active project |
 | `Ctrl + Shift + J` | Show/hide inactive worktrees (active project) |
+| `F2` | Rename the active project (when sidebar focused) |
+| `Ctrl + Shift + Y` | Toggle active project type (Project/Code) |
 
 ### UI & Settings
 | Shortcut | Action |

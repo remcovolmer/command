@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import {
   Plus,
@@ -77,6 +77,11 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     (s) => s.inactiveWorktreesExpanded[project.id] ?? false
   )
   const toggleInactiveWorktrees = useProjectStore((s) => s.toggleInactiveWorktrees)
+  const renamingProjectId = useProjectStore((s) => s.renamingProjectId)
+  const startProjectRename = useProjectStore((s) => s.startProjectRename)
+  const cancelProjectRename = useProjectStore((s) => s.cancelProjectRename)
+  const commitProjectRename = useProjectStore((s) => s.commitProjectRename)
+  const updateProject = useProjectStore((s) => s.updateProject)
   const hasMismatch = useProjectStore((s) => {
     const authMode = project.settings?.authMode ?? 'subscription'
     const profileId = project.settings?.profileId
@@ -95,6 +100,31 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
+  // Inline rename state. renamingProjectId lives in the store so the F2 hotkey
+  // and the context menu can both drive the same edit; only one row edits at a time.
+  const isRenaming = renamingProjectId === project.id
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
+  const renameSubmittedRef = useRef(false)
+
+  useEffect(() => {
+    if (isRenaming) {
+      renameSubmittedRef.current = false
+      setRenameValue(project.name)
+      // Focus + select on the next frame, after the input mounts.
+      requestAnimationFrame(() => {
+        renameInputRef.current?.focus()
+        renameInputRef.current?.select()
+      })
+    }
+  }, [isRenaming, project.name])
+
+  const handleRenameSubmit = () => {
+    if (renameSubmittedRef.current) return
+    renameSubmittedRef.current = true
+    commitProjectRename(renameValue)
+  }
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -110,6 +140,16 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         if (!isActive) setActiveProject(project.id)
         setProjectOverviewVisible(true)
       },
+    },
+    {
+      label: 'Rename',
+      shortcut: 'F2',
+      onClick: () => startProjectRename(project.id),
+    },
+    {
+      label: project.type === 'code' ? 'Switch to Project' : 'Switch to Code',
+      onClick: () =>
+        updateProject(project.id, { type: project.type === 'code' ? 'project' : 'code' }),
     },
     {
       label: project.pinned ? 'Unpin' : 'Pin to top',
@@ -239,10 +279,39 @@ export const SortableProjectItem = memo(function SortableProjectItem({
           <FolderOpen className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
         )}
         {/* Name grows to fill the row so it truncates as late as possible; the
-            chevron and right-side cluster are pushed to the right edge. */}
-        <span className="flex-1 text-sm truncate min-w-0" title={project.path}>
-          {project.name}
-        </span>
+            chevron and right-side cluster are pushed to the right edge. While
+            renaming, an inline input replaces the label. */}
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') handleRenameSubmit()
+              if (e.key === 'Escape') {
+                // Guard the impending blur so it doesn't commit the edit.
+                renameSubmittedRef.current = true
+                cancelProjectRename()
+              }
+            }}
+            onBlur={handleRenameSubmit}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="flex-1 min-w-0 bg-input border border-border rounded px-1 py-0 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          />
+        ) : (
+          <span
+            className="flex-1 text-sm truncate min-w-0"
+            title={project.path}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              startProjectRename(project.id)
+            }}
+          >
+            {project.name}
+          </span>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation()

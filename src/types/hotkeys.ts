@@ -75,6 +75,7 @@ export type HotkeyAction =
   | 'sidebar.toggleProjectCollapse'
   | 'sidebar.pinProject'
   | 'sidebar.toggleInactiveWorktrees'
+  | 'sidebar.toggleProjectType'
   // UI & Settings
   | 'ui.openSettings'
   | 'ui.toggleTheme'

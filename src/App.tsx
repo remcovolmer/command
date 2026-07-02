@@ -82,6 +82,20 @@ function App() {
     }
   }, [])
 
+  // Shared F2 rename dispatcher. The file explorer wins when it has focus;
+  // otherwise the active sidebar project is renamed. useHotkeys fires only the
+  // first matching handler, so both rename actions point at this one function.
+  const renameFocusedItem = () => {
+    const store = useProjectStore.getState()
+    if (document.querySelector('[data-file-explorer]:focus-within')) {
+      if (store.fileExplorerSelectedPath) store.startRename(store.fileExplorerSelectedPath)
+      return
+    }
+    if (document.querySelector('[data-sidebar]:focus-within') && store.activeProjectId) {
+      store.startProjectRename(store.activeProjectId)
+    }
+  }
+
   // Register all hotkeys
   useHotkeys({
     // Navigation
@@ -251,14 +265,7 @@ function App() {
       const parentPath = fileExplorerSelectedPath ?? project.path
       useProjectStore.getState().startCreate(parentPath, 'directory')
     },
-    'fileExplorer.rename': () => {
-      // Only fire when file explorer has focus
-      if (!document.querySelector('[data-file-explorer]:focus-within')) return
-      const { fileExplorerSelectedPath } = useProjectStore.getState()
-      if (fileExplorerSelectedPath) {
-        useProjectStore.getState().startRename(fileExplorerSelectedPath)
-      }
-    },
+    'fileExplorer.rename': renameFocusedItem,
     'fileExplorer.delete': () => {
       // Only fire when file explorer has focus
       if (!document.querySelector('[data-file-explorer]:focus-within')) return
@@ -402,6 +409,14 @@ function App() {
       const { activeProjectId, toggleInactiveWorktrees } = useProjectStore.getState()
       if (!activeProjectId) return
       toggleInactiveWorktrees(activeProjectId)
+    },
+
+    'sidebar.toggleProjectType': () => {
+      const { activeProjectId, projects, updateProject } = useProjectStore.getState()
+      if (!activeProjectId) return
+      const project = projects.find((p) => p.id === activeProjectId)
+      if (!project) return
+      updateProject(activeProjectId, { type: project.type === 'code' ? 'project' : 'code' })
     },
 
     // UI & Settings

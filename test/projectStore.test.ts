@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Captures the partialize option passed to persist so the persist contract is testable
 const persistCapture = vi.hoisted(() => ({
@@ -816,5 +816,45 @@ describe('projectStore toggleInactiveSectionCollapsed pinned fallback', () => {
     useProjectStore.getState().toggleInactiveSectionCollapsed()
 
     expect(useProjectStore.getState().activeProjectId).toBe('a')
+  })
+})
+
+describe('sidebar project rename state', () => {
+  // commitProjectRename delegates to updateProject; swap it for a spy so the
+  // commit logic is tested in isolation, then restore it for other suites.
+  const realUpdateProject = useProjectStore.getState().updateProject
+
+  afterEach(() => {
+    useProjectStore.setState({ updateProject: realUpdateProject, renamingProjectId: null })
+  })
+
+  test('startProjectRename sets the id and cancelProjectRename clears it', () => {
+    useProjectStore.getState().startProjectRename('proj-1')
+    expect(useProjectStore.getState().renamingProjectId).toBe('proj-1')
+    useProjectStore.getState().cancelProjectRename()
+    expect(useProjectStore.getState().renamingProjectId).toBeNull()
+  })
+
+  test('commitProjectRename with a valid name trims, persists, and clears edit state', () => {
+    const updateSpy = vi.fn()
+    useProjectStore.setState({ renamingProjectId: 'proj-1', updateProject: updateSpy })
+    useProjectStore.getState().commitProjectRename('  New Name  ')
+    expect(useProjectStore.getState().renamingProjectId).toBeNull()
+    expect(updateSpy).toHaveBeenCalledWith('proj-1', { name: 'New Name' })
+  })
+
+  test('commitProjectRename with a blank name cancels without persisting', () => {
+    const updateSpy = vi.fn()
+    useProjectStore.setState({ renamingProjectId: 'proj-1', updateProject: updateSpy })
+    useProjectStore.getState().commitProjectRename('   ')
+    expect(useProjectStore.getState().renamingProjectId).toBeNull()
+    expect(updateSpy).not.toHaveBeenCalled()
+  })
+
+  test('commitProjectRename is a no-op when no project is being renamed', () => {
+    const updateSpy = vi.fn()
+    useProjectStore.setState({ renamingProjectId: null, updateProject: updateSpy })
+    useProjectStore.getState().commitProjectRename('New')
+    expect(updateSpy).not.toHaveBeenCalled()
   })
 })
