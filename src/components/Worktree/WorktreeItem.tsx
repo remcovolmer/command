@@ -5,7 +5,12 @@ import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { STATE_DOT_COLORS, isAttentionState, isVisibleState } from '../../utils/terminalState'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
-import { getPRBadge, type PRBadge, type PRBadgeKind } from '../../utils/prBadge'
+import {
+  getPRBadge,
+  shouldShowMergeButton,
+  type PRBadge,
+  type PRBadgeKind,
+} from '../../utils/prBadge'
 import { AttentionChip, AttentionRail, attentionRowBg, CHIP_BASE } from '../Sidebar/AttentionRail'
 
 interface WorktreeItemProps {
@@ -294,14 +299,11 @@ export const WorktreeItem = memo(function WorktreeItem({
     }
   }, [terminal, onSelectTerminal, onCreateTerminal])
 
-  // Merge button visibility (show for any open, conflict-free PR with fresh data)
-  // Hide while stale so the destructive merge can't fire against acknowledged-stale checks.
-  const showMergeButton =
-    prStatus &&
-    !prStatus.noPR &&
-    prStatus.state === 'OPEN' &&
-    prStatus.mergeable === 'MERGEABLE' &&
-    !prStatus.stale
+  // Merge button visibility: any open PR that isn't CONFLICTING. UNKNOWN
+  // mergeability (lazy compute after a push) and stale rows (last poll failed)
+  // still get the button — the merge runs against GitHub's live state via gh
+  // and handleMerge's confirm dialog is the guardrail. See shouldShowMergeButton.
+  const showMergeButton = shouldShowMergeButton(prStatus)
 
   const hasPR = prStatus && !prStatus.noPR && prStatus.state === 'OPEN'
 
