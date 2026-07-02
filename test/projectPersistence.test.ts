@@ -285,3 +285,41 @@ describe('ProjectPersistence v6→v7 migration (workspace type → pinned projec
     expect(rerun.projects[0].pinned).toBe(true)
   })
 })
+
+describe('ProjectPersistence.updateProject — type changes', () => {
+  let persistence: ProjectPersistence
+
+  beforeEach(() => {
+    persistence = new ProjectPersistence()
+  })
+
+  // Seed the private state so updateProject has a project to mutate.
+  function seed(project: Record<string, unknown>) {
+    ;(persistence as unknown as { state: { projects: unknown[] } }).state.projects = [project]
+  }
+
+  test('updates type to a valid value', () => {
+    seed(makeProject({ id: 'p1', type: 'project' }))
+    const result = persistence.updateProject('p1', { type: 'code' })
+    expect(result?.type).toBe('code')
+  })
+
+  test('ignores an invalid type value', () => {
+    seed(makeProject({ id: 'p1', type: 'code' }))
+    const result = persistence.updateProject('p1', { type: 'bogus' as never })
+    expect(result?.type).toBe('code')
+  })
+
+  test('updates name and type together in one call', () => {
+    seed(makeProject({ id: 'p1', name: 'Old', type: 'project' }))
+    const result = persistence.updateProject('p1', { name: 'New', type: 'code' })
+    expect(result?.name).toBe('New')
+    expect(result?.type).toBe('code')
+  })
+
+  test('returns null for an unknown id', () => {
+    seed(makeProject({ id: 'p1', type: 'code' }))
+    const result = persistence.updateProject('does-not-exist', { type: 'project' })
+    expect(result).toBeNull()
+  })
+})

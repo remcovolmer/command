@@ -270,7 +270,7 @@ export interface ElectronAPI {
     remove: (id: string) => Promise<void>
     update: (
       id: string,
-      updates: Partial<Pick<Project, 'name' | 'settings'>>
+      updates: Partial<Pick<Project, 'name' | 'settings' | 'type'>>
     ) => Promise<Project | null>
     setPinned: (id: string, pinned: boolean) => Promise<Project | null>
     selectFolder: () => Promise<string | null>

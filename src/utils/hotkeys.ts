@@ -325,6 +325,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'sidebar',
     enabled: true,
   },
+  'sidebar.toggleProjectType': {
+    key: 'y',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle active project type (Project/Code)',
+    category: 'sidebar',
+    enabled: true,
+  },
 
   // UI & Settings
   'ui.openSettings': {

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Rename &amp; Type Switch - Plan</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --canvas: #ffffff;
+    --fg: #1c1c1a;
+    --muted: #6a6a63;
+    --border: #e2e2dc;
+    --accent: #2f6f4f;
+    --accent-soft: #e7f1ea;
+    --accent-text: #235c40;
+    --warn-soft: #fbf1e3;
+    --warn-text: #8a5316;
+    --info-soft: #e8eef6;
+    --info-text: #2c4a72;
+    --chip-bg: #eeeeE8;
+    --code-bg: #f0f0eb;
+    --radius: 8px;
+    --measure: 72ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a;
+      --canvas: #1f2124;
+      --fg: #e8e8e4;
+      --muted: #9a9a92;
+      --border: #33353a;
+      --accent: #6cc49a;
+      --accent-soft: #1e2f27;
+      --accent-text: #8fd8b3;
+      --warn-soft: #33291a;
+      --warn-text: #e0b078;
+      --info-soft: #1e2733;
+      --info-text: #9dbbe0;
+      --chip-bg: #2a2c30;
+      --code-bg: #26282c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 940px; margin-inline: auto; padding: 40px 28px 80px; }
+  .page > section, .page > header { background: var(--canvas); }
+  header.doc { border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 30px; margin-bottom: 22px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 8px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 21px; margin: 0 0 14px; letter-spacing: -.01em; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 26px 0 10px; }
+  p { max-width: var(--measure); }
+  a { color: var(--accent-text); }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font: 13px/1.5 "SF Mono", "Cascadia Code", Consolas, monospace; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .meta .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--chip-bg); color: var(--muted); border: 1px solid var(--border); display: inline-flex; gap: 6px; align-items: center; }
+  .meta .pill b { color: var(--fg); font-weight: 600; }
+  .meta .pill.ready { background: var(--accent-soft); color: var(--accent-text); border-color: color-mix(in srgb, var(--accent-text) 22%, transparent); }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 14px 30px; margin-bottom: 22px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; }
+  nav.toc a { color: var(--muted); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent-text); }
+  section.block { border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 30px; margin-bottom: 22px; }
+  ul { padding-left: 0; list-style: none; margin: 0; }
+  ul.plain li { max-width: var(--measure); margin: 0 0 9px; padding-left: 22px; position: relative; }
+  ul.plain li::before { content: "–"; position: absolute; left: 4px; color: var(--muted); }
+  ul.check li { max-width: var(--measure); margin: 0 0 9px; padding-left: 26px; position: relative; }
+  ul.check li::before { content: "\2713"; position: absolute; left: 4px; color: var(--accent-text); font-weight: 700; }
+  .req { display: flex; gap: 12px; margin: 0 0 12px; max-width: var(--measure); }
+  .idchip { flex: 0 0 auto; font: 600 12px/1.6 "SF Mono", Consolas, monospace; background: var(--accent-soft); color: var(--accent-text); border-radius: 5px; padding: 2px 8px; height: fit-content; border: 1px solid color-mix(in srgb, var(--accent-text) 22%, transparent); }
+  .req p { margin: 0; }
+  .group-label { font-weight: 700; font-size: 14px; margin: 22px 0 12px; color: var(--fg); }
+  .group-label:first-of-type { margin-top: 4px; }
+  .card { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin: 0 0 12px; background: var(--canvas); }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; color: var(--fg); }
+  .card .kd-id { color: var(--accent-text); font: 600 12px/1 monospace; margin-right: 8px; }
+  .flow { margin: 0 0 16px; max-width: var(--measure); }
+  .flow .lead { font-weight: 600; }
+  .flow ol { margin: 6px 0 0; padding-left: 20px; }
+  .flow ol li { margin: 0 0 4px; }
+  .covers { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .ae { border-left: 3px solid var(--border); padding: 4px 0 4px 16px; margin: 0 0 16px; max-width: var(--measure); }
+  .ae .ae-id { font: 600 12px/1 monospace; color: var(--accent-text); }
+  .ae .covers { margin-left: 6px; }
+  .ae p { margin: 6px 0 0; }
+  .callout { border-radius: var(--radius); padding: 14px 18px; margin: 0 0 12px; max-width: var(--measure); }
+  .callout .lbl { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 6px; }
+  .callout.info { background: var(--info-soft); } .callout.info .lbl { color: var(--info-text); }
+  .callout.warn { background: var(--warn-soft); } .callout.warn .lbl { color: var(--warn-text); }
+  .callout p { margin: 0; }
+  .capsule dl { margin: 0; display: grid; grid-template-columns: 160px 1fr; gap: 10px 20px; }
+  .capsule dt { font-weight: 600; color: var(--muted); font-size: 14px; }
+  .capsule dd { margin: 0; max-width: var(--measure); }
+  /* Implementation units */
+  .unit { border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin: 0 0 14px; }
+  .unit .uhead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .unit .uid { font: 700 13px/1 "SF Mono", Consolas, monospace; background: var(--accent-soft); color: var(--accent-text); border: 1px solid color-mix(in srgb, var(--accent-text) 22%, transparent); border-radius: 5px; padding: 3px 8px; }
+  .unit h3.utitle { text-transform: none; letter-spacing: 0; color: var(--fg); font-size: 16px; margin: 0; }
+  .unit dl.strip { display: grid; grid-template-columns: 120px 1fr; gap: 7px 16px; margin: 0 0 8px; }
+  .unit dl.strip dt { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .unit dl.strip dd { margin: 0; max-width: var(--measure); }
+  .unit dl.strip dd code { font-size: 12px; }
+  .unit details { border-top: 1px solid var(--border); margin-top: 6px; }
+  .unit details summary { cursor: pointer; padding: 8px 0 4px; font-size: 13px; font-weight: 600; color: var(--accent-text); list-style-position: inside; }
+  .unit details[open] summary { margin-bottom: 4px; }
+  .unit details .body { padding: 2px 0 8px; }
+  .unit details .body p { margin: 0 0 6px; }
+  .unit details ul.plain li { margin-bottom: 6px; }
+  .exec { background: var(--warn-soft); border-radius: 6px; padding: 8px 12px; margin: 8px 0; max-width: var(--measure); font-size: 14px; }
+  .exec b { color: var(--warn-text); }
+  .directional { font-size: 12.5px; color: var(--muted); font-style: italic; max-width: var(--measure); margin: 4px 0 0; }
+  /* Wireframe */
+  .wire-wrap { display: flex; gap: 20px; flex-wrap: wrap; margin: 8px 0 10px; }
+  .wire { flex: 1 1 320px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); padding: 14px; font-size: 13px; }
+  .wire .wtitle { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+  .wrow { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 6px; }
+  .wrow.sel { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .wbox { background: var(--chip-bg); border: 1px solid var(--border); border-radius: 3px; }
+  .wicon { width: 15px; height: 15px; flex: 0 0 auto; }
+  .wname { height: 13px; width: 96px; }
+  .winput { flex: 1; border: 1.5px solid var(--accent); border-radius: 4px; padding: 3px 7px; background: var(--canvas); font-size: 13px; color: var(--fg); }
+  .wmenu { margin-top: 4px; background: var(--canvas); border: 1px solid var(--border); border-radius: 6px; padding: 5px 0; box-shadow: 0 6px 20px rgba(0,0,0,.12); width: 210px; }
+  .wmenu .mi { padding: 6px 14px; display: flex; justify-content: space-between; }
+  .wmenu .mi.hi { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .wmenu .mi .sc { color: var(--muted); font-size: 11px; }
+  .wmenu .sep { height: 1px; background: var(--border); margin: 5px 0; }
+  .wmenu .danger { color: #b4462f; }
+  footer.composition-signal { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+  footer.composition-signal code { font-size: 12px; }
+  hr.sec { border: none; border-top: 1px solid var(--border); margin: 0 0 22px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc">
+  <p class="eyebrow">Unified plan · implementation-ready</p>
+  <h1 id="top">Project Rename &amp; Type Switch - Plan</h1>
+  <p style="color:var(--muted); margin:0; max-width:var(--measure);">In-place rename and Project&nbsp;⇄&nbsp;Code type switching for sidebar projects in Command.</p>
+  <div class="meta">
+    <span class="pill"><b>type</b> feat</span>
+    <span class="pill"><b>date</b> <time datetime="2026-07-02">2026-07-02</time></span>
+    <span class="pill"><b>topic</b> project-rename-and-type-switch</span>
+    <span class="pill"><b>execution</b> code</span>
+    <span class="pill"><b>artifact_contract</b> ce-unified-plan/v1</span>
+    <span class="pill ready"><b>artifact_readiness</b> implementation-ready</span>
+    <span class="pill"><b>product_contract_source</b> ce-brainstorm</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#goal-capsule">Goal Capsule</a>
+  <a href="#product-contract">Product Contract</a>
+  <a href="#planning-contract">Planning Contract</a>
+  <a href="#implementation-units">Implementation Units</a>
+  <a href="#verification-contract">Verification Contract</a>
+  <a href="#definition-of-done">Definition of Done</a>
+  <a href="#sources">Sources</a>
+</nav>
+
+<section class="block capsule" id="goal-capsule">
+  <h2>Goal Capsule</h2>
+  <dl>
+    <dt>Objective</dt>
+    <dd>Make sidebar projects editable in place — rename the display name and switch a project between the <strong>Project</strong> and <strong>Code</strong> types — without leaving the sidebar, touching the filesystem, or restarting sessions.</dd>
+    <dt>Product authority</dt>
+    <dd>Remco — in-session dialogue, 2026-07-02.</dd>
+    <dt>Open blockers</dt>
+    <dd>None. Both prior deferred questions (F2 binding scope, type-switch hotkey) were resolved during planning — see KTD3 and KTD5.</dd>
+  </dl>
+</section>
+
+<hr class="sec">
+
+<section class="block" id="product-contract">
+  <h2>Product Contract</h2>
+  <p style="font-size:13.5px; color:var(--muted); margin-top:-4px;"><strong>Product Contract preservation:</strong> unchanged. All R-IDs, flows, and acceptance examples are carried verbatim from the requirements-only version; planning added the HOW below without altering product scope.</p>
+
+  <h3>Summary</h3>
+  <p>Add in-place project rename (inline row edit via double-click, <code>F2</code>, or a context-menu <em>Rename</em> entry) and a single context-menu toggle that switches a project between Project and Code. Both are label/config edits — nothing on disk moves and no Claude session or terminal restarts.</p>
+
+  <h3>Problem Frame</h3>
+  <p>A project's name is fixed to the folder basename when it is added, and its type — <code>project</code> (Files&nbsp;+&nbsp;Claude) or <code>code</code> (full dev tools) — is chosen once in the Add Project dialog. Neither can change afterward. A folder with an awkward or ambiguous name is stuck with that label in the sidebar, and a project added as the wrong type has to be removed and re-added to get the right panels (git tab, sidecar shell). The rename path already exists end-to-end in the backend but has no way to trigger it from the UI; type has no edit path at all.</p>
+
+  <h3>Key Product Decisions</h3>
+  <div class="card"><h4><span class="kd-id">KD1</span>Rename is a display label, decoupled from disk</h4><p>The name lives only in Command's project record. The folder path, worktrees, and running sessions are never touched. Accepted cost: the sidebar name can diverge from the actual folder name.</p></div>
+  <div class="card"><h4><span class="kd-id">KD2</span>One-click type toggle, not a submenu</h4><p>Only two types exist, so a single context-menu item that flips to the other type is simpler and faster than a submenu or radio group.</p></div>
+  <div class="card"><h4><span class="kd-id">KD3</span>Type switch is reactive — no restart</h4><p>Panel visibility (git tab, sidecar shell, activity rail) is already derived from the project's type at render time, so switching updates the UI immediately without respawning terminals or Claude sessions.</p></div>
+  <div class="card"><h4><span class="kd-id">KD4</span>Inline edit mirrors the file-explorer rename</h4><p>Double-click / <code>F2</code> to start, Enter to commit, Esc to cancel — the same interaction the file explorer already uses for renaming files, so the pattern is familiar and consistent.</p></div>
+
+  <h3 id="product-requirements">Requirements</h3>
+
+  <p class="group-label">Rename</p>
+  <div class="req"><span class="idchip" id="r1">R1</span><p>A project's name can be edited inline from the sidebar: double-clicking the name, or pressing <code>F2</code> while the project is active, replaces it with a text input pre-filled with the current name.</p></div>
+  <div class="req"><span class="idchip" id="r2">R2</span><p>The project right-click context menu includes a <em>Rename</em> entry that starts the same inline edit.</p></div>
+  <div class="req"><span class="idchip" id="r3">R3</span><p>Enter or blur commits the edit; Esc cancels and restores the previous name. A blank or whitespace-only value is rejected and the previous name is kept.</p></div>
+  <div class="req"><span class="idchip" id="r4">R4</span><p>Renaming changes only the display name. The folder path, worktrees, and running sessions are unaffected, and duplicate names across projects are allowed.</p></div>
+
+  <p class="group-label">Change type</p>
+  <div class="req"><span class="idchip" id="r5">R5</span><p>The project context menu includes one toggle entry that switches the project to the other type: <em>Switch to Code</em> when it is currently a Project, <em>Switch to Project</em> when it is currently Code.</p></div>
+  <div class="req"><span class="idchip" id="r6">R6</span><p>The switch takes effect immediately with no session or terminal restart; the sidebar icon, git tab, sidecar shell, and activity rail reflect the new type reactively.</p></div>
+  <div class="req"><span class="idchip" id="r7">R7</span><p>Switching Code&nbsp;→&nbsp;Project hides the git tab and sidecar shell and falls back to the files tab; switching back restores them. No confirmation or warning is shown on the downgrade.</p></div>
+
+  <p class="group-label">Persistence &amp; consistency</p>
+  <div class="req"><span class="idchip" id="r8">R8</span><p>Name and type changes persist across app restarts and stay consistent everywhere the project is shown — sidebar row, project overview, and the type icon (folder vs. code glyph).</p></div>
+
+  <h3>Wireframe — sidebar row edit &amp; context menu</h3>
+  <div class="wire-wrap">
+    <div class="wire">
+      <div class="wtitle">Row in rename (edit) state</div>
+      <div class="wrow"><span class="wbox wicon"></span><span class="wbox wname"></span></div>
+      <div class="wrow sel"><span class="wbox wicon"></span><input class="winput" value="My App" readonly aria-label="rename field placeholder"></div>
+      <div class="wrow"><span class="wbox wicon"></span><span class="wbox wname" style="width:70px"></span></div>
+    </div>
+    <div class="wire">
+      <div class="wtitle">Right-click context menu</div>
+      <div class="wmenu">
+        <div class="mi">Show overview</div>
+        <div class="mi hi">Rename <span class="sc">F2</span></div>
+        <div class="mi">Switch to Code</div>
+        <div class="sep"></div>
+        <div class="mi">Pin to top</div>
+        <div class="mi">Open in File Explorer</div>
+        <div class="sep"></div>
+        <div class="mi danger">Remove project</div>
+      </div>
+    </div>
+  </div>
+  <p class="directional">Directional only — illustrates the intended user-facing shape. Exact colors, spacing, copy, ordering, and component choices are placeholders for review, not requirements.</p>
+
+  <h3>Key Flows</h3>
+  <div class="flow">
+    <p class="lead">F1. Rename a project <span class="covers">· Covers R1–R4</span></p>
+    <ol>
+      <li><strong>Trigger:</strong> double-click the name, press <code>F2</code> on the active project, or pick <em>Rename</em> from the context menu.</li>
+      <li>The name becomes a text input pre-filled with the current name, text selected.</li>
+      <li>User edits. Enter or blur commits; a blank value is rejected and the previous name kept. Esc cancels.</li>
+      <li>The sidebar row shows the new name; the folder on disk is untouched.</li>
+    </ol>
+  </div>
+  <div class="flow">
+    <p class="lead">F2. Switch a project's type <span class="covers">· Covers R5–R7</span></p>
+    <ol>
+      <li><strong>Trigger:</strong> pick <em>Switch to Code</em> / <em>Switch to Project</em> from the context menu.</li>
+      <li>The type flips on the project record and persists.</li>
+      <li>The UI re-renders reactively: icon updates, and the git tab / sidecar / activity rail appear or hide per the new type.</li>
+      <li>On a Code&nbsp;→&nbsp;Project downgrade, if the git tab was active the view falls back to the files tab. Running chats and terminals are unaffected.</li>
+    </ol>
+  </div>
+
+  <h3 id="acceptance">Acceptance Examples</h3>
+  <div class="ae"><span class="ae-id">AE1</span><span class="covers">· Covers R3</span><p><strong>Blank name rejected.</strong> Start a rename, clear the field, press Enter → the edit closes and the previous name is retained.</p></div>
+  <div class="ae"><span class="ae-id">AE2</span><span class="covers">· Covers R3</span><p><strong>Esc cancels.</strong> Start a rename, type a different name, press Esc → the previous name is retained, no update is persisted.</p></div>
+  <div class="ae"><span class="ae-id">AE3</span><span class="covers">· Covers R4</span><p><strong>No disk impact.</strong> Rename a project whose folder is <code>foo</code> to "My App" → the folder on disk stays <code>foo</code>, worktrees resolve, and any running chat keeps working.</p></div>
+  <div class="ae"><span class="ae-id">AE4</span><span class="covers">· Covers R6, R7</span><p><strong>Downgrade hides git tab.</strong> On a Code project with the git tab active, choose <em>Switch to Project</em> → the git tab is hidden, the files tab is shown, no warning appears. Choosing <em>Switch to Code</em> restores the git tab.</p></div>
+  <div class="ae"><span class="ae-id">AE5</span><span class="covers">· Covers R6</span><p><strong>No restart on switch.</strong> Switch a project's type while a Claude chat is running in it → the chat and its PTY are unaffected.</p></div>
+
+  <h3 id="scope">Scope Boundaries</h3>
+  <ul class="plain">
+    <li>Renaming the folder on disk — and the resulting path, worktree, and session rewrite — is out of scope.</li>
+    <li>No new project types beyond Project and Code.</li>
+    <li>No bulk rename or bulk type-change across multiple projects.</li>
+    <li>Worktree renaming is unchanged; it is a separate concept with its own naming.</li>
+  </ul>
+
+  <h3>Assumptions</h3>
+  <div class="req"><span class="idchip">A1</span><p>Changing type is a config-only update to the persisted project record — no data migration and no filesystem change.</p></div>
+  <div class="req"><span class="idchip">A2</span><p>Type already drives panel visibility through a reactive selector (<code>isLimitedProject</code> in <code>FileExplorer.tsx</code>; <code>ActivityRail.tsx</code>), so no imperative teardown/rebuild is needed on switch. Verified in code.</p></div>
+</section>
+
+<hr class="sec">
+
+<section class="block" id="planning-contract">
+  <h2>Planning Contract</h2>
+
+  <h3>Approach</h3>
+  <p>The rename backend already exists end-to-end for the <code>name</code> field (<code>project:update</code> IPC → <code>ProjectPersistence.updateProject</code> → store <code>updateProject</code>). The work is: (1) extend that same update path to also accept <code>type</code>; (2) add store-level rename state mirroring the file explorer's <code>startRename</code> pattern so a global <code>F2</code> can drive the active project's row; (3) build the inline-edit UI and the two context-menu entries in the sidebar row; (4) register the two hotkeys. No new IPC channels, no schema/persistence-shape changes, no migration.</p>
+
+  <h3>Key Technical Decisions</h3>
+  <div class="card"><h4><span class="kd-id">KTD1</span>Extend the existing <code>project:update</code> path for <code>type</code></h4><p>Add <code>type</code> to the four places the name update already flows through — <code>ProjectPersistence.updateProject</code>, the <code>project:update</code> IPC <code>allowedUpdates</code> whitelist (validating <code>'project' | 'code'</code> only), the <code>electronAPI.project.update</code> signature, and the store's <code>updateProject</code> <code>Pick&lt;&gt;</code>. One validated channel; no new surface.</p></div>
+  <div class="card"><h4><span class="kd-id">KTD2</span>Rename state lives in the store, not local component state</h4><p>Mirror the file explorer's <code>startRename</code> / <code>fileExplorerRenamingPath</code> pattern with a <code>renamingProjectId</code> and a <code>startProjectRename(id)</code> action. This lets the global <code>F2</code> handler (in <code>App.tsx</code>) and the double-click / context-menu triggers all route through one action, and lets exactly one row be in edit mode at a time.</p></div>
+  <div class="card"><h4><span class="kd-id">KTD3</span><code>F2</code> is shared with file-explorer rename — dispatch by focus zone (resolves prior Q1)</h4><p>Bind <code>F2</code> to a new <code>sidebar.renameProject</code> action whose handler renames the active project only when the sidebar is the focused zone; the existing <code>fileExplorer.rename</code> handler already no-ops without a selected file. If the hotkey conflict detector rejects a duplicate <code>F2</code> across categories, collapse to a single <code>F2</code> handler that branches on the active focus zone. Double-click and the context-menu <em>Rename</em> entry remain the primary, unambiguous triggers.</p></div>
+  <div class="card"><h4><span class="kd-id">KTD4</span>Type switch needs no imperative teardown</h4><p><code>isLimitedProject</code> (FileExplorer) and ActivityRail derive from <code>project.type</code> via reactive Zustand selectors; flipping the persisted type re-renders the affected panels. FileExplorer already falls back to the files tab when the git tab is active on a limited project (<code>activeTab={isLimitedProject &amp;&amp; activeTab === 'git' ? 'files' : activeTab}</code>), so R7's downgrade fallback is already handled by existing code.</p></div>
+  <div class="card"><h4><span class="kd-id">KTD5</span>Ship a type-switch hotkey to honor the repo's hotkey convention (resolves prior Q2)</h4><p>The repo requires every user-facing feature to carry a keyboard shortcut. Add <code>sidebar.toggleProjectType</code> that flips the active project's type. Assign a non-conflicting default binding and verify it against the existing conflict detector, adjusting the key if it clashes.</p></div>
+</section>
+
+<hr class="sec">
+
+<section class="block" id="implementation-units">
+  <h2>Implementation Units</h2>
+
+  <article class="unit" id="u1">
+    <div class="uhead"><span class="uid">U1</span><h3 class="utitle">Extend the project update path to accept <code>type</code></h3></div>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Let <code>type</code> flow through the existing name-update path, persisted and validated.</dd>
+      <dt>Requirements</dt><dd>R5, R6, R8</dd>
+      <dt>Dependencies</dt><dd>None (foundation)</dd>
+      <dt>Files</dt><dd><code>electron/main/services/ProjectPersistence.ts</code>, <code>electron/main/index.ts</code>, <code>electron/preload/index.ts</code>, <code>src/types/index.ts</code>, <code>src/stores/projectStore.ts</code>, <code>test/projectPersistence.test.ts</code></dd>
+    </dl>
+    <details><summary>Approach</summary><div class="body">
+      <ul class="plain">
+        <li>In <code>updateProject</code>, persist a valid <code>type</code> when present, alongside the existing <code>name</code>/<code>settings</code> handling.</li>
+        <li>In the <code>project:update</code> IPC handler, add <code>type</code> to <code>allowedUpdates</code> only when it equals <code>'project'</code> or <code>'code'</code> (reject anything else — do not fall through to a default).</li>
+        <li>Widen the <code>electronAPI.project.update</code> parameter type and the store <code>updateProject</code> <code>Pick&lt;Project, 'name' | 'settings'&gt;</code> to include <code>'type'</code>.</li>
+        <li>No <code>any</code> — use <code>ProjectType</code> and narrow the IPC input with an explicit value check.</li>
+      </ul>
+    </div></details>
+    <details><summary>Test scenarios</summary><div class="body"><ul class="plain">
+      <li>Happy path: <code>updateProject(id, { type: 'code' })</code> persists the new type and returns the updated project.</li>
+      <li>Edge: <code>updateProject(id, { name, type })</code> updates both fields in one call.</li>
+      <li>Error path: an invalid <code>type</code> value (e.g. <code>'xyz'</code>) is not written; the stored type is unchanged.</li>
+      <li>Error path: <code>updateProject</code> on an unknown id returns <code>null</code> (existing behavior preserved).</li>
+    </ul></div></details>
+    <details><summary>Verification</summary><div class="body"><p><code>projectPersistence.test.ts</code> passes; a type update survives a persistence reload; typecheck clean on the widened signatures.</p></div></details>
+  </article>
+
+  <article class="unit" id="u2">
+    <div class="uhead"><span class="uid">U2</span><h3 class="utitle">Add rename state + <code>startProjectRename</code> to the store</h3></div>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Store-level rename state so any trigger (double-click, F2, menu) puts one row into edit mode and a commit persists via <code>updateProject</code>.</dd>
+      <dt>Requirements</dt><dd>R1, R2, R3</dd>
+      <dt>Dependencies</dt><dd>U1 (reuses <code>updateProject</code>; no new backend needed for name)</dd>
+      <dt>Files</dt><dd><code>src/stores/projectStore.ts</code>, <code>test/projectStore.test.ts</code></dd>
+    </dl>
+    <details><summary>Approach</summary><div class="body"><ul class="plain">
+      <li>Add <code>renamingProjectId: string | null</code> plus <code>startProjectRename(id)</code> and <code>cancelProjectRename()</code>, mirroring <code>fileExplorerRenamingPath</code> / <code>startRename</code>.</li>
+      <li>Commit path trims the input; a non-empty result calls the existing <code>updateProject(id, { name })</code>, then clears <code>renamingProjectId</code>. A blank/whitespace result cancels without persisting.</li>
+    </ul></div></details>
+    <details><summary>Test scenarios</summary><div class="body"><ul class="plain">
+      <li>Covers R3. <code>startProjectRename(id)</code> sets <code>renamingProjectId</code>; committing a non-empty name calls update and clears the state.</li>
+      <li>Covers R3. Committing a blank/whitespace name does not call update and restores the previous name.</li>
+      <li><code>cancelProjectRename()</code> clears <code>renamingProjectId</code> without persisting.</li>
+    </ul></div></details>
+    <details><summary>Verification</summary><div class="body"><p><code>projectStore.test.ts</code> passes for the new actions.</p></div></details>
+  </article>
+
+  <article class="unit" id="u3">
+    <div class="uhead"><span class="uid">U3</span><h3 class="utitle">Inline rename UI + <em>Rename</em> menu entry in the sidebar row</h3></div>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Render the name as an editable input while renaming; wire double-click and a <em>Rename</em> context-menu entry.</dd>
+      <dt>Requirements</dt><dd>R1, R2, R3</dd>
+      <dt>Dependencies</dt><dd>U2</dd>
+      <dt>Files</dt><dd><code>src/components/Sidebar/SortableProjectItem.tsx</code>, <code>test/</code> (new component test, mirroring <code>fileExplorerGitGating.test.tsx</code> harness)</dd>
+    </dl>
+    <details><summary>Approach</summary><div class="body"><ul class="plain">
+      <li>When <code>renamingProjectId === project.id</code>, replace the name <code>&lt;span&gt;</code> with a controlled <code>&lt;input&gt;</code> (autofocus, text pre-selected). Mirror <code>FileTreeNode.tsx</code>'s rename input handling (submit-guard ref to avoid double-commit on Enter+blur).</li>
+      <li>Double-click the name → <code>startProjectRename(project.id)</code>. Enter/blur commits, Esc cancels. Stop propagation so the drag handle and row-select don't fire.</li>
+      <li>Add a <em>Rename</em> entry to <code>contextMenuItems</code> that calls <code>startProjectRename(project.id)</code>.</li>
+    </ul></div></details>
+    <details><summary>Test scenarios</summary><div class="body"><ul class="plain">
+      <li>Covers AE1. Rename to blank + Enter → previous name retained, edit closed.</li>
+      <li>Covers AE2. Rename with a new value + Esc → previous name retained, no persist.</li>
+      <li>Double-click the name enters edit mode (input rendered).</li>
+      <li>Enter with a valid new name commits (update called once, not twice on the following blur).</li>
+    </ul></div></details>
+    <details><summary>Verification</summary><div class="body"><p>Component test passes; manual check that renaming a row does not trigger drag or project-select.</p></div></details>
+  </article>
+
+  <article class="unit" id="u4">
+    <div class="uhead"><span class="uid">U4</span><h3 class="utitle">Type-switch toggle in the context menu</h3></div>
+    <dl class="strip">
+      <dt>Goal</dt><dd>One context-menu entry that flips the project's type and lets the UI re-render reactively.</dd>
+      <dt>Requirements</dt><dd>R5, R6, R7</dd>
+      <dt>Dependencies</dt><dd>U1</dd>
+      <dt>Files</dt><dd><code>src/components/Sidebar/SortableProjectItem.tsx</code>, <code>test/activityRail.test.tsx</code> (or sibling) for reactive-gating coverage</dd>
+    </dl>
+    <details><summary>Approach</summary><div class="body"><ul class="plain">
+      <li>Add a <code>contextMenuItems</code> entry whose label is <em>Switch to Code</em> when <code>project.type === 'project'</code> and <em>Switch to Project</em> when <code>'code'</code>; onClick calls <code>updateProject(project.id, { type: otherType })</code>.</li>
+      <li>No teardown code — rely on the reactive <code>isLimitedProject</code> / ActivityRail selectors (KTD4). The <em>Open on GitHub</em> entry that is gated on <code>type === 'code'</code> naturally follows the new type.</li>
+    </ul></div></details>
+    <details><summary>Test scenarios</summary><div class="body"><ul class="plain">
+      <li>Covers R5. Menu label reads <em>Switch to Code</em> for a Project and <em>Switch to Project</em> for a Code project.</li>
+      <li>Covers R6/R7. With a project of <code>type: 'code'</code>, the git ("limited") gating flips when the type becomes <code>'project'</code> (extends the existing ActivityRail limited-project test).</li>
+      <li>Covers R6. Switching type does not tear down or recreate terminals in the store.</li>
+    </ul></div></details>
+    <details><summary>Verification</summary><div class="body"><p>Reactive-gating test passes; manual check that flipping type shows/hides the git tab and sidecar with no visible reload.</p></div></details>
+  </article>
+
+  <article class="unit" id="u5">
+    <div class="uhead"><span class="uid">U5</span><h3 class="utitle">Register rename + type-switch hotkeys</h3></div>
+    <dl class="strip">
+      <dt>Goal</dt><dd><code>F2</code> renames the active project (focus-zone dispatch); a second binding toggles its type.</dd>
+      <dt>Requirements</dt><dd>R1, R5</dd>
+      <dt>Dependencies</dt><dd>U2, U1</dd>
+      <dt>Files</dt><dd><code>src/utils/hotkeys.ts</code>, <code>src/App.tsx</code>, <code>CLAUDE.md</code> (Keyboard Shortcuts table)</dd>
+    </dl>
+    <div class="exec"><b>Execution note:</b> run the existing hotkey conflict detector after adding the two bindings; if <code>F2</code> collides across categories, fall back to the single focus-branching <code>F2</code> handler described in KTD3.</div>
+    <details><summary>Approach</summary><div class="body"><ul class="plain">
+      <li>Add <code>sidebar.renameProject</code> (default <code>F2</code>, category <code>sidebar</code>) and <code>sidebar.toggleProjectType</code> (non-conflicting default) to <code>DEFAULT_HOTKEY_CONFIG</code>.</li>
+      <li>Register handlers in the <code>useHotkeys({...})</code> map in <code>App.tsx</code>: rename calls <code>startProjectRename(activeProjectId)</code> guarded on sidebar focus; toggle calls <code>updateProject(activeProjectId, { type: otherType })</code>.</li>
+      <li>Document both in the CLAUDE.md Keyboard Shortcuts → Sidebar table.</li>
+    </ul></div></details>
+    <details><summary>Test scenarios</summary><div class="body"><ul class="plain">
+      <li>Hotkey config remains valid (no duplicate/invalid bindings per the config validator).</li>
+      <li>Test expectation: focus-zone dispatch behavior verified manually — no unit harness for global key focus routing.</li>
+    </ul></div></details>
+    <details><summary>Verification</summary><div class="body"><p>Conflict detector reports no clash (or the documented fallback is applied); F2 renames the active project only when the sidebar has focus; the toggle flips type.</p></div></details>
+  </article>
+</section>
+
+<hr class="sec">
+
+<section class="block" id="verification-contract">
+  <h2>Verification Contract</h2>
+  <h3>Gates</h3>
+  <ul class="check">
+    <li><code>npm test</code> (Vitest) green, including the new/extended <code>projectPersistence</code>, <code>projectStore</code>, and sidebar component tests.</li>
+    <li>TypeScript strict build clean (<code>npm run build</code> typecheck) — no <code>any</code> introduced.</li>
+    <li>ESLint clean on all touched files.</li>
+  </ul>
+  <h3>Behavioral checks</h3>
+  <ul class="check">
+    <li>Rename via double-click, <code>F2</code> (sidebar focused), and context-menu <em>Rename</em>; Enter commits, Esc cancels, blank rejected (AE1, AE2).</li>
+    <li>Renamed name persists across an app restart; folder on disk unchanged (AE3, R8).</li>
+    <li>Type toggle flips the git tab / sidecar / activity rail with no session or terminal restart (AE4, AE5).</li>
+    <li>Code&nbsp;→&nbsp;Project downgrade while on the git tab falls back to files with no warning; switching back restores the git tab (AE4).</li>
+  </ul>
+</section>
+
+<hr class="sec">
+
+<section class="block" id="definition-of-done">
+  <h2>Definition of Done</h2>
+  <ul class="check">
+    <li>R1–R8 satisfied and exercised by the tests/checks in the Verification Contract.</li>
+    <li>Both hotkeys registered in <code>hotkeys.ts</code>, handled in <code>App.tsx</code>, and documented in the CLAUDE.md Keyboard Shortcuts table (repo convention).</li>
+    <li>Rename and type-switch reachable from double-click, context menu, and keyboard.</li>
+    <li>No <code>any</code> types; ESLint and TypeScript strict both clean; full Vitest suite green.</li>
+    <li>No filesystem changes on rename; no data migration for type; no new IPC channel.</li>
+  </ul>
+</section>
+
+<hr class="sec">
+
+<section class="block" id="sources">
+  <h2>Sources &amp; References</h2>
+  <ul class="plain">
+    <li><a href="https://github.com/remcovolmer/command/blob/main/shared/ipc-types.ts"><code>shared/ipc-types.ts</code></a> — <code>Project</code> and <code>ProjectType = 'project' | 'code'</code> definitions.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/ProjectPersistence.ts"><code>electron/main/services/ProjectPersistence.ts</code></a> — <code>updateProject()</code> handles <code>name</code> + <code>settings</code> today; U1 adds <code>type</code>.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/index.ts"><code>electron/main/index.ts</code></a> — <code>project:update</code> IPC handler and its <code>allowedUpdates</code> whitelist.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts"><code>src/stores/projectStore.ts</code></a> — <code>updateProject</code> store action, typed <code>Pick&lt;Project,'name'|'settings'&gt;</code>; home of the new rename state (U2).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Sidebar/SortableProjectItem.tsx"><code>src/components/Sidebar/SortableProjectItem.tsx</code></a> — project row and <code>contextMenuItems</code> (U3, U4 land here).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Sidebar/ContextMenu.tsx"><code>src/components/Sidebar/ContextMenu.tsx</code></a> — context-menu component (<code>ContextMenuEntry</code> shape).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/FileExplorer.tsx"><code>src/components/FileExplorer/FileExplorer.tsx</code></a> — <code>isLimitedProject</code> gates git tab / sidecar visibility and the files-tab fallback (KTD4).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/FileTreeNode.tsx"><code>src/components/FileExplorer/FileTreeNode.tsx</code></a> — inline rename (F2) input pattern to mirror (U3).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/utils/hotkeys.ts"><code>src/utils/hotkeys.ts</code></a> — <code>DEFAULT_HOTKEY_CONFIG</code>; <code>fileExplorer.rename</code> is the F2 precedent (U5).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/App.tsx"><code>src/App.tsx</code></a> — <code>useHotkeys({...})</code> handler map, incl. the <code>fileExplorer.rename</code> handler (U5).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Project/AddProjectDialog.tsx"><code>src/components/Project/AddProjectDialog.tsx</code></a> — current type selection UI (Project vs. Code labels/descriptions).</li>
+  </ul>
+</section>
+
+<footer class="composition-signal">
+  Composed 2026-07-02 by <code>ce-brainstorm</code>, enriched to implementation-ready by <code>ce-plan</code> from in-session dialogue. No upstream brainstorm doc.
+</footer>
+
+</div>
+</body>
+</html>

@@ -607,6 +607,9 @@ ipcMain.handle('project:update', async (_event, id: string, updates: Record<stri
   if (typeof updates.name === 'string') {
     allowedUpdates.name = updates.name
   }
+  if (updates.type === 'project' || updates.type === 'code') {
+    allowedUpdates.type = updates.type
+  }
   return projectPersistence?.updateProject(id, allowedUpdates)
 })
 

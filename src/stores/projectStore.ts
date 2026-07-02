@@ -174,10 +174,16 @@ interface ProjectStore {
   fileExplorerCreating: { parentPath: string; type: 'file' | 'directory' } | null
   fileExplorerDeletingEntry: FileSystemEntry | null
 
+  // Sidebar project rename state (ephemeral, not persisted)
+  renamingProjectId: string | null
+
   // File explorer interaction actions
   setFileExplorerSelectedPath: (path: string | null) => void
   startRename: (path: string) => void
   cancelRename: () => void
+  startProjectRename: (id: string) => void
+  cancelProjectRename: () => void
+  commitProjectRename: (name: string) => void
   startCreate: (parentPath: string, type: 'file' | 'directory') => void
   cancelCreate: () => void
   setDeletingEntry: (entry: FileSystemEntry | null) => void
@@ -258,7 +264,7 @@ interface ProjectStore {
   setProjects: (projects: Project[]) => void
   addProject: (project: Project) => void
   removeProject: (id: string) => void
-  updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'settings'>>) => Promise<void>
+  updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'settings' | 'type'>>) => Promise<void>
   togglePinProject: (id: string) => Promise<void>
   setActiveProject: (id: string | null) => void
   reorderProjects: (projectIds: string[]) => Promise<void>
@@ -318,6 +324,7 @@ export const useProjectStore = create<ProjectStore>()(
       fileExplorerRenamingPath: null,
       fileExplorerCreating: null,
       fileExplorerDeletingEntry: null,
+      renamingProjectId: null,
 
       // Theme state (system follows OS preference)
       theme: 'system',
@@ -812,6 +819,19 @@ export const useProjectStore = create<ProjectStore>()(
       startRename: (path) => set({ fileExplorerRenamingPath: path, fileExplorerCreating: null }),
 
       cancelRename: () => set({ fileExplorerRenamingPath: null }),
+
+      startProjectRename: (id) => set({ renamingProjectId: id }),
+
+      cancelProjectRename: () => set({ renamingProjectId: null }),
+
+      commitProjectRename: (name) => {
+        const id = get().renamingProjectId
+        if (!id) return
+        // Clear edit state first so the input unmounts even if the update is a no-op.
+        set({ renamingProjectId: null })
+        const trimmed = name.trim()
+        if (trimmed) void get().updateProject(id, { name: trimmed })
+      },
 
       startCreate: (parentPath, type) =>
         set({ fileExplorerCreating: { parentPath, type }, fileExplorerRenamingPath: null }),

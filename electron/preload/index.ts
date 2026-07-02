@@ -201,7 +201,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     update: (
       id: string,
-      updates: Partial<Pick<Project, 'name' | 'settings'>>
+      updates: Partial<Pick<Project, 'name' | 'settings' | 'type'>>
     ): Promise<Project | null> => ipcRenderer.invoke('project:update', id, updates),
 
     setPinned: (id: string, pinned: boolean): Promise<Project | null> =>

@@ -64,6 +64,47 @@ describe('claudeMode IPC validation', () => {
   })
 })
 
+/**
+ * Extracted validation logic matching the project:update IPC handler in
+ * electron/main/index.ts (~line 610):
+ *
+ *   if (updates.type === 'project' || updates.type === 'code') {
+ *     allowedUpdates.type = updates.type
+ *   }
+ *
+ * Only the two valid ProjectType values are forwarded to persistence; any other
+ * value is dropped at the IPC boundary so it can never reach updateProject.
+ */
+function pickAllowedProjectType(input: unknown): 'project' | 'code' | undefined {
+  return input === 'project' || input === 'code' ? input : undefined
+}
+
+describe('project:update type IPC validation', () => {
+  test.each(['project', 'code'] as const)('"%s" is forwarded unchanged', (type) => {
+    expect(pickAllowedProjectType(type)).toBe(type)
+  })
+
+  describe('invalid values are dropped (never forwarded to persistence)', () => {
+    test.each(['workspace', 'Code', 'PROJECT', '', 'proj', 'code ', 'null'])(
+      '"%s" is dropped',
+      (type) => {
+        expect(pickAllowedProjectType(type)).toBeUndefined()
+      }
+    )
+
+    test.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['number', 42],
+      ['boolean', true],
+      ['object', { type: 'code' }],
+      ['array', ['code']],
+    ] as const)('%s is dropped', (_label, input) => {
+      expect(pickAllowedProjectType(input)).toBeUndefined()
+    })
+  })
+})
+
 describe('validateTerminalWritePayload', () => {
   test('accepts empty string', () => {
     const result = validateTerminalWritePayload('')

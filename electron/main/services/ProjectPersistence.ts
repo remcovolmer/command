@@ -311,6 +311,8 @@ export class ProjectPersistence {
     const project = this.state.projects.find((p) => p.id === id)
     if (project) {
       if ('name' in updates && typeof updates.name === 'string') project.name = updates.name
+      if ('type' in updates && (updates.type === 'project' || updates.type === 'code'))
+        project.type = updates.type
       if ('settings' in updates) project.settings = updates.settings
       this.saveState()
       return project
