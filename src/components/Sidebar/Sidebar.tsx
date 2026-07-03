@@ -24,6 +24,7 @@ import { AddProjectDialog } from '../Project/AddProjectDialog'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
 import { LogoIcon } from '../LogoIcon'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
+import { isHtmlFile } from '../../utils/editorLanguages'
 
 export function Sidebar() {
   // Use granular selectors to prevent unnecessary re-renders
@@ -208,7 +209,13 @@ export function Sidebar() {
       useProjectStore.getState().setTerminalStatus(terminalId, message)
     })
     const unsubOpenFile = terminalEvents.onEditorOpenFile((data) => {
-      useProjectStore.getState().openEditorTab(data.filePath, data.fileName, data.projectId)
+      const store = useProjectStore.getState()
+      // HTML opens in the built-in browser; everything else in the editor.
+      if (isHtmlFile(data.fileName)) {
+        store.openFileInBrowser(data.filePath, data.fileName, data.projectId)
+      } else {
+        store.openEditorTab(data.filePath, data.fileName, data.projectId)
+      }
     })
     const unsubOpenDiff = terminalEvents.onEditorOpenDiff((data) => {
       const { openWorkingTreeDiffTab } = useProjectStore.getState()

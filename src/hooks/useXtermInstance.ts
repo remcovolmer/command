@@ -11,6 +11,7 @@ import { terminalEvents } from '../utils/terminalEvents'
 import { buildTerminalTheme, invalidateTerminalThemeCache } from '../utils/terminalTheme'
 import { createFileLinkProvider } from '../utils/fileLinkProvider'
 import { classifyOsc8Uri } from '../utils/osc8LinkRouter'
+import { isHtmlFile } from '../utils/editorLanguages'
 import { terminalPool } from '../utils/terminalPool'
 import { createSpaceKeyWatchdog } from '../utils/spaceKeyWatchdog'
 
@@ -175,12 +176,18 @@ export function useXtermInstance({
                 api.shell.openExternal(decision.url).catch(console.error)
                 return
               }
-              if (decision.kind === 'editor') {
+              if (decision.kind === 'editor' || decision.kind === 'browser') {
+                const openInBrowser = decision.kind === 'browser'
+                const fileName = decision.fileName
                 api.fs
                   .stat(decision.resolved)
                   .then((stat) => {
                     if (stat.exists && stat.isFile) {
-                      store.openEditorTab(stat.resolved, decision.fileName, projectId)
+                      if (openInBrowser) {
+                        store.openFileInBrowser(stat.resolved, fileName, projectId)
+                      } else {
+                        store.openEditorTab(stat.resolved, fileName, projectId)
+                      }
                     }
                   })
                   .catch(() => {
@@ -266,7 +273,12 @@ export function useXtermInstance({
     if (projectId && contextPath) {
       terminal.registerLinkProvider(
         createFileLinkProvider(terminal, contextPath, api, (filePath, fileName) => {
-          store.openEditorTab(filePath, fileName, projectId)
+          // HTML paths open in the built-in browser, consistent with OSC 8 links.
+          if (isHtmlFile(fileName)) {
+            store.openFileInBrowser(filePath, fileName, projectId)
+          } else {
+            store.openEditorTab(filePath, fileName, projectId)
+          }
         })
       )
     }

@@ -6,7 +6,7 @@ import { getElectronAPI } from '../../utils/electron'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { FileTreeNode } from './FileTreeNode'
 import { ContextMenu, type ContextMenuEntry } from '../Sidebar/ContextMenu'
-import { isEditableFile } from '../../utils/editorLanguages'
+import { isEditableFile, isHtmlFile } from '../../utils/editorLanguages'
 import { getFileIcon, getFolderIcon } from './fileIcons'
 import { getParentPath } from '../../utils/paths'
 
@@ -44,6 +44,7 @@ export function FileTree({
   const startRename = useProjectStore((s) => s.startRename)
   const startCreate = useProjectStore((s) => s.startCreate)
   const setDeletingEntry = useProjectStore((s) => s.setDeletingEntry)
+  const openEditorTab = useProjectStore((s) => s.openEditorTab)
   const setFileExplorerSelectedPath = useProjectStore((s) => s.setFileExplorerSelectedPath)
   const invalidateDirectories = useProjectStore((s) => s.invalidateDirectories)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
@@ -189,9 +190,22 @@ export function FileTree({
 
       if (!entry) return items
 
+      // HTML opens in the browser on click; this exposes the raw source editor.
+      const openAsCode: ContextMenuEntry[] =
+        entry.type === 'file' && isHtmlFile(entry.name, entry.extension)
+          ? [
+              {
+                label: 'Open as code',
+                onClick: () => openEditorTab(entry.path, entry.name, project.id),
+              },
+              { type: 'separator' },
+            ]
+          : []
+
       return [
         ...items,
         { type: 'separator' },
+        ...openAsCode,
         { label: 'Rename', onClick: () => startRename(entry.path), shortcut: 'F2' },
         {
           label: 'Copy Path',
@@ -211,7 +225,7 @@ export function FileTree({
         },
       ]
     },
-    [api, rootPath, startCreate, startRename, setDeletingEntry]
+    [api, rootPath, startCreate, startRename, setDeletingEntry, openEditorTab, project.id]
   )
 
   if (isLoading) {

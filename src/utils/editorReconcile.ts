@@ -27,8 +27,8 @@ export function computeDirty(current: string, saved: string): boolean {
 export type ReloadDecision = 'apply' | 'skip-echo' | 'skip-dirty'
 
 /**
- * Decide how to handle an external (file-watcher) change, mirroring the proven
- * logic in HtmlEditor:
+ * Decide how to handle an external (file-watcher) change in an editor with an
+ * editable buffer:
  *  - `skip-echo`  — the change is the chokidar echo of our own save (disk equals
  *    what we just wrote, within the watcher batch window).
  *  - `skip-dirty` — the buffer has unsaved edits; keep the user's work rather

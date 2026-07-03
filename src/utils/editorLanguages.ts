@@ -59,3 +59,16 @@ export function isEditableFile(fileName: string, extension?: string): boolean {
   const ext = extension?.toLowerCase() ?? ''
   return ext in EXT_TO_LANGUAGE || fileName.startsWith('.')
 }
+
+/**
+ * True for HTML files, which open in the built-in browser (<webview>) rather
+ * than the code editor. Falls back to the filename's own extension when no
+ * explicit extension is supplied.
+ */
+export function isHtmlFile(fileName: string, extension?: string): boolean {
+  // Only derive the extension from the filename when it actually contains a dot,
+  // so an extensionless file literally named "html" is not treated as HTML.
+  const derived = fileName.includes('.') ? fileName.split('.').pop() : ''
+  const ext = (extension ?? derived ?? '').toLowerCase()
+  return ext === 'html' || ext === 'htm'
+}

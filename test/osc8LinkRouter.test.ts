@@ -13,28 +13,28 @@ describe('classifyOsc8Uri — editor (happy path)', () => {
     })
   })
 
-  test('routes .html relative path to editor', () => {
+  test('routes .html relative path to browser', () => {
     const decision = classifyOsc8Uri('public/index.html', base)
     expect(decision).toEqual({
-      kind: 'editor',
+      kind: 'browser',
       resolved: 'C:/projects/p/public/index.html',
       fileName: 'index.html',
     })
   })
 
-  test('routes .htm relative path to editor', () => {
+  test('routes .htm relative path to browser', () => {
     const decision = classifyOsc8Uri('public/index.htm', base)
     expect(decision).toEqual({
-      kind: 'editor',
+      kind: 'browser',
       resolved: 'C:/projects/p/public/index.htm',
       fileName: 'index.htm',
     })
   })
 
-  test('accepts mixed-case extension', () => {
+  test('routes mixed-case HTML extension to browser', () => {
     const decision = classifyOsc8Uri('Foo.HTML', base)
-    expect(decision.kind).toBe('editor')
-    if (decision.kind === 'editor') {
+    expect(decision.kind).toBe('browser')
+    if (decision.kind === 'browser') {
       expect(decision.fileName).toBe('Foo.HTML')
     }
   })

@@ -24,6 +24,7 @@ import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys
 import { DEFAULT_HOTKEY_CONFIG, mergeMissingHotkeyDefaults } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
 import { terminalPool } from '../utils/terminalPool'
+import { pathToFileUrl } from '../utils/browserUrls'
 
 /** Maximum number of terminals allowed per project */
 export const MAX_TERMINALS_PER_PROJECT = 10
@@ -234,6 +235,7 @@ interface ProjectStore {
   ) => void
   closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
   openBrowserTab: (projectId: string) => void
+  openFileInBrowser: (filePath: string, fileName: string, projectId: string) => void
   setBrowserTabUrl: (tabId: string, url: string) => void
 
   // Discard confirmation state
@@ -1159,6 +1161,44 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
+      openFileInBrowser: (filePath, fileName, projectId) =>
+        set((state) => {
+          const chatId = state.activeTerminalId ?? ''
+          // Reuse an existing browser tab for the same file rather than duplicating.
+          const existing = Object.values(state.editorTabs).find(
+            (t): t is BrowserTab => t.type === 'browser' && t.filePath === filePath
+          )
+          if (existing) {
+            // Reset the URL to the file: the tab may have been navigated away via
+            // the address bar, and re-opening the file must show the file again
+            // (and re-point live-reload at it).
+            return {
+              editorTabs: {
+                ...state.editorTabs,
+                [existing.id]: { ...existing, url: pathToFileUrl(filePath) },
+              },
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
+          }
+          const id = `browser-${crypto.randomUUID()}`
+          const tab: BrowserTab = {
+            id,
+            type: 'browser',
+            url: pathToFileUrl(filePath),
+            filePath,
+            fileName,
+            projectId,
+            terminalId: chatId,
+          }
+          return {
+            editorTabs: { ...state.editorTabs, [id]: tab },
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
+          }
+        }),
+
       setBrowserTabUrl: (tabId, url) =>
         set((state) => {
           const tab = state.editorTabs[tabId]
@@ -1627,7 +1667,7 @@ export const useProjectStore = create<ProjectStore>()(
           const newEditorTabs = { ...state.editorTabs }
           if (removedWorktree) {
             for (const [tabId, tab] of Object.entries(newEditorTabs)) {
-              if ('filePath' in tab && tab.filePath.startsWith(removedWorktree.path)) {
+              if ('filePath' in tab && tab.filePath?.startsWith(removedWorktree.path)) {
                 delete newEditorTabs[tabId]
               }
             }
