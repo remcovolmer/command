@@ -8,6 +8,7 @@ import {
   Menu,
   powerMonitor,
   clipboard,
+  nativeImage,
   session,
 } from 'electron'
 import { fileURLToPath } from 'node:url'
@@ -35,7 +36,7 @@ import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
 import { hardenWebviewPreferences, BROWSER_PARTITION } from './utils/webviewSecurity'
 import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
-import { sanitizeClipboardText } from './utils/clipboardLimits'
+import { sanitizeClipboardText, sanitizeClipboardImage } from './utils/clipboardLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { CommandServer } from './services/CommandServer'
@@ -1467,6 +1468,19 @@ ipcMain.on('clipboard:writeText', (_event, text: unknown) => {
 
 ipcMain.handle('clipboard:readText', async () => {
   return clipboard.readText()
+})
+
+// Write an image (a browser-annotation screenshot) to the OS clipboard so it
+// can be pasted into a Claude chat via the CLI's image-paste shortcut. Payload
+// is a base64 image data URL from the renderer's webview.capturePage(). Two
+// gates: sanitizeClipboardImage bounds/validates the URL, and isEmpty() rejects
+// anything nativeImage couldn't decode.
+ipcMain.on('clipboard:writeImage', (_event, dataUrl: unknown) => {
+  const safe = sanitizeClipboardImage(dataUrl)
+  if (safe === null) return
+  const image = nativeImage.createFromDataURL(safe)
+  if (image.isEmpty()) return
+  clipboard.writeImage(image)
 })
 
 // IPC Handlers for Shell operations

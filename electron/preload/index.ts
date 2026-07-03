@@ -290,6 +290,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clipboard: {
     writeText: (text: string): void => ipcRenderer.send('clipboard:writeText', text),
     readText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
+    writeImage: (dataUrl: string): void => ipcRenderer.send('clipboard:writeImage', dataUrl),
   },
 
   // Notification operations
