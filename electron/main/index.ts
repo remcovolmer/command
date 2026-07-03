@@ -8,6 +8,7 @@ import {
   Menu,
   powerMonitor,
   clipboard,
+  session,
 } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -32,6 +33,7 @@ import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
 import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
+import { hardenWebviewPreferences, BROWSER_PARTITION } from './utils/webviewSecurity'
 import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
 import { sanitizeClipboardText } from './utils/clipboardLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
@@ -318,6 +320,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // Required for node-pty terminal functionality
+      webviewTag: true, // Enables the built-in browser (<webview>); guests are hardened below
     },
   })
 
@@ -1720,7 +1723,61 @@ ipcMain.handle('automation:check-pr', async (_event, runId: string) => {
   return automationService?.checkPRForRun(runId) ?? null
 })
 
+// Harden every <webview> guest (the built-in browser). None of the content a
+// guest loads is trusted — local HTML, localhost, or external pages — so the
+// main process re-derives its security config at attach time (renderer-set
+// element attributes are not a trusted boundary) and keeps popups out of new
+// unsandboxed windows. A guest can never reach Node or the preload bridge.
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('will-attach-webview', (_e, webPreferences, params) => {
+    hardenWebviewPreferences(webPreferences, params)
+  })
+
+  if (contents.getType() === 'webview') {
+    // Popups open in the OS browser, never a new unsandboxed window. Mirror the
+    // main window's credential guard so a hostile page can't hand
+    // http://user:pass@... to the OS browser.
+    contents.setWindowOpenHandler(({ url }) => {
+      try {
+        const parsed = new URL(url)
+        if (
+          (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+          !parsed.username &&
+          !parsed.password
+        ) {
+          shell.openExternal(url)
+        }
+      } catch {
+        // Invalid URL, ignore
+      }
+      return { action: 'deny' }
+    })
+
+    // Defense-in-depth: keep the guest on web/file schemes; block custom or
+    // unexpected schemes from navigating it.
+    const guardNavigation = (event: Electron.Event, url: string) => {
+      try {
+        const { protocol } = new URL(url)
+        if (protocol !== 'http:' && protocol !== 'https:' && protocol !== 'file:') {
+          event.preventDefault()
+        }
+      } catch {
+        event.preventDefault()
+      }
+    }
+    contents.on('will-navigate', guardNavigation)
+    contents.on('will-redirect', guardNavigation)
+  }
+})
+
 app.whenReady().then(async () => {
+  // Deny all permission requests for the untrusted browser session by default
+  // (no browser-grade permission UX yet). Pages loaded in the <webview> cannot
+  // silently gain camera/mic/geolocation/notifications/etc.
+  session
+    .fromPartition(BROWSER_PARTITION)
+    .setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+
   await createWindow()
 
   // Restore sessions once the renderer store is hydrated (with fallback timeout)

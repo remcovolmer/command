@@ -34,8 +34,10 @@ interface MarkdownEditorProps {
  * switch. The container owns the single content buffer, dirty state, save
  * handler, and file watcher; the two panes are views reconciled on toggle.
  *
- * Mirrors HtmlEditor's lifecycle, but markdown has TWO editable panes, so
- * content reconciles bidirectionally: on activation the canonical content is
+ * Loads via api.fs.readFile, tracks dirty state in projectStore, and reloads
+ * on external file-watcher changes. Unlike a single-pane editor, markdown has
+ * TWO editable panes, so content reconciles bidirectionally: on activation the
+ * canonical content is
  * pushed into the pane that just became visible (only when it actually moved
  * on since that pane last held it, so an unchanged pane keeps its scroll), and
  * the active pane's edits flow back to the canonical buffer.

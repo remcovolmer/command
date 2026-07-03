@@ -129,14 +129,18 @@ export interface WorkingTreeDiffTab {
   terminalId: string
 }
 
-// Browser tab (iframe-based; loads local HTML and the user's own localhost app).
-// Distinct from HtmlPreview (srcdoc file preview) — this navigates a real URL.
+// Browser tab: a real Electron <webview> that navigates a URL. Loads local
+// HTML files, the user's own localhost app, and (at their own risk) external
+// URLs. When it backs a local file, filePath/fileName are set so the tab is
+// titled by filename, de-duplicated per file, and live-reloaded on disk change.
 export interface BrowserTab {
   id: string
   type: 'browser'
   url: string
   projectId: string
   terminalId: string
+  filePath?: string
+  fileName?: string
 }
 
 // Union of all center tab types

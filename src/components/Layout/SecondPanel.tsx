@@ -67,6 +67,8 @@ export function SecondPanel({
                 url={(tab as BrowserTabType).url}
                 isActive={tab.id === activeContentId}
                 onUrlChange={(url) => onBrowserUrlChange(tab.id, url)}
+                filePath={(tab as BrowserTabType).filePath}
+                projectId={(tab as BrowserTabType).projectId}
               />
             ) : (
               <EditorContainer

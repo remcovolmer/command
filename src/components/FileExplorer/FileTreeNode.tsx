@@ -4,7 +4,7 @@ import type { FileSystemEntry } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { getFileIcon, getFolderIcon } from './fileIcons'
-import { isEditableFile } from '../../utils/editorLanguages'
+import { isEditableFile, isHtmlFile } from '../../utils/editorLanguages'
 import { getParentPath } from '../../utils/paths'
 
 interface FileTreeNodeProps {
@@ -43,6 +43,7 @@ export function FileTreeNode({
   const toggleExpandedPath = useProjectStore((s) => s.toggleExpandedPath)
   const setDirectoryContents = useProjectStore((s) => s.setDirectoryContents)
   const openEditorTab = useProjectStore((s) => s.openEditorTab)
+  const openFileInBrowser = useProjectStore((s) => s.openFileInBrowser)
   const cancelRename = useProjectStore((s) => s.cancelRename)
   const cancelCreate = useProjectStore((s) => s.cancelCreate)
   const refreshDirectory = useProjectStore((s) => s.refreshDirectory)
@@ -123,7 +124,10 @@ export function FileTreeNode({
     setFileExplorerSelectedPath(entry.path)
 
     if (!isDirectory) {
-      if (isEditableFile(entry.name, entry.extension)) {
+      // HTML opens in the built-in browser; other editable files in the editor.
+      if (isHtmlFile(entry.name, entry.extension)) {
+        openFileInBrowser(entry.path, entry.name, projectId)
+      } else if (isEditableFile(entry.name, entry.extension)) {
         openEditorTab(entry.path, entry.name, projectId)
       }
       return

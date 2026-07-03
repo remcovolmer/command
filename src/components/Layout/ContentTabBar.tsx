@@ -10,7 +10,8 @@ interface ContentTabBarProps {
 }
 
 function tabLabel(tab: CenterTab): string {
-  if (tab.type === 'browser') return tab.url.replace(/^https?:\/\//, '') || 'Browser'
+  if (tab.type === 'browser')
+    return tab.fileName ?? (tab.url.replace(/^https?:\/\//, '') || 'Browser')
   if (tab.type === 'diff') return `${tab.fileName} (diff)`
   if (tab.type === 'working-tree-diff') {
     const kind =

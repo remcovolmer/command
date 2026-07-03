@@ -14,6 +14,7 @@
 
 export type Osc8Decision =
   | { kind: 'editor'; resolved: string; fileName: string }
+  | { kind: 'browser'; resolved: string; fileName: string }
   | { kind: 'external'; url: string }
   | { kind: 'ignore'; reason: string }
 
@@ -57,5 +58,9 @@ export function classifyOsc8Uri(uri: string, basePath: string): Osc8Decision {
   const resolved = `${baseTrimmed}/${trimmed}`
   const fileName = segments[segments.length - 1]
 
-  return { kind: 'editor', resolved, fileName }
+  // HTML opens in the built-in browser; markdown in the editor. The classifier
+  // stays the single security chokepoint — resolution and all containment
+  // checks above are shared; only the destination differs by extension.
+  const isHtml = lower.endsWith('.html') || lower.endsWith('.htm')
+  return { kind: isHtml ? 'browser' : 'editor', resolved, fileName }
 }
