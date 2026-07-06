@@ -2,12 +2,16 @@ import { describe, test, expect } from 'vitest'
 import {
   readSelectionScript,
   installEditContextMenuScript,
-  enableDrawScript,
+  enableMarkupScript,
+  resetMarkupScript,
   clearAnnotationsScript,
   isSelectionResult,
   isEditResult,
   parseEditSaveMessage,
+  parseMarkupMessage,
   EDIT_SAVE_SENTINEL,
+  MARKUP_ADD_SENTINEL,
+  MARKUP_CANCEL_SENTINEL,
 } from '../src/utils/annotationGuestScript'
 
 // new Function(body) compiles but does not execute, so it validates the
@@ -25,7 +29,8 @@ describe('guest script builders produce valid JS', () => {
   const scripts = {
     readSelectionScript: readSelectionScript(),
     installEditContextMenuScript: installEditContextMenuScript(),
-    enableDrawScript: enableDrawScript(),
+    enableMarkupScript: enableMarkupScript(),
+    resetMarkupScript: resetMarkupScript(),
     clearAnnotationsScript: clearAnnotationsScript(),
   }
 
@@ -56,11 +61,16 @@ describe('guest script builders produce valid JS', () => {
     expect(s).toContain(EDIT_SAVE_SENTINEL)
   })
 
-  test('enableDrawScript creates a pointer-driven canvas overlay', () => {
-    const s = enableDrawScript()
+  test('enableMarkupScript builds a canvas + floating toolbar with tools and actions', () => {
+    const s = enableMarkupScript()
     expect(s).toContain('__cc_annotate_canvas')
+    expect(s).toContain('__cc_annotate_markupbar')
     expect(s).toContain('pointerdown')
     expect(s).toContain("getContext('2d')")
+    expect(s).toContain('Voeg toe aan chat')
+    expect(s).toContain('Cancel')
+    expect(s).toContain(MARKUP_ADD_SENTINEL)
+    expect(s).toContain(MARKUP_CANCEL_SENTINEL)
   })
 
   test('clearAnnotationsScript removes highlight, canvas and tears down edit', () => {
@@ -135,5 +145,18 @@ describe('parseEditSaveMessage', () => {
 
   test('ignores a sentinel whose payload has the wrong shape', () => {
     expect(parseEditSaveMessage(EDIT_SAVE_SENTINEL + JSON.stringify({ before: 'a' }))).toBeNull()
+  })
+})
+
+describe('parseMarkupMessage', () => {
+  test('classifies add and cancel signals', () => {
+    expect(parseMarkupMessage(MARKUP_ADD_SENTINEL)).toBe('add')
+    expect(parseMarkupMessage(MARKUP_CANCEL_SENTINEL)).toBe('cancel')
+  })
+
+  test('ignores other messages', () => {
+    expect(parseMarkupMessage('random page log')).toBeNull()
+    expect(parseMarkupMessage(EDIT_SAVE_SENTINEL + '{}')).toBeNull()
+    expect(parseMarkupMessage(42)).toBeNull()
   })
 })

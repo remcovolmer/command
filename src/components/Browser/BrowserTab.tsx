@@ -9,10 +9,12 @@ import { execInGuest, captureGuest } from '../../utils/webviewControl'
 import {
   readSelectionScript,
   installEditContextMenuScript,
-  enableDrawScript,
+  enableMarkupScript,
+  resetMarkupScript,
   clearAnnotationsScript,
   isSelectionResult,
   parseEditSaveMessage,
+  parseMarkupMessage,
 } from '../../utils/annotationGuestScript'
 import type { EditResult } from '../../utils/annotationGuestScript'
 import {
@@ -74,8 +76,10 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(null)
   const [commentText, setCommentText] = useState('')
   const [status, setStatus] = useState<string | null>(null)
-  // Lets the console-message listener (registered once) call the latest handler.
+  // Let the console-message listener (registered once) call the latest handlers.
   const handleEditSaveRef = useRef<((payload: EditResult) => void) | null>(null)
+  const handleMarkupAddRef = useRef<(() => void) | null>(null)
+  const handleMarkupCancelRef = useRef<(() => void) | null>(null)
 
   // Keep the address bar in sync when the url changes outside this component.
   useEffect(() => {
@@ -106,8 +110,14 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     }
     const onConsole = (e: Event) => {
       const message = (e as unknown as { message?: string }).message
-      const payload = parseEditSaveMessage(message)
-      if (payload) void handleEditSaveRef.current?.(payload)
+      const edit = parseEditSaveMessage(message)
+      if (edit) {
+        void handleEditSaveRef.current?.(edit)
+        return
+      }
+      const markup = parseMarkupMessage(message)
+      if (markup === 'add') void handleMarkupAddRef.current?.()
+      else if (markup === 'cancel') void handleMarkupCancelRef.current?.()
     }
     wv.addEventListener('dom-ready', onReady)
     wv.addEventListener('did-navigate', sync)
@@ -189,7 +199,7 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     setStatus(null)
     const target = mode === next ? 'none' : next
     setMode(target)
-    if (target === 'draw') await runGuest(enableDrawScript())
+    if (target === 'draw') await runGuest(enableMarkupScript())
   }
 
   const captureSelection = async () => {
@@ -276,26 +286,37 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     }
     void runGuest(clearAnnotationsScript())
   }
-  // Keep the ref pointing at the latest handler for the console-message listener.
-  useEffect(() => {
-    handleEditSaveRef.current = handleEditSave
-  })
-
-  const addDrawingToChat = async () => {
+  // Fired from the floating markup toolbar's "Add to chat" (via console-message).
+  // The toolbar has already hidden itself, so capturePage grabs page + markup
+  // without the chrome; then re-show the toolbar and clear for the next markup.
+  const handleMarkupAdd = async () => {
     const image = await captureGuest(webviewRef.current, readyRef.current)
     if (!image) {
       setStatus('Kon geen screenshot maken.')
+      void runGuest(resetMarkupScript())
       return
     }
     getElectronAPI().clipboard.writeImage(image.toDataURL())
     const pageUrl = webviewRef.current?.getURL() ?? ''
     if (sendText(buildDrawMessage({ url: pageUrl }))) {
       setStatus('Screenshot op klembord — plak met Alt+V in de chat.')
-      // Reset the canvas so the user can immediately mark up the next thing.
-      await runGuest(clearAnnotationsScript())
-      await runGuest(enableDrawScript())
     }
+    void runGuest(resetMarkupScript())
   }
+
+  // Fired from the markup toolbar's "Cancel".
+  const handleMarkupCancel = () => {
+    void runGuest(clearAnnotationsScript())
+    setMode('none')
+    setStatus(null)
+  }
+
+  // Keep the refs pointing at the latest handlers for the console-message listener.
+  useEffect(() => {
+    handleEditSaveRef.current = handleEditSave
+    handleMarkupAddRef.current = handleMarkupAdd
+    handleMarkupCancelRef.current = handleMarkupCancel
+  })
 
   const iconBtn =
     'p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
@@ -364,7 +385,7 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
         </button>
       </div>
 
-      {(mode !== 'none' || status) && (
+      {(mode === 'comment' || status) && (
         <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border bg-sidebar-accent text-xs">
           {mode === 'comment' &&
             (!pendingComment ? (
@@ -388,17 +409,6 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
                 </button>
               </>
             ))}
-          {mode === 'draw' && (
-            <>
-              <span className="text-muted-foreground">Teken op de pagina.</span>
-              <button onClick={() => void addDrawingToChat()} className={annotBtn}>
-                <Send className="w-3 h-3" /> Voeg toe aan chat
-              </button>
-              <button onClick={() => void runGuest(clearAnnotationsScript())} className={annotBtn}>
-                Wis
-              </button>
-            </>
-          )}
           {status && <span className="ml-auto text-muted-foreground truncate">{status}</span>}
         </div>
       )}
