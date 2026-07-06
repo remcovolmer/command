@@ -58,6 +58,105 @@ export function buildDrawMessage({ url }: DrawAnnotation): string {
   ].join('\n')
 }
 
+// ---- Direct local-file edit (mode 2 on a file:// page) --------------------
+// A text edit on a local .html file maps straight to that file, so we apply it
+// directly — no agent, no tokens. Dev-server pages (component output, no single
+// source file) and ambiguous matches fall back to the agent instead.
+
+/** Convert a file:// URL to a local filesystem path, or null when not file://. */
+export function fileUrlToLocalPath(url: string): string | null {
+  if (!url.startsWith('file://')) return null
+  try {
+    const pathname = decodeURIComponent(new URL(url).pathname)
+    // Windows drive paths arrive as '/C:/Users/x.html' — drop the leading slash.
+    return /^\/[A-Za-z]:\//.test(pathname) ? pathname.slice(1) : pathname
+  } catch {
+    return null
+  }
+}
+
+export type DirectEditResult =
+  | { ok: true; content: string }
+  | { ok: false; reason: 'not-found' | 'ambiguous' }
+
+// Replace `needle` in `content` iff it occurs exactly once. A discriminated
+// result — not a bare string, since the 'none'/'many' sentinels would be
+// indistinguishable from a replaced string — so the caller can try a narrower
+// or wider match.
+type ReplaceResult = { status: 'ok'; content: string } | { status: 'none' } | { status: 'many' }
+
+function replaceIfUnique(content: string, needle: string, replacement: string): ReplaceResult {
+  if (!needle) return { status: 'none' }
+  const first = content.indexOf(needle)
+  if (first === -1) return { status: 'none' }
+  if (content.indexOf(needle, first + needle.length) !== -1) return { status: 'many' }
+  return {
+    status: 'ok',
+    content: content.slice(0, first) + replacement + content.slice(first + needle.length),
+  }
+}
+
+const EDIT_CONTEXT = 24
+
+// The minimal changed span between before/after (common prefix/suffix stripped)
+// plus a little surrounding context for disambiguation.
+function minimalEdit(before: string, after: string) {
+  const max = Math.min(before.length, after.length)
+  let p = 0
+  while (p < max && before[p] === after[p]) p++
+  let s = 0
+  while (s < max - p && before[before.length - 1 - s] === after[after.length - 1 - s]) s++
+  return {
+    coreBefore: before.slice(p, before.length - s),
+    coreAfter: after.slice(p, after.length - s),
+    ctxLeft: before.slice(Math.max(0, p - EDIT_CONTEXT), p),
+    ctxRight: before.slice(before.length - s, before.length - s + EDIT_CONTEXT),
+  }
+}
+
+/**
+ * Apply an inline text edit to file content. Rendered innerText rarely matches
+ * source verbatim (collapsed whitespace, inline tags, entities), so beyond a
+ * direct whole-text match we diff before/after down to the changed span and
+ * replace just that — which is usually a clean, unique substring of the source.
+ * Falls back (not-found/ambiguous) so the caller hands off to the agent.
+ */
+export function applyDirectEdit(content: string, before: string, after: string): DirectEditResult {
+  if (!before || before === after) return { ok: false, reason: 'not-found' }
+
+  // 1. Whole selection, verbatim and unique — cleanest when the source matches.
+  const whole = replaceIfUnique(content, before, after)
+  if (whole.status === 'ok') return { ok: true, content: whole.content }
+
+  const { coreBefore, coreAfter, ctxLeft, ctxRight } = minimalEdit(before, after)
+
+  // 2. Substitution/deletion: replace just the changed span.
+  if (coreBefore) {
+    const core = replaceIfUnique(content, coreBefore, coreAfter)
+    if (core.status === 'ok') return { ok: true, content: core.content }
+    if (core.status === 'many') {
+      // 3. Disambiguate a repeated span with its surrounding context.
+      const keyed = replaceIfUnique(
+        content,
+        ctxLeft + coreBefore + ctxRight,
+        ctxLeft + coreAfter + ctxRight
+      )
+      if (keyed.status === 'ok') return { ok: true, content: keyed.content }
+      return { ok: false, reason: 'ambiguous' }
+    }
+    return { ok: false, reason: 'not-found' }
+  }
+
+  // 4. Pure insertion: anchor on the junction context.
+  const anchor = ctxLeft + ctxRight
+  if (anchor) {
+    const inserted = replaceIfUnique(content, anchor, ctxLeft + coreAfter + ctxRight)
+    if (inserted.status === 'ok') return { ok: true, content: inserted.content }
+    if (inserted.status === 'many') return { ok: false, reason: 'ambiguous' }
+  }
+  return { ok: false, reason: 'not-found' }
+}
+
 interface TerminalLike {
   id: string
   type: string

@@ -1,13 +1,13 @@
 import { describe, test, expect } from 'vitest'
 import {
   readSelectionScript,
-  startEditScript,
-  readEditScript,
+  installEditContextMenuScript,
   enableDrawScript,
   clearAnnotationsScript,
   isSelectionResult,
-  isEditStartResult,
   isEditResult,
+  parseEditSaveMessage,
+  EDIT_SAVE_SENTINEL,
 } from '../src/utils/annotationGuestScript'
 
 // new Function(body) compiles but does not execute, so it validates the
@@ -24,8 +24,7 @@ function isSyntacticallyValid(code: string): boolean {
 describe('guest script builders produce valid JS', () => {
   const scripts = {
     readSelectionScript: readSelectionScript(),
-    startEditScript: startEditScript(),
-    readEditScript: readEditScript(),
+    installEditContextMenuScript: installEditContextMenuScript(),
     enableDrawScript: enableDrawScript(),
     clearAnnotationsScript: clearAnnotationsScript(),
   }
@@ -45,18 +44,16 @@ describe('guest script builders produce valid JS', () => {
     expect(s).toContain('__cc_annotate_highlight')
   })
 
-  test('startEditScript sets contentEditable and stashes before-state', () => {
-    const s = startEditScript()
+  test('installEditContextMenuScript wires right-click edit, key-blocking and a save signal', () => {
+    const s = installEditContextMenuScript()
+    expect(s).toContain('contextmenu')
     expect(s).toContain('contentEditable')
-    expect(s).toContain('__ccEditEl')
-    expect(s).toContain('__ccEditBefore')
-  })
-
-  test('readEditScript reverts editability and returns before/after', () => {
-    const s = readEditScript()
-    expect(s).toContain('__ccEditEl')
-    expect(s).toContain('inherit')
-    expect(s).toContain('after')
+    expect(s).toContain('Opslaan')
+    expect(s).toContain('keydown')
+    expect(s).toContain('stopPropagation')
+    expect(s).toContain('ccIndexPath')
+    expect(s).toContain('innerHTML')
+    expect(s).toContain(EDIT_SAVE_SENTINEL)
   })
 
   test('enableDrawScript creates a pointer-driven canvas overlay', () => {
@@ -66,11 +63,11 @@ describe('guest script builders produce valid JS', () => {
     expect(s).toContain("getContext('2d')")
   })
 
-  test('clearAnnotationsScript removes highlight, canvas and edit state', () => {
+  test('clearAnnotationsScript removes highlight, canvas and tears down edit', () => {
     const s = clearAnnotationsScript()
     expect(s).toContain('__cc_annotate_highlight')
     expect(s).toContain('__cc_annotate_canvas')
-    expect(s).toContain('__ccEditEl')
+    expect(s).toContain('__ccTeardownEdit')
   })
 })
 
@@ -82,15 +79,61 @@ describe('result guards', () => {
     expect(isSelectionResult({ text: 1, outerHTML: '', selector: '', url: '' })).toBe(false)
   })
 
-  test('isEditStartResult', () => {
-    expect(isEditStartResult({ selector: 'b', before: 'x' })).toBe(true)
-    expect(isEditStartResult({ selector: 'b' })).toBe(false)
-    expect(isEditStartResult(null)).toBe(false)
+  test('isEditResult', () => {
+    expect(
+      isEditResult({
+        before: 'a',
+        after: 'b',
+        html: '<b>b</b>',
+        selector: 'c',
+        indexPath: [1, 0],
+        tag: 'p',
+        url: 'd',
+      })
+    ).toBe(true)
+    expect(isEditResult({ before: 'a', after: 'b' })).toBe(false)
+    expect(
+      isEditResult({
+        before: 'a',
+        after: 'b',
+        html: 'x',
+        selector: 'c',
+        indexPath: ['nope'],
+        tag: 'p',
+        url: 'd',
+      })
+    ).toBe(false)
+    expect(isEditResult(undefined)).toBe(false)
+  })
+})
+
+describe('parseEditSaveMessage', () => {
+  const payload = {
+    before: 'Reosultaten',
+    after: 'Resultaten',
+    html: 'Resultaten',
+    selector: 'h2',
+    indexPath: [1, 0],
+    tag: 'h2',
+    url: 'file:///x.html',
+  }
+
+  test('parses a sentinel-prefixed payload', () => {
+    const msg = EDIT_SAVE_SENTINEL + JSON.stringify(payload)
+    expect(parseEditSaveMessage(msg)).toEqual(payload)
   })
 
-  test('isEditResult', () => {
-    expect(isEditResult({ before: 'a', after: 'b', selector: 'c', url: 'd' })).toBe(true)
-    expect(isEditResult({ before: 'a', after: 'b' })).toBe(false)
-    expect(isEditResult(undefined)).toBe(false)
+  test('ignores messages without the sentinel prefix', () => {
+    expect(parseEditSaveMessage(JSON.stringify(payload))).toBeNull()
+    expect(parseEditSaveMessage('some page log line')).toBeNull()
+    expect(parseEditSaveMessage(42)).toBeNull()
+  })
+
+  test('ignores a sentinel with malformed JSON', () => {
+    expect(parseEditSaveMessage(EDIT_SAVE_SENTINEL + '{not json')).toBeNull()
+  })
+
+  test('ignores a sentinel whose payload has the wrong shape', () => {
+    expect(parseEditSaveMessage(EDIT_SAVE_SENTINEL + JSON.stringify({ before: 'a' }))).toBeNull()
   })
 })

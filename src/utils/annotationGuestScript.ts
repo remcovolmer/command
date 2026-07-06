@@ -2,13 +2,14 @@
 //
 // executeJavaScript resolves with the value of the last expression, so each
 // builder returns a self-invoking function expression that returns a
-// JSON-serializable result (or null / true). Nothing here runs in the host —
-// the host only ships these strings across; the guest stays sandboxed with no
-// preload bridge, so the webview hardening is untouched.
+// JSON-serializable result. The guest cannot call the host (no preload bridge —
+// the webview stays hardened), so the one guest->host signal we need (the edit
+// "Save" click) is delivered over the webview's console-message event: the
+// injected button console.log's a sentinel-prefixed JSON payload, and the host
+// listens for it (see parseEditSaveMessage).
 //
-// The scripts are static (no host interpolation) to keep them injection-safe:
-// user text never becomes code. They read/mutate the live DOM and return data
-// the host reads back through executeJavaScript's resolved value.
+// The scripts are static (no host interpolation of user data) so page text can
+// never become code.
 
 export interface SelectionResult {
   text: string
@@ -17,15 +18,15 @@ export interface SelectionResult {
   url: string
 }
 
-export interface EditStartResult {
-  selector: string
-  before: string
-}
-
 export interface EditResult {
   before: string
   after: string
+  // Post-edit innerHTML — spliced into the element's source range (DOM-match).
+  html: string
   selector: string
+  // Element-child index chain from <html> to the target (structural locator).
+  indexPath: number[]
+  tag: string
   url: string
 }
 
@@ -43,18 +44,32 @@ export function isSelectionResult(v: unknown): v is SelectionResult {
   )
 }
 
-export function isEditStartResult(v: unknown): v is EditStartResult {
-  return isRecord(v) && typeof v.selector === 'string' && typeof v.before === 'string'
-}
-
 export function isEditResult(v: unknown): v is EditResult {
   return (
     isRecord(v) &&
     typeof v.before === 'string' &&
     typeof v.after === 'string' &&
+    typeof v.html === 'string' &&
     typeof v.selector === 'string' &&
-    typeof v.url === 'string'
+    typeof v.tag === 'string' &&
+    typeof v.url === 'string' &&
+    Array.isArray(v.indexPath) &&
+    v.indexPath.every((n) => typeof n === 'number')
   )
+}
+
+/** Prefix the injected Save button console.log's so the host can spot it. */
+export const EDIT_SAVE_SENTINEL = '__CC_ANNOTATE_SAVE__'
+
+/** Parse a guest console message into an edit payload, or null if it isn't one. */
+export function parseEditSaveMessage(message: unknown): EditResult | null {
+  if (typeof message !== 'string' || !message.startsWith(EDIT_SAVE_SENTINEL)) return null
+  try {
+    const parsed: unknown = JSON.parse(message.slice(EDIT_SAVE_SENTINEL.length))
+    return isEditResult(parsed) ? parsed : null
+  } catch {
+    return null
+  }
 }
 
 const MAX_FIELD = 4000
@@ -82,6 +97,8 @@ const CSS_PATH = `function ccPath(e){
 
 const HIGHLIGHT_ID = '__cc_annotate_highlight'
 const CANVAS_ID = '__cc_annotate_canvas'
+const MENU_ID = '__cc_annotate_menu'
+const SAVE_ID = '__cc_annotate_save'
 
 /** Read the current selection, draw a transient highlight, return its context. */
 export function readSelectionScript(): string {
@@ -104,35 +121,81 @@ export function readSelectionScript(): string {
 })()`
 }
 
-/** Make the element containing the selection editable; record before-state. */
-export function startEditScript(): string {
+/**
+ * Install the right-click edit flow into the guest (idempotent). On a
+ * right-click over a selection it suppresses the native menu and shows an
+ * "Edit" chip; choosing it makes the element contentEditable, blocks page-level
+ * key handlers (so arrows move the caret, not the page), and shows an "Opslaan"
+ * overlay near the element. Saving console.log's the sentinel payload for the
+ * host. Re-run after each navigation (the guest DOM resets).
+ */
+export function installEditContextMenuScript(): string {
   return `(function(){
+  if(window.__ccEditInstalled)return true;
+  window.__ccEditInstalled=true;
   ${CSS_PATH}
-  var sel=window.getSelection();
-  if(!sel||sel.rangeCount===0||sel.isCollapsed)return null;
-  var node=sel.getRangeAt(0).commonAncestorContainer;
-  var el=node.nodeType===1?node:node.parentElement;
-  if(!el)return null;
-  window.__ccEditEl=el;
-  window.__ccEditBefore=el.innerText;
-  window.__ccEditSelector=ccPath(el);
-  el.contentEditable='true';
-  el.focus();
-  return {selector:window.__ccEditSelector,before:el.innerText.slice(0,${MAX_FIELD})};
-})()`
-}
-
-/** Read the edited element's after-state, revert editability, return the diff. */
-export function readEditScript(): string {
-  return `(function(){
-  var el=window.__ccEditEl;
-  if(!el)return null;
-  var after=el.innerText;
-  var before=window.__ccEditBefore||'';
-  var selector=window.__ccEditSelector||'';
-  try{el.contentEditable='inherit';}catch(e){}
-  window.__ccEditEl=null;window.__ccEditBefore=null;window.__ccEditSelector=null;
-  return {before:before.slice(0,${MAX_FIELD}),after:after.slice(0,${MAX_FIELD}),selector:selector,url:location.href};
+  function ccIndexPath(el){
+    var path=[];var node=el;
+    while(node&&node.parentElement){
+      path.unshift(Array.prototype.indexOf.call(node.parentElement.children,node));
+      node=node.parentElement;
+    }
+    return path;
+  }
+  function rm(id){var e=document.getElementById(id);if(e)e.remove();}
+  function teardown(){
+    rm('${MENU_ID}');rm('${SAVE_ID}');
+    if(window.__ccEditEl){try{window.__ccEditEl.contentEditable='inherit';}catch(e){}window.__ccEditEl=null;}
+    if(window.__ccKeyBlocker){window.removeEventListener('keydown',window.__ccKeyBlocker,true);window.removeEventListener('keyup',window.__ccKeyBlocker,true);window.__ccKeyBlocker=null;}
+  }
+  window.__ccTeardownEdit=teardown;
+  function startEdit(el){
+    teardown();
+    window.__ccEditEl=el;
+    window.__ccEditBefore=el.innerText;
+    window.__ccEditSelector=ccPath(el);
+    window.__ccEditIndexPath=ccIndexPath(el);
+    window.__ccEditTag=el.tagName?el.tagName.toLowerCase():'';
+    el.contentEditable='true';
+    el.focus();
+    // Capture-phase blocker: stops page key handlers (e.g. arrow navigation)
+    // from firing, but does not preventDefault, so caret movement/typing works.
+    window.__ccKeyBlocker=function(ev){ev.stopPropagation();};
+    window.addEventListener('keydown',window.__ccKeyBlocker,true);
+    window.addEventListener('keyup',window.__ccKeyBlocker,true);
+    var r=el.getBoundingClientRect();
+    var save=document.createElement('button');
+    save.id='${SAVE_ID}';save.textContent='Opslaan';
+    save.style.cssText='position:fixed;z-index:2147483647;left:'+r.left+'px;top:'+Math.max(2,r.top-30)+'px;background:#1f6b3a;color:#fff;font:600 12px sans-serif;padding:5px 12px;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+    save.addEventListener('click',function(ev){
+      ev.preventDefault();ev.stopPropagation();
+      var el2=window.__ccEditEl;
+      var payload={before:(window.__ccEditBefore||'').slice(0,${MAX_FIELD}),after:(el2?el2.innerText:'').slice(0,${MAX_FIELD}),html:el2?el2.innerHTML:'',selector:window.__ccEditSelector||'',indexPath:window.__ccEditIndexPath||[],tag:window.__ccEditTag||'',url:location.href};
+      console.log('${EDIT_SAVE_SENTINEL}'+JSON.stringify(payload));
+    });
+    document.body.appendChild(save);
+  }
+  function showMenu(el,rect){
+    rm('${MENU_ID}');
+    var menu=document.createElement('div');
+    menu.id='${MENU_ID}';menu.textContent='Edit';
+    menu.style.cssText='position:fixed;z-index:2147483647;left:'+rect.left+'px;top:'+(rect.bottom+4)+'px;background:#0f5f6b;color:#fff;font:600 12px sans-serif;padding:4px 12px;border-radius:6px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);';
+    function outside(ev){if(ev.target!==menu){rm('${MENU_ID}');document.removeEventListener('pointerdown',outside,true);}}
+    menu.addEventListener('click',function(ev){ev.stopPropagation();document.removeEventListener('pointerdown',outside,true);rm('${MENU_ID}');startEdit(el);});
+    document.body.appendChild(menu);
+    setTimeout(function(){document.addEventListener('pointerdown',outside,true);},0);
+  }
+  document.addEventListener('contextmenu',function(e){
+    var sel=window.getSelection();
+    if(!sel||sel.rangeCount===0||sel.isCollapsed)return;
+    var range=sel.getRangeAt(0);
+    var node=range.commonAncestorContainer;
+    var el=node.nodeType===1?node:node.parentElement;
+    if(!el)return;
+    e.preventDefault();
+    showMenu(el,range.getBoundingClientRect());
+  });
+  return true;
 })()`
 }
 
@@ -155,12 +218,12 @@ export function enableDrawScript(): string {
 })()`
 }
 
-/** Remove any highlight, drawing canvas, and revert an in-progress edit. */
+/** Remove any highlight, drawing canvas, and tear down an in-progress edit. */
 export function clearAnnotationsScript(): string {
   return `(function(){
   var hl=document.getElementById('${HIGHLIGHT_ID}');if(hl)hl.remove();
   var cv=document.getElementById('${CANVAS_ID}');if(cv)cv.remove();
-  if(window.__ccEditEl){try{window.__ccEditEl.contentEditable='inherit';}catch(e){}window.__ccEditEl=null;}
+  if(window.__ccTeardownEdit){window.__ccTeardownEdit();}
   return true;
 })()`
 }

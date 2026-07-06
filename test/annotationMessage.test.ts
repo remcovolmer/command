@@ -5,6 +5,8 @@ import {
   buildDrawMessage,
   resolveActiveClaudeTerminalId,
   sendAnnotationToChat,
+  fileUrlToLocalPath,
+  applyDirectEdit,
 } from '../src/utils/annotationMessage'
 
 describe('message builders', () => {
@@ -88,5 +90,72 @@ describe('sendAnnotationToChat', () => {
     )
     expect(result).toEqual({ ok: false, reason: 'no-active-chat' })
     expect(write).not.toHaveBeenCalled()
+  })
+})
+
+describe('fileUrlToLocalPath', () => {
+  test('converts a Windows file URL to a drive path', () => {
+    expect(fileUrlToLocalPath('file:///C:/Users/me/report.html')).toBe('C:/Users/me/report.html')
+  })
+
+  test('converts a POSIX file URL', () => {
+    expect(fileUrlToLocalPath('file:///home/me/report.html')).toBe('/home/me/report.html')
+  })
+
+  test('decodes percent-encoding', () => {
+    expect(fileUrlToLocalPath('file:///home/me/my%20report.html')).toBe('/home/me/my report.html')
+  })
+
+  test('returns null for non-file URLs', () => {
+    expect(fileUrlToLocalPath('http://localhost:3000/report')).toBeNull()
+    expect(fileUrlToLocalPath('https://example.com')).toBeNull()
+  })
+})
+
+describe('applyDirectEdit', () => {
+  test('replaces a single occurrence', () => {
+    expect(applyDirectEdit('<h2>Reosultaten</h2>', 'Reosultaten', 'Resultaten')).toEqual({
+      ok: true,
+      content: '<h2>Resultaten</h2>',
+    })
+  })
+
+  test('refuses when the text is absent', () => {
+    expect(applyDirectEdit('<h2>Hello</h2>', 'Missing', 'X')).toEqual({
+      ok: false,
+      reason: 'not-found',
+    })
+  })
+
+  test('refuses an empty before', () => {
+    expect(applyDirectEdit('abc', '', 'X')).toEqual({ ok: false, reason: 'not-found' })
+  })
+
+  test('refuses when the text occurs more than once', () => {
+    expect(applyDirectEdit('<p>hi</p><p>hi</p>', 'hi', 'yo')).toEqual({
+      ok: false,
+      reason: 'ambiguous',
+    })
+  })
+
+  test('replaces just the changed word across an inline tag', () => {
+    expect(applyDirectEdit('<h1>Mijn <b>Titel</b></h1>', 'Mijn Titel', 'Mijn Kop')).toEqual({
+      ok: true,
+      content: '<h1>Mijn <b>Kop</b></h1>',
+    })
+  })
+
+  test('replaces despite collapsed whitespace in the source', () => {
+    expect(applyDirectEdit('<h1>Mijn   Titel</h1>', 'Mijn Titel', 'Mijn Kop')).toEqual({
+      ok: true,
+      content: '<h1>Mijn   Kop</h1>',
+    })
+  })
+
+  test('handles a deletion', () => {
+    expect(applyDirectEdit('<p>Hello World</p>', 'Hello World', 'Hello')).toEqual({
+      ok: true,
+      content: '<p>Hello</p>',
+    })
   })
 })

@@ -1,15 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  RotateCw,
-  ArrowRight,
-  ArrowLeft,
-  ChevronRight,
-  Wrench,
-  MessageSquare,
-  PencilLine,
-  Highlighter,
-  Send,
-} from 'lucide-react'
+import { RotateCw, ArrowRight, ArrowLeft, ChevronRight, Wrench, MessageSquare, Highlighter, Send } from 'lucide-react'
 import { normalizeAddressBarInput } from '../../utils/browserUrls'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { normalizeFilePath } from '../../utils/paths'
@@ -18,20 +8,22 @@ import { useProjectStore } from '../../stores/projectStore'
 import { execInGuest, captureGuest } from '../../utils/webviewControl'
 import {
   readSelectionScript,
-  startEditScript,
-  readEditScript,
+  installEditContextMenuScript,
   enableDrawScript,
   clearAnnotationsScript,
   isSelectionResult,
-  isEditStartResult,
-  isEditResult,
+  parseEditSaveMessage,
 } from '../../utils/annotationGuestScript'
+import type { EditResult } from '../../utils/annotationGuestScript'
 import {
   buildCommentMessage,
   buildEditMessage,
   buildDrawMessage,
   sendAnnotationToChat,
+  fileUrlToLocalPath,
+  applyDirectEdit,
 } from '../../utils/annotationMessage'
+import { applyDomEdit } from '../../utils/htmlEdit'
 import type { FileWatchEvent } from '../../types'
 import type { CommandWebviewElement } from '../../types/webview'
 
@@ -51,10 +43,10 @@ const RELOAD_DEBOUNCE_MS = 200
 // will-attach-webview regardless, so this attribute is belt-and-suspenders.
 const PARTITION = 'persist:command-browser'
 
-// Annotation modes layered on the webview. Each drives the guest via host-pull
-// (executeJavaScript / capturePage) and routes the result to the active Claude
-// chat; the primary UI lives here in React, not injected into the guest.
-type AnnotationMode = 'none' | 'comment' | 'edit' | 'draw'
+// Toolbar annotation modes. Edit is NOT a toolbar mode — it's triggered by
+// right-clicking a selection in the page (installEditContextMenuScript), with
+// an in-guest "Opslaan" overlay that signals back over console-message.
+type AnnotationMode = 'none' | 'comment' | 'draw'
 
 interface PendingComment {
   url: string
@@ -82,18 +74,23 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(null)
   const [commentText, setCommentText] = useState('')
   const [status, setStatus] = useState<string | null>(null)
+  // Lets the console-message listener (registered once) call the latest handler.
+  const handleEditSaveRef = useRef<((payload: EditResult) => void) | null>(null)
 
   // Keep the address bar in sync when the url changes outside this component.
   useEffect(() => {
     setInput(url)
   }, [url])
 
-  // Reflect the guest's real navigation state into the address bar and buttons.
+  // Reflect the guest's navigation state, (re)install the right-click edit flow
+  // on each fresh document, and listen for the in-guest "save" signal.
   useEffect(() => {
     const wv = webviewRef.current
     if (!wv) return
     const onReady = () => {
       readyRef.current = true
+      // The guest DOM resets on every navigation, so re-install each dom-ready.
+      void execInGuest(wv, true, installEditContextMenuScript())
     }
     const sync = () => {
       setInput(wv.getURL())
@@ -107,15 +104,22 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
       setPendingComment(null)
       setStatus(null)
     }
+    const onConsole = (e: Event) => {
+      const message = (e as unknown as { message?: string }).message
+      const payload = parseEditSaveMessage(message)
+      if (payload) void handleEditSaveRef.current?.(payload)
+    }
     wv.addEventListener('dom-ready', onReady)
     wv.addEventListener('did-navigate', sync)
     wv.addEventListener('did-navigate', resetAnnotation)
     wv.addEventListener('did-navigate-in-page', sync)
+    wv.addEventListener('console-message', onConsole)
     return () => {
       wv.removeEventListener('dom-ready', onReady)
       wv.removeEventListener('did-navigate', sync)
       wv.removeEventListener('did-navigate', resetAnnotation)
       wv.removeEventListener('did-navigate-in-page', sync)
+      wv.removeEventListener('console-message', onConsole)
     }
   }, [])
 
@@ -209,31 +213,73 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     }
   }
 
-  const startEdit = async () => {
-    const res = await runGuest(startEditScript())
-    if (!isEditStartResult(res)) {
-      setStatus('Selecteer eerst tekst om te bewerken.')
-      return
+  // Apply an inline edit straight to a local file (no agent). Reports the exact
+  // outcome so the caller can surface why it fell back to the agent.
+  const tryDirectFileEdit = async (
+    localPath: string,
+    payload: EditResult
+  ): Promise<'ok' | 'not-found' | 'ambiguous' | 'io-error'> => {
+    let content: string
+    try {
+      content = await getElectronAPI().fs.readFile(localPath)
+    } catch {
+      return 'io-error'
     }
-    setStatus('Bewerk de tekst op de pagina, klik dan "Stuur edit".')
+    // 1. Structural DOM-match (parse5): splice only the element's source range,
+    //    leaving the rest of the file byte-for-byte intact.
+    let result = applyDomEdit(content, payload.indexPath, payload.tag, payload.html)
+    // 2. Fallback: text diff-span, in case the live DOM drifted from the source.
+    if (!result.ok) result = applyDirectEdit(content, payload.before, payload.after)
+    if (!result.ok) return result.reason
+    try {
+      await getElectronAPI().fs.writeFile(localPath, result.content)
+      return 'ok'
+    } catch {
+      return 'io-error'
+    }
   }
 
-  const sendEdit = async () => {
-    const res = await runGuest(readEditScript())
-    if (!isEditResult(res)) {
-      setStatus('Geen actieve edit — klik eerst "Start edit".')
-      return
-    }
-    if (res.before === res.after) {
-      setStatus('Geen wijziging gevonden.')
+  // Fired from the in-guest "Opslaan" button via console-message. A local .html
+  // page maps straight to its file, so apply the edit directly; dev-server
+  // pages and ambiguous/absent matches fall back to the agent, with the reason
+  // shown in the status line for diagnosis.
+  const handleEditSave = async (payload: EditResult) => {
+    if (payload.before === payload.after) {
+      setStatus('Geen wijziging.')
       void runGuest(clearAnnotationsScript())
       return
     }
-    if (sendText(buildEditMessage(res))) {
-      setStatus('Edit naar chat gestuurd.')
+    const localPath = fileUrlToLocalPath(payload.url)
+    if (localPath) {
+      const outcome = await tryDirectFileEdit(localPath, payload)
+      if (outcome === 'ok') {
+        setStatus('Direct in het bestand aangepast.')
+        void runGuest(clearAnnotationsScript())
+        if (readyRef.current) webviewRef.current?.reload()
+        return
+      }
+      const why =
+        outcome === 'not-found'
+          ? 'element/tekst niet teruggevonden'
+          : outcome === 'ambiguous'
+            ? 'niet eenduidig'
+            : 'bestand lezen/schrijven mislukt'
+      if (sendText(buildEditMessage(payload))) {
+        setStatus(`Direct niet gelukt (${why}) — via de chat.`)
+      }
       void runGuest(clearAnnotationsScript())
+      return
     }
+    // Non-file page (localhost dev-server): only the agent can find the source.
+    if (sendText(buildEditMessage(payload))) {
+      setStatus('Dev-server pagina — via de chat.')
+    }
+    void runGuest(clearAnnotationsScript())
   }
+  // Keep the ref pointing at the latest handler for the console-message listener.
+  useEffect(() => {
+    handleEditSaveRef.current = handleEditSave
+  })
 
   const addDrawingToChat = async () => {
     const image = await captureGuest(webviewRef.current, readyRef.current)
@@ -310,13 +356,6 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
           <MessageSquare className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={() => void switchMode('edit')}
-          title="Annotatie: inline editen"
-          className={modeBtn(mode === 'edit')}
-        >
-          <PencilLine className="w-3.5 h-3.5" />
-        </button>
-        <button
           onClick={() => void switchMode('draw')}
           title="Annotatie: tekenen"
           className={modeBtn(mode === 'draw')}
@@ -325,7 +364,7 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
         </button>
       </div>
 
-      {mode !== 'none' && (
+      {(mode !== 'none' || status) && (
         <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border bg-sidebar-accent text-xs">
           {mode === 'comment' &&
             (!pendingComment ? (
@@ -349,16 +388,6 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
                 </button>
               </>
             ))}
-          {mode === 'edit' && (
-            <>
-              <button onClick={() => void startEdit()} className={annotBtn}>
-                Start edit
-              </button>
-              <button onClick={() => void sendEdit()} className={annotBtn}>
-                <Send className="w-3 h-3" /> Stuur edit
-              </button>
-            </>
-          )}
           {mode === 'draw' && (
             <>
               <span className="text-muted-foreground">Teken op de pagina.</span>
