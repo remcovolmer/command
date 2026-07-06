@@ -24,11 +24,12 @@ type EditorOpenFileCallback = (data: {
   fileName: string
   projectId: string
   line?: number
+  terminalId?: string
 }) => void
-type EditorOpenDiffCallback = (data: {
-  filePath: string
-  fileName: string
+type EditorOpenBrowserCallback = (data: {
+  url: string
   projectId: string
+  terminalId?: string
 }) => void
 type SpawnFailedCallback = (event: SpawnFailedEvent) => void
 
@@ -50,7 +51,7 @@ class TerminalEventManager {
   private sidecarCreatedCallbacks: SidecarCreatedCallback[] = []
   private statusMessageCallbacks: StatusMessageCallback[] = []
   private editorOpenFileCallbacks: EditorOpenFileCallback[] = []
-  private editorOpenDiffCallbacks: EditorOpenDiffCallback[] = []
+  private editorOpenBrowserCallbacks: EditorOpenBrowserCallback[] = []
   private spawnFailedCallbacks: SpawnFailedCallback[] = []
   private initialized = false
   private unsubscribers: Unsubscribe[] = []
@@ -152,8 +153,8 @@ class TerminalEventManager {
     )
 
     this.unsubscribers.push(
-      api.editor.onOpenDiff((data) => {
-        for (const callback of this.editorOpenDiffCallbacks) {
+      api.editor.onOpenBrowser((data) => {
+        for (const callback of this.editorOpenBrowserCallbacks) {
           callback(data)
         }
       })
@@ -268,14 +269,15 @@ class TerminalEventManager {
   }
 
   /**
-   * Subscribe to editor open diff events (from CommandServer /diff route)
+   * Subscribe to editor open browser events (from CommandServer /open route,
+   * URL targets). Renders a URL in a built-in browser tab.
    */
-  onEditorOpenDiff(callback: EditorOpenDiffCallback): () => void {
+  onEditorOpenBrowser(callback: EditorOpenBrowserCallback): () => void {
     this.init()
-    this.editorOpenDiffCallbacks.push(callback)
+    this.editorOpenBrowserCallbacks.push(callback)
     return () => {
-      const index = this.editorOpenDiffCallbacks.indexOf(callback)
-      if (index !== -1) this.editorOpenDiffCallbacks.splice(index, 1)
+      const index = this.editorOpenBrowserCallbacks.indexOf(callback)
+      if (index !== -1) this.editorOpenBrowserCallbacks.splice(index, 1)
     }
   }
 
@@ -311,7 +313,7 @@ class TerminalEventManager {
     this.sidecarCreatedCallbacks = []
     this.statusMessageCallbacks = []
     this.editorOpenFileCallbacks = []
-    this.editorOpenDiffCallbacks = []
+    this.editorOpenBrowserCallbacks = []
     this.spawnFailedCallbacks = []
     this.initialized = false
   }

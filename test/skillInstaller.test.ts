@@ -43,7 +43,7 @@ describe('SkillInstaller', () => {
 
     expect(existsSync(globalSkillPath())).toBe(true)
     const content = readFileSync(globalSkillPath(), 'utf-8')
-    expect(content).toContain('<!-- ccli-skill-v1 -->')
+    expect(content).toContain('<!-- ccli-skill-v2 -->')
     expect(content).toContain('ccli worktree create')
   })
 
@@ -80,7 +80,7 @@ describe('SkillInstaller', () => {
     await installer.install()
 
     const content = readFileSync(globalSkillPath(), 'utf-8')
-    expect(content).toContain('<!-- ccli-skill-v1 -->')
+    expect(content).toContain('<!-- ccli-skill-v2 -->')
     expect(content).not.toContain('Old content')
   })
 
@@ -124,7 +124,7 @@ describe('SkillInstaller', () => {
     expect(content).toContain('ccli title')
     expect(content).toContain('ccli sidecar')
     expect(content).toContain('ccli chat list')
-    expect(content).toContain('ccli diff')
+    expect(content).not.toContain('ccli diff')
     expect(content).toContain('ccli worktree merge')
   })
 })

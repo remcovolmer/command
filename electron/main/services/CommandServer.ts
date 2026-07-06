@@ -54,6 +54,20 @@ function isValidUUID(id: string): boolean {
   return typeof id === 'string' && UUID_REGEX.test(id)
 }
 
+/**
+ * Normalize an `open` URL target the same way the browser address bar does:
+ * http(s):// and file:// pass through; a bare host (example.com, localhost:5173)
+ * gets an http:// prefix. Returns null for empty/whitespace input. Mirrors
+ * `normalizeAddressBarInput` in src/utils/browserUrls.ts (kept in sync by hand —
+ * the renderer util can't be imported into the main process).
+ */
+function normalizeOpenUrl(raw: string): string | null {
+  const next = raw.trim()
+  if (!next) return null
+  if (/^https?:\/\//i.test(next) || next.startsWith('file://')) return next
+  return `http://${next}`
+}
+
 export class CommandServer {
   private server: Server | null = null
   private port: number | null = null
@@ -378,8 +392,38 @@ export class CommandServer {
    * Register file-related route handlers (Unit 6).
    */
   private registerFileRoutes(): void {
-    // POST /open — open a file in the editor
+    // POST /open — render HTML files and URLs in the browser, other files in
+    // the editor. The renderer branches on file type; URLs skip file validation
+    // and route straight to a browser tab. Both events carry the calling
+    // terminalId so the tab lands in the invoking chat, not the focused one.
     this.route('POST', '/open', async (body, context) => {
+      const { terminalId } = context
+
+      // URL target: render in the browser. No path validation applies; the
+      // projectId comes from the calling terminal.
+      if (typeof body.url === 'string') {
+        const url = normalizeOpenUrl(body.url)
+        if (!url) {
+          return { ok: false, error: 'Invalid "url"' }
+        }
+        if (!terminalId) {
+          return { ok: false, error: 'Missing X-Terminal-ID header' }
+        }
+        const info = context.terminalManager.getTerminalInfo(terminalId)
+        if (!info) {
+          return { ok: false, error: 'Terminal not found' }
+        }
+        context.mainWindow.webContents.send('editor:open-browser', {
+          url,
+          projectId: info.projectId,
+          terminalId,
+        })
+        return { ok: true }
+      }
+
+      // File target: validate within a project, verify it exists, then send to
+      // the renderer, which renders HTML in the browser and other files in the
+      // editor (see Sidebar's editor:open-file handler).
       const file = body.file
       const validation = this.validateFilePath(file, context)
       if (!validation.ok) return validation
@@ -401,28 +445,7 @@ export class CommandServer {
         fileName: path.basename(validation.resolved),
         projectId: validation.projectId,
         line: line as number | undefined,
-      })
-
-      return { ok: true }
-    })
-
-    // POST /diff — open a diff view for a file
-    this.route('POST', '/diff', async (body, context) => {
-      const file = body.file
-      const validation = this.validateFilePath(file, context)
-      if (!validation.ok) return validation
-
-      // Verify file exists
-      try {
-        accessSync(validation.resolved)
-      } catch {
-        return { ok: false, error: 'File not found' }
-      }
-
-      context.mainWindow.webContents.send('editor:open-diff', {
-        filePath: validation.resolved,
-        fileName: path.basename(validation.resolved),
-        projectId: validation.projectId,
+        terminalId,
       })
 
       return { ok: true }

@@ -13,7 +13,7 @@ const log = createLogger('SkillInstaller')
  * Also cleans up legacy per-project command files from older versions.
  */
 export class SkillInstaller {
-  private readonly SKILL_VERSION = 'ccli-skill-v1'
+  private readonly SKILL_VERSION = 'ccli-skill-v2'
   private readonly skillTemplate: string
   private readonly globalSkillDir: string
   private readonly globalSkillPath: string
@@ -113,15 +113,20 @@ ccli worktree merge                          # merge the current worktree's PR
 
 **Never use \`git worktree add\` directly** \u2014 Command cannot track worktrees it didn't create.
 
-## Files & Diffs
+## Files & Browser
 
-Show files and diffs to the user in Command's editor:
+Show things to the user with \`ccli open\`. It routes by target type: HTML files
+and URLs (localhost dev servers, external sites) render in the built-in browser;
+every other file opens as source in the editor.
 
 \`\`\`bash
-ccli open src/App.tsx                  # open file in editor
-ccli open src/App.tsx --line 42        # open at specific line
-ccli diff src/App.tsx                  # show git diff for file
+ccli open src/App.tsx                  # source in the editor
+ccli open src/App.tsx --line 42        # editor, scrolled to a line
+ccli open report.html                  # HTML rendered in the browser (live-reloads)
+ccli open http://localhost:5173        # a running dev server in the browser
 \`\`\`
+
+After generating an HTML deliverable, \`ccli open <file>\` renders it for the user.
 
 ## Communication
 

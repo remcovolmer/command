@@ -117,10 +117,39 @@ describe('ccli', () => {
       expect(route.error).toBeTruthy()
     })
 
-    test('diff resolves file path to absolute', () => {
+    test('diff subcommand is removed and returns an error', () => {
       const route = ccli.buildRoute(['diff', 'src/App.tsx'], {})
+      expect(route.error).toContain('Unknown command')
+    })
+
+    test('open with an http URL routes to browser without path resolution', () => {
+      const route = ccli.buildRoute(['open', 'http://localhost:5173'], {})
       expect(route.method).toBe('POST')
-      expect(route.path).toBe('/diff')
+      expect(route.path).toBe('/open')
+      expect(route.body!.url).toBe('http://localhost:5173')
+      expect(route.body!.file).toBeUndefined()
+    })
+
+    test('open with a bare host:port is treated as a URL', () => {
+      const route = ccli.buildRoute(['open', 'localhost:5173'], {})
+      expect(route.body!.url).toBe('localhost:5173')
+      expect(route.body!.file).toBeUndefined()
+    })
+
+    test('open with a bare domain is treated as a URL', () => {
+      const route = ccli.buildRoute(['open', 'example.com'], {})
+      expect(route.body!.url).toBe('example.com')
+    })
+
+    test('open with an .html target resolves as a file (browser routing is server-side)', () => {
+      const route = ccli.buildRoute(['open', 'report.html'], {})
+      expect(route.body!.url).toBeUndefined()
+      expect(path.isAbsolute(route.body!.file as string)).toBe(true)
+    })
+
+    test('open with a non-existent doc file still routes as a file, not a URL', () => {
+      const route = ccli.buildRoute(['open', 'ontbreekt.md'], {})
+      expect(route.body!.url).toBeUndefined()
       expect(path.isAbsolute(route.body!.file as string)).toBe(true)
     })
 

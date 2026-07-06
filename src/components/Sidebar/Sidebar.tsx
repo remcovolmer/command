@@ -211,20 +211,22 @@ export function Sidebar() {
     const unsubOpenFile = terminalEvents.onEditorOpenFile((data) => {
       const store = useProjectStore.getState()
       // HTML opens in the built-in browser; everything else in the editor.
+      // terminalId (the calling chat) targets the invoking chat's tab area
+      // rather than whichever chat the user currently has focused.
       if (isHtmlFile(data.fileName)) {
-        store.openFileInBrowser(data.filePath, data.fileName, data.projectId)
+        store.openFileInBrowser(data.filePath, data.fileName, data.projectId, data.terminalId)
       } else {
-        store.openEditorTab(data.filePath, data.fileName, data.projectId)
+        store.openEditorTab(data.filePath, data.fileName, data.projectId, data.terminalId)
       }
     })
-    const unsubOpenDiff = terminalEvents.onEditorOpenDiff((data) => {
-      const { openWorkingTreeDiffTab } = useProjectStore.getState()
-      openWorkingTreeDiffTab(data.filePath, data.fileName, 'unstaged', data.projectId)
+    const unsubOpenBrowser = terminalEvents.onEditorOpenBrowser((data) => {
+      const store = useProjectStore.getState()
+      store.openUrlInBrowser(data.url, data.projectId, data.terminalId)
     })
     return () => {
       unsubStatus()
       unsubOpenFile()
-      unsubOpenDiff()
+      unsubOpenBrowser()
     }
   }, [])
 

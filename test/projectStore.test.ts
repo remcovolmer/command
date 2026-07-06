@@ -200,6 +200,74 @@ describe('projectStore active terminal & content', () => {
       const tab = useProjectStore.getState().editorTabs[tabId]
       expect(tab.type === 'browser' && tab.url).toBe('http://localhost:3000')
     })
+
+    // Calling-chat targeting: a CLI-driven open passes the invoking terminalId,
+    // which must win over whichever chat the user currently has focused.
+    test('openEditorTab targets the passed terminalId over the focused chat', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-focused' })
+      useProjectStore.getState().openEditorTab('/p/a.ts', 'a.ts', 'proj-1', 'chat-caller')
+      const s = useProjectStore.getState()
+      const tab = Object.values(s.editorTabs)[0]
+      expect(tab.terminalId).toBe('chat-caller')
+      expect(s.activeContentTabId['chat-caller']).toBe(tab.id)
+      expect(s.activeContentTabId['chat-focused']).toBeUndefined()
+    })
+
+    test('openFileInBrowser targets the passed terminalId over the focused chat', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-focused' })
+      useProjectStore
+        .getState()
+        .openFileInBrowser('/p/report.html', 'report.html', 'proj-1', 'chat-caller')
+      const s = useProjectStore.getState()
+      const tab = Object.values(s.editorTabs)[0]
+      expect(tab.type).toBe('browser')
+      expect(tab.terminalId).toBe('chat-caller')
+      expect(s.activeContentTabId['chat-caller']).toBe(tab.id)
+    })
+
+    test('openEditorTab without terminalId still falls back to the active chat', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      useProjectStore.getState().openEditorTab('/p/a.ts', 'a.ts', 'proj-1')
+      const tab = Object.values(useProjectStore.getState().editorTabs)[0]
+      expect(tab.terminalId).toBe('chat-A')
+    })
+
+    test('openUrlInBrowser opens a URL tab in the calling chat', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-focused' })
+      useProjectStore.getState().openUrlInBrowser('http://localhost:5173', 'proj-1', 'chat-caller')
+      const s = useProjectStore.getState()
+      const tab = Object.values(s.editorTabs)[0]
+      expect(tab.type).toBe('browser')
+      expect(tab.type === 'browser' && tab.url).toBe('http://localhost:5173')
+      expect(tab.type === 'browser' && tab.filePath).toBeUndefined()
+      expect(tab.terminalId).toBe('chat-caller')
+    })
+
+    test('openUrlInBrowser reuses the tab for the same URL but opens a new tab for a different URL', () => {
+      useProjectStore.setState({ activeTerminalId: 'chat-A' })
+      const store = useProjectStore.getState()
+      store.openUrlInBrowser('http://localhost:5173', 'proj-1', 'chat-A')
+      store.openUrlInBrowser('http://localhost:5173', 'proj-1', 'chat-A')
+      expect(Object.values(useProjectStore.getState().editorTabs).length).toBe(1)
+
+      store.openUrlInBrowser('http://localhost:3000', 'proj-1', 'chat-A')
+      expect(Object.values(useProjectStore.getState().editorTabs).length).toBe(2)
+    })
+
+    test('openUrlInBrowser does not reuse a same-URL tab from a different chat', () => {
+      const store = useProjectStore.getState()
+      // Same URL already open in chat-A (e.g. a manual browser tab).
+      store.openUrlInBrowser('http://localhost:5173', 'proj-1', 'chat-A')
+      // Opening it from chat-B must give chat-B its own tab, not reactivate A's.
+      store.openUrlInBrowser('http://localhost:5173', 'proj-1', 'chat-B')
+
+      const s = useProjectStore.getState()
+      const tabs = Object.values(s.editorTabs)
+      expect(tabs.length).toBe(2)
+      const bTabId = s.activeContentTabId['chat-B']
+      const bTab = tabs.find((t) => t.id === bTabId)
+      expect(bTab?.terminalId).toBe('chat-B')
+    })
   })
 
   describe('removeTerminal', () => {
