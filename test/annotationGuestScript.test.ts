@@ -1,17 +1,18 @@
 import { describe, test, expect } from 'vitest'
 import {
-  readSelectionScript,
   installEditContextMenuScript,
+  enableCommentInspectScript,
   enableMarkupScript,
   resetMarkupScript,
   clearAnnotationsScript,
-  isSelectionResult,
   isEditResult,
   parseEditSaveMessage,
   parseMarkupMessage,
+  parseCommentMessage,
   EDIT_SAVE_SENTINEL,
   MARKUP_ADD_SENTINEL,
   MARKUP_CANCEL_SENTINEL,
+  COMMENT_SENTINEL,
 } from '../src/utils/annotationGuestScript'
 
 // new Function(body) compiles but does not execute, so it validates the
@@ -27,8 +28,8 @@ function isSyntacticallyValid(code: string): boolean {
 
 describe('guest script builders produce valid JS', () => {
   const scripts = {
-    readSelectionScript: readSelectionScript(),
     installEditContextMenuScript: installEditContextMenuScript(),
+    enableCommentInspectScript: enableCommentInspectScript(),
     enableMarkupScript: enableMarkupScript(),
     resetMarkupScript: resetMarkupScript(),
     clearAnnotationsScript: clearAnnotationsScript(),
@@ -41,12 +42,13 @@ describe('guest script builders produce valid JS', () => {
     })
   }
 
-  test('readSelectionScript reads selection, outerHTML, selector and url', () => {
-    const s = readSelectionScript()
-    expect(s).toContain('getSelection')
-    expect(s).toContain('outerHTML')
-    expect(s).toContain('location.href')
+  test('enableCommentInspectScript highlights on hover and opens a comment box on click', () => {
+    const s = enableCommentInspectScript()
+    expect(s).toContain('elementFromPoint')
     expect(s).toContain('__cc_annotate_highlight')
+    expect(s).toContain('ccShowComment')
+    expect(s).toContain('outerHTML')
+    expect(s).toContain(COMMENT_SENTINEL)
   })
 
   test('installEditContextMenuScript wires right-click edit, key-blocking and a save signal', () => {
@@ -58,7 +60,10 @@ describe('guest script builders produce valid JS', () => {
     expect(s).toContain('stopPropagation')
     expect(s).toContain('ccIndexPath')
     expect(s).toContain('innerHTML')
+    expect(s).toContain('Comment')
+    expect(s).toContain('ccShowComment')
     expect(s).toContain(EDIT_SAVE_SENTINEL)
+    expect(s).toContain(COMMENT_SENTINEL)
   })
 
   test('enableMarkupScript builds a canvas + floating toolbar with tools and actions', () => {
@@ -82,13 +87,6 @@ describe('guest script builders produce valid JS', () => {
 })
 
 describe('result guards', () => {
-  test('isSelectionResult', () => {
-    expect(isSelectionResult({ text: 'a', outerHTML: '<b>', selector: 'b', url: 'x' })).toBe(true)
-    expect(isSelectionResult(null)).toBe(false)
-    expect(isSelectionResult({ text: 'a' })).toBe(false)
-    expect(isSelectionResult({ text: 1, outerHTML: '', selector: '', url: '' })).toBe(false)
-  })
-
   test('isEditResult', () => {
     expect(
       isEditResult({
@@ -158,5 +156,20 @@ describe('parseMarkupMessage', () => {
     expect(parseMarkupMessage('random page log')).toBeNull()
     expect(parseMarkupMessage(EDIT_SAVE_SENTINEL + '{}')).toBeNull()
     expect(parseMarkupMessage(42)).toBeNull()
+  })
+})
+
+describe('parseCommentMessage', () => {
+  const payload = { selector: 'h2', snippet: '<h2>x</h2>', comment: 'te klein', url: 'file:///x.html' }
+
+  test('parses a sentinel-prefixed comment payload', () => {
+    expect(parseCommentMessage(COMMENT_SENTINEL + JSON.stringify(payload))).toEqual(payload)
+  })
+
+  test('ignores non-comment, malformed, or wrong-shape messages', () => {
+    expect(parseCommentMessage(JSON.stringify(payload))).toBeNull()
+    expect(parseCommentMessage(COMMENT_SENTINEL + '{bad')).toBeNull()
+    expect(parseCommentMessage(COMMENT_SENTINEL + JSON.stringify({ selector: 'h2' }))).toBeNull()
+    expect(parseCommentMessage(42)).toBeNull()
   })
 })

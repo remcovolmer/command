@@ -11,13 +11,6 @@
 // The scripts are static (no host interpolation of user data) so page text can
 // never become code.
 
-export interface SelectionResult {
-  text: string
-  outerHTML: string
-  selector: string
-  url: string
-}
-
 export interface EditResult {
   before: string
   after: string
@@ -32,16 +25,6 @@ export interface EditResult {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null
-}
-
-export function isSelectionResult(v: unknown): v is SelectionResult {
-  return (
-    isRecord(v) &&
-    typeof v.text === 'string' &&
-    typeof v.outerHTML === 'string' &&
-    typeof v.selector === 'string' &&
-    typeof v.url === 'string'
-  )
 }
 
 export function isEditResult(v: unknown): v is EditResult {
@@ -84,6 +67,37 @@ export function parseMarkupMessage(message: unknown): 'add' | 'cancel' | null {
   return null
 }
 
+export interface CommentPayload {
+  selector: string
+  snippet: string
+  comment: string
+  url: string
+}
+
+/** Signal from an in-guest comment box (right-click Comment, or inspect click). */
+export const COMMENT_SENTINEL = '__CC_COMMENT__'
+
+function isCommentPayload(v: unknown): v is CommentPayload {
+  return (
+    isRecord(v) &&
+    typeof v.selector === 'string' &&
+    typeof v.snippet === 'string' &&
+    typeof v.comment === 'string' &&
+    typeof v.url === 'string'
+  )
+}
+
+/** Parse a guest console message into a comment payload, or null. */
+export function parseCommentMessage(message: unknown): CommentPayload | null {
+  if (typeof message !== 'string' || !message.startsWith(COMMENT_SENTINEL)) return null
+  try {
+    const parsed: unknown = JSON.parse(message.slice(COMMENT_SENTINEL.length))
+    return isCommentPayload(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 const MAX_FIELD = 4000
 
 // Shared guest helper: a compact-ish CSS path (id shortcut, up to 6 levels,
@@ -112,27 +126,27 @@ const CANVAS_ID = '__cc_annotate_canvas'
 const MENU_ID = '__cc_annotate_menu'
 const SAVE_ID = '__cc_annotate_save'
 const MARKUP_BAR_ID = '__cc_annotate_markupbar'
+const COMMENT_BOX_ID = '__cc_annotate_commentbox'
 
-/** Read the current selection, draw a transient highlight, return its context. */
-export function readSelectionScript(): string {
-  return `(function(){
-  ${CSS_PATH}
-  var sel=window.getSelection();
-  if(!sel||sel.rangeCount===0||sel.isCollapsed)return null;
-  var range=sel.getRangeAt(0);
-  var node=range.commonAncestorContainer;
-  var el=node.nodeType===1?node:node.parentElement;
-  var rect=range.getBoundingClientRect();
-  var hl=document.getElementById('${HIGHLIGHT_ID}')||document.createElement('div');
-  hl.id='${HIGHLIGHT_ID}';
-  hl.style.cssText='position:fixed;z-index:2147483646;pointer-events:none;border:2px solid #0f5f6b;background:rgba(15,95,107,0.12);border-radius:3px;';
-  hl.style.left=rect.left+'px';hl.style.top=rect.top+'px';
-  hl.style.width=rect.width+'px';hl.style.height=rect.height+'px';
-  document.body.appendChild(hl);
-  var html=el&&el.outerHTML?el.outerHTML:sel.toString();
-  return {text:sel.toString().slice(0,${MAX_FIELD}),outerHTML:html.slice(0,${MAX_FIELD}),selector:ccPath(el),url:location.href};
-})()`
-}
+// Shared guest helper: ccShowComment(rect, snippet, selector) shows an input +
+// send button near rect and, on send, console.log's the comment payload. Used
+// by both the right-click "Comment" menu item and the inspect-mode click.
+const COMMENT_UI = `function ccShowComment(rect,snippet,selector){
+  var old=document.getElementById('${COMMENT_BOX_ID}');if(old)old.remove();
+  var box=document.createElement('div');box.id='${COMMENT_BOX_ID}';
+  box.style.cssText='position:fixed;z-index:2147483647;left:'+Math.max(4,Math.min(rect.left,window.innerWidth-280))+'px;top:'+(rect.bottom+6)+'px;display:flex;gap:6px;background:#fff;border:1px solid #d7dbe0;border-radius:8px;padding:6px;box-shadow:0 4px 14px rgba(0,0,0,.15);';
+  var inp=document.createElement('input');inp.type='text';inp.placeholder='Opmerking…';
+  inp.style.cssText='font:400 13px sans-serif;color:#1a1c1e;border:1px solid #d7dbe0;border-radius:6px;padding:4px 8px;min-width:200px;outline:none;';
+  var send=document.createElement('button');send.textContent='Stuur';
+  send.style.cssText='font:600 13px sans-serif;background:#0f5f6b;color:#fff;border:none;border-radius:6px;padding:0 12px;cursor:pointer;';
+  box.appendChild(inp);box.appendChild(send);document.body.appendChild(box);
+  var done=false;
+  function fin(){if(done)return;done=true;var t=inp.value.trim();if(box.parentNode)box.remove();if(t)console.log('${COMMENT_SENTINEL}'+JSON.stringify({selector:selector||'',snippet:(snippet||'').slice(0,${MAX_FIELD}),comment:t,url:location.href}));}
+  box.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
+  send.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();fin();});
+  inp.addEventListener('keydown',function(ev){ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();fin();}else if(ev.key==='Escape'){done=true;if(box.parentNode)box.remove();}});
+  setTimeout(function(){inp.focus();},0);
+}`
 
 /**
  * Install the right-click edit flow into the guest (idempotent). On a
@@ -147,6 +161,7 @@ export function installEditContextMenuScript(): string {
   if(window.__ccEditInstalled)return true;
   window.__ccEditInstalled=true;
   ${CSS_PATH}
+  ${COMMENT_UI}
   function ccIndexPath(el){
     var path=[];var node=el;
     while(node&&node.parentElement){
@@ -188,13 +203,15 @@ export function installEditContextMenuScript(): string {
     });
     document.body.appendChild(save);
   }
-  function showMenu(el,rect){
+  function showMenu(el,rect,selText){
     rm('${MENU_ID}');
-    var menu=document.createElement('div');
-    menu.id='${MENU_ID}';menu.textContent='Edit';
-    menu.style.cssText='position:fixed;z-index:2147483647;left:'+rect.left+'px;top:'+(rect.bottom+4)+'px;background:#0f5f6b;color:#fff;font:600 12px sans-serif;padding:4px 12px;border-radius:6px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);';
-    function outside(ev){if(ev.target!==menu){rm('${MENU_ID}');document.removeEventListener('pointerdown',outside,true);}}
-    menu.addEventListener('click',function(ev){ev.stopPropagation();document.removeEventListener('pointerdown',outside,true);rm('${MENU_ID}');startEdit(el);});
+    var menu=document.createElement('div');menu.id='${MENU_ID}';
+    menu.style.cssText='position:fixed;z-index:2147483647;left:'+rect.left+'px;top:'+(rect.bottom+4)+'px;background:#0f5f6b;color:#fff;font:600 12px sans-serif;border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.2);';
+    function close(){rm('${MENU_ID}');document.removeEventListener('pointerdown',outside,true);}
+    function outside(ev){if(!menu.contains(ev.target))close();}
+    function item(label,fn){var it=document.createElement('div');it.textContent=label;it.style.cssText='padding:5px 14px;cursor:pointer;';it.addEventListener('mouseenter',function(){it.style.background='rgba(255,255,255,.15)';});it.addEventListener('mouseleave',function(){it.style.background='transparent';});it.addEventListener('click',function(ev){ev.stopPropagation();close();fn();});menu.appendChild(it);}
+    item('Edit',function(){startEdit(el);});
+    item('Comment',function(){ccShowComment(rect,selText,ccPath(el));});
     document.body.appendChild(menu);
     setTimeout(function(){document.addEventListener('pointerdown',outside,true);},0);
   }
@@ -206,8 +223,55 @@ export function installEditContextMenuScript(): string {
     var el=node.nodeType===1?node:node.parentElement;
     if(!el)return;
     e.preventDefault();
-    showMenu(el,range.getBoundingClientRect());
+    showMenu(el,range.getBoundingClientRect(),sel.toString());
   });
+  return true;
+})()`
+}
+
+/**
+ * Inspect mode for the comment tool: hovering highlights the element under the
+ * cursor; clicking it opens a comment box (sending the comment + the element's
+ * outerHTML to the chat). Clicks are captured so the page's own handlers don't
+ * fire while picking. Toggle the mode off to exit.
+ */
+export function enableCommentInspectScript(): string {
+  return `(function(){
+  ${CSS_PATH}
+  ${COMMENT_UI}
+  var hl=document.getElementById('${HIGHLIGHT_ID}')||document.createElement('div');
+  hl.id='${HIGHLIGHT_ID}';
+  hl.style.cssText='position:fixed;z-index:2147483646;pointer-events:none;border:2px solid #0f5f6b;background:rgba(15,95,107,0.10);border-radius:3px;display:none;';
+  document.body.appendChild(hl);
+  function commenting(){return !!document.getElementById('${COMMENT_BOX_ID}');}
+  function isChrome(el){return !el||el.id==='${HIGHLIGHT_ID}'||el.id==='${COMMENT_BOX_ID}'||!!(el.closest&&el.closest('#${COMMENT_BOX_ID}'));}
+  function onMove(e){
+    if(commenting()){hl.style.display='none';return;}
+    var el=document.elementFromPoint(e.clientX,e.clientY);
+    if(isChrome(el)){hl.style.display='none';window.__ccInspectEl=null;return;}
+    var r=el.getBoundingClientRect();
+    hl.style.display='block';hl.style.left=r.left+'px';hl.style.top=r.top+'px';hl.style.width=r.width+'px';hl.style.height=r.height+'px';
+    window.__ccInspectEl=el;
+  }
+  function onClick(e){
+    if(commenting())return;
+    var at=document.elementFromPoint(e.clientX,e.clientY);
+    if(isChrome(at))return;
+    var el=window.__ccInspectEl||at;
+    if(!el)return;
+    e.preventDefault();e.stopPropagation();
+    hl.style.display='none';
+    ccShowComment(el.getBoundingClientRect(),el.outerHTML,ccPath(el));
+  }
+  window.addEventListener('mousemove',onMove,true);
+  window.addEventListener('click',onClick,true);
+  window.__ccInspectTeardown=function(){
+    window.removeEventListener('mousemove',onMove,true);
+    window.removeEventListener('click',onClick,true);
+    var h=document.getElementById('${HIGHLIGHT_ID}');if(h)h.remove();
+    var b=document.getElementById('${COMMENT_BOX_ID}');if(b)b.remove();
+    window.__ccInspectEl=null;
+  };
   return true;
 })()`
 }
@@ -320,8 +384,10 @@ export function clearAnnotationsScript(): string {
   return `(function(){
   var hl=document.getElementById('${HIGHLIGHT_ID}');if(hl)hl.remove();
   var cv=document.getElementById('${CANVAS_ID}');if(cv)cv.remove();
+  var cb=document.getElementById('${COMMENT_BOX_ID}');if(cb)cb.remove();
   if(window.__ccTeardownEdit){window.__ccTeardownEdit();}
   if(window.__ccMarkupTeardown){window.__ccMarkupTeardown();}
+  if(window.__ccInspectTeardown){window.__ccInspectTeardown();}
   return true;
 })()`
 }

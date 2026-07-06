@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { RotateCw, ArrowRight, ArrowLeft, ChevronRight, Wrench, MessageSquare, Highlighter, Send } from 'lucide-react'
+import { RotateCw, ArrowRight, ArrowLeft, ChevronRight, Wrench, MessageSquare, Highlighter } from 'lucide-react'
 import { normalizeAddressBarInput } from '../../utils/browserUrls'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { normalizeFilePath } from '../../utils/paths'
@@ -7,16 +7,16 @@ import { getElectronAPI } from '../../utils/electron'
 import { useProjectStore } from '../../stores/projectStore'
 import { execInGuest, captureGuest } from '../../utils/webviewControl'
 import {
-  readSelectionScript,
   installEditContextMenuScript,
+  enableCommentInspectScript,
   enableMarkupScript,
   resetMarkupScript,
   clearAnnotationsScript,
-  isSelectionResult,
   parseEditSaveMessage,
   parseMarkupMessage,
+  parseCommentMessage,
 } from '../../utils/annotationGuestScript'
-import type { EditResult } from '../../utils/annotationGuestScript'
+import type { EditResult, CommentPayload } from '../../utils/annotationGuestScript'
 import {
   buildCommentMessage,
   buildEditMessage,
@@ -50,12 +50,6 @@ const PARTITION = 'persist:command-browser'
 // an in-guest "Opslaan" overlay that signals back over console-message.
 type AnnotationMode = 'none' | 'comment' | 'draw'
 
-interface PendingComment {
-  url: string
-  selector: string
-  snippet: string
-}
-
 /**
  * The built-in browser: a real Electron <webview> with back/forward/reload,
  * an address bar, and dev tools. Loads local HTML and localhost dev apps, and
@@ -73,11 +67,10 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
 
   // Annotation state.
   const [mode, setMode] = useState<AnnotationMode>('none')
-  const [pendingComment, setPendingComment] = useState<PendingComment | null>(null)
-  const [commentText, setCommentText] = useState('')
   const [status, setStatus] = useState<string | null>(null)
   // Let the console-message listener (registered once) call the latest handlers.
   const handleEditSaveRef = useRef<((payload: EditResult) => void) | null>(null)
+  const handleCommentSendRef = useRef<((payload: CommentPayload) => void) | null>(null)
   const handleMarkupAddRef = useRef<(() => void) | null>(null)
   const handleMarkupCancelRef = useRef<(() => void) | null>(null)
 
@@ -105,7 +98,6 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     // is gone — drop back to no active annotation to avoid stale references.
     const resetAnnotation = () => {
       setMode('none')
-      setPendingComment(null)
       setStatus(null)
     }
     const onConsole = (e: Event) => {
@@ -113,6 +105,11 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
       const edit = parseEditSaveMessage(message)
       if (edit) {
         void handleEditSaveRef.current?.(edit)
+        return
+      }
+      const comment = parseCommentMessage(message)
+      if (comment) {
+        handleCommentSendRef.current?.(comment)
         return
       }
       const markup = parseMarkupMessage(message)
@@ -194,32 +191,17 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
 
   const switchMode = async (next: AnnotationMode) => {
     await runGuest(clearAnnotationsScript())
-    setPendingComment(null)
-    setCommentText('')
     setStatus(null)
     const target = mode === next ? 'none' : next
     setMode(target)
-    if (target === 'draw') await runGuest(enableMarkupScript())
+    if (target === 'comment') await runGuest(enableCommentInspectScript())
+    else if (target === 'draw') await runGuest(enableMarkupScript())
   }
 
-  const captureSelection = async () => {
-    const res = await runGuest(readSelectionScript())
-    if (!isSelectionResult(res) || !res.text) {
-      setStatus('Niets geselecteerd op de pagina.')
-      return
-    }
-    setPendingComment({ url: res.url, selector: res.selector, snippet: res.outerHTML })
-    setStatus(null)
-  }
-
-  const sendComment = () => {
-    if (!pendingComment || !commentText.trim()) return
-    const msg = buildCommentMessage({ ...pendingComment, comment: commentText.trim() })
-    if (sendText(msg)) {
-      setPendingComment(null)
-      setCommentText('')
-      void runGuest(clearAnnotationsScript())
-      setStatus('Naar chat gestuurd.')
+  // Fired from an in-guest comment box (right-click Comment, or inspect click).
+  const handleCommentSend = (payload: CommentPayload) => {
+    if (sendText(buildCommentMessage(payload))) {
+      setStatus('Opmerking naar chat gestuurd.')
     }
   }
 
@@ -314,6 +296,7 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
   // Keep the refs pointing at the latest handlers for the console-message listener.
   useEffect(() => {
     handleEditSaveRef.current = handleEditSave
+    handleCommentSendRef.current = handleCommentSend
     handleMarkupAddRef.current = handleMarkupAdd
     handleMarkupCancelRef.current = handleMarkupCancel
   })
@@ -321,8 +304,6 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
   const iconBtn =
     'p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
   const modeBtn = (active: boolean) => `${iconBtn} ${active ? 'text-primary bg-muted/60' : ''}`
-  const annotBtn =
-    'inline-flex items-center gap-1 px-2 py-1 rounded text-foreground border border-border hover:bg-muted/50'
 
   return (
     <div
@@ -371,7 +352,7 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
         <div className="w-px h-4 bg-border mx-0.5" />
         <button
           onClick={() => void switchMode('comment')}
-          title="Annotatie: selecteer + commentaar"
+          title="Annotatie: hover + klik een element om te becommentariëren"
           className={modeBtn(mode === 'comment')}
         >
           <MessageSquare className="w-3.5 h-3.5" />
@@ -385,31 +366,9 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
         </button>
       </div>
 
-      {(mode === 'comment' || status) && (
-        <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border bg-sidebar-accent text-xs">
-          {mode === 'comment' &&
-            (!pendingComment ? (
-              <button onClick={() => void captureSelection()} className={annotBtn}>
-                Lees selectie
-              </button>
-            ) : (
-              <>
-                <input
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') sendComment()
-                  }}
-                  autoFocus
-                  placeholder="Opmerking…"
-                  className="flex-1 px-2 py-1 rounded bg-background border border-border text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <button onClick={sendComment} className={annotBtn}>
-                  <Send className="w-3 h-3" /> Stuur
-                </button>
-              </>
-            ))}
-          {status && <span className="ml-auto text-muted-foreground truncate">{status}</span>}
+      {status && (
+        <div className="flex items-center px-2 py-1.5 border-b border-border bg-sidebar-accent text-xs">
+          <span className="text-muted-foreground truncate">{status}</span>
         </div>
       )}
 
