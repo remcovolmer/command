@@ -34,8 +34,8 @@ function makeAutomation(): Automation {
     trigger: { type: 'schedule', cron: '0 9 * * *' },
     enabled: true,
     timeoutMinutes: 30,
-    createdAt: 0,
-    updatedAt: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
   }
 }
 
