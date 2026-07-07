@@ -15,6 +15,9 @@ import {
   COMMENT_SENTINEL,
 } from '../src/utils/annotationGuestScript'
 
+// A stand-in for the per-document random nonce the host mints and injects.
+const NONCE = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'
+
 // new Function(body) compiles but does not execute, so it validates the
 // injected JS is syntactically well-formed without needing a live DOM.
 function isSyntacticallyValid(code: string): boolean {
@@ -28,9 +31,9 @@ function isSyntacticallyValid(code: string): boolean {
 
 describe('guest script builders produce valid JS', () => {
   const scripts = {
-    installEditContextMenuScript: installEditContextMenuScript(),
-    enableCommentInspectScript: enableCommentInspectScript(),
-    enableMarkupScript: enableMarkupScript(),
+    installEditContextMenuScript: installEditContextMenuScript(NONCE),
+    enableCommentInspectScript: enableCommentInspectScript(NONCE),
+    enableMarkupScript: enableMarkupScript(NONCE),
     resetMarkupScript: resetMarkupScript(),
     clearAnnotationsScript: clearAnnotationsScript(),
   }
@@ -42,8 +45,23 @@ describe('guest script builders produce valid JS', () => {
     })
   }
 
+  test('signal-emitting scripts embed the nonce as a function-scoped var, never on window', () => {
+    for (const build of [
+      installEditContextMenuScript,
+      enableCommentInspectScript,
+      enableMarkupScript,
+    ]) {
+      const s = build(NONCE)
+      expect(s).toContain('var ccNonce=')
+      expect(s).toContain(NONCE) // the nonce value is inlined into the payload
+      // Must not be reachable by page scripts sharing the guest world.
+      expect(s).not.toContain('window.ccNonce')
+      expect(s).not.toContain('window.__ccNonce')
+    }
+  })
+
   test('enableCommentInspectScript highlights on hover and opens a comment box on click', () => {
-    const s = enableCommentInspectScript()
+    const s = enableCommentInspectScript(NONCE)
     expect(s).toContain('elementFromPoint')
     expect(s).toContain('__cc_annotate_highlight')
     expect(s).toContain('ccShowComment')
@@ -52,7 +70,7 @@ describe('guest script builders produce valid JS', () => {
   })
 
   test('installEditContextMenuScript wires right-click edit, key-blocking and a save signal', () => {
-    const s = installEditContextMenuScript()
+    const s = installEditContextMenuScript(NONCE)
     expect(s).toContain('contextmenu')
     expect(s).toContain('contentEditable')
     expect(s).toContain('Opslaan')
@@ -67,7 +85,7 @@ describe('guest script builders produce valid JS', () => {
   })
 
   test('enableMarkupScript builds a canvas + floating toolbar with tools and actions', () => {
-    const s = enableMarkupScript()
+    const s = enableMarkupScript(NONCE)
     expect(s).toContain('__cc_annotate_canvas')
     expect(s).toContain('__cc_annotate_markupbar')
     expect(s).toContain('pointerdown')
@@ -115,7 +133,7 @@ describe('result guards', () => {
   })
 })
 
-describe('parseEditSaveMessage', () => {
+describe('parseEditSaveMessage (nonce-gated)', () => {
   const payload = {
     before: 'Reosultaten',
     after: 'Resultaten',
@@ -126,50 +144,68 @@ describe('parseEditSaveMessage', () => {
     url: 'file:///x.html',
   }
 
-  test('parses a sentinel-prefixed payload', () => {
-    const msg = EDIT_SAVE_SENTINEL + JSON.stringify(payload)
-    expect(parseEditSaveMessage(msg)).toEqual(payload)
+  test('parses a sentinel-prefixed payload whose nonce matches (nonce stripped)', () => {
+    const msg = EDIT_SAVE_SENTINEL + JSON.stringify({ ...payload, n: NONCE })
+    expect(parseEditSaveMessage(msg, NONCE)).toEqual(payload)
   })
 
-  test('ignores messages without the sentinel prefix', () => {
-    expect(parseEditSaveMessage(JSON.stringify(payload))).toBeNull()
-    expect(parseEditSaveMessage('some page log line')).toBeNull()
-    expect(parseEditSaveMessage(42)).toBeNull()
+  test('rejects a forged payload: wrong nonce, missing nonce, or empty expected nonce', () => {
+    expect(
+      parseEditSaveMessage(EDIT_SAVE_SENTINEL + JSON.stringify({ ...payload, n: 'wrong' }), NONCE)
+    ).toBeNull()
+    expect(parseEditSaveMessage(EDIT_SAVE_SENTINEL + JSON.stringify(payload), NONCE)).toBeNull()
+    expect(
+      parseEditSaveMessage(EDIT_SAVE_SENTINEL + JSON.stringify({ ...payload, n: NONCE }), '')
+    ).toBeNull()
   })
 
-  test('ignores a sentinel with malformed JSON', () => {
-    expect(parseEditSaveMessage(EDIT_SAVE_SENTINEL + '{not json')).toBeNull()
-  })
-
-  test('ignores a sentinel whose payload has the wrong shape', () => {
-    expect(parseEditSaveMessage(EDIT_SAVE_SENTINEL + JSON.stringify({ before: 'a' }))).toBeNull()
-  })
-})
-
-describe('parseMarkupMessage', () => {
-  test('classifies add and cancel signals', () => {
-    expect(parseMarkupMessage(MARKUP_ADD_SENTINEL)).toBe('add')
-    expect(parseMarkupMessage(MARKUP_CANCEL_SENTINEL)).toBe('cancel')
-  })
-
-  test('ignores other messages', () => {
-    expect(parseMarkupMessage('random page log')).toBeNull()
-    expect(parseMarkupMessage(EDIT_SAVE_SENTINEL + '{}')).toBeNull()
-    expect(parseMarkupMessage(42)).toBeNull()
+  test('ignores non-sentinel, malformed, and wrong-shape messages', () => {
+    expect(parseEditSaveMessage(JSON.stringify({ ...payload, n: NONCE }), NONCE)).toBeNull()
+    expect(parseEditSaveMessage(EDIT_SAVE_SENTINEL + '{not json', NONCE)).toBeNull()
+    expect(
+      parseEditSaveMessage(EDIT_SAVE_SENTINEL + JSON.stringify({ before: 'a', n: NONCE }), NONCE)
+    ).toBeNull()
+    expect(parseEditSaveMessage(42, NONCE)).toBeNull()
   })
 })
 
-describe('parseCommentMessage', () => {
+describe('parseMarkupMessage (nonce-gated)', () => {
+  test('classifies add and cancel only with the exact nonce suffix', () => {
+    expect(parseMarkupMessage(MARKUP_ADD_SENTINEL + NONCE, NONCE)).toBe('add')
+    expect(parseMarkupMessage(MARKUP_CANCEL_SENTINEL + NONCE, NONCE)).toBe('cancel')
+  })
+
+  test('rejects a bare sentinel, a wrong nonce, or an empty expected nonce', () => {
+    expect(parseMarkupMessage(MARKUP_ADD_SENTINEL, NONCE)).toBeNull()
+    expect(parseMarkupMessage(MARKUP_ADD_SENTINEL + 'wrong', NONCE)).toBeNull()
+    expect(parseMarkupMessage(MARKUP_ADD_SENTINEL + NONCE, '')).toBeNull()
+    expect(parseMarkupMessage('random page log', NONCE)).toBeNull()
+    expect(parseMarkupMessage(42, NONCE)).toBeNull()
+  })
+})
+
+describe('parseCommentMessage (nonce-gated)', () => {
   const payload = { selector: 'h2', snippet: '<h2>x</h2>', comment: 'te klein', url: 'file:///x.html' }
 
-  test('parses a sentinel-prefixed comment payload', () => {
-    expect(parseCommentMessage(COMMENT_SENTINEL + JSON.stringify(payload))).toEqual(payload)
+  test('parses a matching-nonce comment payload (nonce stripped)', () => {
+    expect(
+      parseCommentMessage(COMMENT_SENTINEL + JSON.stringify({ ...payload, n: NONCE }), NONCE)
+    ).toEqual(payload)
   })
 
-  test('ignores non-comment, malformed, or wrong-shape messages', () => {
-    expect(parseCommentMessage(JSON.stringify(payload))).toBeNull()
-    expect(parseCommentMessage(COMMENT_SENTINEL + '{bad')).toBeNull()
-    expect(parseCommentMessage(COMMENT_SENTINEL + JSON.stringify({ selector: 'h2' }))).toBeNull()
-    expect(parseCommentMessage(42)).toBeNull()
+  test('rejects wrong/missing/empty nonce and non-comment, malformed, wrong-shape messages', () => {
+    expect(
+      parseCommentMessage(COMMENT_SENTINEL + JSON.stringify({ ...payload, n: 'x' }), NONCE)
+    ).toBeNull()
+    expect(parseCommentMessage(COMMENT_SENTINEL + JSON.stringify(payload), NONCE)).toBeNull()
+    expect(
+      parseCommentMessage(COMMENT_SENTINEL + JSON.stringify({ ...payload, n: NONCE }), '')
+    ).toBeNull()
+    expect(parseCommentMessage(JSON.stringify({ ...payload, n: NONCE }), NONCE)).toBeNull()
+    expect(parseCommentMessage(COMMENT_SENTINEL + '{bad', NONCE)).toBeNull()
+    expect(
+      parseCommentMessage(COMMENT_SENTINEL + JSON.stringify({ selector: 'h2', n: NONCE }), NONCE)
+    ).toBeNull()
+    expect(parseCommentMessage(42, NONCE)).toBeNull()
   })
 })

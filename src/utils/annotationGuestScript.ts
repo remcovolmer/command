@@ -3,13 +3,22 @@
 // executeJavaScript resolves with the value of the last expression, so each
 // builder returns a self-invoking function expression that returns a
 // JSON-serializable result. The guest cannot call the host (no preload bridge —
-// the webview stays hardened), so the one guest->host signal we need (the edit
-// "Save" click) is delivered over the webview's console-message event: the
-// injected button console.log's a sentinel-prefixed JSON payload, and the host
-// listens for it (see parseEditSaveMessage).
+// the webview stays hardened), so guest->host signals are delivered over the
+// webview's console-message event: the injected UI console.log's a
+// sentinel-prefixed payload, and the host listens for it (see the parse*
+// functions).
 //
-// The scripts are static (no host interpolation of user data) so page text can
-// never become code.
+// The scripts are otherwise static — the ONLY host-interpolated value is a
+// per-document random `nonce`. console-message fires for ANY console.log the
+// guest makes, including the page's own scripts (executeJavaScript runs in the
+// page's world), so the channel is otherwise forgeable: a hostile page could
+// emit the sentinels itself with no user gesture. The host mints a fresh nonce
+// per document, injects it as a function-scoped `var ccNonce` (never on window,
+// so page scripts can't read it), and the guest echoes it in every signal; the
+// parsers reject any message whose nonce doesn't match. That blocks no-gesture
+// forgery. Residual: a page that hooks console.log AND induces a real user
+// annotation could observe the nonce and forge afterward — narrower,
+// interaction-gated, and accepted here for a local-first tool.
 
 export interface EditResult {
   before: string
@@ -44,12 +53,20 @@ export function isEditResult(v: unknown): v is EditResult {
 /** Prefix the injected Save button console.log's so the host can spot it. */
 export const EDIT_SAVE_SENTINEL = '__CC_ANNOTATE_SAVE__'
 
-/** Parse a guest console message into an edit payload, or null if it isn't one. */
-export function parseEditSaveMessage(message: unknown): EditResult | null {
+/**
+ * Parse a guest console message into an edit payload, or null if it isn't one
+ * or its nonce doesn't match the one the host injected for the current document.
+ * A page that forges the sentinel without the (unreadable) nonce is rejected.
+ */
+export function parseEditSaveMessage(message: unknown, expectedNonce: string): EditResult | null {
+  if (!expectedNonce) return null
   if (typeof message !== 'string' || !message.startsWith(EDIT_SAVE_SENTINEL)) return null
   try {
     const parsed: unknown = JSON.parse(message.slice(EDIT_SAVE_SENTINEL.length))
-    return isEditResult(parsed) ? parsed : null
+    if (!isRecord(parsed) || parsed.n !== expectedNonce) return null
+    if (!isEditResult(parsed)) return null
+    delete (parsed as Record<string, unknown>).n // wire-only, not part of EditResult
+    return parsed
   } catch {
     return null
   }
@@ -59,11 +76,16 @@ export function parseEditSaveMessage(message: unknown): EditResult | null {
 export const MARKUP_ADD_SENTINEL = '__CC_MARKUP_ADD__'
 export const MARKUP_CANCEL_SENTINEL = '__CC_MARKUP_CANCEL__'
 
-/** Classify a guest console message as a markup toolbar action, or null. */
-export function parseMarkupMessage(message: unknown): 'add' | 'cancel' | null {
+/**
+ * Classify a guest console message as a markup toolbar action, or null. The
+ * message is `<sentinel><nonce>`; an exact nonce match is required, so a forged
+ * bare sentinel (or one with the wrong nonce) is ignored.
+ */
+export function parseMarkupMessage(message: unknown, expectedNonce: string): 'add' | 'cancel' | null {
+  if (!expectedNonce) return null
   if (typeof message !== 'string') return null
-  if (message.startsWith(MARKUP_ADD_SENTINEL)) return 'add'
-  if (message.startsWith(MARKUP_CANCEL_SENTINEL)) return 'cancel'
+  if (message === MARKUP_ADD_SENTINEL + expectedNonce) return 'add'
+  if (message === MARKUP_CANCEL_SENTINEL + expectedNonce) return 'cancel'
   return null
 }
 
@@ -87,12 +109,19 @@ function isCommentPayload(v: unknown): v is CommentPayload {
   )
 }
 
-/** Parse a guest console message into a comment payload, or null. */
-export function parseCommentMessage(message: unknown): CommentPayload | null {
+/**
+ * Parse a guest console message into a comment payload, or null if it isn't one
+ * or its nonce doesn't match the host-injected nonce for the current document.
+ */
+export function parseCommentMessage(message: unknown, expectedNonce: string): CommentPayload | null {
+  if (!expectedNonce) return null
   if (typeof message !== 'string' || !message.startsWith(COMMENT_SENTINEL)) return null
   try {
     const parsed: unknown = JSON.parse(message.slice(COMMENT_SENTINEL.length))
-    return isCommentPayload(parsed) ? parsed : null
+    if (!isRecord(parsed) || parsed.n !== expectedNonce) return null
+    if (!isCommentPayload(parsed)) return null
+    delete (parsed as Record<string, unknown>).n // wire-only, not part of CommentPayload
+    return parsed
   } catch {
     return null
   }
@@ -130,7 +159,8 @@ const COMMENT_BOX_ID = '__cc_annotate_commentbox'
 
 // Shared guest helper: ccShowComment(rect, snippet, selector) shows an input +
 // send button near rect and, on send, console.log's the comment payload. Used
-// by both the right-click "Comment" menu item and the inspect-mode click.
+// by both the right-click "Comment" menu item and the inspect-mode click. Reads
+// `ccNonce` from the enclosing IIFE scope (declared by each builder).
 const COMMENT_UI = `function ccShowComment(rect,snippet,selector){
   var old=document.getElementById('${COMMENT_BOX_ID}');if(old)old.remove();
   var box=document.createElement('div');box.id='${COMMENT_BOX_ID}';
@@ -141,7 +171,7 @@ const COMMENT_UI = `function ccShowComment(rect,snippet,selector){
   send.style.cssText='font:600 13px sans-serif;background:#0f5f6b;color:#fff;border:none;border-radius:6px;padding:0 12px;cursor:pointer;';
   box.appendChild(inp);box.appendChild(send);document.body.appendChild(box);
   var done=false;
-  function fin(){if(done)return;done=true;var t=inp.value.trim();if(box.parentNode)box.remove();if(t)console.log('${COMMENT_SENTINEL}'+JSON.stringify({selector:selector||'',snippet:(snippet||'').slice(0,${MAX_FIELD}),comment:t,url:location.href}));}
+  function fin(){if(done)return;done=true;var t=inp.value.trim();if(box.parentNode)box.remove();if(t)console.log('${COMMENT_SENTINEL}'+JSON.stringify({selector:selector||'',snippet:(snippet||'').slice(0,${MAX_FIELD}),comment:t,url:location.href,n:ccNonce}));}
   box.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
   send.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();fin();});
   inp.addEventListener('keydown',function(ev){ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();fin();}else if(ev.key==='Escape'){done=true;if(box.parentNode)box.remove();}});
@@ -153,13 +183,15 @@ const COMMENT_UI = `function ccShowComment(rect,snippet,selector){
  * right-click over a selection it suppresses the native menu and shows an
  * "Edit" chip; choosing it makes the element contentEditable, blocks page-level
  * key handlers (so arrows move the caret, not the page), and shows an "Opslaan"
- * overlay near the element. Saving console.log's the sentinel payload for the
- * host. Re-run after each navigation (the guest DOM resets).
+ * overlay near the element. Saving console.log's the sentinel payload (carrying
+ * the host `nonce`) for the host. Re-run after each navigation with a fresh
+ * nonce (the guest DOM resets).
  */
-export function installEditContextMenuScript(): string {
+export function installEditContextMenuScript(nonce: string): string {
   return `(function(){
   if(window.__ccEditInstalled)return true;
   window.__ccEditInstalled=true;
+  var ccNonce=${JSON.stringify(nonce)};
   ${CSS_PATH}
   ${COMMENT_UI}
   function ccIndexPath(el){
@@ -198,7 +230,7 @@ export function installEditContextMenuScript(): string {
     save.addEventListener('click',function(ev){
       ev.preventDefault();ev.stopPropagation();
       var el2=window.__ccEditEl;
-      var payload={before:(window.__ccEditBefore||'').slice(0,${MAX_FIELD}),after:(el2?el2.innerText:'').slice(0,${MAX_FIELD}),html:el2?el2.innerHTML:'',selector:window.__ccEditSelector||'',indexPath:window.__ccEditIndexPath||[],tag:window.__ccEditTag||'',url:location.href};
+      var payload={before:(window.__ccEditBefore||'').slice(0,${MAX_FIELD}),after:(el2?el2.innerText:'').slice(0,${MAX_FIELD}),html:el2?el2.innerHTML:'',selector:window.__ccEditSelector||'',indexPath:window.__ccEditIndexPath||[],tag:window.__ccEditTag||'',url:location.href,n:ccNonce};
       console.log('${EDIT_SAVE_SENTINEL}'+JSON.stringify(payload));
     });
     document.body.appendChild(save);
@@ -235,8 +267,9 @@ export function installEditContextMenuScript(): string {
  * outerHTML to the chat). Clicks are captured so the page's own handlers don't
  * fire while picking. Toggle the mode off to exit.
  */
-export function enableCommentInspectScript(): string {
+export function enableCommentInspectScript(nonce: string): string {
   return `(function(){
+  var ccNonce=${JSON.stringify(nonce)};
   ${CSS_PATH}
   ${COMMENT_UI}
   var hl=document.getElementById('${HIGHLIGHT_ID}')||document.createElement('div');
@@ -283,9 +316,10 @@ export function enableCommentInspectScript(): string {
  * host over console-message; Add to chat hides the toolbar (two rAFs so the
  * hidden frame paints) before signalling, so it's excluded from the capture.
  */
-export function enableMarkupScript(): string {
+export function enableMarkupScript(nonce: string): string {
   return `(function(){
   if(document.getElementById('${MARKUP_BAR_ID}'))return true;
+  var ccNonce=${JSON.stringify(nonce)};
   var c=document.createElement('canvas');
   c.id='${CANVAS_ID}';
   c.width=window.innerWidth;c.height=window.innerHeight;
@@ -360,9 +394,9 @@ export function enableMarkupScript(): string {
   });
   function refreshColors(){Array.prototype.forEach.call(bar.querySelectorAll('button'),function(b){if(b.__col)b.style.boxShadow=(b.__col===color)?'0 0 0 2px #0f5f6b':'0 0 0 1px #d7dbe0';});}
   var del=mkBtn('Wis');del.innerHTML=ICON.trash;del.addEventListener('click',function(ev){ev.stopPropagation();ops=[];redraw();disableAdd();});bar.appendChild(del);
-  var cancel=mkBtn('Cancel');cancel.textContent='Cancel';cancel.style.minWidth='auto';cancel.style.padding='0 8px';cancel.addEventListener('click',function(ev){ev.stopPropagation();console.log('${MARKUP_CANCEL_SENTINEL}');});bar.appendChild(cancel);
+  var cancel=mkBtn('Cancel');cancel.textContent='Cancel';cancel.style.minWidth='auto';cancel.style.padding='0 8px';cancel.addEventListener('click',function(ev){ev.stopPropagation();console.log('${MARKUP_CANCEL_SENTINEL}'+ccNonce);});bar.appendChild(cancel);
   var add=mkBtn('Add to chat');add.textContent='Voeg toe aan chat';add.style.minWidth='auto';add.style.padding='0 10px';add.style.background='#0f5f6b';add.style.color='#fff';
-  add.addEventListener('click',function(ev){ev.stopPropagation();if(add.disabled)return;bar.style.visibility='hidden';requestAnimationFrame(function(){requestAnimationFrame(function(){console.log('${MARKUP_ADD_SENTINEL}');});});});
+  add.addEventListener('click',function(ev){ev.stopPropagation();if(add.disabled)return;bar.style.visibility='hidden';requestAnimationFrame(function(){requestAnimationFrame(function(){console.log('${MARKUP_ADD_SENTINEL}'+ccNonce);});});});
   bar.appendChild(add);
   function enableAdd(){add.disabled=false;add.style.opacity='1';add.style.cursor='pointer';}
   function disableAdd(){add.disabled=true;add.style.opacity='.5';add.style.cursor='default';}

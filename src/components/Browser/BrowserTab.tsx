@@ -50,6 +50,17 @@ const PARTITION = 'persist:command-browser'
 // an in-guest "Opslaan" overlay that signals back over console-message.
 type AnnotationMode = 'none' | 'comment' | 'draw'
 
+// Fresh per-document token that authenticates the guest->host console-message
+// channel. 16 random bytes as hex, injected into the guest scripts and required
+// back on every signal, so a page (which shares the guest's world and can emit
+// console messages) cannot forge annotation signals it never received the nonce
+// for. See annotationGuestScript.ts for the full rationale.
+function makeNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /**
  * The built-in browser: a real Electron <webview> with back/forward/reload,
  * an address bar, and dev tools. Loads local HTML and localhost dev apps, and
@@ -73,6 +84,10 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
   const handleCommentSendRef = useRef<((payload: CommentPayload) => void) | null>(null)
   const handleMarkupAddRef = useRef<(() => void) | null>(null)
   const handleMarkupCancelRef = useRef<(() => void) | null>(null)
+  // Current channel nonce (minted per document) + latest mode, read by the
+  // once-registered console-message listener.
+  const nonceRef = useRef('')
+  const modeRef = useRef<AnnotationMode>('none')
 
   // Keep the address bar in sync when the url changes outside this component.
   useEffect(() => {
@@ -86,8 +101,12 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     if (!wv) return
     const onReady = () => {
       readyRef.current = true
+      // Mint a fresh nonce for this document; the guest echoes it on every
+      // signal so a forged console-message (wrong/absent nonce) is rejected.
+      const nonce = makeNonce()
+      nonceRef.current = nonce
       // The guest DOM resets on every navigation, so re-install each dom-ready.
-      void execInGuest(wv, true, installEditContextMenuScript())
+      void execInGuest(wv, true, installEditContextMenuScript(nonce))
     }
     const sync = () => {
       setInput(wv.getURL())
@@ -102,17 +121,21 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     }
     const onConsole = (e: Event) => {
       const message = (e as unknown as { message?: string }).message
-      const edit = parseEditSaveMessage(message)
+      const nonce = nonceRef.current
+      const edit = parseEditSaveMessage(message, nonce)
       if (edit) {
         void handleEditSaveRef.current?.(edit)
         return
       }
-      const comment = parseCommentMessage(message)
+      const comment = parseCommentMessage(message, nonce)
       if (comment) {
         handleCommentSendRef.current?.(comment)
         return
       }
-      const markup = parseMarkupMessage(message)
+      const markup = parseMarkupMessage(message, nonce)
+      // Markup signals are only legitimate while draw mode is armed — a stray
+      // (or forged) one outside draw mode is ignored.
+      if (markup && modeRef.current !== 'draw') return
       if (markup === 'add') void handleMarkupAddRef.current?.()
       else if (markup === 'cancel') void handleMarkupCancelRef.current?.()
     }
@@ -195,8 +218,8 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     const target = mode === next ? 'none' : next
     setMode(target)
     let ok: unknown = true
-    if (target === 'comment') ok = await runGuest(enableCommentInspectScript())
-    else if (target === 'draw') ok = await runGuest(enableMarkupScript())
+    if (target === 'comment') ok = await runGuest(enableCommentInspectScript(nonceRef.current))
+    else if (target === 'draw') ok = await runGuest(enableMarkupScript(nonceRef.current))
     if (target !== 'none' && !ok) setStatus('Kon annotatiemodus niet starten — herlaad de pagina.')
   }
 
@@ -301,12 +324,13 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     setStatus(null)
   }
 
-  // Keep the refs pointing at the latest handlers for the console-message listener.
+  // Keep the refs pointing at the latest handlers + mode for the console-message listener.
   useEffect(() => {
     handleEditSaveRef.current = handleEditSave
     handleCommentSendRef.current = handleCommentSend
     handleMarkupAddRef.current = handleMarkupAdd
     handleMarkupCancelRef.current = handleMarkupCancel
+    modeRef.current = mode
   })
 
   const iconBtn =
