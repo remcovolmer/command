@@ -1,4 +1,8 @@
-<!-- ccli-skill-v2 -->
+---
+name: ccli
+description: Control the Command app from inside a Command chat. Use `ccli open <file|url>` to show something to the user — HTML files and URLs (localhost dev servers, external sites) render in Command's browser tab, other files open in the editor; ideal right after generating an HTML report/plan/dashboard or to preview a running dev server. Also: create/link/merge git worktrees, run and read sidecar terminals, send OS notifications, set the chat status/title, and list chats/projects. Available whenever COMMAND_CENTER_* env vars are set in the terminal.
+---
+<!-- ccli-skill-v3 -->
 # ccli — Command Center CLI
 
 You are running inside a **Command** terminal. The `ccli` CLI lets you control the app. Use it when it adds value to the current task — don't be preemptive.
