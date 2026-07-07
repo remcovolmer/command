@@ -41,4 +41,11 @@ describe('applyDomEdit', () => {
     const src = '<html><body><h1>x</h1></body></html>'
     expect(applyDomEdit(src, [1, 0], 'p', 'y')).toEqual({ ok: false, reason: 'not-found' })
   })
+
+  test('returns not-found for a void element (no end tag to splice into)', () => {
+    // <img> is void — parse5 gives it a startTag but no endTag, so there is no
+    // inner range; the caller must fall back to the text-diff path, not splice.
+    const src = '<html><body><img id="x"></body></html>'
+    expect(applyDomEdit(src, [1, 0], 'img', 'y')).toEqual({ ok: false, reason: 'not-found' })
+  })
 })

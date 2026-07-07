@@ -7,6 +7,8 @@ import {
   sendAnnotationToChat,
   fileUrlToLocalPath,
   applyDirectEdit,
+  minimalEdit,
+  sanitizeField,
 } from '../src/utils/annotationMessage'
 
 describe('message builders', () => {
@@ -39,6 +41,27 @@ describe('message builders', () => {
     const msg = buildDrawMessage({ url: 'http://localhost:5173/' })
     expect(msg).toContain('http://localhost:5173/')
     expect(msg).toContain('Alt+V')
+  })
+
+  test('strips control chars from page-derived fields (no CR/ESC reaches the PTY)', () => {
+    const msg = buildCommentMessage({
+      url: 'file:///x.html',
+      selector: 'h2',
+      snippet: 'a\rb',
+      comment: 'stuur\r\nrm -rf /\x1b[2J',
+    })
+    expect(msg).not.toContain('\r') // the Enter byte that would auto-submit
+    expect(msg).not.toContain('\x1b') // no terminal escape sequences
+    expect(msg).toContain('ab') // \r removed, surrounding text kept
+    expect(msg).toContain('stuur\nrm -rf /[2J') // \n survives, \r and ESC gone
+  })
+})
+
+describe('sanitizeField', () => {
+  test('removes CR and ESC but keeps newlines and tabs', () => {
+    expect(sanitizeField('a\rb')).toBe('ab')
+    expect(sanitizeField('x\x1b[31mred')).toBe('x[31mred')
+    expect(sanitizeField('line1\nline2\tcol')).toBe('line1\nline2\tcol')
   })
 })
 
@@ -157,5 +180,31 @@ describe('applyDirectEdit', () => {
       ok: true,
       content: '<p>Hello</p>',
     })
+  })
+
+  test('disambiguates a repeated word via surrounding context (keyed branch)', () => {
+    // The whole selection is broken by an inline tag (so the verbatim match
+    // fails) and the changed word ("42") recurs elsewhere (so the bare-span
+    // match is ambiguous) — only the context-keyed branch can place the edit.
+    const before = 'This is a long lead-in sentence with 42 trailing words that pad the tail out further'
+    const after = before.replace('42', '99')
+    const content =
+      '<p><b>This is</b> a long lead-in sentence with 42 trailing words that pad the tail out further</p><span>42</span>'
+    const result = applyDirectEdit(content, before, after)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.content).toContain('with 99 trailing')
+      expect(result.content).toContain('<span>42</span>') // the decoy stays untouched
+    }
+  })
+})
+
+describe('minimalEdit (code-point scan)', () => {
+  test('keeps an edited emoji whole instead of splitting its surrogate pair', () => {
+    // 😀 (U+1F600) and 😁 (U+1F601) share a high surrogate; a UTF-16 code-unit
+    // scan would leave a lone low surrogate as the changed span.
+    const { coreBefore, coreAfter } = minimalEdit('Score: 😀 great', 'Score: 😁 great')
+    expect(coreBefore).toBe('😀')
+    expect(coreAfter).toBe('😁')
   })
 })

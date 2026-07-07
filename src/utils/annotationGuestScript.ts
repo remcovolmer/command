@@ -313,12 +313,13 @@ export function enableMarkupScript(): string {
     if(tool==='pen'){pts.push([e.clientX,e.clientY]);redraw();draw({t:'pen',color:color,pts:pts});}
     else{redraw();draw({t:tool,color:color,x0:start[0],y0:start[1],x1:e.clientX,y1:e.clientY});}
   });
-  window.addEventListener('pointerup',function(e){
+  function onUp(e){
     if(!start)return;
     if(tool==='pen'){if(pts&&pts.length>1)commit({t:'pen',color:color,pts:pts});pts=null;}
     else commit({t:tool,color:color,x0:start[0],y0:start[1],x1:e.clientX,y1:e.clientY});
     start=null;
-  });
+  }
+  window.addEventListener('pointerup',onUp);
   function addText(x,y){
     var inp=document.createElement('input');inp.type='text';
     inp.style.cssText='position:fixed;z-index:2147483647;left:'+x+'px;top:'+(y-14)+'px;font:600 18px sans-serif;color:'+color+';background:rgba(255,255,255,.95);border:1px dashed '+color+';padding:0 2px;outline:none;min-width:40px;';
@@ -368,7 +369,7 @@ export function enableMarkupScript(): string {
   disableAdd();
   document.body.appendChild(bar);
   refreshTools();refreshColors();
-  window.__ccMarkupTeardown=function(){var b=document.getElementById('${MARKUP_BAR_ID}');if(b)b.remove();var cv=document.getElementById('${CANVAS_ID}');if(cv)cv.remove();};
+  window.__ccMarkupTeardown=function(){window.removeEventListener('pointerup',onUp);var b=document.getElementById('${MARKUP_BAR_ID}');if(b)b.remove();var cv=document.getElementById('${CANVAS_ID}');if(cv)cv.remove();};
   window.__ccMarkupReset=function(){ops=[];redraw();disableAdd();bar.style.visibility='visible';};
   return true;
 })()`

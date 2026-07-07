@@ -194,8 +194,10 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     setStatus(null)
     const target = mode === next ? 'none' : next
     setMode(target)
-    if (target === 'comment') await runGuest(enableCommentInspectScript())
-    else if (target === 'draw') await runGuest(enableMarkupScript())
+    let ok: unknown = true
+    if (target === 'comment') ok = await runGuest(enableCommentInspectScript())
+    else if (target === 'draw') ok = await runGuest(enableMarkupScript())
+    if (target !== 'none' && !ok) setStatus('Kon annotatiemodus niet starten — herlaad de pagina.')
   }
 
   // Fired from an in-guest comment box (right-click Comment, or inspect click).
@@ -241,7 +243,13 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
       void runGuest(clearAnnotationsScript())
       return
     }
-    const localPath = fileUrlToLocalPath(payload.url)
+    // Trust the host's view of the loaded document, not the guest-supplied url,
+    // and only apply a direct write when the save targets the exact page shown.
+    // A forged/mismatched save (a page naming another in-project file) falls
+    // through to the agent instead of writing to disk. NOTE: fully closing the
+    // forged-console-message channel needs a per-injection nonce (see review).
+    const realUrl = webviewRef.current?.getURL() ?? ''
+    const localPath = payload.url === realUrl ? fileUrlToLocalPath(realUrl) : null
     if (localPath) {
       const outcome = await tryDirectFileEdit(localPath, payload)
       if (outcome === 'ok') {

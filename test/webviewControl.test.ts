@@ -29,6 +29,13 @@ describe('execInGuest', () => {
     expect(wv.executeJavaScript).toHaveBeenCalledWith('document.title')
     expect(result).toBe('result')
   })
+
+  test('resolves to null (not reject) when the guest call rejects mid-flight', async () => {
+    const wv = fakeWebview({
+      executeJavaScript: vi.fn().mockRejectedValue(new Error('frame was disposed')),
+    } as Partial<CommandWebviewElement>)
+    await expect(execInGuest(wv, true, 'x')).resolves.toBeNull()
+  })
 })
 
 describe('captureGuest', () => {
@@ -50,5 +57,12 @@ describe('captureGuest', () => {
       capturePage: vi.fn().mockResolvedValue(empty),
     } as Partial<CommandWebviewElement>)
     expect(await captureGuest(wv, true)).toBeNull()
+  })
+
+  test('resolves to null (not reject) when capture rejects mid-flight', async () => {
+    const wv = fakeWebview({
+      capturePage: vi.fn().mockRejectedValue(new Error('frame was disposed')),
+    } as Partial<CommandWebviewElement>)
+    await expect(captureGuest(wv, true)).resolves.toBeNull()
   })
 })

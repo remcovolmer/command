@@ -26,34 +26,46 @@ export interface DrawAnnotation {
   url: string
 }
 
+// Every field below is page-controlled (a comment box, a selection, outerHTML,
+// the URL) and is written raw into the active Claude terminal's PTY. Strip C0
+// control bytes except \n and \t before interpolating: \r is what Enter sends
+// (it would submit the prompt early) and ESC (\x1b) opens terminal escape
+// sequences. Newlines and tabs stay, so a legit multi-line snippet or edit is
+// preserved. Belt-and-suspenders against a hostile page forging these fields;
+// see the guest->host channel note in annotationGuestScript.ts.
+export function sanitizeField(value: string): string {
+  // Strips 0x00-0x08, 0x0B-0x1F (incl. \r and ESC) and 0x7F; keeps \t and \n.
+  return value.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '')
+}
+
 export function buildCommentMessage({ url, selector, snippet, comment }: CommentAnnotation): string {
   return [
-    `Browser-annotatie op ${url}`,
-    `Selector: ${selector}`,
+    `Browser-annotatie op ${sanitizeField(url)}`,
+    `Selector: ${sanitizeField(selector)}`,
     '',
     'Geselecteerd:',
-    snippet,
+    sanitizeField(snippet),
     '',
-    `Opmerking: ${comment}`,
+    `Opmerking: ${sanitizeField(comment)}`,
   ].join('\n')
 }
 
 export function buildEditMessage({ url, selector, before, after }: EditAnnotation): string {
   return [
-    `Browser-annotatie (inline edit) op ${url}`,
-    `Selector: ${selector}`,
+    `Browser-annotatie (inline edit) op ${sanitizeField(url)}`,
+    `Selector: ${sanitizeField(selector)}`,
     '',
     'Verander deze tekst:',
-    before,
+    sanitizeField(before),
     '',
     'Naar:',
-    after,
+    sanitizeField(after),
   ].join('\n')
 }
 
 export function buildDrawMessage({ url }: DrawAnnotation): string {
   return [
-    `Browser-annotatie (tekening) op ${url}`,
+    `Browser-annotatie (tekening) op ${sanitizeField(url)}`,
     'De bijgevoegde afbeelding toont mijn markering op de pagina — plak met Alt+V.',
   ].join('\n')
 }
@@ -99,18 +111,24 @@ function replaceIfUnique(content: string, needle: string, replacement: string): 
 const EDIT_CONTEXT = 24
 
 // The minimal changed span between before/after (common prefix/suffix stripped)
-// plus a little surrounding context for disambiguation.
-function minimalEdit(before: string, after: string) {
-  const max = Math.min(before.length, after.length)
+// plus a little surrounding context for disambiguation. Exported for tests.
+export function minimalEdit(before: string, after: string) {
+  // Scan by Unicode code point, not UTF-16 code unit: Array.from splits on code
+  // points, so a prefix/suffix boundary never lands inside a surrogate pair (an
+  // emoji edit would otherwise yield a lone surrogate half as the search needle,
+  // which mis-matches unrelated astral chars sharing that half).
+  const b = Array.from(before)
+  const a = Array.from(after)
+  const max = Math.min(b.length, a.length)
   let p = 0
-  while (p < max && before[p] === after[p]) p++
+  while (p < max && b[p] === a[p]) p++
   let s = 0
-  while (s < max - p && before[before.length - 1 - s] === after[after.length - 1 - s]) s++
+  while (s < max - p && b[b.length - 1 - s] === a[a.length - 1 - s]) s++
   return {
-    coreBefore: before.slice(p, before.length - s),
-    coreAfter: after.slice(p, after.length - s),
-    ctxLeft: before.slice(Math.max(0, p - EDIT_CONTEXT), p),
-    ctxRight: before.slice(before.length - s, before.length - s + EDIT_CONTEXT),
+    coreBefore: b.slice(p, b.length - s).join(''),
+    coreAfter: a.slice(p, a.length - s).join(''),
+    ctxLeft: b.slice(Math.max(0, p - EDIT_CONTEXT), p).join(''),
+    ctxRight: b.slice(b.length - s, b.length - s + EDIT_CONTEXT).join(''),
   }
 }
 
