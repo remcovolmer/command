@@ -1,0 +1,479 @@
+<title>Kestrel → Command: Feature-analyse - Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #fbfbfa;
+    --surface: #ffffff;
+    --ink: #1a1c1e;
+    --muted: #5b6470;
+    --line: #e4e6ea;
+    --accent: #0f5f6b;        /* riverwise teal-blue */
+    --accent-soft: #e6f2f3;
+    --accent-text: #0a4750;
+    --warn: #a6560d;
+    --warn-soft: #fbf0e4;
+    --warn-text: #8a4708;
+    --good: #1f6b3a;
+    --good-soft: #e7f3ec;
+    --good-text: #17572e;
+    --info: #35507a;
+    --info-soft: #eaf0f8;
+    --gap-soft: #f4ece4;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font); font-size: 15.5px; line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin-inline: auto; padding: 40px 28px 80px; }
+  h1 { font-size: 2.05rem; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 6px; }
+  h2 { font-size: 1.42rem; letter-spacing: -0.01em; margin: 2.6em 0 0.5em; padding-top: 0.7em; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.08rem; margin: 1.8em 0 0.4em; }
+  h4 { font-size: 0.96rem; margin: 1.3em 0 0.3em; color: var(--accent-text); }
+  p, li { max-width: 72ch; }
+  p { margin: 0.55em 0; }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 0.86em; background: #f0f1f2; padding: 1px 5px; border-radius: 4px; }
+  .eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.11em; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+  .lede { font-size: 1.06rem; color: var(--muted); max-width: 74ch; }
+
+  /* metadata */
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 18px 0 6px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-size: 0.82rem; }
+  .meta dl { display: flex; gap: 6px; margin: 0; }
+  .meta dt { color: var(--muted); font-weight: 500; }
+  .meta dd { margin: 0; font-weight: 600; }
+  .meta code { background: var(--accent-soft); color: var(--accent-text); }
+
+  /* nav */
+  nav.toc { margin: 22px 0 8px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  nav.toc ol { margin: 6px 0 0; padding-left: 1.2em; columns: 2; column-gap: 32px; font-size: 0.9rem; }
+  nav.toc a { text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  /* stats strip */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 14px; }
+  .stat .num { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em; color: var(--accent); }
+  .stat .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+  section { }
+  .quote { border-left: 3px solid var(--accent); background: var(--accent-soft); margin: 12px 0; padding: 10px 16px; border-radius: 0 8px 8px 0; font-size: 0.94rem; }
+  .quote .ts { font-family: var(--mono); font-size: 0.74rem; color: var(--accent-text); font-weight: 500; }
+  .quote p { margin: 3px 0 0; color: #253238; }
+
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 0.9rem; }
+  .scroll-x { overflow-x: auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; background: #f7f8f9; }
+  tbody tr:hover, tbody tr:hover { background: #fafbfc; }
+  td.id, .idchip { font-family: var(--mono); font-weight: 600; color: var(--accent-text); white-space: nowrap; }
+
+  .chip { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+  .chip.have { background: var(--good-soft); color: var(--good-text); border-color: #cfe6d8; }
+  .chip.partial { background: var(--warn-soft); color: var(--warn-text); border-color: #eeddc7; }
+  .chip.gap { background: #fdeceb; color: #9a2c22; border-color: #f2d0cc; }
+  .chip.eff-l { background: var(--good-soft); color: var(--good-text); }
+  .chip.eff-m { background: var(--warn-soft); color: var(--warn-text); }
+  .chip.eff-h { background: #fdeceb; color: #9a2c22; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 12px 0; }
+  .callout { border-radius: 10px; padding: 14px 18px; margin: 14px 0; border: 1px solid var(--line); }
+  .callout .kicker { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; margin-bottom: 4px; }
+  .callout.rec { background: var(--accent-soft); border-color: #bfe0e2; }
+  .callout.rec .kicker { color: var(--accent-text); }
+  .callout.warn { background: var(--warn-soft); border-color: #eeddc7; }
+  .callout.warn .kicker { color: var(--warn-text); }
+  .callout.info { background: var(--info-soft); border-color: #d3dded; }
+  .callout.info .kicker { color: var(--info); }
+
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .cols2 .card h4 { margin-top: 0; }
+
+  figure { margin: 20px 0; }
+  figure svg { max-width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  figcaption { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+
+  .tier-h { display: flex; align-items: center; gap: 10px; margin-top: 1.4em; }
+  .tier-dot { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+
+  footer.composition-signal { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--muted); }
+  footer code { font-size: 0.9em; }
+
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .cols2 { grid-template-columns: 1fr; }
+    nav.toc ol { columns: 1; }
+  }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">CE-Brainstorm · Requirements-only</p>
+  <h1>Kestrel → Command: wat de demo laat zien en welke features we eruit halen</h1>
+  <p class="lede">Een volledige analyse van de Kestrel-demo (Every's Fable&nbsp;5 Power User Camp, 29:00–52:00) en een feature-lijst van 17 kandidaten voor Command — gemapt op wat Command vandaag al kan.</p>
+
+  <div class="meta">
+    <dl><dt>type</dt><dd><code>feat</code></dd></dl>
+    <dl><dt>date</dt><dd><time datetime="2026-07-02">2026-07-02</time></dd></dl>
+    <dl><dt>topic</dt><dd><code>kestrel-features-command</code></dd></dl>
+    <dl><dt>artifact_contract</dt><dd><code>ce-unified-plan/v1</code></dd></dl>
+    <dl><dt>artifact_readiness</dt><dd><code>requirements-only</code></dd></dl>
+    <dl><dt>product_contract_source</dt><dd><code>ce-brainstorm</code></dd></dl>
+    <dl><dt>execution</dt><dd><code>code</code></dd></dl>
+    <dl><dt>bron</dt><dd><a href="https://www.youtube.com/watch?v=zlLJRVFXCDI">YouTube demo 29:00–52:00</a></dd></dl>
+  </div>
+
+  <nav class="toc" aria-label="Inhoud">
+    <strong style="font-size:0.82rem;">Inhoud</strong>
+    <ol>
+      <li><a href="#goal-capsule">Kern in één alinea</a></li>
+      <li><a href="#what-is-kestrel">Wat is Kestrel</a></li>
+      <li><a href="#analysis">Volledige analyse (29–52 min)</a></li>
+      <li><a href="#missed">Punten die je nog miste</a></li>
+      <li><a href="#product-contract">Kernbeslissing: terminal-first vs GUI-layer</a></li>
+      <li><a href="#sweep-built">Sweep is al grotendeels gebouwd</a></li>
+      <li><a href="#features">Feature-kandidaten (de lijst)</a></li>
+      <li><a href="#priority">Aanbevolen prioritering</a></li>
+      <li><a href="#questions">Openstaande vragen</a></li>
+    </ol>
+  </nav>
+
+  <div class="stats">
+    <div class="stat"><div class="num">17</div><div class="lbl">feature-kandidaten uit de demo</div></div>
+    <div class="stat"><div class="num">~65%</div><div class="lbl">van Sweep-infra zit al in Command</div></div>
+    <div class="stat"><div class="num">0</div><div class="lbl">regels multi-backend / Codex-support vandaag</div></div>
+    <div class="stat"><div class="num">~48u</div><div class="lbl">bouwtijd Kestrel door een editor, geen engineer</div></div>
+  </div>
+
+  <section id="goal-capsule">
+    <h2>Kern in één alinea</h2>
+    <p><strong>Situatie —</strong> Kestrel is in ~48 uur gebouwd door Jack, senior editor (géén engineer) bij Every, omdat hij "een Codex voor Claude Code" wilde: een GUI-laag boven de agent in plaats van een terminal. <strong>Complicatie —</strong> de demo bevat drie ideeën die Command raken (Sweep-loops op documenten, browser-annotatie die de agent uitvoert, en Codex + Claude Code náást elkaar) plus een reeks kleinere mechanismes die makkelijk over het hoofd te zien zijn. <strong>Resolutie —</strong> het grootste deel van de infrastructuur voor het krachtigste idee (Sweep) zit al in Command; de missende stukken zijn klein en concreet. Multi-backend is echt greenfield. Dit document inventariseert alles en zet een aanbevolen prioritering neer — de keuze "welke pakken we op" is de volgende stap.</p>
+    <div class="callout info">
+      <div class="kicker">Product-autoriteit</div>
+      <p style="margin:0;">Remco (eigenaar Command). Geen externe stakeholders. Prioritering wordt in de vervolgstap samen bepaald; dit doc is de menukaart, geen commitment.</p>
+    </div>
+    <div class="callout rec">
+      <div class="kicker">Kernbeslissing — beslist 2026-07-02</div>
+      <p style="margin:0;">Command blijft <strong>terminal-first zoals het nu werkt</strong>. Een GUI/chat-shell wordt pas overwogen als we tegen iets aanlopen dat niet anders op te lossen is — en dán via <strong>wrap-de-CLI</strong>, nooit via de SDK/API. Reden: te veel onderhoud voor een tool die nu alleen Remco gebruikt. Zie <a href="#product-contract">Kernbeslissing</a>.</p>
+    </div>
+  </section>
+
+  <section id="what-is-kestrel">
+    <h2>Wat is Kestrel</h2>
+    <p>Kestrel ("torenvalk") is een zelfgebouwde desktop-app die Jack omschrijft als een vogel-compagnon: <em>"this little bird companion that kind of sits on your shoulder and then goes and does things for you"</em> (30:33). Het is expliciet gepositioneerd als de Codex-desktopervaring, maar dan draaiend op Claude Code:</p>
+    <div class="quote"><span class="ts">[30:01]</span><p>"I'm usually in Codex and I was like: oh, I wish I had a Codex for Claude Code. And then once Fable came out I was like: maybe I can build one."</p></div>
+    <p>De belangrijkste ontwerpgedachte is dat het géén dev-tool is. Codex en Claude Code zijn gemaakt voor developers; Jack wilde iets dat "the wide range of tasks that I do" ondersteunt — schrijven, research, markdown (40:39). Zijn stelling: <em>"AI turns everything into user experience"</em> (32:09) — je bouwt precies de interactie en het gevoel dat je wilt, in plaats van je te voegen naar een gespecialiseerd product. Kestrel bestaat uit vier bouwstenen: een <strong>ingebouwde browser</strong>, <strong>annotatie op een surface</strong>, <strong>Sweep</strong> (agent-loops), en het draaien op <strong>bestaande Claude- én Codex-abonnementen</strong> tegelijk.</p>
+  </section>
+
+  <section id="analysis">
+    <h2>Volledige analyse van de demo (29:00–52:00)</h2>
+
+    <h3>1. Positionering &amp; architectuur — een laag, geen terminal</h3>
+    <p>Kestrel toont nergens een terminal. Het is een GUI die de agent aanstuurt. Het draait bovendien op meerdere backends tegelijk en erft de connectors (MCP) van die accounts:</p>
+    <div class="quote"><span class="ts">[32:41]</span><p>"This is running off of my existing Claude and Codex subscriptions, and therefore it has all my existing connectors that I have linked up to those accounts."</p></div>
+    <p>Dit is precies het punt dat je zelf signaleerde: Kestrel gebruikt Claude Code niet als terminal, maar als een aanstuurbare motor eronder. Vergelijkbaar met Conductor, dat Jack ook noemt als inspiratie (32:41).</p>
+
+    <h3>2. Sweep — de kern-innovatie</h3>
+    <p>Sweep is een agent die een <strong>surface</strong> (een webpagina óf een markdown-document) in een loop bewaakt en erop handelt. Het idee komt van Dan's "inbox sweep" (33:19). De mechaniek bestaat uit zes onderdelen die elk apart de moeite waard zijn:</p>
+    <ul>
+      <li><strong>Brief per surface.</strong> De eerste keer dat je een surface sweep't, vraagt Kestrel wat je wilt: <em>"the first time around, it actually says: I need to know what you want me to do"</em> (43:11). Die brief wordt opgeslagen ("the brief saved", 44:55) en hoort bij dát document/die pagina.</li>
+      <li><strong>Marker-gedreven capture.</strong> De trigger is schrijver-native syntax, geen aparte takenlijst-UI: <em>"anytime that I have TKs or things in brackets, it will as part of its sweep pick up those indicators"</em> (34:26). TK en <code>[...]</code> zijn wat een schrijver tóch al gebruikt voor "moet nog gebeuren".</li>
+      <li><strong>Diff-gating.</strong> Sweep vergelijkt met de vorige versie en doet niets als er niets veranderd is: <em>"it actually compares it against the previous version"</em> → <em>"it says nothing new"</em> (37:00). Alleen op veranderingen wordt gehandeld.</li>
+      <li><strong>Done-migratie.</strong> Afgeronde items schuiven naar een done-sectie: <em>"once it's completed with the item, it moves it into the done section... this is everything I've done on this app"</em> (37:00). Dat levert een audit-trail op van alles wat de agent deed.</li>
+      <li><strong>Auto-execute vs. bevestigen.</strong> Een toggle: <em>"I can also have it just auto-execute — every sweep it'll just go and execute"</em> (39:37).</li>
+      <li><strong>Self-building loop.</strong> Jack richtte Sweep op de repo van Kestrel zélf, met een taken-document en de instructie: <em>"every sweep, if there's an item that feels manageable and doesn't require too much work, just go ahead and do it"</em> (36:28). De app bouwt zichzelf op laaghangend fruit.</li>
+    </ul>
+
+    <h3>3. Browser + annotatie — highlighten en de agent doet het werk</h3>
+    <p>Een van Jack's favoriete features uit Codex/Cursor: annoteren op een gerenderde pagina en de agent voert het uit.</p>
+    <div class="quote"><span class="ts">[31:05]</span><p>"One of them is the ability to annotate on the web page and have it do the work... I can highlight it and say: the labels are too small." → "it bumped up the SVG label size and we can just refresh."</p></div>
+    <p>De feedback-loop is visueel en ruimtelijk: zie iets → markeer het op de surface → comment → agent past aan → refresh. Geen prompt tikken over een abstract bestand.</p>
+
+    <h3>4. Interactiemodel — polling vs. on-demand, en twee soorten agents</h3>
+    <p>Dan levert live de belangrijkste ontwerpkritiek: hij wil géén interval-polling, maar event-triggering.</p>
+    <div class="quote"><span class="ts">[41:40 / 44:22]</span><p>Dan: "For sweep, I'd prefer that if I type something it steers it — sends a message — rather than the chat having to pull... I want it to not be on a sweep, I want it to be on demand. Instead of it polling, I want it to be activated."</p></div>
+    <p>Jack's antwoord verklapt de reden: polling is duur. <em>"Right now I don't have that built in yet, partially because it's very costly with Fable to do that"</em> (44:22). Verder benoemt Every twee modellen van samenwerken (51:00):</p>
+    <div class="cols2">
+      <div class="card"><h4>Delegate-agent</h4><p style="margin:0;font-size:0.92rem;">"One agent that you delegate everything to and just don't care about being in a document live." Async hand-off. Vereist <strong>betrouwbaarheid</strong>.</p></div>
+      <div class="card"><h4>Pair-agent</h4><p style="margin:0;font-size:0.92rem;">"The other that you're working with simultaneously while you're in the same file." Real-time. Vereist <strong>snelheid</strong> — Fable op low effort is snel genoeg.</p></div>
+    </div>
+    <p>Hieruit volgt de <strong>effort-dial</strong> als cost/speed-hendel: low effort = goedkoop + snel genoeg voor real-time; hoger voor moeilijkere taken (46:26, 51:33).</p>
+
+    <h3>5. Ambient / life-integration</h3>
+    <p>Het onderliggende werkmodel is asynchroon en verweven met het leven, niet "voor een chatvenster zitten". Jack heeft een peuter en wil ideeën vangen zonder te chatten:</p>
+    <div class="quote"><span class="ts">[37:32 / 49:00]</span><p>"Wednesday morning I was doing laundry and in between folding clothes I would think of things to add — I'd just add it and I had the sweep running... I want to capture my thoughts, monologue them into notes, and then just have it automatically act on that note on a regular interval."</p></div>
+    <p>De evolutie die hij schetst: twee weken eerder liet hij Claude 's nachts zijn notitiebestand scannen en ideeën ordenen; nu kan het niet alleen ordenen maar ook taken uitvoeren (49:30–50:00).</p>
+  </section>
+
+  <section id="missed">
+    <h2>Punten die je nog miste</h2>
+    <p>Je noemde Sweep, Codex+Claude Code, de laag-in-plaats-van-terminal en de browser-met-comments. Dat zijn de grote drie. Dit zijn de subtielere mechanismes die minstens zo bepalend zijn:</p>
+    <ul>
+      <li><strong>Brief per surface</strong> — instructies zitten vást aan een document/pagina, niet aan een chat. Dit is het verschil tussen "een prompt" en "een staande opdracht op een bestand".</li>
+      <li><strong>Diff-gating ("nothing new")</strong> — de loop doet niets tenzij het bestand veranderde. Cruciaal tegen kosten en ruis.</li>
+      <li><strong>Done-migratie / audit-trail</strong> — afgeronde items verhuizen zichtbaar naar "done". <em>Command doet dit vandaag al voor <code>TASKS.md</code>.</em></li>
+      <li><strong>Self-building loop</strong> — de app op zijn eigen repo richten en laaghangend fruit autonoom laten oppakken.</li>
+      <li><strong>Polling vs. event-triggering + de kostendriver</strong> — Dan's kritiek is het belangrijkste architectuur-inzicht. En hier ligt Command juist vóór: <code>file-change</code>-triggers zijn al event-based, niet polling.</li>
+      <li><strong>Auto-execute vs. bevestigen</strong> als expliciete toggle.</li>
+      <li><strong>Twee-agent-model (delegate vs pair)</strong> als productfilosofie, met betrouwbaarheid vs. snelheid als de twee vereisten.</li>
+      <li><strong>Effort-dial</strong> als eerste-klas cost/speed-hendel.</li>
+      <li><strong>Connector-erfenis</strong> — MCP-connectors komen automatisch mee van de gekoppelde accounts.</li>
+      <li><strong>Ambient capture</strong> — inbox-note die op interval wordt verwerkt; het echte gebruiksmodel achter Sweep.</li>
+    </ul>
+  </section>
+
+  <section id="product-contract">
+    <h2>Kernbeslissing: terminal-first vs. GUI-layer</h2>
+    <p>Command is vandaag terminal-first: <code>TerminalManager</code> spawnt een PTY en draait <code>claude</code> (met <code>--resume</code> en auto-mode). Kestrel laat de terminal helemaal weg. Voor Command is dit primair een <strong>kosten- en onderhoudsvraag</strong>, geen esthetische. Twee feiten uit de scan bepalen het antwoord: (1) Command praat niet met de API maar draait de <code>claude</code> CLI als subprocess — dat houdt alles op het <strong>flat abonnement</strong>, niet op metered API-billing; (2) de rauwe terminal toont de CLI-stream 1-op-1, dus élke nieuwe Claude Code-feature (user questions, subagents, skills) verschijnt vanzelf — nul onderhoud.</p>
+    <div class="callout rec">
+      <div class="kicker">Beslist 2026-07-02 — KD1 resolved</div>
+      <p style="margin:0;">Command blijft <strong>voorlopig terminal-first zoals het nu werkt</strong>. Een GUI/chat-shell wordt pas overwogen als we tegen iets aanlopen dat niet op een andere manier op te lossen is. Reden: een geparste chat-UI creëert een <strong>feature-treadmill</strong> (elke nieuwe interactieve primitive moet je bijhouden) — te veel onderhoud voor een tool die nu alleen Remco gebruikt.</p>
+    </div>
+    <div class="cols2">
+      <div class="card">
+        <p class="idchip">Nu · gekozen</p>
+        <h4>Terminal zoals nu <span class="chip have">gekozen</span></h4>
+        <p style="font-size:0.92rem;">Status quo: PTY + <code>claude</code> CLI. Sweep en annotatie kunnen als <em>additieve surfaces</em> bovenop de bestaande Automation/FileWatcher/Editor/Browser-infra — die vervangen de terminal niet, dus ze staan los van deze keuze.</p>
+      </div>
+      <div class="card">
+        <p class="idchip">Later · alleen als nodig</p>
+        <h4>GUI-shell via wrap-de-CLI <span class="chip partial">uitgesteld</span></h4>
+        <p style="font-size:0.92rem;">Als de switch ooit komt: render de CLI-output in eigen UI mét de terminal als source-of-truth-fallback. Blijft op het abonnement, geen treadmill. <strong>Nooit</strong> via SDK/API (= metered + herbouw). Trigger: een concreet probleem dat niet anders op te lossen is.</p>
+      </div>
+    </div>
+    <div class="callout info">
+      <div class="kicker">Impact op de feature-lijst</div>
+      <p style="margin:0;"><strong>FC16</strong> (terminal-loze modus) blijft <strong>uitgesteld</strong>. <strong>FC10</strong> (echte webview) komt juist <strong>in scope</strong>: de ingebouwde browser wordt geconsolideerd tot enige page-surface en van iframe naar webview geüpgraded — dat is de enabler voor <strong>FC9</strong> (annotatie op dev-server + lokaal bestand). Sweep-features (FC1–FC8) draaien op de automation-infra (<code>claude -p</code>) en blijven los op tafel.</p>
+    </div>
+  </section>
+
+  <section id="sweep-built">
+    <h2>Sweep is al grotendeels gebouwd</h2>
+    <p>Het sterkste, verrassendste inzicht uit de capaciteitsscan: de infrastructuur voor Sweep zit voor het overgrote deel al in Command. Vier van de bouwstenen bestaan, drie ontbreken — en de missende zijn klein en scherp afgebakend.</p>
+    <figure>
+      <svg viewBox="0 0 900 430" role="img" aria-labelledby="sweep-fig-title">
+        <title id="sweep-fig-title">Sweep-bouwstenen: aanwezig in Command versus missend</title>
+        <style>
+          .box { rx: 9; }
+          .lbl { font: 600 14px 'Inter', sans-serif; fill: #1a1c1e; }
+          .sub { font: 400 11.5px 'Inter', sans-serif; fill: #5b6470; }
+          .hdr { font: 700 13px 'Inter', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+          .file { font: 500 10.5px 'JetBrains Mono', monospace; fill: #0a4750; }
+        </style>
+        <!-- Have column -->
+        <text x="30" y="34" class="hdr" fill="#17572e">Aanwezig in Command (~65%)</text>
+        <rect x="30" y="48" width="390" height="66" rx="9" fill="#e7f3ec" stroke="#cfe6d8"/>
+        <text x="46" y="72" class="lbl">FileWatcherService</text>
+        <text x="46" y="92" class="sub">chokidar file add/change/remove → IPC + automations</text>
+        <text x="46" y="108" class="file">electron/main/services/FileWatcherService.ts</text>
+
+        <rect x="30" y="124" width="390" height="66" rx="9" fill="#e7f3ec" stroke="#cfe6d8"/>
+        <text x="46" y="148" class="lbl">AutomationService — file-change trigger</text>
+        <text x="46" y="168" class="sub">event-based, worktree-isolatie, cooldown 60s, max 3</text>
+        <text x="46" y="184" class="file">electron/main/services/AutomationService.ts</text>
+
+        <rect x="30" y="200" width="390" height="66" rx="9" fill="#e7f3ec" stroke="#cfe6d8"/>
+        <text x="46" y="224" class="lbl">TaskService — done-migratie</text>
+        <text x="46" y="244" class="sub">checkbox-parse; afgevinkt schuift naar "Done"-sectie</text>
+        <text x="46" y="260" class="file">electron/main/services/TaskService.ts</text>
+
+        <rect x="30" y="276" width="390" height="66" rx="9" fill="#e7f3ec" stroke="#cfe6d8"/>
+        <text x="46" y="300" class="lbl">Editor-surfaces (de "surface")</text>
+        <text x="46" y="320" class="sub">Milkdown WYSIWYG / Monaco + HtmlPreview (sandboxed)</text>
+        <text x="46" y="336" class="file">src/components/Editor/EditorContainer.tsx</text>
+
+        <rect x="30" y="352" width="390" height="60" rx="9" fill="#e7f3ec" stroke="#cfe6d8"/>
+        <text x="46" y="376" class="lbl">Headless runner</text>
+        <text x="46" y="396" class="sub">claude -p &lt;prompt&gt; --output-format json in worktree</text>
+
+        <!-- Missing column -->
+        <text x="480" y="34" class="hdr" fill="#9a2c22">Nog te bouwen (klein &amp; scherp)</text>
+        <rect x="480" y="48" width="390" height="76" rx="9" fill="#fdeceb" stroke="#f2d0cc"/>
+        <text x="496" y="74" class="lbl">Brief per surface</text>
+        <text x="496" y="94" class="sub">staande instructie gekoppeld aan één bestand/pagina;</text>
+        <text x="496" y="110" class="sub">opgeslagen, herbruikt bij elke trigger</text>
+
+        <rect x="480" y="134" width="390" height="76" rx="9" fill="#fdeceb" stroke="#f2d0cc"/>
+        <text x="496" y="160" class="lbl">Marker-executie (TK / [ ])</text>
+        <text x="496" y="180" class="sub">TaskService leest markers al — koppel ze aan de runner</text>
+        <text x="496" y="196" class="sub">zodat een marker de agent activeert</text>
+
+        <rect x="480" y="220" width="390" height="76" rx="9" fill="#fdeceb" stroke="#f2d0cc"/>
+        <text x="496" y="246" class="lbl">Annotatie-overlay op surface</text>
+        <text x="496" y="266" class="sub">highlight/comment op HtmlPreview of Browser →</text>
+        <text x="496" y="282" class="sub">stuur selectie + comment naar de agent</text>
+
+        <rect x="480" y="306" width="390" height="106" rx="9" fill="#eaf0f8" stroke="#d3dded"/>
+        <text x="496" y="332" class="lbl">Grotendeels aanwezig, licht aanpassen</text>
+        <text x="496" y="352" class="sub">• Diff-gating: FileWatcher levert change-events al</text>
+        <text x="496" y="370" class="sub">• Event-trigger i.p.v. polling: file-change bestaat al</text>
+        <text x="496" y="388" class="sub">• Done-migratie: TaskService-patroon hergebruiken</text>
+      </svg>
+      <figcaption>Groen = bestaat vandaag (met bestandslocatie). Rood = echt nieuw. Blauw = bestaat grotendeels, alleen aan elkaar knopen. Command's <code>file-change</code>-trigger is bovendien al het event-model dat Dan in de demo vroeg — Command ligt daar vóór op Kestrel.</figcaption>
+    </figure>
+    <div class="callout info">
+      <div class="kicker">Consequentie voor de eerste stap</div>
+      <p style="margin:0;">De kleinste concrete eerste stap is één verticale plak: een <strong>marker-getriggerde sweep op één markdown-bestand</strong> — <code>file-change</code>-trigger (bestaat) + een per-bestand brief (nieuw, klein) + <code>claude -p</code>-runner (bestaat) + done-migratie via het TaskService-patroon (bestaat). Dat is FC1 + FC2 + FC4 + FC6 samen als één dunne slice, bouwbaar zonder de terminal-architectuur te raken.</p>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2>Feature-kandidaten (de lijst)</h2>
+    <p>17 kandidaten, gegroepeerd per thema. "Command vandaag" is geverifieerd tegen de codebase. Effort is grof: <span class="chip eff-l">L</span> laag · <span class="chip eff-m">M</span> midden · <span class="chip eff-h">H</span> hoog.</p>
+
+    <h3>Thema A — Sweep / document-loops</h3>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Feature</th><th>Wat Kestrel toont</th><th>Command vandaag</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="fc1">FC1</td><td><strong>Watched surface + brief</strong></td><td>Staande instructie per document/pagina, opgeslagen bij eerste sweep</td><td><span class="chip gap">ontbreekt</span> geen per-surface state</td><td><span class="chip eff-m">M</span></td></tr>
+        <tr><td class="id" id="fc2">FC2</td><td><strong>Marker-executie (TK / [ ])</strong></td><td>Bracket/TK-markers triggeren de agent</td><td><span class="chip partial">deels</span> TaskService léést markers, voert niet uit</td><td><span class="chip eff-m">M</span></td></tr>
+        <tr><td class="id" id="fc3">FC3</td><td><strong>Diff-gating ("nothing new")</strong></td><td>Alleen handelen op wijziging t.o.v. vorige versie</td><td><span class="chip partial">deels</span> FileWatcher levert change-events</td><td><span class="chip eff-l">L</span></td></tr>
+        <tr><td class="id" id="fc4">FC4</td><td><strong>Done-migratie / audit-trail</strong></td><td>Afgeronde items schuiven naar "done"-sectie</td><td><span class="chip have">aanwezig</span> al voor <code>TASKS.md</code></td><td><span class="chip eff-l">L</span></td></tr>
+        <tr><td class="id" id="fc5">FC5</td><td><strong>Auto-execute vs. bevestigen</strong></td><td>Toggle: elke sweep automatisch uitvoeren of niet</td><td><span class="chip partial">deels</span> auto-mode bestaat, niet per surface</td><td><span class="chip eff-l">L</span></td></tr>
+        <tr><td class="id" id="fc6">FC6</td><td><strong>Event-trigger i.p.v. polling</strong></td><td>Dan's kritiek: activeer bij typen, niet op interval</td><td><span class="chip have">aanwezig</span> <code>file-change</code>-trigger is event-based</td><td><span class="chip eff-l">L</span></td></tr>
+        <tr><td class="id" id="fc7">FC7</td><td><strong>Self-building loop</strong></td><td>Sweep op eigen repo; pak laaghangend fruit autonoom op</td><td><span class="chip partial">deels</span> automations draaien in worktree</td><td><span class="chip eff-m">M</span></td></tr>
+        <tr><td class="id" id="fc8">FC8</td><td><strong>Loop-UX (collapse "nothing new")</strong></td><td>Herhaalde lege runs opvouwen</td><td><span class="chip gap">ontbreekt</span> geen loop-UI</td><td><span class="chip eff-l">L</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Thema B — Browser / annotatie</h3>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Feature</th><th>Wat Kestrel toont</th><th>Command vandaag</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="fc9">FC9</td><td><strong>Annoteer-op-surface → agent handelt</strong></td><td>Highlight/comment op pagina → agent past aan → refresh</td><td><span class="chip gap">ontbreekt</span> HtmlPreview/Browser zijn passief</td><td><span class="chip eff-m">M</span></td></tr>
+        <tr><td class="id" id="fc10">FC10</td><td><strong>Browser upgraden naar echte webview</strong></td><td>Volwaardige ingebouwde browser (Codex-desktop)</td><td><span class="chip partial">deels</span> alleen iframe: localhost + file://</td><td><span class="chip eff-h">H</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Thema C — Multi-backend (Codex + Claude)</h3>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Feature</th><th>Wat Kestrel toont</th><th>Command vandaag</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="fc11">FC11</td><td><strong>Configureerbare agent-backend</strong></td><td>Draait op Claude én Codex tegelijk</td><td><span class="chip gap">ontbreekt</span> <code>claude</code> is hardcoded</td><td><span class="chip eff-h">H</span></td></tr>
+        <tr><td class="id" id="fc12">FC12</td><td><strong>Connector/MCP-erfenis</strong></td><td>Connectors komen mee van gekoppelde accounts</td><td><span class="chip gap">ontbreekt</span> geen connector-concept</td><td><span class="chip eff-m">M</span></td></tr>
+        <tr><td class="id" id="fc13">FC13</td><td><strong>Route-by-fit (delegate vs pair)</strong></td><td>Taak naar de best passende backend sturen</td><td><span class="chip gap">ontbreekt</span> hangt af van FC11</td><td><span class="chip eff-h">H</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Thema D — Interactiemodel / effort</h3>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Feature</th><th>Wat Kestrel toont</th><th>Command vandaag</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="fc14">FC14</td><td><strong>Effort-dial (cost/speed-hendel)</strong></td><td>Low effort = snel + goedkoop voor real-time</td><td><span class="chip gap">ontbreekt</span> geen effort-selectie</td><td><span class="chip eff-l">L</span></td></tr>
+        <tr><td class="id" id="fc15">FC15</td><td><strong>Delegate- vs pair-modus</strong></td><td>Async hand-off vs. live in hetzelfde bestand</td><td><span class="chip partial">deels</span> chats = pair; automations = delegate</td><td><span class="chip eff-m">M</span></td></tr>
+        <tr><td class="id" id="fc16">FC16</td><td><strong>Terminal-loze document-modus</strong></td><td>Nooit een terminal; werk vanuit doc/pagina</td><td><span class="chip partial">deels</span> headless runner bestaat al</td><td><span class="chip eff-h">H</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Thema E — Ambient capture</h3>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Feature</th><th>Wat Kestrel toont</th><th>Command vandaag</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="fc17">FC17</td><td><strong>Ambient inbox → act on interval</strong></td><td>Monologue/daily-note die op interval wordt verwerkt</td><td><span class="chip partial">deels</span> schedule-trigger bestaat</td><td><span class="chip eff-m">M</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="priority">
+    <h2>Aanbevolen prioritering</h2>
+    <p>De logica: begin waar Command al 65% klaar is (Sweep-MVP), bewijs de waarde met een testcase, en stel de dure architectuur-keuzes (multi-backend, echte webview) uit tot na dat bewijs. Prioritering is een POV — de definitieve keuze maken we samen in de vervolgstap.</p>
+
+    <figure>
+      <svg viewBox="0 0 820 480" role="img" aria-labelledby="matrix-title">
+        <title id="matrix-title">Prioriteringsmatrix: waarde versus effort</title>
+        <style>
+          .ax { stroke: #c3c9d0; stroke-width: 1.5; }
+          .axlbl { font: 600 12px 'Inter', sans-serif; fill: #5b6470; }
+          .qz { font: 600 11px 'Inter', sans-serif; fill: #99a1ab; text-transform: uppercase; letter-spacing: 0.05em; }
+          .node { font: 600 12px 'JetBrains Mono', monospace; fill: #fff; }
+        </style>
+        <!-- quadrant backgrounds -->
+        <rect x="70" y="40" width="330" height="180" fill="#e7f3ec" opacity="0.55"/>
+        <rect x="400" y="40" width="350" height="180" fill="#eaf0f8" opacity="0.55"/>
+        <rect x="70" y="220" width="330" height="200" fill="#fbfbfa"/>
+        <rect x="400" y="220" width="350" height="200" fill="#fbf0e4" opacity="0.55"/>
+        <!-- axes -->
+        <line x1="70" y1="40" x2="70" y2="420" class="ax"/>
+        <line x1="70" y1="420" x2="750" y2="420" class="ax"/>
+        <text x="60" y="36" class="axlbl" text-anchor="end">hoge waarde</text>
+        <text x="60" y="418" class="axlbl" text-anchor="end">lage waarde</text>
+        <text x="72" y="440" class="axlbl">lage effort</text>
+        <text x="748" y="440" class="axlbl" text-anchor="end">hoge effort</text>
+        <text x="235" y="58" class="qz" text-anchor="middle">Quick wins — doen</text>
+        <text x="575" y="58" class="qz" text-anchor="middle">Strategische bets</text>
+        <text x="575" y="238" class="qz" text-anchor="middle">Groot / later</text>
+
+        <!-- nodes: quick wins (low effort, high value) -->
+        <g>
+          <circle cx="140" cy="95" r="17" fill="#1f6b3a"/><text x="140" y="99" class="node" text-anchor="middle">FC6</text>
+          <circle cx="205" cy="130" r="17" fill="#1f6b3a"/><text x="205" y="134" class="node" text-anchor="middle">FC3</text>
+          <circle cx="150" cy="170" r="17" fill="#1f6b3a"/><text x="150" y="174" class="node" text-anchor="middle">FC4</text>
+          <circle cx="270" cy="100" r="17" fill="#1f6b3a"/><text x="270" y="104" class="node" text-anchor="middle">FC1</text>
+          <circle cx="330" cy="140" r="17" fill="#1f6b3a"/><text x="330" y="144" class="node" text-anchor="middle">FC2</text>
+          <circle cx="255" cy="185" r="16" fill="#2f8a4e"/><text x="255" y="189" class="node" text-anchor="middle">FC14</text>
+          <circle cx="345" cy="200" r="16" fill="#2f8a4e"/><text x="345" y="204" class="node" text-anchor="middle">FC5</text>
+        </g>
+        <!-- strategic bets (higher effort, high value) -->
+        <g>
+          <circle cx="470" cy="120" r="17" fill="#35507a"/><text x="470" y="124" class="node" text-anchor="middle">FC9</text>
+          <circle cx="560" cy="150" r="17" fill="#35507a"/><text x="560" y="154" class="node" text-anchor="middle">FC15</text>
+          <circle cx="470" cy="185" r="16" fill="#35507a"/><text x="470" y="189" class="node" text-anchor="middle">FC7</text>
+          <circle cx="640" cy="110" r="17" fill="#35507a"/><text x="640" y="114" class="node" text-anchor="middle">FC11</text>
+          <circle cx="690" cy="170" r="17" fill="#35507a"/><text x="690" y="174" class="node" text-anchor="middle">FC16</text>
+          <circle cx="560" cy="205" r="16" fill="#4a6796"/><text x="560" y="209" class="node" text-anchor="middle">FC17</text>
+        </g>
+        <!-- lower value / later -->
+        <g>
+          <circle cx="470" cy="300" r="16" fill="#a6560d"/><text x="470" y="304" class="node" text-anchor="middle">FC12</text>
+          <circle cx="600" cy="330" r="16" fill="#a6560d"/><text x="600" y="334" class="node" text-anchor="middle">FC13</text>
+          <circle cx="690" cy="300" r="16" fill="#a6560d"/><text x="690" y="304" class="node" text-anchor="middle">FC10</text>
+          <circle cx="230" cy="300" r="16" fill="#8a9099"/><text x="230" y="304" class="node" text-anchor="middle">FC8</text>
+        </g>
+      </svg>
+      <figcaption>Positie is indicatief, niet exact. Groen = quick wins (start hier). Blauw = strategische bets na bewijs. Oranje = groter/later. FC8 is lage effort maar ook lage waarde — meenemen als bijvangst.</figcaption>
+    </figure>
+
+    <div class="tier-h"><span class="tier-dot" style="background:#1f6b3a;"></span><h3 style="margin:0;">Tier 1 — Quick wins: de Sweep-MVP</h3></div>
+    <p><strong>FC1, FC2, FC3, FC4, FC6</strong> (+ FC14, FC5 als kleine bijvangst). Eén verticale plak: marker-getriggerde sweep op één markdown-bestand, gebouwd op FileWatcher + Automation + TaskService + <code>claude -p</code>. Levert het kern-Kestrel-gevoel zonder de terminal-architectuur te raken. Dit is de aanbevolen eerste stap.</p>
+
+    <div class="tier-h"><span class="tier-dot" style="background:#35507a;"></span><h3 style="margin:0;">Tier 2 — Strategische bets (na bewijs)</h3></div>
+    <p><strong>FC9</strong> (annotatie-overlay — de meest "wow" feature), <strong>FC15</strong> (delegate/pair expliciet maken), <strong>FC7</strong> (self-building loop), <strong>FC17</strong> (ambient inbox), en <strong>FC11/FC16</strong> als de grote richtingkeuzes. FC11 (multi-backend) en FC16 (terminal-loze modus) zijn de twee die het meest raken aan de identiteit van Command — bewust apart houden.</p>
+
+    <div class="tier-h"><span class="tier-dot" style="background:#a6560d;"></span><h3 style="margin:0;">Tier 3 — Groter / later of overslaan</h3></div>
+    <p><strong>FC10</strong> (echte webview i.p.v. iframe — flink werk, alleen als annotatie op live-web echt nodig blijkt), <strong>FC12</strong> (connector-erfenis — afhankelijk van multi-backend), <strong>FC13</strong> (route-by-fit — hangt aan FC11). <strong>FC8</strong> is trivia; meenemen als het toevallig langskomt.</p>
+  </section>
+
+  <section id="questions">
+    <h2>Openstaande vragen</h2>
+    <h4>Beslist</h4>
+    <ul>
+      <li><strong>KD1-fork</strong> (2026-07-02): terminal-first blijft; GUI pas via wrap-de-CLI als iets niet anders op te lossen is. Zie Kernbeslissing.</li>
+      <li><strong>Eerste feature</strong> (2026-07-02): browser + annotatie (FC9). Uitgewerkt in een apart brainstorm-doc.</li>
+    </ul>
+    <h4>Uit te zoeken tijdens planning</h4>
+    <ul>
+      <li>Is de effort-dial (FC14) beschikbaar via de Claude CLI-flags die Command gebruikt, of vergt dat SDK-werk? (Verify vóór inplannen.)</li>
+      <li>Multi-backend (FC11): is er een realistische Codex-CLI/headless-modus die net als <code>claude -p</code> aanstuurbaar is? (Onbevestigde aanname — checken.)</li>
+      <li>Diff-gating (FC3): FileWatcher levert events, maar bewaren we een snapshot per surface om "nothing new" te bepalen, of vertrouwen we op change-events alleen?</li>
+    </ul>
+  </section>
+
+  <footer class="composition-signal">
+    Samengesteld op 2026-07-02 door <code>ce-brainstorm</code> uit de Kestrel-demo (Every, Fable&nbsp;5 Power User Camp), transcript 29:00–52:00 via <code>yt-dlp</code>. Capaciteiten van Command geverifieerd tegen de codebase op branch <code>feat/kestrel</code>. Requirements-only — nog geen implementatieplan.
+  </footer>
+
+</div>

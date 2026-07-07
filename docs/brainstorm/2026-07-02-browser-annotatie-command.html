@@ -1,0 +1,351 @@
+<title>Browser + Annotatie - Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #fbfbfa; --surface: #ffffff; --ink: #1a1c1e; --muted: #5b6470; --line: #e4e6ea;
+    --accent: #0f5f6b; --accent-soft: #e6f2f3; --accent-text: #0a4750;
+    --warn: #a6560d; --warn-soft: #fbf0e4; --warn-text: #8a4708;
+    --good: #1f6b3a; --good-soft: #e7f3ec; --good-text: #17572e;
+    --info: #35507a; --info-soft: #eaf0f8;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15.5px; line-height: 1.62; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 960px; margin-inline: auto; padding: 40px 28px 80px; }
+  h1 { font-size: 2.05rem; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 6px; }
+  h2 { font-size: 1.42rem; letter-spacing: -0.01em; margin: 2.6em 0 0.5em; padding-top: 0.7em; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.08rem; margin: 1.8em 0 0.4em; }
+  h4 { font-size: 0.96rem; margin: 1.3em 0 0.3em; color: var(--accent-text); }
+  p, li { max-width: 72ch; } p { margin: 0.55em 0; }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 0.86em; background: #f0f1f2; padding: 1px 5px; border-radius: 4px; }
+  .eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.11em; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+  .lede { font-size: 1.06rem; color: var(--muted); max-width: 74ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 18px 0 6px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-size: 0.82rem; }
+  .meta dl { display: flex; gap: 6px; margin: 0; } .meta dt { color: var(--muted); font-weight: 500; } .meta dd { margin: 0; font-weight: 600; }
+  .meta code { background: var(--accent-soft); color: var(--accent-text); }
+  nav.toc { margin: 22px 0 8px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  nav.toc ol { margin: 6px 0 0; padding-left: 1.2em; columns: 2; column-gap: 32px; font-size: 0.9rem; }
+  nav.toc a { text-decoration: none; } nav.toc a:hover { text-decoration: underline; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 14px; }
+  .stat .num { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--accent); }
+  .stat .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .quote { border-left: 3px solid var(--accent); background: var(--accent-soft); margin: 12px 0; padding: 10px 16px; border-radius: 0 8px 8px 0; font-size: 0.94rem; }
+  .quote .ts { font-family: var(--mono); font-size: 0.74rem; color: var(--accent-text); font-weight: 500; }
+  .quote p { margin: 3px 0 0; color: #253238; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 0.9rem; }
+  .scroll-x { overflow-x: auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; background: #f7f8f9; }
+  td.id, .idchip { font-family: var(--mono); font-weight: 600; color: var(--accent-text); white-space: nowrap; }
+  .chip { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+  .chip.have { background: var(--good-soft); color: var(--good-text); border-color: #cfe6d8; }
+  .chip.partial { background: var(--warn-soft); color: var(--warn-text); border-color: #eeddc7; }
+  .chip.gap { background: #fdeceb; color: #9a2c22; border-color: #f2d0cc; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 12px 0; }
+  .modehdr { display:flex; align-items:center; gap:10px; }
+  .modehdr .n { font-family: var(--mono); font-weight:700; color:#fff; background:var(--accent); border-radius:6px; width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center; font-size:0.85rem; flex:none; }
+  .callout { border-radius: 10px; padding: 14px 18px; margin: 14px 0; border: 1px solid var(--line); }
+  .callout .kicker { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; margin-bottom: 4px; }
+  .callout.rec { background: var(--accent-soft); border-color: #bfe0e2; } .callout.rec .kicker { color: var(--accent-text); }
+  .callout.warn { background: var(--warn-soft); border-color: #eeddc7; } .callout.warn .kicker { color: var(--warn-text); }
+  .callout.info { background: var(--info-soft); border-color: #d3dded; } .callout.info .kicker { color: var(--info); }
+  dl.fields { margin: 8px 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 0.9rem; }
+  dl.fields dt { color: var(--muted); font-weight: 600; } dl.fields dd { margin: 0; }
+  figure { margin: 22px 0; }
+  figure svg { max-width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  figcaption { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+  footer.composition-signal { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--muted); }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } nav.toc ol { columns: 1; } }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">CE-Brainstorm · Requirements-only · Volgt op KD1</p>
+  <h1>Drie manieren om vanuit de browser met de agent te praten</h1>
+  <p class="lede">De browser is nu een echte <code>&lt;webview&gt;</code> (PR&nbsp;#152). Daarop komen drie interactie-modi bovenop — beschrijven, demonstreren, aanwijzen — die elk selectie/context naar je actieve Claude-chat sturen. Gebouwd via host-pull op de webview, zonder de security te verzwakken.</p>
+
+  <div class="meta">
+    <dl><dt>type</dt><dd><code>feat</code></dd></dl>
+    <dl><dt>date</dt><dd><time datetime="2026-07-02">2026-07-02</time></dd></dl>
+    <dl><dt>topic</dt><dd><code>browser-annotatie</code></dd></dl>
+    <dl><dt>artifact_contract</dt><dd><code>ce-unified-plan/v1</code></dd></dl>
+    <dl><dt>artifact_readiness</dt><dd><code>requirements-only</code></dd></dl>
+    <dl><dt>product_contract_source</dt><dd><code>ce-brainstorm</code></dd></dl>
+    <dl><dt>execution</dt><dd><code>code</code></dd></dl>
+    <dl><dt>context</dt><dd>FC9, bovenop FC10 (webview, #152) uit <a href="2026-07-02-kestrel-features-command.html">kestrel-features</a></dd></dl>
+  </div>
+
+  <nav class="toc" aria-label="Inhoud">
+    <strong style="font-size:0.82rem;">Inhoud</strong>
+    <ol>
+      <li><a href="#goal-capsule">Kern in één alinea</a></li>
+      <li><a href="#product-contract">Product Contract</a></li>
+      <li><a href="#summary">Summary</a></li>
+      <li><a href="#problem-frame">Problem Frame</a></li>
+      <li><a href="#key-decisions">Key Decisions</a></li>
+      <li><a href="#modes">De drie modi</a></li>
+      <li><a href="#actors">Actors</a></li>
+      <li><a href="#flow">Key Flows</a></li>
+      <li><a href="#requirements">Requirements</a></li>
+      <li><a href="#acceptance">Acceptance Examples</a></li>
+      <li><a href="#scope">Scope Boundaries</a></li>
+      <li><a href="#questions">Outstanding Questions</a></li>
+    </ol>
+  </nav>
+
+  <div class="stats">
+    <div class="stat"><div class="num">3 modi</div><div class="lbl">beschrijven · demonstreren · aanwijzen</div></div>
+    <div class="stat"><div class="num">webview = klaar</div><div class="lbl">echte &lt;webview&gt; geland via #152</div></div>
+    <div class="stat"><div class="num">host-pull</div><div class="lbl">executeJavaScript/capturePage; geen guest-bridge</div></div>
+    <div class="stat"><div class="num">1 kleine IPC</div><div class="lbl">clipboard.writeImage, voor modus 3</div></div>
+  </div>
+
+  <section id="goal-capsule">
+    <h2>Kern in één alinea</h2>
+    <p><strong>Situatie —</strong> na KD1 (terminal-first) is browser + annotatie de eerste Kestrel-feature, en de browser is intussen een echte <code>&lt;webview&gt;</code> (PR&nbsp;#152). De eis: drie manieren om vanuit die browser met de agent te praten — (1) selecteer + comment → snippet naar chat, (2) highlight + inline-edit → wijziging naar chat, (3) teken op de pagina + "voeg toe aan chat" → screenshot naar chat. <strong>Complicatie —</strong> de webview is bewust gehard (<code>hardenWebviewPreferences</code>: preload gestript, sandbox aan), dus je kunt geen bridge in de pagina injecteren om events omhoog te pushen. <strong>Resolutie —</strong> alle drie de modi werken via <em>host-pull</em>: Command's renderer roept <code>executeJavaScript</code>/<code>capturePage</code> aan op de webview-ref en houdt de interactie-UI in de eigen React-laag. Tekst gaat via <code>terminal.write</code>; de screenshot van modus 3 gaat via het klembord de chat in (Claude Code plakt afbeeldingen met Alt+V).</p>
+    <div class="callout info">
+      <div class="kicker">Product-autoriteit</div>
+      <p style="margin:0;">Remco (eigenaar Command). Dit doc scopt <em>wat</em>; het <em>hoe</em> (overlay-techniek, executeJavaScript-payloads) is voor de planfase.</p>
+    </div>
+    <div class="callout warn">
+      <div class="kicker">Open blocker vóór planning</div>
+      <p style="margin:0;">Overlay van de interactie-UI over een <code>&lt;webview&gt;</code> — z-index/paint over een guest-view is een bekend Electron-pijnpunt; React-overlay vs. UI-in-de-pagina injecteren is te beslissen. Zie <a href="#questions">Outstanding Questions</a>.</p>
+    </div>
+  </section>
+
+  <section id="product-contract">
+    <h2>Product Contract</h2>
+
+    <h3 id="summary">Summary</h3>
+    <p>Bouw drie interactie-modi op de bestaande browser-webview. Command's renderer stuurt de webview aan via <code>executeJavaScript</code>/<code>capturePage</code> (host-pull); de mode-schakelaar en popover leven in Command's React-laag. Modus 1 stuurt de code-snippet van een selectie + comment als tekst naar de actieve Claude-chat; modus 2 laat je tekst ter plekke editen en stuurt de voor→na-wijziging als instructie; modus 3 laat je op de pagina tekenen en stuurt een screenshot van tekening + pagina als afbeelding via het klembord (Alt+V). De agent past de bron aan; de gebruiker ververst de pagina.</p>
+
+    <h3 id="problem-frame">Problem Frame</h3>
+    <p>Er is een gat tussen "iets zien dat niet klopt op een draaiende pagina" en "de agent dat laten fixen". De gebruiker moet de fout in woorden vangen, het juiste bestand/component benoemen en dat als prompt tikken — traag, foutgevoelig, en het breekt de visuele feedback-loop. Kestrel loste dit op door de aanwijzing letterlijk op de pagina te doen:</p>
+    <div class="quote"><span class="ts">[31:37 / 32:41]</span><p>"This text is kind of small — I can highlight it and say: the labels are too small." → "It bumped up the SVG label size and we can just refresh."</p></div>
+    <p>Verschillende problemen vragen om verschillende gebaren: soms wil je iets <em>beschrijven</em> (comment), soms exact <em>demonstreren</em> hoe het moet (edit), soms alleen <em>aanwijzen</em> waar het mis is (tekening). Vandaar drie modi in plaats van één.</p>
+
+    <h3 id="key-decisions">Key Decisions</h3>
+    <div class="card">
+      <p class="idchip">KD-A · Host-pull, geen guest-bridge</p>
+      <p style="margin:.3em 0 0;"><strong>Bouw op de bestaande, geharde webview via host-pull.</strong> <code>webviewSecurity.hardenWebviewPreferences</code> stript preload en zet sandbox/contextIsolation aan — bewust, als bridge-escape-verdediging. We verzwakken dat niet. In plaats daarvan roept Command's renderer <code>executeJavaScript()</code> en <code>capturePage()</code> aan op de webview-ref (host-side, overleeft de sandbox), en de interactie-UI leeft in Command's React-laag. Dit vervangt de oude aanpak (script in <code>srcdoc</code> dat postMessaget) die met de verwijderde HtmlPreview verdween.</p>
+    </div>
+    <div class="card">
+      <p class="idchip">KD-B · Alles naar de actieve Claude-chat</p>
+      <p style="margin:.3em 0 0;"><strong>Elke modus stuurt naar de actieve chat via <code>terminal.write</code></strong> (tekst) — nooit API/SDK. Modus 1 en 2 sturen tekst; modus 3 stuurt tekst die verwijst naar een opgeslagen screenshot-bestand (Claude leest de afbeelding via het pad). Consistent met KD1 en de gebruiker ziet de agent live werken.</p>
+    </div>
+    <div class="card">
+      <p class="idchip">KD-C · Source-mapping</p>
+      <p style="margin:.3em 0 0;"><strong>Deterministisch voor lokale bestanden, agent-resolved voor dev-servers.</strong> Een lokaal bestand mapt naar zichzelf; een dev-server rendert component-output, dus Command stuurt rijke context mee (outerHTML/selector, DOM-pad, tekst, URL/route) en laat Claude — dat de repo heeft — de juiste component vinden.</p>
+    </div>
+    <div class="card">
+      <p class="idchip">KD-D · Modus 3: afbeelding via het klembord (Alt+V)</p>
+      <p style="margin:.3em 0 0;"><strong>De screenshot gaat via het klembord de chat in.</strong> Claude Code plakt klembord-afbeeldingen met Alt+V (bevestigd werkend) — dat is een Claude Code-capability, geen Command-code. Command zet de capture op het OS-klembord (<code>clipboard.writeImage</code>, main-process, past bij het bestaande clipboard-over-IPC-patroon) en de afbeelding landt via Alt+V in de prompt. Dit vraagt alleen dat <code>clipboard.writeImage</code> wordt blootgelegd — geen binaire file-write of temp-bestand. Een opgeslagen-bestand-met-pad blijft de fallback.</p>
+    </div>
+
+    <h3 id="modes">De drie modi</h3>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>Modus</th><th>Gebaar</th><th>Wat naar de chat gaat</th><th>Kern-mechanisme</th><th>Effort</th><th>Feasibility</th></tr></thead>
+      <tbody>
+        <tr><td class="id">1 · Aanwijzen &amp; commentaar</td><td>Selecteer content + typ comment</td><td>Code-snippet van de selectie + comment (tekst)</td><td><code>executeJavaScript</code> leest selectie → <code>terminal.write</code></td><td><span class="chip partial">M</span></td><td><span class="chip have">✓</span></td></tr>
+        <tr><td class="id">2 · Inline editen</td><td>Highlight tekst + pas ter plekke aan</td><td>Voor→na als edit-instructie (tekst)</td><td><code>contentEditable</code> via <code>executeJavaScript</code>, teruglezen → <code>terminal.write</code></td><td><span class="chip partial">M</span></td><td><span class="chip have">✓</span></td></tr>
+        <tr><td class="id">3 · Tekenen &amp; snapshot</td><td>Teken op de pagina + "voeg toe aan chat"</td><td>Screenshot van tekening + pagina (afbeelding via klembord)</td><td>Canvas ín de pagina + <code>capturePage</code> + <code>clipboard.writeImage</code> + Alt+V</td><td><span class="chip partial">M</span></td><td><span class="chip have">✓</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3 id="actors">Actors</h3>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Actor</th><th>Rol</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="a1">A1</td><td><strong>Gebruiker</strong></td><td>Kiest een modus, selecteert/edit/tekent, verstuurt, ververst.</td></tr>
+        <tr><td class="id" id="a2">A2</td><td><strong>Command-renderer</strong></td><td>Host-pull: roept <code>executeJavaScript</code>/<code>capturePage</code> aan, host de mode-UI, stelt het bericht samen, schrijft naar de terminal.</td></tr>
+        <tr><td class="id" id="a3">A3</td><td><strong>Webview-guest</strong></td><td>Voert geïnjecteerde JS uit (selectie lezen, contentEditable, teken-canvas); heeft geen bridge naar Command.</td></tr>
+        <tr><td class="id" id="a4">A4</td><td><strong>Claude-chat-terminal (agent)</strong></td><td>Ontvangt het bericht, vindt de juiste bron, past aan.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3 id="flow">Key Flows</h3>
+    <p><strong>F1 · Modus 1 — Aanwijzen &amp; commentaar.</strong> <strong>Trigger:</strong> modus 1 actief. Gebruiker selecteert tekst/content in de webview → klikt "commentaar" → Command leest via <code>executeJavaScript</code> de selectie + outerHTML/selector + URL → toont een comment-invoer → gebruiker typt en verstuurt → Command schrijft snippet + comment + bron naar de chat → agent past aan → gebruiker ververst.</p>
+    <p><strong>F2 · Modus 2 — Inline editen.</strong> <strong>Trigger:</strong> modus 2 actief. Gebruiker highlight tekst → Command zet dat element via <code>executeJavaScript</code> op <code>contentEditable</code> → gebruiker typt de gewenste tekst ter plekke → klikt "verstuur edit" → Command leest voor→na + locator terug → schrijft een edit-instructie naar de chat → agent past de bron aan → gebruiker ververst.</p>
+    <p><strong>F3 · Modus 3 — Tekenen &amp; snapshot.</strong> <strong>Trigger:</strong> modus 3 actief. Command injecteert een teken-canvas over de pagina (<code>executeJavaScript</code>) → gebruiker tekent → klikt "voeg toe aan chat" → Command roept <code>capturePage</code> aan (pagina + tekening) → zet de afbeelding op het klembord (<code>clipboard.writeImage</code>) → de afbeelding landt via Alt+V in de chat (Command triggert de paste of de gebruiker doet Alt+V) → agent bekijkt de afbeelding → gebruiker ververst.</p>
+    <figure>
+      <svg viewBox="0 0 760 360" role="img" aria-labelledby="wf-title">
+        <title id="wf-title">Split view met mode-schakelaar en modus 3 (tekenen)</title>
+        <style>
+          .frame { fill: #f7f8f9; stroke: #d7dbe0; stroke-width: 1.5; }
+          .term { fill: #1f2430; }
+          .termtxt { font: 400 11px 'JetBrains Mono', monospace; fill: #c8cdd6; }
+          .prev { fill: #ffffff; stroke: #e4e6ea; stroke-width: 1; }
+          .wlbl { font: 600 11px 'Inter', sans-serif; fill: #5b6470; }
+          .ph { fill: #eceef1; }
+          .mbtn { fill: #ffffff; stroke: #c3c9d0; stroke-width: 1; }
+          .mbtnA { fill: #0f5f6b; }
+          .mtxt { font: 600 10px 'Inter', sans-serif; }
+          .draw { fill: none; stroke: #d64545; stroke-width: 2.5; stroke-linecap: round; }
+          .cta { fill: #0f5f6b; }
+        </style>
+        <rect x="12" y="12" width="736" height="336" rx="10" class="frame"/>
+        <text x="32" y="40" class="wlbl">Claude-chat (terminal)</text>
+        <rect x="28" y="50" width="300" height="280" rx="6" class="term"/>
+        <text x="42" y="78" class="termtxt">&gt; [afbeelding geplakt · Alt+V]</text>
+        <text x="42" y="96" class="termtxt">  markering op /report —</text>
+        <text x="42" y="116" class="termtxt">  de grafiek is te klein</text>
+        <text x="42" y="140" class="termtxt">● Reading image…</text>
+        <text x="42" y="160" class="termtxt">● Editing Chart.tsx</text>
+        <text x="42" y="300" class="termtxt" fill="#7b8290">— via modus 3 (tekening) —</text>
+        <rect x="340" y="50" width="4" height="280" rx="2" fill="#d7dbe0"/>
+        <!-- browser toolbar with mode switcher -->
+        <text x="360" y="40" class="wlbl">Browser — localhost:3000 /report</text>
+        <rect x="356" y="50" width="376" height="30" rx="6" fill="#eef0f2" stroke="#e0e3e7"/>
+        <rect x="364" y="56" width="70" height="18" rx="5" class="mbtn"/><text x="399" y="68" class="mtxt" fill="#5b6470" text-anchor="middle">comment</text>
+        <rect x="440" y="56" width="52" height="18" rx="5" class="mbtn"/><text x="466" y="68" class="mtxt" fill="#5b6470" text-anchor="middle">edit</text>
+        <rect x="498" y="56" width="58" height="18" rx="5" class="mbtnA"/><text x="527" y="68" class="mtxt" fill="#fff" text-anchor="middle">teken</text>
+        <!-- page area -->
+        <rect x="356" y="86" width="376" height="244" rx="6" class="prev"/>
+        <rect x="374" y="104" width="150" height="14" rx="3" class="ph"/>
+        <rect x="374" y="130" width="330" height="80" rx="4" class="ph"/>
+        <text x="384" y="150" style="font:500 10px 'Inter';fill:#9aa2ac;">[ grafiek ]</text>
+        <!-- freehand drawing -->
+        <path class="draw" d="M420 145 q40 -25 80 5 q20 25 -10 40 q-45 18 -78 -8 q-22 -22 8 -37"/>
+        <!-- CTA button -->
+        <rect x="600" y="290" width="120" height="26" rx="6" class="cta"/>
+        <text x="660" y="307" style="font:600 11px 'Inter';fill:#fff;" text-anchor="middle">Voeg toe aan chat</text>
+      </svg>
+      <figcaption>Directioneel — illustreert de beoogde vorm (mode-schakelaar in de toolbar, tekening + CTA). Exacte kleuren, spacing, copy en componentkeuzes zijn placeholders voor review, geen requirements.</figcaption>
+    </figure>
+
+    <h3 id="requirements">Requirements</h3>
+    <h4>Overkoepelend</h4>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="r1">R1</td><td>De browser-toolbar heeft een mode-schakelaar tussen de drie modi (aanwijzen, editen, tekenen); één modus is tegelijk actief.</td></tr>
+        <tr><td class="id" id="r2">R2</td><td>Elke modus stuurt het resultaat naar de actieve Claude-chat via <code>terminal.write</code> — niet via API/SDK.</td></tr>
+        <tr><td class="id" id="r3">R3</td><td>Als er geen actieve chat van type <code>claude</code> is, meldt de UI dat en blokkeert verzending; het opgebouwde item blijft behouden.</td></tr>
+        <tr><td class="id" id="r13">R13</td><td>De interactie draait via host-pull: Command roept <code>executeJavaScript</code>/<code>capturePage</code> aan op de webview-ref. Er wordt geen preload/bridge in de guest geïnjecteerd en de bestaande hardening blijft intact.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h4>Modus 1 — Aanwijzen &amp; commentaar</h4>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="r4">R4</td><td>De gebruiker kan tekst/content op de pagina selecteren en er een vrije opmerking aan koppelen.</td></tr>
+        <tr><td class="id" id="r5">R5</td><td>Command legt de selectie vast als code-snippet (outerHTML/tekst) plus locator (selector/DOM-pad) en de bron-URL/route.</td></tr>
+        <tr><td class="id" id="r6">R6</td><td>Het chatbericht bevat de snippet + de opmerking + de bron, zo dat de agent de juiste plek vindt.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h4>Modus 2 — Inline editen</h4>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="r7">R7</td><td>De gebruiker kan een gehighlighte tekstpassage ter plekke in de pagina bewerken (via <code>contentEditable</code>, host-geïnitieerd).</td></tr>
+        <tr><td class="id" id="r8">R8</td><td>Command legt de voor→na-tekst plus locator vast.</td></tr>
+        <tr><td class="id" id="r9">R9</td><td>De wijziging gaat als edit-instructie ("verander X in Y op &lt;locator&gt;") naar de chat; de agent past de bron aan (werkt voor dev-server én lokaal bestand). De inline-edit in de pagina zelf is tijdelijk, geen bronwijziging.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h4>Modus 3 — Tekenen &amp; snapshot</h4>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td class="id" id="r10">R10</td><td>De gebruiker kan vrij over de pagina tekenen; een "voeg toe aan chat"-knop rondt de tekening af.</td></tr>
+        <tr><td class="id" id="r11">R11</td><td>Command maakt een screenshot van pagina + tekening samen (<code>capturePage</code> op de guest, met de tekening in de guest gerenderd) en zet die op het klembord via <code>clipboard.writeImage</code>.</td></tr>
+        <tr><td class="id" id="r12">R12</td><td>De afbeelding landt in de chat via Alt+V (Claude Code's klembord-image-paste); Command triggert de paste of de gebruiker doet Alt+V, met de bron-URL/route als begeleidende tekst.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3 id="acceptance">Acceptance Examples</h3>
+    <div class="card">
+      <p><span class="idchip">AE1</span> — <strong>Covers R4–R6 (modus 1).</strong></p>
+      <dl class="fields">
+        <dt>Wanneer</dt><dd>op <code>localhost:3000</code> selecteert de gebruiker een "Score"-label, kiest comment en typt "maak groter".</dd>
+        <dt>Dan</dt><dd>de chat krijgt de snippet (outerHTML) + selector + route + "maak groter", en Claude zoekt de component en past aan.</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <p><span class="idchip">AE2</span> — <strong>Covers R7–R9 (modus 2).</strong></p>
+      <dl class="fields">
+        <dt>Wanneer</dt><dd>de gebruiker highlight de kop "Reosultaten", corrigeert 'm inline naar "Resultaten" en verstuurt.</dd>
+        <dt>Dan</dt><dd>de chat krijgt "verander 'Reosultaten' → 'Resultaten' op &lt;h2 op /report&gt;", en Claude past de bron aan; de pagina zelf is niet permanent gewijzigd tot de agent klaar is.</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <p><span class="idchip">AE3</span> — <strong>Covers R10–R12 (modus 3).</strong></p>
+      <dl class="fields">
+        <dt>Wanneer</dt><dd>de gebruiker cirkelt een grafiek en een naastgelegen witruimte in, en klikt "voeg toe aan chat".</dd>
+        <dt>Dan</dt><dd>de PNG van pagina + cirkels komt op het klembord en landt via Alt+V in de chat (met de route als tekst erbij); Claude leest de afbeelding.</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <p><span class="idchip">AE4</span> — <strong>Covers R3.</strong></p>
+      <dl class="fields">
+        <dt>Wanneer</dt><dd>een modus wordt gebruikt terwijl er geen actieve <code>claude</code>-chat is.</dd>
+        <dt>Dan</dt><dd>de UI meldt dat er een chat nodig is en het item blijft behouden tot er een is.</dd>
+      </dl>
+    </div>
+
+    <h3 id="scope">Scope Boundaries</h3>
+    <div class="card">
+      <h4>In scope</h4>
+      <ul style="margin:0;padding-left:1.1em;font-size:0.92rem;">
+        <li>Drie modi op de bestaande webview (dev-server localhost + lokaal <code>file://</code>)</li>
+        <li>Host-pull architectuur; mode-schakelaar in de toolbar</li>
+        <li><code>clipboard.writeImage</code> blootleggen (voor modus 3)</li>
+        <li>Verzenden naar de actieve Claude-chat</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Uitgesteld / buiten scope</h4>
+      <ul style="margin:0;padding-left:1.1em;font-size:0.92rem;">
+        <li>Externe/SaaS-URLs annoteren</li>
+        <li>Opgeslagen-bestand-met-pad als route voor modus 3 (fallback, niet primair)</li>
+        <li>Batchen van meerdere annotaties in één bericht (kan later; MVP = per actie versturen)</li>
+        <li>Annotatie-persistentie over sessies; verzwakken van de webview-hardening</li>
+      </ul>
+    </div>
+    <div class="callout warn">
+      <div class="kicker">Buiten de identiteit</div>
+      <p style="margin:0;">Dit maakt van de browser geen visuele WYSIWYG-editor en vervangt de terminal niet. De modi zijn snelle input-methodes naar de chat.</p>
+    </div>
+
+    <h3 id="dependencies">Dependencies / Assumptions</h3>
+    <ul>
+      <li><strong>Geverifieerd (na merge van #152):</strong> de browser is een <code>&lt;webview&gt;</code> met een ref in <code>BrowserTab.tsx</code>; <code>webviewSecurity.hardenWebviewPreferences</code> stript preload en zet <code>sandbox</code>/<code>contextIsolation</code> aan, partition gepind. <code>terminal.write(id, data: string)</code> bestaat (tekst-only). In Command zit vandaag géén image-clipboard-code (geen <code>writeImage</code>/<code>readImage</code>). Actieve browser-tab + URL zijn te vinden via <code>activeContentTabId[activeTerminalId] → editorTabs[..]</code> met <code>type: 'browser'</code>.</li>
+      <li><strong>Bevestigd door gebruiker:</strong> Claude Code plakt klembord-afbeeldingen in de terminal via Alt+V. Dat is een Claude Code-capability (de CLI leest het OS-klembord), niet Command-code — Command hoeft de afbeelding alleen op het klembord te zetten.</li>
+      <li><strong>Nieuw werk:</strong> (1) <code>executeJavaScript</code> op de webview-ref beschikbaar maken vanuit de renderer voor selectie/edit/canvas; (2) <code>capturePage</code> op de guest wiren; (3) <code>clipboard.writeImage</code> blootleggen via de main-process clipboard-module (klein; bestaand IPC-patroon).</li>
+      <li><strong>Aanname (te bevestigen in plan):</strong> voor een dev-server vindt Claude de juiste component betrouwbaar genoeg uit outerHTML + selector + route; <code>capturePage</code> is bereikbaar op de guest-webContents; het Alt+V-paste-signaal kan programmatisch getriggerd worden (anders drukt de gebruiker Alt+V).</li>
+    </ul>
+
+    <h3 id="questions">Outstanding Questions</h3>
+    <h4>Op te lossen vóór planning</h4>
+    <ul>
+      <li><strong>Overlay-strategie:</strong> leeft de mode-UI (popover, comment-invoer) als React-overlay boven de <code>&lt;webview&gt;</code>, of injecteren we de UI in de guest via <code>executeJavaScript</code>? Overlay over een guest-view is een bekend z-index/paint-pijnpunt; dit raakt alle drie de modi (R13/R1).</li>
+      <li><strong>Selectie-UX:</strong> host-pull betekent dat een selectie op een trigger wordt uitgelezen (knop/hotkey). Accepteren we die extra klik, of gebruiken we het <code>console-message</code>-kanaal om selecties toch event-gedreven te laten verschijnen (zonder de hardening te verzwakken)?</li>
+    </ul>
+    <h4>Uit te zoeken tijdens planning</h4>
+    <ul>
+      <li><strong>Locator-formaat (R5/R8):</strong> welke combinatie van selector, DOM-pad, tekst en route vindt Claude het betrouwbaarst terug; benutten we dev-mode source-attributen indien aanwezig?</li>
+      <li><strong>capturePage-scope (R11):</strong> volledige pagina of alleen viewport; hoe de tekening in de guest renderen zodat 'ie in de capture zit.</li>
+      <li><strong>Alt+V-trigger (R12):</strong> kan Command de paste programmatisch triggeren (byte-sequence naar de PTY), of drukt de gebruiker zelf Alt+V — en zet <code>clipboard.writeImage</code> de NativeImage zo neer dat Claude Code 'm oppikt?</li>
+    </ul>
+  </section>
+
+  <footer class="composition-signal">
+    Samengesteld op 2026-07-02 door <code>ce-brainstorm</code>, herzien na merge van PR&nbsp;#152 (webview) en een capaciteitsscan. Volgt op besluit KD1 (terminal-first) in <code>docs/brainstorm/2026-07-02-kestrel-features-command.html</code>. Geverifieerd tegen de codebase op branch <code>feat/kestrel</code>: <code>src/components/Browser/BrowserTab.tsx</code>, <code>electron/main/utils/webviewSecurity.ts</code>, <code>electron/preload/index.ts</code>, <code>src/hooks/useXtermInstance.ts</code>, <code>src/stores/projectStore.ts</code>. Requirements-only — nog geen implementatieplan.
+  </footer>
+
+</div>

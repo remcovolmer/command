@@ -1,0 +1,451 @@
+<title>Browser Annotation Modes - Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #fbfbfa; --surface: #ffffff; --ink: #1a1c1e; --muted: #5b6470; --line: #e4e6ea;
+    --accent: #0f5f6b; --accent-soft: #e6f2f3; --accent-text: #0a4750;
+    --warn: #a6560d; --warn-soft: #fbf0e4; --warn-text: #8a4708;
+    --good: #1f6b3a; --good-soft: #e7f3ec; --good-text: #17572e;
+    --info: #35507a; --info-soft: #eaf0f8;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15.5px; line-height: 1.62; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 980px; margin-inline: auto; padding: 40px 28px 80px; }
+  h1 { font-size: 2.0rem; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 6px; }
+  h2 { font-size: 1.4rem; letter-spacing: -0.01em; margin: 2.4em 0 0.5em; padding-top: 0.7em; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.05rem; margin: 1.6em 0 0.4em; }
+  h4 { font-size: 0.95rem; margin: 1.2em 0 0.3em; color: var(--accent-text); }
+  p, li { max-width: 74ch; } p { margin: 0.5em 0; }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 0.85em; background: #f0f1f2; padding: 1px 5px; border-radius: 4px; }
+  .eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.11em; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+  .lede { font-size: 1.04rem; color: var(--muted); max-width: 76ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 18px 0 6px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-size: 0.82rem; }
+  .meta dl { display: flex; gap: 6px; margin: 0; } .meta dt { color: var(--muted); font-weight: 500; } .meta dd { margin: 0; font-weight: 600; }
+  .meta code { background: var(--accent-soft); color: var(--accent-text); }
+  nav.toc { margin: 22px 0 8px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  nav.toc ol { margin: 6px 0 0; padding-left: 1.2em; columns: 2; column-gap: 32px; font-size: 0.9rem; }
+  nav.toc a { text-decoration: none; } nav.toc a:hover { text-decoration: underline; }
+  .subnav { font-size: 0.85rem; margin: 6px 0 14px; padding: 10px 14px; background: #f7f8f9; border: 1px solid var(--line); border-radius: 8px; }
+  .subnav a { text-decoration: none; margin-right: 12px; white-space: nowrap; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.9rem; }
+  .scroll-x { overflow-x: auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; background: #f7f8f9; }
+  td.id, .idchip { font-family: var(--mono); font-weight: 600; color: var(--accent-text); white-space: nowrap; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 12px 0; }
+  .callout { border-radius: 10px; padding: 14px 18px; margin: 14px 0; border: 1px solid var(--line); }
+  .callout .kicker { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; margin-bottom: 4px; }
+  .callout.rec { background: var(--accent-soft); border-color: #bfe0e2; } .callout.rec .kicker { color: var(--accent-text); }
+  .callout.warn { background: var(--warn-soft); border-color: #eeddc7; } .callout.warn .kicker { color: var(--warn-text); }
+  .callout.info { background: var(--info-soft); border-color: #d3dded; } .callout.info .kicker { color: var(--info); }
+  article.unit { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 14px 0; }
+  article.unit > h3 { margin-top: 0; }
+  dl.strip { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 8px 0 4px; font-size: 0.9rem; }
+  dl.strip dt { color: var(--muted); font-weight: 600; } dl.strip dd { margin: 0; }
+  details { margin: 8px 0 0; border-top: 1px dashed var(--line); padding-top: 6px; }
+  summary { cursor: pointer; font-size: 0.86rem; font-weight: 600; color: var(--accent-text); }
+  details ul { margin: 8px 0; } details li { font-size: 0.9rem; }
+  figure { margin: 20px 0; } figure svg { max-width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  figcaption { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+  footer.composition-signal { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--muted); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 2.4em 0 0; }
+  @media (max-width: 720px) { .cols2 { grid-template-columns: 1fr; } nav.toc ol { columns: 1; } }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">CE-Plan · Implementation-ready · execution: code</p>
+  <h1>Browser Annotation Modes — Plan</h1>
+  <p class="lede">Drie interactie-modi op de bestaande <code>&lt;webview&gt;</code> (aanwijzen &amp; commentaar, inline editen, tekenen &amp; snapshot), die selectie/context naar de actieve Claude-chat sturen via host-pull. Terminal-first, geen SDK; de webview-hardening blijft intact.</p>
+
+  <div class="meta">
+    <dl><dt>type</dt><dd><code>feat</code></dd></dl>
+    <dl><dt>date</dt><dd><time datetime="2026-07-03">2026-07-03</time></dd></dl>
+    <dl><dt>artifact_contract</dt><dd><code>ce-unified-plan/v1</code></dd></dl>
+    <dl><dt>artifact_readiness</dt><dd><code>implementation-ready</code></dd></dl>
+    <dl><dt>product_contract_source</dt><dd><code>ce-brainstorm</code></dd></dl>
+    <dl><dt>execution</dt><dd><code>code</code></dd></dl>
+    <dl><dt>target branch</dt><dd><code>feat/kestrel</code></dd></dl>
+    <dl><dt>origin</dt><dd><code>docs/brainstorm/2026-07-02-browser-annotatie-command.html</code></dd></dl>
+  </div>
+
+  <nav class="toc" aria-label="Inhoud">
+    <strong style="font-size:0.82rem;">Inhoud</strong>
+    <ol>
+      <li><a href="#goal-capsule">Goal Capsule</a></li>
+      <li><a href="#product-contract">Product Contract (recap)</a></li>
+      <li><a href="#planning-contract">Planning Contract — KTD's + ontwerp</a></li>
+      <li><a href="#implementation-units">Implementation Units</a></li>
+      <li><a href="#verification-contract">Verification Contract</a></li>
+      <li><a href="#definition-of-done">Definition of Done</a></li>
+      <li><a href="#appendix">Appendix — Risks &amp; Sources</a></li>
+    </ol>
+  </nav>
+
+  <section id="goal-capsule">
+    <h2>Goal Capsule</h2>
+    <p><strong>Objectief:</strong> voeg drie annotatie-modi toe aan de ingebouwde browser-webview zodat de gebruiker vanuit een gerenderde pagina (dev-server of lokaal bestand) context naar de actieve Claude-chat stuurt — door te selecteren + becommentariëren, inline te editen, of te tekenen + een screenshot te sturen. De agent past de bron aan; de gebruiker ververst.</p>
+    <p><strong>Product-autoriteit:</strong> Remco. <strong>Origin:</strong> de requirements-only brainstorm <code>docs/brainstorm/2026-07-02-browser-annotatie-command.html</code> (Product Contract, R1–R13, KD-A t/m E).</p>
+    <div class="callout info">
+      <div class="kicker">Product Contract preservation</div>
+      <p style="margin:0;">Product Contract ongewijzigd. Eén afwijking t.o.v. de brainstorm: de <strong>hotkey-eis is uit scope</strong> gehaald (besluit gebruiker 2026-07-03) — hotkeys waren een repo-conventie, geen Product Contract-item. De <code>CLAUDE.md</code>-regel is bijgewerkt naar "kernfunctionaliteit/primaire workflows".</p>
+    </div>
+    <div class="callout rec">
+      <div class="kicker">Verankerd (KD1, 2026-07-02)</div>
+      <p style="margin:0;">Terminal-first. De webview is een <em>content-surface</em>, geen chat-shell; annotatie is een input-methode die via <code>terminal.write</code> in de bestaande Claude-chat landt — nooit via SDK/API.</p>
+    </div>
+  </section>
+
+  <hr>
+
+  <section id="product-contract">
+    <h2>Product Contract (recap)</h2>
+    <p>Volledige tekst in origin. Beknopte requirements-trace, gegroepeerd per modus, met R-IDs uit de brainstorm:</p>
+    <div class="scroll-x">
+    <table>
+      <thead><tr><th>Groep</th><th>Requirements</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Overkoepelend</strong></td><td><span class="idchip">R1</span> mode-switcher tussen de drie modi · <span class="idchip">R2</span> resultaat naar actieve Claude-chat via <code>terminal.write</code>, geen API/SDK · <span class="idchip">R3</span> "geen actieve chat"-guard (bewaar item, blokkeer verzending) · <span class="idchip">R13</span> host-pull, geen preload/bridge in de guest, hardening intact</td></tr>
+        <tr><td><strong>Modus 1 — Aanwijzen &amp; commentaar</strong></td><td><span class="idchip">R4</span> tekst/content selecteren + opmerking · <span class="idchip">R5</span> snippet (outerHTML/tekst) + locator + bron-URL vastleggen · <span class="idchip">R6</span> snippet + comment + bron naar chat</td></tr>
+        <tr><td><strong>Modus 2 — Inline editen</strong></td><td><span class="idchip">R7</span> gehighlighte passage ter plekke bewerken (contentEditable) · <span class="idchip">R8</span> voor→na + locator vastleggen · <span class="idchip">R9</span> als edit-instructie naar chat; pagina-edit is tijdelijk</td></tr>
+        <tr><td><strong>Modus 3 — Tekenen &amp; snapshot</strong></td><td><span class="idchip">R10</span> vrij tekenen + "voeg toe aan chat" · <span class="idchip">R11</span> screenshot pagina+tekening → klembord (<code>clipboard.writeImage</code>) · <span class="idchip">R12</span> landt via Alt+V, met bron-URL als tekst</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Scope:</strong> dev-server (localhost) én lokaal bestand (<code>file://</code>); externe/SaaS-URLs buiten scope. Batchen, annotatie-persistentie, markdown/Milkdown-surface: uitgesteld (zie origin). <strong>Hotkeys:</strong> uit scope voor deze feature.</p>
+  </section>
+
+  <hr>
+
+  <section id="planning-contract">
+    <h2>Planning Contract — Key Technical Decisions</h2>
+
+    <div class="card">
+      <p><span class="idchip">KTD1</span> <strong>Host-pull architectuur; primaire UI in de React-toolbar.</strong> Command's renderer stuurt de guest via <code>executeJavaScript</code>/<code>capturePage</code> op de webview-ref. Mode-switcher, comment-invoer en actieknoppen leven in de bestaande React browser-toolbar (buiten de webview → geen z-index/paint-conflict). Alleen de <em>highlight</em> en het <em>teken-canvas</em> worden ín de guest geïnjecteerd (moeten wel: over de pagina liggen + in <code>capturePage</code> zitten). Lost KD-A én de selectie-UX uit de brainstorm op.</p>
+    </div>
+    <div class="card">
+      <p><span class="idchip">KTD2</span> <strong>Breid <code>CommandWebviewElement</code> uit met <code>executeJavaScript</code> en <code>capturePage</code>.</strong> Het is een echte Electron <code>WebviewTag</code> (<code>webviewTag: true</code> in <code>electron/main/index.ts</code>); beide methodes werken native en ontbreken alleen in <code>src/types/webview.d.ts</code> ("we declare only the surface BrowserTab drives"). Geen Electron-side wijziging nodig.</p>
+    </div>
+    <div class="card">
+      <p><span class="idchip">KTD3</span> <strong>Guest→host is host-pull-only in de MVP.</strong> Triggers zijn toolbar-knoppen; op klik leest Command de guest-state via <code>executeJavaScript</code> (dat een Promise met de returnwaarde teruggeeft). Geen guest→host push-kanaal. Het <code>console-message</code>-kanaal (voor auto-popover-op-selectie, zonder de hardening te verzwakken) is een expliciete latere upgrade. Kosten nu: één extra klik (selecteer → knop).</p>
+    </div>
+    <div class="card">
+      <p><span class="idchip">KTD4</span> <strong>Modus 3-afbeelding via <code>clipboard.writeImage</code> + Alt+V.</strong> Nieuw IPC-kanaal dat <code>clipboard:writeText</code> spiegelt (een <code>ipcMain.on</code> in <code>electron/main/index.ts</code>, met een <code>sanitizeClipboardImage</code>-helper in <code>electron/main/utils/clipboardLimits.ts</code> en <code>nativeImage</code>). Claude Code plakt de klembord-afbeelding met Alt+V (Claude Code-capability, geen Command-code). Geen binaire file-write of temp-bestand.</p>
+    </div>
+    <div class="card">
+      <p><span class="idchip">KTD5</span> <strong>Grote payloads chunken — <code>terminal.write</code> kapt af rond ~1 KB.</strong> Bekend probleem (node-pty 1.1.x EAGAIN + ConPTY backpressure, zie <code>docs/solutions/integration-issues/node-pty-paste-truncation.md</code>). Modus 1/2 sturen <code>outerHTML</code>-snippets die dit overschrijden; het bericht wordt in stukken geschreven met de gedocumenteerde veilige write-cadans, niet in één keer.</p>
+    </div>
+    <div class="card">
+      <p><span class="idchip">KTD6</span> <strong>Source-mapping (uit KD-C).</strong> Lokaal bestand mapt direct naar zichzelf; voor een dev-server stuurt Command outerHTML + selector + DOM-pad + route mee en laat Claude de juiste component vinden. Deterministisch vs. agent-resolved.</p>
+    </div>
+
+    <h3>High-Level Technical Design</h3>
+    <figure>
+      <svg viewBox="0 0 760 566" role="img" aria-labelledby="htd-title">
+        <title id="htd-title">Host-pull dataflow: toolbar → webview-guest → chat</title>
+        <style>
+          .b { fill: #ffffff; stroke: #d7dbe0; stroke-width: 1.5; }
+          .bg { fill: #e6f2f3; stroke: #bfe0e2; }
+          .bi { fill: #eaf0f8; stroke: #d3dded; }
+          .bc { fill: #1f2430; }
+          .t { font: 600 13px 'Inter', sans-serif; fill: #1a1c1e; }
+          .s { font: 400 11.5px 'Inter', sans-serif; fill: #5b6470; }
+          .tc { font: 500 11.5px 'JetBrains Mono', monospace; fill: #c8cdd6; }
+          .lbl { font: 500 11px 'JetBrains Mono', monospace; fill: #0a4750; }
+          .arr { stroke: #0f5f6b; stroke-width: 2; fill: none; marker-end: url(#a); }
+        </style>
+        <defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0f5f6b"/></marker></defs>
+
+        <rect x="230" y="20" width="300" height="60" rx="9" class="b bg"/>
+        <text x="248" y="44" class="t">React browser-toolbar (host)</text>
+        <text x="248" y="64" class="s">mode-switcher · comment-invoer · actieknoppen</text>
+
+        <path class="arr" d="M380 80 L380 122"/>
+        <text x="392" y="105" class="lbl">executeJavaScript / capturePage</text>
+
+        <rect x="200" y="124" width="360" height="72" rx="9" class="b"/>
+        <text x="218" y="148" class="t">&lt;webview&gt; guest</text>
+        <text x="218" y="168" class="s">geïnjecteerd: highlight · contentEditable · teken-canvas</text>
+        <text x="218" y="186" class="s">geen preload-bridge — hardening blijft intact</text>
+
+        <path class="arr" d="M380 196 L380 238"/>
+        <text x="392" y="221" class="lbl">leest selectie / edit / screenshot terug</text>
+
+        <rect x="230" y="240" width="300" height="56" rx="9" class="b bi"/>
+        <text x="248" y="264" class="t">Command host</text>
+        <text x="248" y="282" class="s">annotationMessage bouwen · capture verwerken</text>
+
+        <!-- branch -->
+        <path class="arr" d="M330 296 L250 344"/>
+        <path class="arr" d="M430 296 L510 344"/>
+
+        <rect x="70" y="346" width="330" height="58" rx="9" class="b"/>
+        <text x="88" y="370" class="t">Tekst — modus 1 &amp; 2</text>
+        <text x="88" y="390" class="s">annotationMessage → terminal.write (chunked, KTD5)</text>
+
+        <rect x="420" y="346" width="270" height="58" rx="9" class="b"/>
+        <text x="438" y="370" class="t">Beeld — modus 3</text>
+        <text x="438" y="390" class="s">clipboard.writeImage → Alt+V</text>
+
+        <path class="arr" d="M235 404 L360 452"/>
+        <path class="arr" d="M555 404 L420 452"/>
+
+        <rect x="230" y="454" width="300" height="70" rx="9" class="b bc"/>
+        <text x="248" y="480" class="t" fill="#e8eaee">Claude-chat (agent)</text>
+        <text x="248" y="500" class="tc">vindt de bron (bestand of component),</text>
+        <text x="248" y="516" class="tc">past aan → gebruiker ververst</text>
+      </svg>
+      <figcaption>Alle drie de modi delen dezelfde host-pull-ruggengraat; alleen de laatste stap vertakt in een tekst- en een beeldkanaal.</figcaption>
+    </figure>
+  </section>
+
+  <hr>
+
+  <section id="implementation-units">
+    <h2>Implementation Units</h2>
+    <div class="subnav">
+      <a href="#u1">U1 · webview-control</a>
+      <a href="#u2">U2 · mode-switcher</a>
+      <a href="#u3">U3 · message + send</a>
+      <a href="#u7">U7 · clipboard IPC</a>
+      <a href="#u4">U4 · modus 1</a>
+      <a href="#u5">U5 · modus 2</a>
+      <a href="#u6">U6 · modus 3</a>
+    </div>
+    <p>Volgorde: fundamenten eerst (<strong>U1</strong>, <strong>U7</strong>), dan de gedeelde laag (<strong>U2</strong>, <strong>U3</strong>), dan de modi (<strong>U4</strong>, <strong>U5</strong>, <strong>U6</strong>).</p>
+
+    <article class="unit" id="u1">
+      <h3>U1. Webview-control uitbreiden (executeJavaScript / capturePage)</h3>
+      <dl class="strip">
+        <dt>Goal</dt><dd>De host in staat stellen JS in de guest uit te voeren en de pagina te capturen — het fundament voor alle modi.</dd>
+        <dt>Requirements</dt><dd>R13</dd>
+        <dt>Dependencies</dt><dd>—</dd>
+        <dt>Files</dt><dd><code>src/types/webview.d.ts</code>, <code>src/components/Browser/BrowserTab.tsx</code>, <code>test/webviewControl.test.ts</code></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <p><strong>Approach:</strong> voeg <code>executeJavaScript(code: string): Promise&lt;unknown&gt;</code> en <code>capturePage(): Promise&lt;Electron.NativeImage&gt;</code> toe aan het <code>CommandWebviewElement</code>-interface (native op de <code>WebviewTag</code>, alleen niet gedeclareerd). Introduceer een dunne host-side helper (in <code>BrowserTab</code> of een klein hook) die deze aanroepen achter de bestaande <code>readyRef</code>-guard zet, zodat calls vóór <code>dom-ready</code> niet gooien.</p>
+        <p><strong>Patterns to follow:</strong> ref-gebruik en <code>readyRef</code>-guard in <code>BrowserTab.tsx</code> (de bestaande <code>goBack()/loadURL()</code>-calls); de <code>.d.ts</code>-conventie "declare only what we drive".</p>
+        <p><strong>Test scenarios:</strong></p>
+        <ul>
+          <li>Helper roept niet aan vóór <code>dom-ready</code> (readyRef false → no-op, geen throw).</li>
+          <li><code>executeJavaScript</code>-helper geeft de returnwaarde van de guest-expressie door (gemockte webview-ref).</li>
+          <li><code>capturePage</code>-helper resolve't naar een image-object (gemockt).</li>
+        </ul>
+        <p><strong>Verification:</strong> vanuit devtools/console een triviale <code>executeJavaScript('document.title')</code> op een geladen pagina geeft de titel terug.</p>
+      </details>
+    </article>
+
+    <article class="unit" id="u7">
+      <h3>U7. IPC <code>clipboard:writeImage</code></h3>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Een afbeelding op het OS-klembord kunnen zetten, zodat modus 3 via Alt+V in de chat landt.</dd>
+        <dt>Requirements</dt><dd>R11</dd>
+        <dt>Dependencies</dt><dd>—</dd>
+        <dt>Files</dt><dd><code>electron/main/index.ts</code>, <code>electron/main/utils/clipboardLimits.ts</code>, <code>electron/preload/index.ts</code>, <code>src/types/index.ts</code>, <code>test/clipboardLimits.test.ts</code></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <p><strong>Approach:</strong> nieuwe <code>ipcMain.on('clipboard:writeImage', ...)</code> die de payload (data-URL of buffer) door een <code>sanitizeClipboardImage</code>-helper haalt (size-cap + type-check, mirror van <code>sanitizeClipboardText</code>), dan <code>clipboard.writeImage(nativeImage.createFromDataURL(...))</code>. Voeg de <code>nativeImage</code>-import toe. Expose <code>clipboard.writeImage(dataUrl)</code> in preload (send) en in het <code>ElectronAPI</code>-type.</p>
+        <p><strong>Patterns to follow:</strong> <code>clipboard:writeText</code> + <code>sanitizeClipboardText</code>/<code>MAX_CLIPBOARD_TEXT_BYTES</code> in <code>clipboardLimits.ts</code>; de <code>{ ok } | { reason }</code>- of <code>value | null</code>-validatievorm; preload-namespace <code>clipboard</code>.</p>
+        <p><strong>Test scenarios:</strong> <em>Covers R11.</em></p>
+        <ul>
+          <li>Geldige PNG-dataURL onder de cap → sanitizer geeft image terug.</li>
+          <li>Payload boven de size-cap → <code>null</code> (no-op), geen throw.</li>
+          <li>Niet-image / kapotte dataURL → <code>null</code>.</li>
+          <li>Niet-string / niet-verwacht type → <code>null</code>.</li>
+        </ul>
+        <p><strong>Verification:</strong> handler aanroepen met een kleine test-PNG → het OS-klembord bevat de afbeelding (of Alt+V in een chat plakt 'm).</p>
+      </details>
+    </article>
+
+    <article class="unit" id="u2">
+      <h3>U2. Mode-switcher in de browser-toolbar</h3>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Een schakelaar tussen geen/comment/edit/teken-modus in de bestaande toolbar; één modus tegelijk actief.</dd>
+        <dt>Requirements</dt><dd>R1</dd>
+        <dt>Dependencies</dt><dd>—</dd>
+        <dt>Files</dt><dd><code>src/components/Browser/BrowserTab.tsx</code></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <p><strong>Approach:</strong> lokale <code>useState</code> voor de actieve modus in <code>BrowserTab</code>; drie <code>iconBtn</code>-knoppen als siblings in de bestaande toolbar-<code>div</code>. Actieve modus visueel gemarkeerd. Nederlandse UI-copy (mirror van de bestaande placeholder). Schakelen tussen modi ruimt de pending guest-state op (highlight/canvas verwijderen via <code>executeJavaScript</code>).</p>
+        <p><strong>Patterns to follow:</strong> toolbar-JSX + gedeelde <code>iconBtn</code>-Tailwind-string + <code>lucide-react</code>-iconen (<code>w-3.5 h-3.5</code>) in <code>BrowserTab.tsx</code>.</p>
+        <p><strong>Test scenarios:</strong> <em>Test expectation: none — puur lokale UI-state/styling; gedrag wordt getest via de modus-units (U4–U6).</em></p>
+        <p><strong>Verification:</strong> klikken op elke mode-knop markeert 'm actief en deactiveert de andere; van modus wisselen wist een pending highlight.</p>
+      </details>
+    </article>
+
+    <article class="unit" id="u3">
+      <h3>U3. Bericht samenstellen + naar actieve Claude-chat schrijven</h3>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Eén plek die de context-rijke berichten bouwt en veilig (chunked) naar de actieve <code>claude</code>-terminal schrijft, met de "geen chat"-guard.</dd>
+        <dt>Requirements</dt><dd>R2, R3, R5, R6, R8, R9, R12</dd>
+        <dt>Dependencies</dt><dd>—</dd>
+        <dt>Files</dt><dd><code>src/utils/annotationMessage.ts</code>, <code>test/annotationMessage.test.ts</code>, <code>src/stores/projectStore.ts</code> (lookup hergebruiken)</dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <p><strong>Approach:</strong> pure builders per modus (comment/edit → tekst met snippet/voor→na + locator + route). Een send-functie die de actieve <code>claude</code>-terminal opzoekt (<code>activeTerminalId</code> → <code>terminals[id]</code>, <code>type === 'claude'</code>), en bij afwezigheid een guard-resultaat teruggeeft (R3). Grote payloads worden in stukken via <code>terminal.write</code> geschreven met de veilige cadans (KTD5).</p>
+        <p><strong>Execution note:</strong> begin met een falende test voor de chunk-grens (payload &gt; ~1 KB) — dat is de kern van KTD5.</p>
+        <p><strong>Patterns to follow:</strong> store-lookup <code>state.terminals[activeTerminalId]</code> + <code>type</code>-check; <code>getElectronAPI().terminal.write(id, data)</code>; de node-pty paste-truncation-oplossing in <code>docs/solutions/</code>.</p>
+        <p><strong>Test scenarios:</strong> <em>Covers R3.</em></p>
+        <ul>
+          <li>Comment-builder produceert bericht met snippet + comment + route.</li>
+          <li>Edit-builder produceert "verander X → Y op &lt;locator&gt;".</li>
+          <li>Payload &gt; ~1 KB → meerdere <code>terminal.write</code>-calls (chunked), niet één.</li>
+          <li>Geen actieve <code>claude</code>-terminal → guard-resultaat, geen write.</li>
+          <li>Actieve terminal is <code>normal</code> (geen claude) → guard-resultaat.</li>
+        </ul>
+        <p><strong>Verification:</strong> met een actieve chat verschijnt het samengestelde bericht in de terminal; zonder chat gebeurt er niets en meldt de UI dat.</p>
+      </details>
+    </article>
+
+    <article class="unit" id="u4">
+      <h3>U4. Modus 1 — Aanwijzen &amp; commentaar</h3>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Selectie op de pagina + opmerking → snippet + comment naar de chat.</dd>
+        <dt>Requirements</dt><dd>R4, R5, R6</dd>
+        <dt>Dependencies</dt><dd>U1, U2, U3</dd>
+        <dt>Files</dt><dd><code>src/components/Browser/BrowserTab.tsx</code>, <code>src/utils/annotationGuestScript.ts</code>, <code>test/annotationGuestScript.test.ts</code></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <p><strong>Approach:</strong> in comment-modus klikt de gebruiker de toolbar-knop "commentaar"; Command roept <code>executeJavaScript</code> aan met een expressie (uit <code>annotationGuestScript</code>) die de huidige <code>window.getSelection()</code> + omliggende <code>outerHTML</code> + een CSS-selector/DOM-pad + <code>location.href</code> als JSON teruggeeft, en een tijdelijke highlight om de selectie tekent. Een React comment-invoer (toolbar) neemt de opmerking; op verzenden bouwt en stuurt U3 het bericht.</p>
+        <p><strong>Patterns to follow:</strong> U1-helper; U3-builders; toolbar-UI uit U2.</p>
+        <p><strong>Test scenarios:</strong> <em>Covers R4, R5, R6 / AE1.</em></p>
+        <ul>
+          <li>Guest-script-builder produceert geldige JS die selectie + outerHTML + selector + href retourneert (unit-test op de gegenereerde string / tegen een jsdom-fragment).</li>
+          <li>Lege selectie → knop geeft nette "niets geselecteerd"-feedback, geen bericht.</li>
+          <li>Geldige selectie + comment → U3 krijgt snippet + comment + route (gemockt).</li>
+          <li>Highlight wordt gewist na verzenden of bij mode-wissel.</li>
+        </ul>
+        <p><strong>Verification:</strong> op een lokaal <code>.html</code> én op een localhost dev-app: selecteer tekst, typ een opmerking, verstuur → het bericht (met snippet + route) staat in de actieve chat.</p>
+      </details>
+    </article>
+
+    <article class="unit" id="u5">
+      <h3>U5. Modus 2 — Inline editen</h3>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Gehighlighte tekst ter plekke bewerken → voor→na als edit-instructie naar de chat.</dd>
+        <dt>Requirements</dt><dd>R7, R8, R9</dd>
+        <dt>Dependencies</dt><dd>U1, U2, U3</dd>
+        <dt>Files</dt><dd><code>src/components/Browser/BrowserTab.tsx</code>, <code>src/utils/annotationGuestScript.ts</code>, <code>test/annotationGuestScript.test.ts</code></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <p><strong>Approach:</strong> in edit-modus zet Command via <code>executeJavaScript</code> het geselecteerde element (of een wrapper om de selectie) op <code>contentEditable</code> en legt de <em>voor</em>-tekst + locator vast. De gebruiker bewerkt in de pagina. Op "verstuur edit" leest Command de <em>na</em>-tekst terug en laat U3 een edit-instructie sturen. De pagina-edit is tijdelijk (niet gepersisteerd); <code>contentEditable</code> wordt daarna weer uitgezet.</p>
+        <p><strong>Execution note:</strong> let op selecties die meerdere elementen overspannen — beperk de MVP tot een enkel tekst-dragend element en geef nette feedback bij een complexe selectie.</p>
+        <p><strong>Patterns to follow:</strong> U1-helper; U3-edit-builder.</p>
+        <p><strong>Test scenarios:</strong> <em>Covers R7, R8, R9 / AE2.</em></p>
+        <ul>
+          <li>Guest-script legt voor-tekst + locator vast bij start van de edit.</li>
+          <li>Na bewerken levert het na-lezen de gewijzigde tekst; ongewijzigd → geen bericht.</li>
+          <li>Edit-instructie bevat voor→na + locator (gemockte U3).</li>
+          <li>Complexe/multi-element selectie → nette feedback, geen kapot bericht.</li>
+          <li><code>contentEditable</code> staat uit na verzenden/annuleren.</li>
+        </ul>
+        <p><strong>Verification:</strong> highlight een woord, corrigeer het inline, verstuur → de chat krijgt "verander X → Y op &lt;locator&gt;"; de pagina zelf blijft onveranderd tot de agent de bron aanpast.</p>
+      </details>
+    </article>
+
+    <article class="unit" id="u6">
+      <h3>U6. Modus 3 — Tekenen &amp; snapshot</h3>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Vrij tekenen op de pagina + "voeg toe aan chat" → screenshot van pagina+tekening via het klembord naar de chat.</dd>
+        <dt>Requirements</dt><dd>R10, R11, R12</dd>
+        <dt>Dependencies</dt><dd>U1, U2, U3, U7</dd>
+        <dt>Files</dt><dd><code>src/components/Browser/BrowserTab.tsx</code>, <code>src/utils/annotationGuestScript.ts</code></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <p><strong>Approach:</strong> in teken-modus injecteert Command via <code>executeJavaScript</code> een full-page canvas-overlay met pointer-handlers ín de guest (zodat de tekening in <code>capturePage</code> zit). Op de toolbar-knop "voeg toe aan chat" roept Command <code>capturePage()</code> aan, zet de afbeelding via <code>clipboard.writeImage</code> (U7) op het klembord, en stuurt via U3 een begeleidend tekstbericht met de route. De afbeelding landt via Alt+V (Claude Code-capability). De canvas wordt daarna gewist.</p>
+        <p><strong>Execution note:</strong> Alt+V programmatisch triggeren (byte-sequence naar de PTY) is best-effort; fallback = de gebruiker drukt zelf Alt+V. Verifieer eerst dat <code>capturePage</code> de geïnjecteerde canvas meepakt.</p>
+        <p><strong>Patterns to follow:</strong> U1 <code>capturePage</code>-helper; U7 clipboard-IPC; U3 voor het tekstdeel.</p>
+        <p><strong>Test scenarios:</strong> <em>Covers R10, R11, R12 / AE3.</em></p>
+        <ul>
+          <li>Guest-script-builder produceert canvas-injectie + wis-routine (unit-test op de string / jsdom).</li>
+          <li>"Voeg toe aan chat" zonder tekening → nette no-op of feedback.</li>
+          <li>Met tekening → <code>capturePage</code> + <code>clipboard.writeImage</code> aangeroepen (gemockt) + tekstbericht met route via U3.</li>
+          <li>Canvas gewist na verzenden / mode-wissel.</li>
+        </ul>
+        <p><strong>Verification:</strong> op een dev-app: teken een cirkel om een element, klik "voeg toe aan chat", plak met Alt+V → de screenshot mét tekening verschijnt in de chat, met de route als tekst erbij.</p>
+      </details>
+    </article>
+  </section>
+
+  <hr>
+
+  <section id="verification-contract">
+    <h2>Verification Contract</h2>
+    <ul>
+      <li><strong>Unit tests (vitest, <code>test/</code>):</strong> <code>clipboardLimits</code> image-sanitize (U7), <code>annotationMessage</code> builders + chunk-grens + chat-guard (U3), <code>annotationGuestScript</code> builders (U4–U6), webview-control helper guard (U1). Draai via <code>npm run test</code>.</li>
+      <li><strong>Handmatige end-to-end per modus, op twee surfaces</strong> (een lokaal <code>.html</code>-bestand én een draaiende localhost dev-app):
+        <ul>
+          <li>Modus 1: selecteer + comment → snippet + route in de chat.</li>
+          <li>Modus 2: highlight + inline edit → "verander X → Y" in de chat; pagina niet permanent gewijzigd.</li>
+          <li>Modus 3: teken + "voeg toe aan chat" → screenshot mét tekening in de chat via Alt+V.</li>
+        </ul>
+      </li>
+      <li><strong>Guard:</strong> zonder actieve <code>claude</code>-chat blokkeert verzending in elke modus en meldt de UI dat.</li>
+      <li><strong>Security-regressie:</strong> bevestig dat er geen preload aan de guest is toegevoegd en <code>hardenWebviewPreferences</code> ongewijzigd is (<code>test/webviewSecurity.test.ts</code> blijft groen).</li>
+      <li><strong>Grote payload:</strong> een grote <code>outerHTML</code>-snippet komt volledig in de chat (geen ~1 KB-truncatie).</li>
+    </ul>
+  </section>
+
+  <hr>
+
+  <section id="definition-of-done">
+    <h2>Definition of Done</h2>
+    <ul>
+      <li>Alle drie de modi werken op zowel een lokaal <code>.html</code>-bestand als een draaiende dev-server.</li>
+      <li>Tekst (modus 1/2) landt via <code>terminal.write</code> in de actieve Claude-chat; grote snippets truncaten niet.</li>
+      <li>Beeld (modus 3) landt via <code>clipboard.writeImage</code> + Alt+V, met de route als begeleidende tekst.</li>
+      <li>De "geen actieve chat"-guard werkt in elke modus.</li>
+      <li>Geen preload/bridge in de guest; webview-hardening en <code>test/webviewSecurity.test.ts</code> intact; geen SDK/API.</li>
+      <li>Alle nieuwe unit tests groen; <code>npm run test</code> en de ESLint-gate slagen.</li>
+      <li>Hotkeys: bewust niet toegevoegd (uit scope).</li>
+    </ul>
+  </section>
+
+  <hr>
+
+  <section id="appendix">
+    <h2>Appendix — Risks &amp; Sources</h2>
+    <h3>Risks &amp; open items</h3>
+    <div class="callout warn">
+      <div class="kicker">Risk · mitigated</div>
+      <p style="margin:0;"><strong><code>terminal.write</code> ~1 KB-truncatie.</strong> Gemitigeerd door chunking (KTD5, U3). Verifieer met een expliciet grote-payload-test.</p>
+    </div>
+    <div class="callout warn">
+      <div class="kicker">Risk · te verifiëren in implementatie</div>
+      <p style="margin:0;"><strong><code>capturePage</code> pakt de geïnjecteerde canvas mee</strong> (modus 3) en <strong>Alt+V programmatisch triggeren</strong> — beide best-effort; fallback = gebruiker drukt Alt+V. Bevestig het gedrag op de repo's Electron-versie vóór U6 afgerond wordt.</p>
+    </div>
+    <div class="callout info">
+      <div class="kicker">Deferred (uit origin)</div>
+      <p style="margin:0;"><code>console-message</code>-kanaal voor auto-popover-op-selectie · batchen van annotaties · externe/SaaS-URLs · markdown/Milkdown-surface · annotatie-persistentie. Kosten nu van host-pull: één extra klik per annotatie.</p>
+    </div>
+
+    <h3>Sources &amp; Research</h3>
+    <ul>
+      <li>Origin brainstorm: <code>docs/brainstorm/2026-07-02-browser-annotatie-command.html</code> (Product Contract, R1–R13, KD-A t/m E).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/utils/webviewSecurity.ts">electron/main/utils/webviewSecurity.ts</a> — <code>hardenWebviewPreferences</code> (preload gestript, sandbox aan).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Browser/BrowserTab.tsx">src/components/Browser/BrowserTab.tsx</a> — webview-ref, toolbar, readyRef-guard, event-listeners.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/types/webview.d.ts">src/types/webview.d.ts</a> — <code>CommandWebviewElement</code> (uit te breiden).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/index.ts">electron/main/index.ts</a> — IPC-patroon, <code>clipboard:writeText/readText</code>, <code>will-attach-webview</code>.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/utils/clipboardLimits.ts">electron/main/utils/clipboardLimits.ts</a> — <code>sanitizeClipboardText</code> (te spiegelen voor image).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/utils/hotkeys.ts">src/utils/hotkeys.ts</a> — hotkey-conventie (niet gebruikt in deze feature).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/docs/solutions/integration-issues/node-pty-paste-truncation.md">docs/solutions/integration-issues/node-pty-paste-truncation.md</a> — ~1 KB paste-truncatie (KTD5).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-07-02-001-feat-html-in-browser-plan.html">docs/plans/2026-07-02-001-feat-html-in-browser-plan.html</a> — webview-migratie #152 (partition, trust boundary, guest lockdown).</li>
+    </ul>
+  </section>
+
+  <footer class="composition-signal">
+    Samengesteld op 2026-07-03 door <code>ce-plan</code> uit origin <code>docs/brainstorm/2026-07-02-browser-annotatie-command.html</code>. Geverifieerd tegen de codebase op branch <code>feat/kestrel</code> (na merge van #152). Implementation-ready — geen code geschreven.
+  </footer>
+
+</div>

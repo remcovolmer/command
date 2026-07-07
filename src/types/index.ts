@@ -316,6 +316,7 @@ export interface ElectronAPI {
   clipboard: {
     writeText: (text: string) => void
     readText: () => Promise<string>
+    writeImage: (dataUrl: string) => void
   }
   notification: {
     show: (title: string, body: string) => void
