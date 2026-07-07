@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
@@ -35,9 +35,14 @@ export function AutomationCreateDialog({
 
   const isEditing = !!editAutomation
 
-  // Populate form when editing
+  // Populate form only on the closed→open transition. The store replaces the
+  // projects array on unrelated updates (rename, pin, reorder); re-running this
+  // while the dialog is open would wipe the user's in-progress input.
+  const wasOpenRef = useRef(false)
   useEffect(() => {
-    if (!isOpen) return
+    const justOpened = isOpen && !wasOpenRef.current
+    wasOpenRef.current = isOpen
+    if (!justOpened) return
     if (editAutomation) {
       setName(editAutomation.name)
       setPrompt(editAutomation.prompt)
