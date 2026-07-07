@@ -13,7 +13,7 @@ const log = createLogger('SkillInstaller')
  * Also cleans up legacy per-project command files from older versions.
  */
 export class SkillInstaller {
-  private readonly SKILL_VERSION = 'ccli-skill-v1'
+  private readonly SKILL_VERSION = 'ccli-skill-v3'
   private readonly skillTemplate: string
   private readonly globalSkillDir: string
   private readonly globalSkillPath: string
@@ -74,8 +74,10 @@ export class SkillInstaller {
 
     try {
       const content = readFileSync(skillPath, 'utf-8')
-      const firstLine = content.split('\n')[0]
-      const match = firstLine.match(/^<!--\s*(ccli-skill-v\d+)\s*-->/)
+      // The version comment sits just after the YAML frontmatter (which Claude
+      // Code needs at the very top for skill discovery), so scan the content
+      // rather than only the first line.
+      const match = content.match(/<!--\s*(ccli-skill-v\d+)\s*-->/)
       return match ? match[1] : null
     } catch {
       return null
@@ -95,7 +97,11 @@ export class SkillInstaller {
       // Fall through to embedded template
     }
 
-    return `<!-- ${this.SKILL_VERSION} -->
+    return `---
+name: ccli
+description: Control the Command app from inside a Command chat. Use "ccli open <file|url>" to show something to the user \u2014 HTML files and URLs render in Command's browser tab, other files open in the editor. Also: git worktrees, sidecar terminals, notifications, chat status/title, and chat/project discovery. Available whenever COMMAND_CENTER_* env vars are set.
+---
+<!-- ${this.SKILL_VERSION} -->
 # ccli \u2014 Command Center CLI
 
 You are running inside a **Command** terminal. The \`ccli\` CLI lets you control the app. Use it when it adds value to the current task \u2014 don't be preemptive.
@@ -113,15 +119,20 @@ ccli worktree merge                          # merge the current worktree's PR
 
 **Never use \`git worktree add\` directly** \u2014 Command cannot track worktrees it didn't create.
 
-## Files & Diffs
+## Files & Browser
 
-Show files and diffs to the user in Command's editor:
+Show things to the user with \`ccli open\`. It routes by target type: HTML files
+and URLs (localhost dev servers, external sites) render in the built-in browser;
+every other file opens as source in the editor.
 
 \`\`\`bash
-ccli open src/App.tsx                  # open file in editor
-ccli open src/App.tsx --line 42        # open at specific line
-ccli diff src/App.tsx                  # show git diff for file
+ccli open src/App.tsx                  # source in the editor
+ccli open src/App.tsx --line 42        # editor, scrolled to a line
+ccli open report.html                  # HTML rendered in the browser (live-reloads)
+ccli open http://localhost:5173        # a running dev server in the browser
 \`\`\`
+
+After generating an HTML deliverable, \`ccli open <file>\` renders it for the user.
 
 ## Communication
 

@@ -1,4 +1,8 @@
-<!-- ccli-skill-v1 -->
+---
+name: ccli
+description: Control the Command app from inside a Command chat. Use `ccli open <file|url>` to show something to the user — HTML files and URLs (localhost dev servers, external sites) render in Command's browser tab, other files open in the editor; ideal right after generating an HTML report/plan/dashboard or to preview a running dev server. Also: create/link/merge git worktrees, run and read sidecar terminals, send OS notifications, set the chat status/title, and list chats/projects. Available whenever COMMAND_CENTER_* env vars are set in the terminal.
+---
+<!-- ccli-skill-v3 -->
 # ccli — Command Center CLI
 
 You are running inside a **Command** terminal. The `ccli` CLI lets you control the app. Use it when it adds value to the current task — don't be preemptive.
@@ -16,15 +20,22 @@ ccli worktree merge                          # merge the current worktree's PR
 
 **Never use `git worktree add` directly** — Command cannot track worktrees it didn't create.
 
-## Files & Diffs
+## Files & Browser
 
-Show files and diffs to the user in Command's editor:
+Show things to the user with `ccli open`. It routes by target type:
 
 ```bash
-ccli open src/App.tsx                  # open file in editor
-ccli open src/App.tsx --line 42        # open at specific line
-ccli diff src/App.tsx                  # show git diff for file
+ccli open src/App.tsx                  # source in the editor
+ccli open src/App.tsx --line 42        # editor, scrolled to a line
+ccli open report.html                  # HTML rendered in the browser (live-reloads)
+ccli open http://localhost:5173        # a running dev server in the browser
 ```
+
+- **HTML files and URLs** (localhost dev servers, external sites) render in the built-in browser.
+- **Every other file** opens as source in the editor; `--line` jumps to a line.
+- After generating an HTML deliverable (a report, plan, or dashboard), `ccli open <file>` renders it for the user and live-reloads as you regenerate it.
+
+Reading or editing a file's raw source is done with your normal file tools, not `ccli open`.
 
 ## Communication
 

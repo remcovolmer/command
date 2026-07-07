@@ -259,10 +259,11 @@ export interface ElectronAPI {
         fileName: string
         projectId: string
         line?: number
+        terminalId?: string
       }) => void
     ) => Unsubscribe
-    onOpenDiff: (
-      callback: (data: { filePath: string; fileName: string; projectId: string }) => void
+    onOpenBrowser: (
+      callback: (data: { url: string; projectId: string; terminalId?: string }) => void
     ) => Unsubscribe
   }
   sessionIndex: {

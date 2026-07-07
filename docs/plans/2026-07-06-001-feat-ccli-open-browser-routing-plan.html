@@ -1,0 +1,359 @@
+<title>ccli open — render HTML & URLs in de browser - Plan</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f0f2f5;
+    --border: #e2e5ea;
+    --text: #1a1d24;
+    --muted: #5c6472;
+    --accent: #1f6feb;
+    --accent-soft: #e8f0fe;
+    --accent-text: #1a56c4;
+    --warn-soft: #fdf1e3;
+    --warn-text: #9a5b12;
+    --warn-border: #f0d3aa;
+    --ok-soft: #e6f4ea;
+    --ok-text: #1c7a3f;
+    --ok-border: #bfe2c9;
+    --code-bg: #f0f2f5;
+    --radius: 8px;
+    --measure: 72ch;
+    --maxw: 940px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1117; --surface: #161a22; --surface-2: #1c212b; --border: #2a3039;
+      --text: #e6e9ef; --muted: #9aa4b2; --accent: #4d9bff; --accent-soft: #16273f;
+      --accent-text: #7cb4ff; --warn-soft: #2e2213; --warn-text: #e0a860; --warn-border: #4a3818;
+      --ok-soft: #12271a; --ok-text: #6bc98a; --ok-border: #234a30; --code-bg: #1c212b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1117; --surface: #161a22; --surface-2: #1c212b; --border: #2a3039;
+    --text: #e6e9ef; --muted: #9aa4b2; --accent: #4d9bff; --accent-soft: #16273f;
+    --accent-text: #7cb4ff; --warn-soft: #2e2213; --warn-text: #e0a860; --warn-border: #4a3818;
+    --ok-soft: #12271a; --ok-text: #6bc98a; --ok-border: #234a30; --code-bg: #1c212b;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f8fa; --surface: #ffffff; --surface-2: #f0f2f5; --border: #e2e5ea;
+    --text: #1a1d24; --muted: #5c6472; --accent: #1f6feb; --accent-soft: #e8f0fe;
+    --accent-text: #1a56c4; --warn-soft: #fdf1e3; --warn-text: #9a5b12; --warn-border: #f0d3aa;
+    --ok-soft: #e6f4ea; --ok-text: #1c7a3f; --ok-border: #bfe2c9; --code-bg: #f0f2f5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--sans); line-height: 1.6; font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin-inline: auto; padding: 40px 24px 80px; }
+  header.doc { border-bottom: 2px solid var(--border); padding-bottom: 22px; margin-bottom: 8px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); font-weight: 600; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 8px 0 16px; letter-spacing: -.01em; }
+  h2 { font-size: 21px; margin: 40px 0 12px; padding-top: 8px; letter-spacing: -.01em; }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { max-width: var(--measure); }
+  section p, section li { max-width: var(--measure); }
+  a { color: var(--accent-text); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--code-bg); padding: .12em .38em; border-radius: 4px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; }
+  .meta div { display: flex; flex-direction: column; }
+  .meta dt { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .meta dd { margin: 0; font-size: 13px; font-weight: 600; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 8px; }
+  nav.toc a {
+    font-size: 12.5px; padding: 5px 11px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; color: var(--muted); font-weight: 500;
+  }
+  nav.toc a:hover { border-color: var(--accent); color: var(--accent-text); text-decoration: none; }
+  .capsule { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; margin-top: 12px; }
+  .capsule dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 10px 18px; }
+  .capsule dt { color: var(--muted); font-size: 13px; font-weight: 600; }
+  .capsule dd { margin: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .idcell { white-space: nowrap; font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--accent-text); }
+  .rgroup td { padding-top: 18px; }
+  .rgroup .grouplabel { font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--text); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin: 12px 0; }
+  .card .kd-id { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--accent-text); }
+  .card h3 { margin: 4px 0 6px; font-size: 15.5px; }
+  .card p { margin: 0; }
+  .callout { border: 1px solid var(--warn-border); background: var(--warn-soft); border-radius: var(--radius); padding: 14px 18px; margin: 14px 0; }
+  .callout .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--warn-text); font-weight: 700; }
+  .callout p { margin: 6px 0 0; color: var(--text); }
+  .scope-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 12px; }
+  .scope-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; background: var(--surface); }
+  .scope-card.deferred { background: var(--warn-soft); border-color: var(--warn-border); }
+  .scope-card.out { background: var(--surface-2); }
+  .scope-card.keep { background: var(--ok-soft); border-color: var(--ok-border); }
+  .scope-card .lbl { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; font-weight: 700; }
+  .scope-card.deferred .lbl { color: var(--warn-text); }
+  .scope-card.keep .lbl { color: var(--ok-text); }
+  .scope-card.out .lbl { color: var(--muted); }
+  .scope-card ul { margin: 8px 0 0; padding-left: 18px; }
+  .scope-card li { margin: 4px 0; font-size: 13.5px; }
+  figure { margin: 16px 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; overflow-x: auto; }
+  figure figcaption { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+  .ae b { color: var(--text); }
+  ul.clean { padding-left: 20px; }
+  ul.clean li { margin: 6px 0; }
+  footer.composition-signal { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+  .flowbox { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+  .flowbox-b { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  .flowbox-e { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1.5; }
+  .flowdiamond { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+  .flowtext { fill: var(--text); font-family: var(--sans); font-size: 12.5px; }
+  .flowtext-sm { fill: var(--muted); font-family: var(--sans); font-size: 11px; }
+  .flowline { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+  .flowlabel { fill: var(--muted); font-family: var(--sans); font-size: 10.5px; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+</style>
+
+<div class="wrap">
+<header class="doc">
+  <div class="eyebrow">Requirements-only plan · ce-brainstorm</div>
+  <h1><code>ccli open</code> — render HTML &amp; URL's in de browser, verwijder <code>ccli diff</code></h1>
+  <dl class="meta">
+    <div><dt>Type</dt><dd>feat</dd></div>
+    <div><dt>Datum</dt><dd><time datetime="2026-07-06">2026-07-06</time></dd></div>
+    <div><dt>Topic</dt><dd>ccli-open-browser-routing</dd></div>
+    <div><dt>Contract</dt><dd>ce-unified-plan/v1</dd></div>
+    <div><dt>Readiness</dt><dd>requirements-only</dd></div>
+    <div><dt>Source</dt><dd>ce-brainstorm</dd></div>
+    <div><dt>Execution</dt><dd>code</dd></div>
+  </dl>
+</header>
+
+<nav class="toc">
+  <a href="#goal-capsule">Goal Capsule</a>
+  <a href="#product-contract">Product Contract</a>
+  <a href="#summary">Summary</a>
+  <a href="#problem-frame">Problem Frame</a>
+  <a href="#key-decisions">Key Decisions</a>
+  <a href="#product-requirements">Requirements</a>
+  <a href="#key-flows">Key Flows</a>
+  <a href="#acceptance-examples">Acceptance Examples</a>
+  <a href="#scope-boundaries">Scope Boundaries</a>
+  <a href="#dependencies-assumptions">Dependencies &amp; Assumptions</a>
+  <a href="#success-criteria">Success Criteria</a>
+  <a href="#sources">Sources</a>
+</nav>
+
+<section id="goal-capsule">
+  <h2>Goal Capsule</h2>
+  <div class="capsule">
+    <dl>
+      <dt>Objective</dt>
+      <dd>Maak <code>ccli open</code> Command's enige "open dit"-commando: het rendert HTML-bestanden en URL's in de webview-browser en toont overige bestanden als broncode in de editor — altijd in het gesprek dat het commando aanriep. Verwijder <code>ccli diff</code>.</dd>
+      <dt>Product authority</dt>
+      <dd>Remco Volmer (Riverwise)</dd>
+      <dt>Open blockers</dt>
+      <dd>Geen — scope bevestigd tijdens brainstorm.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="product-contract">
+  <h2>Product Contract</h2>
+
+  <h3 id="summary">Summary</h3>
+  <p><code>ccli open &lt;file-of-url&gt;</code> wordt één commando dat routeert op doeltype: een URL (localhost of extern) en een <code>.html</code>/<code>.htm</code>-bestand openen gerenderd in Command's <code>&lt;webview&gt;</code>-browser (met live-reload), elk ander bestand opent als broncode in de code-editor. De tab verschijnt in het tab-gebied van de aanroepende chat, afgeleid uit het terminal-ID van de CLI. <code>ccli diff</code> vervalt; de diff-weergaven in de git-UI blijven ongewijzigd.</p>
+
+  <h3 id="problem-frame">Problem Frame</h3>
+  <p>Claude Code draait in Command's terminals en genereert vaak web-renderbare output — een HTML-rapport, een plan, een dashboard — of start een dev-server op <code>localhost</code>. Vandaag kan Claude alleen naar de <em>editor</em> verwijzen (<code>ccli open</code> toont broncode) en de gebruiker moet zelf een absoluut pad in de adresbalk plakken om het gerenderde resultaat te zien. De browser-tab (een echte <code>&lt;webview&gt;</code> met live-reload) bestaat al, maar er is geen CLI-pad ernaartoe.</p>
+  <p>Een aanpalend, subtiel probleem: de bestaande open-actie koppelt de tab aan de chat die de gebruiker <em>toevallig gefocust</em> heeft (<code>activeTerminalId</code>). Voor een CLI-aanroep vanuit een achtergrond-chat is dat verkeerd — het resultaat hoort in de aanroepende chat te landen.</p>
+
+  <h3 id="key-decisions">Key Decisions</h3>
+
+  <div class="card">
+    <div class="kd-id">KD1</div>
+    <h3>Eén <code>ccli open</code> dat routeert op doeltype, geen apart <code>browser</code>-commando</h3>
+    <p>Een tweede commando (<code>ccli browser</code>) zou overlappen met <code>ccli open</code> voor niet-HTML bestanden en twee mentale modellen creëren. Door <code>ccli open</code> te laten routeren op doeltype blijft er één commando met één betekenis: "zet dit in de nuttigste weergave voor de gebruiker." Het hergebruikt de bestaande editor- én webview-paden.</p>
+  </div>
+  <div class="card">
+    <div class="kd-id">KD2</div>
+    <h3>HTML en URL's renderen; overige bestanden tonen broncode</h3>
+    <p>De webview rendert alleen zinvol web-content. Een <code>.md</code> of <code>.ts</code> rauw in een webview is platte tekst — nutteloos. Daarom: HTML/URL → gerenderd, al het andere → broncode in de editor. Wie HTML-<em>broncode</em> wil lezen of wijzigen gebruikt de Read/edit-tools, niet <code>ccli open</code>.</p>
+  </div>
+  <div class="card">
+    <div class="kd-id">KD3</div>
+    <h3>De tab opent in de aanroepende chat, afgeleid uit het terminal-ID</h3>
+    <p>De CLI stuurt altijd zijn <code>terminal-ID</code> mee; de server leidt daaruit het juiste gesprek/worktree af. De geopende tab (browser óf editor) landt in de aanroepende chat, niet in de gefocuste chat. Dit corrigeert meteen de huidige <code>activeTerminalId</code>-koppeling voor CLI-gedreven opens.</p>
+  </div>
+  <div class="card">
+    <div class="kd-id">KD4</div>
+    <h3><code>ccli diff</code> verwijderd; geen override-argument; geen nieuwe hotkey</h3>
+    <p>Diffs bekijken kan al via de git-UI (commit-historie en status-panel); bestanden wijzigen gaat via bestaande tools — een <code>ccli diff</code>-pad is dubbelop. Het terminal-ID lost altijd op, dus een override om een ánder gesprek/project te targeten is speculatief (YAGNI). De interface is het CLI-commando zelf; <code>Ctrl+Shift+B</code> opent al handmatig een lege browser-tab.</p>
+  </div>
+
+  <div class="callout">
+    <div class="lbl">Call-out · gedragswijziging</div>
+    <p>Dit <strong>wijzigt bestaand gedrag van <code>ccli open</code></strong> voor <code>.html</code>-bestanden: waar het nu de broncode in de editor toont, rendert het straks de pagina in de browser. Bevestigd als bedoeld — HTML-broncode lezen gebeurt voortaan via de Read/edit-tools.</p>
+  </div>
+
+  <h3 id="product-requirements">Requirements</h3>
+  <table>
+    <thead><tr><th style="width:64px">ID</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr class="rgroup"><td colspan="2"><span class="grouplabel">Unified open &amp; routing</span></td></tr>
+      <tr><td class="idcell" id="r1">R1.</td><td><code>ccli open &lt;target&gt;</code> accepteert één positioneel argument dat óf een bestandspad óf een URL is.</td></tr>
+      <tr><td class="idcell" id="r2">R2.</td><td>Is het doel een URL (<code>http(s)://</code> of een kale host als <code>localhost:5173</code>), dan opent het als gerenderde pagina in de webview-browser.</td></tr>
+      <tr><td class="idcell" id="r3">R3.</td><td>Is het doel een <code>.html</code>/<code>.htm</code>-bestand, dan opent het gerenderd in de webview-browser, met live-reload bij wijziging op schijf.</td></tr>
+      <tr><td class="idcell" id="r4">R4.</td><td>Is het doel een ander bestaand bestand, dan opent het als broncode in de code-editor; <code>--line &lt;n&gt;</code> scrollt naar die regel.</td></tr>
+      <tr><td class="idcell" id="r5">R5.</td><td>Argument-disambiguatie: een expliciet <code>file://</code>/<code>http(s)://</code>-schema is doorslaggevend; anders geldt een waarde die naar een bestaand bestand op schijf resolvet als pad, en een waarde met een URL/host-vorm als URL.</td></tr>
+
+      <tr class="rgroup"><td colspan="2"><span class="grouplabel">Chat-targeting &amp; tabs</span></td></tr>
+      <tr><td class="idcell" id="r6">R6.</td><td>De geopende tab (browser of editor) verschijnt in het tab-gebied van de chat die <code>ccli open</code> aanriep, afgeleid uit het terminal-ID — niet in de gefocuste chat.</td></tr>
+      <tr><td class="idcell" id="r7">R7.</td><td>Hetzelfde doel opnieuw openen hergebruikt de bestaande tab (bestanden gededupliceerd op pad, URL's op URL); een ander doel krijgt een eigen tab.</td></tr>
+
+      <tr class="rgroup"><td colspan="2"><span class="grouplabel">Verwijderen van <code>ccli diff</code></span></td></tr>
+      <tr><td class="idcell" id="r8">R8.</td><td>Het subcommando <code>ccli diff</code> en zijn server-route worden verwijderd. De diff-weergaven in de git-UI (commit-historie, status-panel) blijven onaangetast.</td></tr>
+
+      <tr class="rgroup"><td colspan="2"><span class="grouplabel">Skill-begeleiding</span></td></tr>
+      <tr><td class="idcell" id="r9">R9.</td><td>De meegeleverde ccli-skill wordt bijgewerkt: documenteer de routering van <code>ccli open</code>, verwijder <code>ccli diff</code>, en suggereer <code>ccli open</code> om gegenereerde HTML-deliverables gerenderd te tonen. De skill-versie wordt opgehoogd zodat de auto-install herinstalleert.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="key-flows">Key Flows</h3>
+  <p><b>F1. Routering van <code>ccli open &lt;target&gt;</code>.</b> De CLI resolvet het doel, de server bepaalt de weergave en het doel-gesprek uit het terminal-ID.</p>
+  <figure>
+    <svg viewBox="0 0 720 470" width="100%" role="img" aria-label="Beslisboom voor ccli open routering">
+      <!-- start -->
+      <rect class="flowbox" x="280" y="14" width="160" height="40" rx="6"/>
+      <text class="flowtext" x="360" y="39" text-anchor="middle"><tspan font-family="var(--mono)">ccli open &lt;target&gt;</tspan></text>
+      <path class="flowline" d="M360 54 L360 84" marker-end="url(#arrow)"/>
+
+      <!-- diamond 1: URL? -->
+      <polygon class="flowdiamond" points="360,86 470,131 360,176 250,131"/>
+      <text class="flowtext" x="360" y="127" text-anchor="middle">URL-vorm?</text>
+      <text class="flowtext-sm" x="360" y="145" text-anchor="middle">scheme of host:port</text>
+
+      <!-- URL yes -> browser -->
+      <path class="flowline" d="M470 131 L590 131 L590 176" marker-end="url(#arrow)"/>
+      <text class="flowlabel" x="500" y="123">ja</text>
+
+      <!-- diamond 1 no down -->
+      <path class="flowline" d="M360 176 L360 206" marker-end="url(#arrow)"/>
+      <text class="flowlabel" x="372" y="196">nee</text>
+
+      <!-- diamond 2: .html file? -->
+      <polygon class="flowdiamond" points="360,208 470,253 360,298 250,253"/>
+      <text class="flowtext" x="360" y="249" text-anchor="middle">.html / .htm</text>
+      <text class="flowtext-sm" x="360" y="267" text-anchor="middle">bestand op schijf?</text>
+
+      <!-- html yes -> browser -->
+      <path class="flowline" d="M470 253 L590 253 L590 216" marker-end="url(#arrow)"/>
+      <text class="flowlabel" x="500" y="245">ja</text>
+
+      <!-- browser box -->
+      <rect class="flowbox-b" x="520" y="176" width="140" height="40" rx="6"/>
+      <text class="flowtext" x="590" y="201" text-anchor="middle">Webview-browser</text>
+
+      <!-- diamond 2 no down -->
+      <path class="flowline" d="M360 298 L360 328" marker-end="url(#arrow)"/>
+      <text class="flowlabel" x="372" y="318">nee</text>
+
+      <!-- diamond 3: file exists? -->
+      <polygon class="flowdiamond" points="360,330 470,375 360,420 250,375"/>
+      <text class="flowtext" x="360" y="371" text-anchor="middle">bestand bestaat?</text>
+
+      <!-- file yes -> editor -->
+      <path class="flowline" d="M470 375 L590 375" marker-end="url(#arrow)"/>
+      <text class="flowlabel" x="500" y="367">ja</text>
+      <rect class="flowbox-e" x="520" y="355" width="140" height="40" rx="6"/>
+      <text class="flowtext" x="590" y="380" text-anchor="middle">Code-editor</text>
+
+      <!-- no -> error -->
+      <path class="flowline" d="M360 420 L360 448 L150 448 L150 395" marker-end="url(#arrow)"/>
+      <text class="flowlabel" x="372" y="440">nee</text>
+      <rect class="flowbox-e" x="80" y="355" width="140" height="40" rx="6"/>
+      <text class="flowtext" x="150" y="380" text-anchor="middle">Fout: not found</text>
+
+      <defs>
+        <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>Elk pad opent in de aanroepende chat (terminal-ID). URL's slaan de bestaanscontrole over; bestandspaden worden gevalideerd binnen de project/worktree-grens.</figcaption>
+  </figure>
+
+  <h3 id="acceptance-examples">Acceptance Examples</h3>
+  <table class="ae">
+    <thead><tr><th style="width:64px">ID</th><th>Aanroep → verwacht gedrag</th></tr></thead>
+    <tbody>
+      <tr><td class="idcell" id="ae1">AE1.</td><td><b>Covers R3, R6.</b> <code>ccli open report.html</code> (bestaat) → gerenderde pagina in de webview, in de aanroepende chat.</td></tr>
+      <tr><td class="idcell" id="ae2">AE2.</td><td><b>Covers R2.</b> <code>ccli open http://localhost:5173</code> → de dev-server gerenderd in de webview.</td></tr>
+      <tr><td class="idcell" id="ae3">AE3.</td><td><b>Covers R4.</b> <code>ccli open src/App.tsx</code> → broncode in de code-editor.</td></tr>
+      <tr><td class="idcell" id="ae4">AE4.</td><td><b>Covers R4.</b> <code>ccli open src/App.tsx --line 42</code> → editor, gescrolld naar regel 42.</td></tr>
+      <tr><td class="idcell" id="ae5">AE5.</td><td><b>Covers R4, KD2.</b> <code>ccli open notes.md</code> → broncode in de editor, niet gerenderd.</td></tr>
+      <tr><td class="idcell" id="ae6">AE6.</td><td><b>Covers R2, R5.</b> <code>ccli open example.com</code> → <code>http://example.com</code> gerenderd in de webview.</td></tr>
+      <tr><td class="idcell" id="ae7">AE7.</td><td><b>Covers R7.</b> Tweede <code>ccli open report.html</code> → hergebruikt de bestaande tab; daarna <code>ccli open localhost:5173</code> → nieuwe tab.</td></tr>
+      <tr><td class="idcell" id="ae8">AE8.</td><td><b>Covers R3.</b> <code>ccli open report.html --line 10</code> → gerenderd in de browser, <code>--line</code> genegeerd.</td></tr>
+      <tr><td class="idcell" id="ae9">AE9.</td><td><b>Covers R5.</b> <code>ccli open ontbreekt.md</code> (geen URL-vorm, bestaat niet) → foutmelding "not found".</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="scope-boundaries">Scope Boundaries</h3>
+  <div class="scope-grid">
+    <div class="scope-card deferred">
+      <div class="lbl">Deferred</div>
+      <ul>
+        <li>Override-argument om een ánder gesprek of project te targeten dan de aanroepende chat.</li>
+      </ul>
+    </div>
+    <div class="scope-card out">
+      <div class="lbl">Outside scope</div>
+      <ul>
+        <li>Nieuwe keyboard shortcut (<code>Ctrl+Shift+B</code> dekt handmatig openen van een lege browser-tab).</li>
+        <li>URL allow/blocklist — steunt op de bestaande hardening in <code>webviewSecurity.ts</code>.</li>
+        <li>Dev-servers automatisch starten of poorten detecteren.</li>
+      </ul>
+    </div>
+    <div class="scope-card keep">
+      <div class="lbl">Onaangetast</div>
+      <ul>
+        <li>Diff-weergaven in de git-UI (commit-historie, status-panel).</li>
+        <li>Bestanden wijzigen via bestaande tools.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 id="dependencies-assumptions">Dependencies &amp; Assumptions</h3>
+  <ul class="clean">
+    <li><b>Hergebruikt bestaand:</b> de <code>terminalId → projectId</code>-resolutie in CommandServer; de <code>&lt;webview&gt;</code> BrowserTab met live-reload; de store-acties <code>openFileInBrowser</code>/<code>openBrowserTab</code>/<code>setBrowserTabUrl</code> en <code>openEditorTab</code>; de <code>validateFilePath</code>-grenscontrole.</li>
+    <li><b>Aanname:</b> bestandspad-validatie (project/worktree-grens) geldt voor bestand-doelen; URL's worden niet pad-gevalideerd; externe URL's zijn al gehard in <code>webviewSecurity.ts</code>.</li>
+    <li><b>Aanname:</b> <code>--line</code> geldt alleen voor de editor-route en wordt genegeerd voor browser-doelen.</li>
+    <li><b>Aanname:</b> de tab-koppeling verschuift van <code>activeTerminalId</code> naar het meegestuurde terminal-ID; het bestaande handmatige pad (<code>Ctrl+Shift+B</code>) blijft <code>activeTerminalId</code> gebruiken.</li>
+    <li><b>Gedragswijziging:</b> bestaande <code>ccli open &lt;html&gt;</code>-aanroepen tonen voortaan een gerenderde pagina i.p.v. broncode.</li>
+  </ul>
+
+  <h3 id="success-criteria">Success Criteria</h3>
+  <ul class="clean">
+    <li>Claude genereert een HTML-deliverable (bijv. een plan in <code>docs/plans/</code>) en toont het met één <code>ccli open &lt;file&gt;</code> gerenderd in de aanroepende chat; het herlaadt live bij elke regeneratie.</li>
+    <li><code>ccli open</code> op broncode en op een localhost-URL gedraagt zich voorspelbaar volgens de routeringsregel (F1) — bevestigd door AE1–AE9.</li>
+    <li>Geen dood <code>ccli diff</code>-oppervlak meer; de git-UI diff-weergaven werken ongewijzigd.</li>
+  </ul>
+
+  <h3 id="sources">Sources &amp; References</h3>
+  <ul class="clean">
+    <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/cli/ccli.cjs">electron/main/cli/ccli.cjs</a> — <code>buildRoute</code>: de <code>open</code>- en <code>diff</code>-cases; disambiguatie en <code>path.resolve</code>.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/CommandServer.ts">electron/main/services/CommandServer.ts</a> — <code>/open</code> &amp; <code>/diff</code>-routes (~380–430); <code>terminalId → projectId</code>-resolutie; <code>editor:open-file</code>/<code>editor:open-diff</code>-events.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts">src/stores/projectStore.ts</a> — <code>openFileInBrowser</code>/<code>openBrowserTab</code>/<code>setBrowserTabUrl</code> (~1167–1227), <code>openEditorTab</code> (~496), <code>openDiffTab</code>/<code>openWorkingTreeDiffTab</code> (~1061–1143). Let op de <code>activeTerminalId</code>-koppeling.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Browser/BrowserTab.tsx">src/components/Browser/BrowserTab.tsx</a> — de <code>&lt;webview&gt;</code> + live-reload.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/utils/browserUrls.ts">src/utils/browserUrls.ts</a> — <code>pathToFileUrl</code>, <code>normalizeAddressBarInput</code> (URL/host-heuristiek).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/CommitDetail.tsx">src/components/FileExplorer/CommitDetail.tsx</a> &amp; <a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/GitStatusPanel.tsx">GitStatusPanel.tsx</a> — git-UI diff-ingangen (onaangetast door R8).</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/templates/ccli-skill.md">electron/main/templates/ccli-skill.md</a> — skill-tekst + versie-comment (<code>ccli-skill-v1</code>) voor de versie-bump.</li>
+    <li><a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-04-10-001-feat-ccli-agent-control-plane-plan.md">docs/plans/2026-04-10-001-feat-ccli-agent-control-plane-plan.md</a> — oorspronkelijk ccli-plan (context voor de HTTP/event/store-architectuur).</li>
+  </ul>
+</section>
+
+<footer class="composition-signal">
+  Composed 2026-07-06 by ce-brainstorm · source: interactieve brainstorm (feature "ccli open browser routing"). Requirements-only unified plan — <code>ce-plan</code> verrijkt dit bestand in-place met de implementatiesecties.
+</footer>
+</div>

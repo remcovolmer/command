@@ -123,7 +123,12 @@ interface ProjectStore {
   checkVertexConfig: (projectId: string) => Promise<void>
 
   // Editor tab actions
-  openEditorTab: (filePath: string, fileName: string, projectId: string) => void
+  openEditorTab: (
+    filePath: string,
+    fileName: string,
+    projectId: string,
+    terminalId?: string
+  ) => void
   closeEditorTab: (tabId: string) => void
   setEditorDirty: (tabId: string, isDirty: boolean) => void
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
@@ -240,8 +245,14 @@ interface ProjectStore {
     projectId: string
   ) => void
   closeWorkingTreeDiffTabs: (affectedFiles?: string[]) => void
-  openBrowserTab: (projectId: string) => void
-  openFileInBrowser: (filePath: string, fileName: string, projectId: string) => void
+  openBrowserTab: (projectId: string, terminalId?: string) => void
+  openFileInBrowser: (
+    filePath: string,
+    fileName: string,
+    projectId: string,
+    terminalId?: string
+  ) => void
+  openUrlInBrowser: (url: string, projectId: string, terminalId?: string) => void
   setBrowserTabUrl: (tabId: string, url: string) => void
 
   // Discard confirmation state
@@ -493,9 +504,11 @@ export const useProjectStore = create<ProjectStore>()(
       },
 
       // Editor tab actions
-      openEditorTab: (filePath, fileName, projectId) =>
+      openEditorTab: (filePath, fileName, projectId, terminalId) =>
         set((state) => {
-          const chatId = state.activeTerminalId ?? ''
+          // terminalId (the calling chat, e.g. from `ccli open`) overrides the
+          // focused chat so the tab lands in the invoking chat's content area.
+          const chatId = terminalId ?? state.activeTerminalId ?? ''
           // Check if already open
           const existing = Object.values(state.editorTabs).find(
             (t) => t.type !== 'browser' && t.filePath === filePath
@@ -1164,9 +1177,9 @@ export const useProjectStore = create<ProjectStore>()(
           return { editorTabs: newTabs, activeContentTabId: newContent }
         }),
 
-      openBrowserTab: (projectId) =>
+      openBrowserTab: (projectId, terminalId) =>
         set((state) => {
-          const chatId = state.activeTerminalId ?? ''
+          const chatId = terminalId ?? state.activeTerminalId ?? ''
           const id = `browser-${crypto.randomUUID()}`
           const tab: BrowserTab = {
             id,
@@ -1181,9 +1194,9 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
-      openFileInBrowser: (filePath, fileName, projectId) =>
+      openFileInBrowser: (filePath, fileName, projectId, terminalId) =>
         set((state) => {
-          const chatId = state.activeTerminalId ?? ''
+          const chatId = terminalId ?? state.activeTerminalId ?? ''
           // Reuse an existing browser tab for the same file rather than duplicating.
           const existing = Object.values(state.editorTabs).find(
             (t): t is BrowserTab => t.type === 'browser' && t.filePath === filePath
@@ -1210,6 +1223,41 @@ export const useProjectStore = create<ProjectStore>()(
             url: pathToFileUrl(filePath),
             filePath,
             fileName,
+            projectId,
+            terminalId: chatId,
+          }
+          return {
+            editorTabs: { ...state.editorTabs, [id]: tab },
+            activeContentTabId: { ...state.activeContentTabId, [chatId]: id },
+          }
+        }),
+
+      openUrlInBrowser: (url, projectId, terminalId) =>
+        set((state) => {
+          const chatId = terminalId ?? state.activeTerminalId ?? ''
+          // Reuse an existing URL-backed browser tab for the same URL rather
+          // than duplicating; a distinct URL gets its own tab. Scoped to the
+          // calling chat (terminalId) so a URL already open in another chat
+          // doesn't get reactivated there — that would leave the calling chat
+          // with nothing visible. File-backed tabs (filePath set) are excluded
+          // so a URL never hijacks a file's tab.
+          const existing = Object.values(state.editorTabs).find(
+            (t): t is BrowserTab =>
+              t.type === 'browser' && t.terminalId === chatId && !t.filePath && t.url === url
+          )
+          if (existing) {
+            return {
+              activeContentTabId: {
+                ...state.activeContentTabId,
+                [existing.terminalId]: existing.id,
+              },
+            }
+          }
+          const id = `browser-${crypto.randomUUID()}`
+          const tab: BrowserTab = {
+            id,
+            type: 'browser',
+            url,
             projectId,
             terminalId: chatId,
           }

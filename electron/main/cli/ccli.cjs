@@ -169,6 +169,36 @@ function output(result, pretty) {
 }
 
 // ---------------------------------------------------------------------------
+// File-vs-URL disambiguation for `open`
+// ---------------------------------------------------------------------------
+
+// Extensions `ccli open` treats as local files rather than hostnames, so
+// `report.html` / `notes.md` resolve as paths while a bare `example.com` is a
+// URL. Existence on disk is deliberately NOT consulted, so buildRoute stays
+// pure — a non-existent file still routes to the server, which returns a clear
+// "File not found" rather than being mistaken for a hostname.
+const FILE_EXTENSIONS = new Set([
+  'html', 'htm', 'md', 'markdown', 'txt', 'json', 'xml', 'yml', 'yaml', 'toml',
+  'ini', 'env', 'csv', 'log', 'pdf', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp',
+  'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'css', 'scss', 'less', 'vue', 'svelte',
+  'py', 'rb', 'go', 'rs', 'java', 'c', 'h', 'cpp', 'sh', 'sql', 'lock',
+])
+
+// Decide whether an `open` target is a URL (render in the browser) or a
+// filesystem path (validated + routed by the server). Explicit schemes win; a
+// path separator or leading dot forces file; a bare `host:port` is a URL; a
+// bare dotted token is a file when its extension is a known file type,
+// otherwise a hostname/URL.
+function isUrlTarget(target) {
+  if (/^(https?|file):\/\//i.test(target)) return true
+  if (/[/\\]/.test(target) || target.startsWith('.')) return false
+  if (/^[^\s/\\:]+:\d+$/.test(target)) return true // host:port, e.g. localhost:5173
+  const dot = target.lastIndexOf('.')
+  if (dot === -1) return false // no dot, no port, no scheme -> treat as file
+  return !FILE_EXTENSIONS.has(target.slice(dot + 1).toLowerCase())
+}
+
+// ---------------------------------------------------------------------------
 // Route mapping
 // ---------------------------------------------------------------------------
 
@@ -206,17 +236,16 @@ function buildRoute(positional, flags) {
     }
 
     case 'open': {
-      const file = positional[1]
-      if (!file) return { error: 'Usage: ccli open <file> [--line <n>]' }
-      const body = { file: path.resolve(file) }
+      const target = positional[1]
+      if (!target) return { error: 'Usage: ccli open <file|url> [--line <n>]' }
+      // URLs (localhost dev servers, external sites) render in the browser and
+      // must not be path-resolved. Files are resolved against the terminal cwd.
+      if (isUrlTarget(target)) {
+        return { method: 'POST', path: '/open', body: { url: target } }
+      }
+      const body = { file: path.resolve(target) }
       if (flags.line) body.line = Number(flags.line)
       return { method: 'POST', path: '/open', body }
-    }
-
-    case 'diff': {
-      const file = positional[1]
-      if (!file) return { error: 'Usage: ccli diff <file>' }
-      return { method: 'POST', path: '/diff', body: { file: path.resolve(file) } }
     }
 
     case 'chat': {
@@ -323,8 +352,7 @@ Commands:
   worktree link <path>                                    Link existing worktree to current chat
   worktree merge                                          Merge the current worktree's PR
 
-  open <file> [--line <n>]                                Open a file in the editor
-  diff <file>                                             Open a file diff in the editor
+  open <file|url> [--line <n>]                            Open in Command: HTML files and URLs render in the browser, other files open in the editor
 
   chat list                                               List chats in the current project
   chat info [id]                                          Show chat details (default: current)

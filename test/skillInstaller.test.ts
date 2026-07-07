@@ -43,8 +43,27 @@ describe('SkillInstaller', () => {
 
     expect(existsSync(globalSkillPath())).toBe(true)
     const content = readFileSync(globalSkillPath(), 'utf-8')
-    expect(content).toContain('<!-- ccli-skill-v1 -->')
+    expect(content).toContain('<!-- ccli-skill-v3 -->')
     expect(content).toContain('ccli worktree create')
+    // Skill discovery needs real YAML frontmatter at the very top — a name and
+    // a description Claude Code can use as the invocation trigger. Match
+    // line-ending-agnostically (the installed file may be CRLF on Windows).
+    expect(content).toMatch(/^---\r?\n/)
+    expect(content).toMatch(/^name:\s*ccli\s*$/m)
+    expect(content).toMatch(/^description:\s*\S/m)
+  })
+
+  test('version is detected even though the comment follows the frontmatter', async () => {
+    const installer = new SkillInstaller()
+    await installer.install()
+    const firstContent = readFileSync(globalSkillPath(), 'utf-8')
+
+    // A second install must recognize the current version (scanning past the
+    // frontmatter) and skip — not clobber user edits by failing to detect it.
+    writeFileSync(globalSkillPath(), firstContent + '\n# User addition', 'utf-8')
+    await installer.install()
+
+    expect(readFileSync(globalSkillPath(), 'utf-8')).toContain('# User addition')
   })
 
   test('creates ~/.claude/skills/ccli/ directory', async () => {
@@ -80,7 +99,7 @@ describe('SkillInstaller', () => {
     await installer.install()
 
     const content = readFileSync(globalSkillPath(), 'utf-8')
-    expect(content).toContain('<!-- ccli-skill-v1 -->')
+    expect(content).toContain('<!-- ccli-skill-v3 -->')
     expect(content).not.toContain('Old content')
   })
 
@@ -124,7 +143,7 @@ describe('SkillInstaller', () => {
     expect(content).toContain('ccli title')
     expect(content).toContain('ccli sidecar')
     expect(content).toContain('ccli chat list')
-    expect(content).toContain('ccli diff')
+    expect(content).not.toContain('ccli diff')
     expect(content).toContain('ccli worktree merge')
   })
 })

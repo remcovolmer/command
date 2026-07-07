@@ -64,7 +64,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'automation:run-completed',
   'automation:run-failed',
   'editor:open-file',
-  'editor:open-diff',
+  'editor:open-browser',
   'sidecar:created',
   'worktree:added',
 ] as const
@@ -305,25 +305,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fileName: string
         projectId: string
         line?: number
+        terminalId?: string
       }) => void
     ): Unsubscribe => {
       const handler = (
         _event: Electron.IpcRendererEvent,
-        data: { filePath: string; fileName: string; projectId: string; line?: number }
+        data: {
+          filePath: string
+          fileName: string
+          projectId: string
+          line?: number
+          terminalId?: string
+        }
       ) => callback(data)
       ipcRenderer.on('editor:open-file', handler)
       return () => ipcRenderer.removeListener('editor:open-file', handler)
     },
 
-    onOpenDiff: (
-      callback: (data: { filePath: string; fileName: string; projectId: string }) => void
+    onOpenBrowser: (
+      callback: (data: { url: string; projectId: string; terminalId?: string }) => void
     ): Unsubscribe => {
       const handler = (
         _event: Electron.IpcRendererEvent,
-        data: { filePath: string; fileName: string; projectId: string }
+        data: { url: string; projectId: string; terminalId?: string }
       ) => callback(data)
-      ipcRenderer.on('editor:open-diff', handler)
-      return () => ipcRenderer.removeListener('editor:open-diff', handler)
+      ipcRenderer.on('editor:open-browser', handler)
+      return () => ipcRenderer.removeListener('editor:open-browser', handler)
     },
   },
 
