@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code review — Browser-annotatie (feat/kestrel)</title>
+<style>
+  :root{
+    --bg:#0e1113; --panel:#171b1e; --panel2:#1d2226; --line:#2a3136;
+    --ink:#e8edf0; --mut:#9aa7ae; --teal:#2bb6c6; --teal-d:#0f5f6b;
+    --p0:#e5484d; --p1:#f5a524; --p2:#3b82f6; --p3:#6b7683; --ok:#16a34a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:40px 24px 96px}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.2px}
+  h2{font-size:19px;margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--teal)}
+  p{margin:8px 0}
+  a{color:var(--teal)}
+  .sub{color:var(--mut);font-size:13.5px}
+  code{font-family:"SF Mono",ui-monospace,Consolas,monospace;font-size:12.5px;
+    background:var(--panel2);padding:1px 5px;border-radius:4px;color:#cfe8ec}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 22px;margin:14px 0 4px;font-size:13px;color:var(--mut)}
+  .meta b{color:var(--ink);font-weight:600}
+  .verdict{margin:22px 0;padding:16px 18px;border-radius:10px;background:var(--panel);
+    border:1px solid var(--line);border-left:4px solid var(--p1)}
+  .verdict .lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--p1);font-weight:700}
+  .verdict h2{border:0;margin:4px 0 6px;font-size:20px}
+  .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;
+    padding:2px 8px;border-radius:999px;color:#fff;vertical-align:middle}
+  .b-p0{background:var(--p0)} .b-p1{background:var(--p1);color:#241a02} .b-p2{background:var(--p2)}
+  .b-p3{background:var(--p3)} .b-ok{background:var(--ok)} .b-adv{background:#334};
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;letter-spacing:.03em;text-transform:uppercase}
+  tr:last-child td{border-bottom:0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 18px;margin:12px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0}
+  .card.p0{border-left:4px solid var(--p0)} .card.p1{border-left:4px solid var(--p1)}
+  .card.p2{border-left:4px solid var(--p2)} .card.adv{border-left:4px solid var(--p3)}
+  .card h3{margin-top:0;color:var(--ink);display:flex;align-items:center;gap:10px}
+  .k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .row{display:grid;grid-template-columns:96px 1fr;gap:6px 14px;margin:8px 0;font-size:13.5px}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:5px;background:var(--panel2);
+    color:var(--mut);border:1px solid var(--line)}
+  .conf{font-weight:700}
+  ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
+  .applied td:first-child{white-space:nowrap}
+  .foot{margin-top:10px;color:var(--mut);font-size:12.5px}
+  .scroll{overflow-x:auto}
+  .grp{display:grid;grid-template-columns:1fr;gap:0}
+  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+  .pill.gate{background:#3a2130;color:#f2b8c6} .pill.queue{background:#12331f;color:#8fe6a8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Code review — Browser-annotatie</h1>
+  <div class="sub">Multi-agent review (9 reviewers) van de browser-annotatiefeature op <code>feat/kestrel</code>.</div>
+  <div class="meta">
+    <span><b>Scope</b> <code>feat/kestrel</code> vs <code>79a0405</code> · 21 files, +2.733/-14</span>
+    <span><b>Verdict</b> Ready to merge</span>
+    <span><b>Fix-commits</b> <code>d94e5a1</code> + <code>284d150</code></span>
+    <span><b>Suite</b> 714 groen</span>
+  </div>
+
+  <div class="verdict" style="border-left-color:var(--ok)">
+    <div class="lbl" style="color:var(--ok)">Verdict — Ready to merge <span class="badge b-ok">P0 gesloten</span></div>
+    <h2>De feature is degelijk gebouwd en de beide P0's zijn nu gedicht — het gast→host-kanaal is geauthenticeerd.</h2>
+    <p>Alle findings zijn opgelost en gecommit. De directe defects landden in <code>d94e5a1</code>; de kern-P0 —
+    het niet-geauthenticeerde <code>console-message</code>-kanaal — is daarna volledig gebouwd in <code>284d150</code>:
+    de host mint een <b>per-document random nonce</b>, injecteert die function-scoped in elk gastscript (nooit op <code>window</code>,
+    dus onleesbaar voor pagina-scripts), en de parsers weigeren elk signaal met een verkeerde/afwezige nonce. Daarmee is de
+    <b>no-gesture-forgery</b> dicht. Restrisico (gedocumenteerd): een pagina die <code>console.log</code> hookt én een échte
+    annotatie-actie van de gebruiker uitlokt, kan de nonce alsnog observeren — smaller, interactie-afhankelijk, aanvaard voor een
+    local-first tool. Suite groen (714), tsc + eslint schoon.</p>
+  </div>
+
+  <h2>Reviewteam &amp; dekking</h2>
+  <p class="sub">Volledige roster wegens omvang (1.444 exec-regels), risicosignalen (untrusted page-content → IPC, directe file-writes, terminal-injectie) en de <code>frontend</code>/<code>ipc-main</code>-signalen.</p>
+  <div class="panel"><table>
+    <tr><th>Lens</th><th>Uitkomst</th></tr>
+    <tr><td>security <span class="tag">Opus</span></td><td>2× P0 — vervalsbaar <code>console-message</code>-kanaal (file-write + chat-injectie)</td></tr>
+    <tr><td>adversarial <span class="tag">Opus</span></td><td>Bevestigt beide P0's; + markup listener-leak (P2), blinde DOM-splice (P2)</td></tr>
+    <tr><td>correctness <span class="tag">Opus</span></td><td>markup <code>pointerup</code> listener-leak (P2)</td></tr>
+    <tr><td>reliability</td><td>ongevangen guest-call rejection → stille no-op (P1)</td></tr>
+    <tr><td>testing</td><td>emoji surrogate-split (echte bug), 2 dekkingsgaten op de edit-fallback</td></tr>
+    <tr><td>maintainability</td><td>0 findings; 2 residual (module-scheiding, <code>as unknown</code>-cast)</td></tr>
+    <tr><td>project-standards</td><td>0 violations; drift tussen CLAUDE.md en AGENTS.md gesignaleerd</td></tr>
+    <tr><td>agent-native</td><td>berichtkwaliteit richting de chat kan scherper (7 punten)</td></tr>
+    <tr><td>learnings</td><td>2 gedocumenteerde patronen — beide nageleefd</td></tr>
+  </table></div>
+  <p class="foot">Onafhankelijke cross-model pass (Codex) <b>niet uitgevoerd</b>: het script vereist <code>jq</code>, dat ontbreekt in deze omgeving. De drie zwaarste lenzen (security/adversarial/correctness) draaiden op Opus; elke P0/P1-finding is door een aparte validator gecontroleerd.</p>
+
+  <h2>Toegepast &amp; gecommit <span class="badge b-ok">d94e5a1</span></h2>
+  <div class="panel scroll"><table class="applied">
+    <tr><th>#</th><th>Fix</th><th>Bestand</th><th>Verificatie</th></tr>
+    <tr><td>3</td><td><b>Markup <code>pointerup</code> listener-leak</b> — teardown ruimde alleen bar/canvas op; nu ook de window-listener <span class="badge b-p2">P2</span></td><td><code>annotationGuestScript.ts</code></td><td>correctness+adversarial; inspectie</td></tr>
+    <tr><td>4</td><td><b>Stille guest-call fout</b> — <code>execInGuest/captureGuest</code> vingen async-rejection niet; nu → <code>null</code> + statusmelding <span class="badge b-p1">P1</span></td><td><code>webviewControl.ts</code>, <code>BrowserTab.tsx</code></td><td>validator ✓; +2 tests</td></tr>
+    <tr><td>5</td><td><b>Emoji surrogate-split</b> — <code>minimalEdit</code> scande per UTF-16 code-unit → losse surrogate-helft als zoeknaald, corrupte edit; nu per code-point <span class="badge b-p2">P2</span></td><td><code>annotationMessage.ts</code></td><td>testing (repro); +1 test</td></tr>
+    <tr><td>1·2</td><td><b>Security-mitigaties</b> — directe file-edit gebonden aan <code>getURL()</code> i.p.v. <code>payload.url</code>; controlebytes (<code>\r</code>, ESC) uit page-velden gestript vóór de PTY <span class="badge b-p0">deel P0</span></td><td><code>BrowserTab.tsx</code>, <code>annotationMessage.ts</code></td><td><code>d94e5a1</code>; +tests</td></tr>
+    <tr><td>1·2</td><td><b>Kanaal-authenticatie (nonce)</b> — per-document nonce, function-scoped in de gastscripts geïnjecteerd en op elk signaal vereist; markup extra ge-gate op draw-modus. Sluit de no-gesture-forgery van beide P0's. <span class="badge b-ok">P0 gesloten</span></td><td><code>annotationGuestScript.ts</code>, <code>BrowserTab.tsx</code></td><td><code>284d150</code>; nonce-tests</td></tr>
+    <tr><td>T1·T2</td><td><b>Testdekking</b> — context-keyed disambiguatie-tak, void-element fallback, guest-call rejection-paden, forged/wrong/empty-nonce</td><td><code>*.test.ts</code></td><td>714 groen</td></tr>
+  </table></div>
+  <p class="foot"><b>Let op (green-but-unverifiable):</b> de security-mitigaties raken auth/trust-grenzen; unit-tests dekken de sanitisatie, maar de <code>getURL</code>-binding en de end-to-end injectiepaden vragen verificatie in de draaiende app.</p>
+
+  <h2>Triage-groepen</h2>
+  <div class="card p0" style="border-left-color:var(--ok)">
+    <h3><span class="pill queue">GESLOTEN</span> Groep A — Niet-geauthenticeerd gast→host-kanaal <span class="badge b-ok">opgelost · 284d150</span></h3>
+    <p>Findings <b>#1</b> + <b>#2</b> deelden één oorzaak: <code>onConsole</code> (deps <code>[]</code>, altijd actief) verwerkte <em>elke</em> <code>console.log</code> van de gast met een bekende constante sentinel — geen origin-, mode- of gesture-check. Elke pagina (inclusief externe URL's) kon de signalen vervalsen.</p>
+    <p><span class="k">Toegepast</span> Het kanaal is nu geauthenticeerd met een <b>per-document nonce</b>: de host genereert per document een random token (<code>crypto.getRandomValues</code>), injecteert het function-scoped als <code>var ccNonce</code> (nooit op <code>window</code> → onleesbaar voor pagina-scripts), en de gast echoot het in elk signaal. De parsers weigeren elk bericht met verkeerde/afwezige nonce (leeg = altijd weigeren, dekt het venster vóór dom-ready). Comment/markup zijn bovendien mode-gegate. De statische-scripts-invariant blijft intact (de nonce is host-randomness, geen page-data). Restrisico: <code>console.log</code>-hook + uitgelokte user-actie kan de nonce alsnog lekken — smaller, interactie-afhankelijk, gedocumenteerd in de code.</p>
+  </div>
+  <div class="card p2">
+    <h3><span class="pill queue">UITVOEREN</span> Groep B — Robuustheid van de directe file-edit <span class="badge b-p2">P2</span></h3>
+    <p>Findings <b>#5</b> (emoji, ✓ gefixt) en <b>#6</b> (blinde DOM-splice) raken dezelfde edit-pijplijn. <code>applyDomEdit</code> splitst puur op <code>indexPath</code>+<code>tag</code> zonder inhoudscheck, dus bij live-DOM-drift (of een vervalst <code>indexPath:[]</code>, <code>tag:'html'</code>) overschrijft het de verkeerde/hele bron-range en de veiligere tekst-fallback draait niet. Verifieer consistentie vóór splice en weiger whole-document targets — <em>maar</em> een naïeve "match <code>payload.before</code>" is onveilig (innerText ≠ bron); gebruik een genormaliseerde tekstvergelijking. Hoort bij de #1-fix.</p>
+  </div>
+
+  <h2>Findings</h2>
+
+  <div class="card p0">
+    <h3>#1 · Vervalste save-sentinel overschrijft in-project bestanden <span class="badge b-p0">P0</span> <span class="badge b-adv">manual</span></h3>
+    <div class="row"><span class="k">Waar</span><span><code>BrowserTab.tsx:244</code> → <code>handleEditSave</code> · reviewers: <b>security, adversarial</b> · <span class="conf">confidence 100</span> · validator ✓</span></div>
+    <div class="row"><span class="k">Wat breekt</span><span>Een pagina kan met <code>console.log('__CC_ANNOTATE_SAVE__'+JSON…)</code> — zonder klik — een edit forceren. Het schrijfpad nam <code>payload.url</code> (page-controlled) als doel; <code>fs:writeFile</code> is via <code>validateFilePathInProject</code> begrensd tot geregistreerde projecten, maar dat is <em>projectbreed</em>, niet het open bestand. <code>applyDomEdit</code> splitst bovendien blind op <code>indexPath</code>+<code>tag</code> (validator: <code>indexPath:[]</code>+<code>tag:'html'</code> overschrijft het hele bestand). Overschreven broncode draait bij de volgende build → code-execution/supply-chain-vector.</span></div>
+    <div class="row"><span class="k">Respons</span><span><span class="badge b-ok">gesloten</span> Schrijf gebonden aan <code>getURL()</code> (<code>d94e5a1</code>) én kanaal geauthenticeerd met per-document nonce (<code>284d150</code>) — een pagina zonder de (onleesbare) nonce kan geen save-signaal meer forgen.</span></div>
+  </div>
+
+  <div class="card p0">
+    <h3>#2 · Vervalste comment/edit-sentinel injecteert een prompt in de actieve chat <span class="badge b-p0">P0</span> <span class="badge b-adv">manual</span></h3>
+    <div class="row"><span class="k">Waar</span><span><code>BrowserTab.tsx:110</code> → <code>handleCommentSend</code> → <code>terminal.write</code> · security <b>P0</b>, adversarial <b>P1</b> (→ P0 aangehouden) · <span class="conf">confidence 100</span> · validatie <em>degraded</em> (over-bepaald)</span></div>
+    <div class="row"><span class="k">Wat breekt</span><span>Zelfde kanaal: een vervalste <code>__CC_COMMENT__</code> zet zonder gesture attacker-tekst in de input van de actieve Claude-chat. <code>terminal.write</code> is niet bracketed-paste-gewrapt (net als de bestaande Ctrl+V-plak), dus een <code>\r</code> in het veld werd rauw doorgegeven en <code>writeToTerminal</code> behandelt <code>\r/\n</code> als submit → mogelijke <b>auto-verzending</b> naar een agent die commando's draait.</span></div>
+    <div class="row"><span class="k">Respons</span><span><span class="badge b-ok">gesloten</span> Controlebytes (<code>\r</code>/ESC) uit page-velden gestript (<code>d94e5a1</code>, geen auto-submit/escape meer) én kanaal-nonce (<code>284d150</code>) — no-gesture-injectie is geblokkeerd; comment/markup ook mode-gegate.</span></div>
+    <div class="foot">Residual: <code>console-message</code> vuurt ook voor sub-frames/iframes — een third-party embed in een verder vertrouwde localhost-pagina kan de sentinels óók vervalsen. En <code>clipboard:writeImage</code> is via een vervalste <code>__CC_MARKUP_ADD__</code> op dezelfde manier bereikbaar (ongevraagde screenshot naar klembord).</div>
+  </div>
+
+  <div class="card p1">
+    <h3>#4 · Ongevangen guest-call rejection → stille fout <span class="badge b-p1">P1</span> <span class="badge b-ok">gefixt</span></h3>
+    <div class="row"><span class="k">Waar</span><span><code>webviewControl.ts:21/30</code> · reliability · <span class="conf">75</span> · validator ✓</span></div>
+    <div class="row"><span class="k">Wat brak</span><span><code>executeJavaScript/capturePage</code> rejecten als het frame midden in een call wordt afgebroken (de 200ms live-reload-timer die <code>reload()</code> draait tijdens een annotatie-actie). Geen try/catch → <code>switchMode</code> sloeg <code>setStatus/setMode</code> over (knop doet stil niets) en <code>handleMarkupAdd</code> liet de toolbar verborgen achter. Nu → <code>null</code> + statusmelding.</span></div>
+  </div>
+
+  <div class="card p2">
+    <h3>#3 · Markup <code>pointerup</code> listener-leak · #5 emoji surrogate-split · #6 blinde DOM-splice <span class="badge b-p2">P2</span></h3>
+    <div class="row"><span class="k">#3</span><span><b>gefixt</b> — window-listener werd nooit verwijderd bij teardown; lekte per draw-toggle (correctness+adversarial, promoted 100).</span></div>
+    <div class="row"><span class="k">#5</span><span><b>gefixt</b> — <code>minimalEdit</code> splitste een surrogate-paar op emoji (testing, geverifieerd met repro). Nu per code-point.</span></div>
+    <div class="row"><span class="k">#6</span><span><b>advisory / open</b> — <code>applyDomEdit</code> kan bij live-DOM-drift in de verkeerde element-range splicen (Groep B). Consistentiecheck vóór splice; naïeve before-match is onveilig.</span></div>
+  </div>
+
+  <h2>Advisory &amp; residual risks</h2>
+  <div class="panel"><ul>
+    <li><b>Agent-affordance (agent-native):</b> de fallback-boodschap dropt de faalreden van de directe edit, geeft het opgeloste pad niet mee, en gooit <code>payload.html</code> weg; comment-fideliteit verschilt (inspect = <code>outerHTML</code>, rechtsklik = <code>sel.toString()</code>) zonder marker; stille afkap op <code>MAX_FIELD=4000</code>; draw-bericht claimt onvoorwaardelijk "afbeelding bijgevoegd" terwijl de Alt+V-plak handmatig/ongegarandeerd is.</li>
+    <li><b>Standards-drift (project-standards):</b> deze diff versoepelt de Hotkey-eis in <code>CLAUDE.md</code>, maar <code>AGENTS.md</code> houdt het strikte "MUST" — de twee standaardbestanden spreken elkaar nu tegen.</li>
+    <li><b>Module-scheiding (maintainability):</b> <code>annotationMessage.ts</code> mengt berichtbouw met een ~90-regels tekst-diff-engine; <code>htmlEdit.ts</code> importeert <code>DirectEditResult</code> terug (omgekeerde type-afhankelijkheid). Overweeg <code>directEdit.ts</code>. En <code>(e as unknown as {message?})</code> in <code>BrowserTab.tsx:104</code> hoort een getypte event-interface te zijn (project verkiest "unknown + type guard" boven casts).</li>
+    <li><b>Reliability-residual:</b> <code>clipboard:writeImage</code> is fire-and-forget — de "Screenshot op klembord"-melding kan onwaar zijn als de main-process het beeld weigert. Geen timeout op guest-calls: een busy-loopende externe pagina hangt de promise onbeperkt.</li>
+    <li><b>Busy-state (agent-native #7, pre-existing):</b> elke annotatie-write zet de Claude-terminal meteen op "busy" (<code>writeToTerminal</code> ziet <code>\n</code> als Enter) vóór de gebruiker verzendt — deze feature is de eerste reguliere bron van multi-line unsent writes.</li>
+  </ul></div>
+
+  <h2>Learnings &amp; bekende patronen</h2>
+  <div class="panel"><ul>
+    <li><span class="badge b-ok">nageleefd</span> <code>docs/solutions/integration-issues/node-pty-paste-truncation.md</code> — geen dubbele chunking; <code>terminal.write</code> leunt op <code>writePtySafe</code>.</li>
+    <li><span class="badge b-ok">nageleefd</span> <code>docs/solutions/security-issues/tasks-ipc-path-traversal-and-review-fixes.md</code> — de fs-IPC is via <code>validateFilePathInProject</code> begrensd (faalt closed → agent-fallback).</li>
+    <li><span class="tag">nieuw</span> Geen bestaande solution dekt webview guest-script-injectie / <code>console-message</code>-signaling / host-pull. Goede kandidaat voor een nieuwe <code>docs/solutions/</code>-entry zodra de kanaal-authenticatie landt.</li>
+  </ul></div>
+
+  <h2>Coverage</h2>
+  <div class="panel"><ul>
+    <li>9 reviewers voltooid (2 herstart na mid-stream API-stalls; artifacts vóór de stall bewaard). Cross-model Codex-pass: <b>niet uitgevoerd</b> (<code>jq</code> ontbreekt).</li>
+    <li>Validators: #1 ✓, #4 ✓; #2 P0 <b>degraded</b> (validator gaf geen schone verdict terug) — behouden en niet gedropt, want over-bepaald door security+adversarial + de gedeelde-mechaniek-validatie van #1.</li>
+    <li>Directe orchestrator-verificatie: <code>validateFilePathInProject</code> begrenst writes; <code>writePtySafe</code> wrapt géén bracketed-paste (annotatie-write is consistent met de bestaande Ctrl+V-plak — daarom is "ontbrekende bracketed paste" géén nieuwe defect).</li>
+    <li>Pre-existing (telt niet mee): ESLint-warning <code>BrowserTab.tsx:79</code> <code>setInput(url)</code>-in-effect — bestond al vóór deze feature.</li>
+    <li>Suite: <b>714 groen</b>, <code>tsc</code> schoon, ESLint schoon op gewijzigde bestanden.</li>
+  </ul></div>
+
+  <h2>Actielijst</h2>
+  <div class="panel"><table>
+    <tr><th>#</th><th>Sev</th><th>Actie</th><th>Status</th></tr>
+    <tr><td>1+2</td><td><span class="badge b-ok">P0 done</span></td><td>Kanaal geauthenticeerd (per-document nonce + mode-gating) — no-gesture-forgery gesloten.</td><td><code>284d150</code></td></tr>
+    <tr><td>3·4·5</td><td><span class="badge b-ok">done</span></td><td>Listener-leak, stille guest-fout, emoji-corruptie, security-mitigaties + testdekking.</td><td><code>d94e5a1</code></td></tr>
+    <tr><td>6</td><td><span class="badge b-p2">P2</span></td><td><code>applyDomEdit</code>: consistentiecheck vóór splice + weiger whole-document targets (genormaliseerde tekstvergelijking, geen naïeve before-match). Kleiner risico nu de nonce forgery blokkeert; blijft goede hardening tegen live-DOM-drift.</td><td>open (optioneel)</td></tr>
+    <tr><td>—</td><td><span class="badge b-adv">adv</span></td><td>AGENTS.md ↔ CLAUDE.md hotkey-regel synchroniseren; agent-berichten verrijken (faalreden, pad, truncatie-marker).</td><td>open (optioneel)</td></tr>
+  </table></div>
+
+  <p class="foot">Run-artifacts: <code>/tmp/compound-engineering/ce-code-review/20260707-0dde6c6/</code> · gegenereerd 2026-07-07 · Riverwise</p>
+
+</div>
+</body>
+</html>
