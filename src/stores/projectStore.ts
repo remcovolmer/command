@@ -32,16 +32,52 @@ export const MAX_TERMINALS_PER_PROJECT = 10
 /** Maximum number of editor tabs allowed per project */
 export const MAX_EDITOR_TABS = 15
 
-/** Returns center-area visible terminals for a project (excludes sidecar/normal terminals) */
-function getVisibleTerminals(
+// Chats of a project in canonical order — the exact top-to-bottom order the
+// sidebar renders: root chats (worktreeId === null) first, then, per worktree in
+// worktree-creation order, that worktree's chats. Within each group chats keep
+// their creation order. Excludes 'normal' shells and sidecar terminals.
+//
+// This is the single source of truth for chat order. The tab bar, arrow-key
+// navigation (nav.previous/nextTerminal), Alt+1-9 jump, and the close/switch
+// active-terminal fallback all read it, so those surfaces and the sidebar can
+// never disagree about ordering. The sidebar renders the same partition
+// structurally (root chats, then worktrees in Object.values order); keep this
+// function in step with that grouping.
+export function getVisibleTerminals(
   terminals: Record<string, TerminalSession>,
+  worktrees: Record<string, Worktree>,
   sidecarTerminals: Record<string, string[]>,
   projectId: string
 ): TerminalSession[] {
   const sidecarIds = new Set(Object.values(sidecarTerminals).flat())
-  return Object.values(terminals).filter(
+  const chats = Object.values(terminals).filter(
     (t) => t.projectId === projectId && t.type !== 'normal' && !sidecarIds.has(t.id)
   )
+
+  const rootChats = chats.filter((t) => t.worktreeId === null)
+
+  // Worktrees in creation (insertion) order, matching the sidebar's iteration.
+  const projectWorktreeIds = Object.values(worktrees)
+    .filter((w) => w.projectId === projectId)
+    .map((w) => w.id)
+
+  const grouped: TerminalSession[] = []
+  const claimed = new Set<string>()
+  for (const worktreeId of projectWorktreeIds) {
+    for (const chat of chats) {
+      if (chat.worktreeId === worktreeId) {
+        grouped.push(chat)
+        claimed.add(chat.id)
+      }
+    }
+  }
+
+  // Chats on a worktree that isn't loaded yet (a non-active project's worktrees
+  // load lazily) would otherwise vanish — append them in creation order so no
+  // chat is ever dropped from navigation.
+  const orphans = chats.filter((t) => t.worktreeId !== null && !claimed.has(t.id))
+
+  return [...rootChats, ...grouped, ...orphans]
 }
 
 interface ProjectStore {
@@ -1470,7 +1506,12 @@ export const useProjectStore = create<ProjectStore>()(
       setActiveProject: (id) =>
         set((state) => {
           // When switching projects, also update active terminal (exclude sidecar/normal)
-          const visible = getVisibleTerminals(state.terminals, state.sidecarTerminals, id ?? '')
+          const visible = getVisibleTerminals(
+            state.terminals,
+            state.worktrees,
+            state.sidecarTerminals,
+            id ?? ''
+          )
           const newActiveTerminalId = visible.length > 0 ? visible[0].id : null
 
           // Auto-expand: selecting a project clears its collapse entry in the
@@ -1554,12 +1595,29 @@ export const useProjectStore = create<ProjectStore>()(
           let newActiveTerminalId = state.activeTerminalId
 
           if (state.activeTerminalId === id) {
-            const visible = getVisibleTerminals(
-              newTerminals,
+            const projectId = removedTerminal?.projectId ?? ''
+            const before = getVisibleTerminals(
+              state.terminals,
+              state.worktrees,
               state.sidecarTerminals,
-              removedTerminal?.projectId ?? ''
+              projectId
             )
-            newActiveTerminalId = visible.length > 0 ? visible[0].id : null
+            const after = getVisibleTerminals(
+              newTerminals,
+              state.worktrees,
+              state.sidecarTerminals,
+              projectId
+            )
+            if (after.length === 0) {
+              newActiveTerminalId = null
+            } else {
+              // Activate the neighbour in canonical order: the chat that now
+              // occupies the closed chat's slot (the next one), or the previous
+              // chat when the closed chat was last — never a jump to the top.
+              const removedIndex = before.findIndex((t) => t.id === id)
+              const nextIndex = Math.min(Math.max(removedIndex, 0), after.length - 1)
+              newActiveTerminalId = after[nextIndex].id
+            }
           }
 
           // Clean stale ID from sidecarTerminals
@@ -1699,7 +1757,12 @@ export const useProjectStore = create<ProjectStore>()(
 
       getProjectTerminals: (projectId) => {
         const state = get()
-        return getVisibleTerminals(state.terminals, state.sidecarTerminals, projectId)
+        return getVisibleTerminals(
+          state.terminals,
+          state.worktrees,
+          state.sidecarTerminals,
+          projectId
+        )
       },
 
       getWorktreeTerminals: (worktreeId) => {
@@ -1792,6 +1855,7 @@ export const useProjectStore = create<ProjectStore>()(
           if (activeTerminalGone) {
             const visible = getVisibleTerminals(
               newTerminals,
+              newWorktrees,
               newSidecarTerminals,
               removedWorktree?.projectId ?? ''
             )
