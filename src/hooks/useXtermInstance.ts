@@ -14,6 +14,7 @@ import { classifyOsc8Uri } from '../utils/osc8LinkRouter'
 import { isHtmlFile } from '../utils/editorLanguages'
 import { terminalPool } from '../utils/terminalPool'
 import { createSpaceKeyWatchdog } from '../utils/spaceKeyWatchdog'
+import { createOsc52ClipboardHandler } from '../utils/osc52Clipboard'
 
 // Timing constants for terminal dimension calculations
 const FIT_RETRY_DELAY_MS = 50
@@ -331,6 +332,19 @@ export function useXtermInstance({
       return true
     })
 
+    // Honor OSC 52 clipboard writes. Claude Code implements copy-on-select and
+    // /copy by emitting OSC 52; xterm has no built-in handler and drops it, so
+    // those copies never reach the clipboard. Route writes through the same
+    // Electron-native clipboard the Ctrl+C path uses. Reads are refused inside
+    // the handler (clipboard-exfiltration vector).
+    const osc52 = createOsc52ClipboardHandler({
+      writeText: (text) => api.clipboard.writeText(text),
+    })
+    const osc52Disposable = terminal.parser.registerOscHandler(52, (data) => {
+      osc52.handle(data)
+      return true
+    })
+
     const readyTimer = setTimeout(() => {
       if (!isDisposedRef.current) {
         isReadyRef.current = true
@@ -408,6 +422,7 @@ export function useXtermInstance({
       resizeObserver.disconnect()
       mutationObserver.disconnect()
       spaceWatchdog.dispose()
+      osc52Disposable.dispose()
       terminalEvents.unsubscribe(id)
       terminalPool.unregisterCallbacks(id)
       // Dispose WebGL addon before terminal to avoid _isDisposed race
