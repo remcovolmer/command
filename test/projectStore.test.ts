@@ -57,6 +57,8 @@ function makeWorktree(overrides: Partial<Worktree> & { id: string; projectId: st
     name: 'feature',
     path: '/wt',
     branch: 'feature',
+    createdAt: 0,
+    isLocked: false,
     ...overrides,
   }
 }
@@ -423,6 +425,26 @@ describe('projectStore active terminal & content', () => {
       useProjectStore.getState().removeTerminal('w1')
 
       expect(useProjectStore.getState().activeTerminalId).toBe('r2')
+    })
+
+    test('closing the active chat can activate a neighbour across a worktree-group boundary', () => {
+      // Canonical order [r1, r2, w1]: closing the last root chat (r2) must land on
+      // w1 — the first chat of the next worktree group — proving the neighbour
+      // formula holds across a group boundary, not just within the root group.
+      const r1 = makeTerminal({ id: 'r1', projectId: 'proj-1', worktreeId: null })
+      const r2 = makeTerminal({ id: 'r2', projectId: 'proj-1', worktreeId: null })
+      const w1 = makeTerminal({ id: 'w1', projectId: 'proj-1', worktreeId: 'wt-1' })
+
+      useProjectStore.setState({
+        terminals: { r1, r2, w1 },
+        worktrees: { 'wt-1': makeWorktree({ id: 'wt-1', projectId: 'proj-1' }) },
+        activeTerminalId: 'r2',
+        activeProjectId: 'proj-1',
+      })
+
+      useProjectStore.getState().removeTerminal('r2')
+
+      expect(useProjectStore.getState().activeTerminalId).toBe('w1')
     })
   })
 
