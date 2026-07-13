@@ -9,18 +9,23 @@ const log = createLogger('ProjectPersistence')
 
 import type {
   AccountProfile,
+  AgentType,
   AuthMode,
   ClaudeMode,
   Project,
   ProjectType,
   Worktree,
 } from '../../../shared/ipc-types'
+import { isAgentType } from '../../../shared/agents'
 
 interface PersistedSession {
   terminalId: string
   projectId: string
   worktreeId: string | null
+  /** Agent session id (name kept for back-compat; applies to any hook-capable agent). */
   claudeSessionId: string
+  /** Which agent produced this session. Absent on legacy entries → treated as 'claude'. */
+  agentType?: AgentType
   cwd: string
   title: string
   /**
@@ -55,6 +60,7 @@ function isValidSession(session: unknown): session is PersistedSession {
       (typeof s.worktreeId === 'string' && UUID_REGEX.test(s.worktreeId))) &&
     typeof s.claudeSessionId === 'string' &&
     SESSION_ID_REGEX.test(s.claudeSessionId) &&
+    (s.agentType === undefined || isAgentType(s.agentType)) &&
     typeof s.cwd === 'string' &&
     s.cwd.length > 0 &&
     typeof s.title === 'string' &&
@@ -235,6 +241,11 @@ export class ProjectPersistence {
         activeProfileId: oldState.activeProfileId ?? null,
       })
     }
+
+    // Note: adding the optional per-project `defaultAgent` setting needed no
+    // migration or version bump — an absent value reads as 'claude' at every use
+    // site (project:update validator, Settings UI, new-chat creation), matching
+    // how v5→v6 leaves setting-less projects untouched.
 
     // Default migration: ensure all fields exist
     return {

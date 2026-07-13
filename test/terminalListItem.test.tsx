@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, test, expect, vi, afterEach } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, fireEvent } from '@testing-library/react'
 import type { TerminalSession } from '../src/types'
 import { TerminalListItem } from '../src/components/Sidebar/TerminalListItem'
 
@@ -79,11 +79,17 @@ describe('TerminalListItem stopped state (red icon is the sole indicator)', () =
     expect(icon.getAttribute('class')).not.toContain('text-muted-foreground')
   })
 
-  test('non-stopped states: icon stays muted', () => {
+  test('non-stopped states: logo is tinted by its state color, not stopped-red', () => {
+    const expected: Record<string, string> = {
+      busy: 'var(--status-busy)',
+      done: 'var(--status-done)',
+      permission: 'var(--status-attention)',
+      question: 'var(--status-attention)',
+    }
     for (const state of ['busy', 'done', 'permission', 'question'] as const) {
       const { unmount } = renderItem(makeTerminal({ state }), false)
       const icon = getTerminalIcon(screen.getByRole('listitem'))
-      expect(icon.getAttribute('class')).toContain('text-muted-foreground')
+      expect(icon.getAttribute('class')).toContain(expected[state])
       expect(icon.getAttribute('class')).not.toContain('text-[var(--status-stopped)]')
       unmount()
     }
@@ -111,17 +117,61 @@ describe('TerminalListItem attention rail (permission/question)', () => {
     expect(queryStateDot(screen.getByRole('listitem'))).toBeNull()
   })
 
-  test('done state: no rail, status dot present', () => {
+  test('done state: no rail, no dot; logo tinted done-green', () => {
     renderItem(makeTerminal({ state: 'done' }), false)
+    const li = screen.getByRole('listitem')
     expect(screen.queryByTestId('attention-rail')).toBeNull()
     expect(screen.queryByText('wacht op jou')).toBeNull()
-    expect(queryStateDot(screen.getByRole('listitem'))).toBeTruthy()
+    expect(queryStateDot(li)).toBeNull()
+    expect(li.querySelector('svg')?.getAttribute('class')).toContain('var(--status-done)')
   })
 
-  test('busy state: no rail, status dot present', () => {
+  test('busy state: no rail, no dot; logo tinted busy-gray', () => {
     renderItem(makeTerminal({ state: 'busy' }), false)
+    const li = screen.getByRole('listitem')
     expect(screen.queryByTestId('attention-rail')).toBeNull()
     expect(screen.queryByText('wacht op jou')).toBeNull()
-    expect(queryStateDot(screen.getByRole('listitem'))).toBeTruthy()
+    expect(queryStateDot(li)).toBeNull()
+    expect(li.querySelector('svg')?.getAttribute('class')).toContain('var(--status-busy)')
+  })
+})
+
+describe('TerminalListItem agent switch (right-click)', () => {
+  afterEach(() => cleanup())
+
+  function renderWithSwitch(terminal: TerminalSession, onSwitchAgent = vi.fn()) {
+    render(
+      <ul>
+        <TerminalListItem
+          terminal={terminal}
+          isActive={false}
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+          onSwitchAgent={onSwitchAgent}
+        />
+      </ul>
+    )
+    return onSwitchAgent
+  }
+
+  test('offers switching to the other agents (excludes the current one)', () => {
+    renderWithSwitch(makeTerminal({ type: 'claude' }))
+    fireEvent.contextMenu(screen.getByRole('listitem'))
+    expect(screen.getByText('Switch to Codex')).toBeTruthy()
+    expect(screen.getByText('Switch to Pi')).toBeTruthy()
+    expect(screen.queryByText('Switch to Claude')).toBeNull()
+  })
+
+  test('clicking an item invokes onSwitchAgent with that agent', () => {
+    const onSwitchAgent = renderWithSwitch(makeTerminal({ type: 'claude' }))
+    fireEvent.contextMenu(screen.getByRole('listitem'))
+    fireEvent.click(screen.getByText('Switch to Codex'))
+    expect(onSwitchAgent).toHaveBeenCalledWith('codex')
+  })
+
+  test('no switch menu for a normal shell', () => {
+    renderWithSwitch(makeTerminal({ type: 'normal' }))
+    fireEvent.contextMenu(screen.getByRole('listitem'))
+    expect(screen.queryByText('Switch to Codex')).toBeNull()
   })
 })

@@ -79,6 +79,19 @@ export function normalizeStateFile(parsed: unknown): MultiSessionState {
   return result
 }
 
+/**
+ * Watches the shared agent state file and routes state changes to terminals.
+ *
+ * Agent-agnostic by design: the file (`~/.claude/command-center-state.json`) is
+ * a single source-of-truth that any hook-capable agent writes to (Claude and
+ * Codex today), keyed by `session_id`. This class never inspects which agent
+ * produced an entry — it maps `session_id`/`cwd` to a registered terminal, so
+ * adding another hook-capable agent needs no change here. A terminal registers
+ * via `registerTerminal` only when its agent is hook-capable (see
+ * `isHookCapableAgent` / `TerminalManager`); hookless agents (pi) get state from
+ * output heuristics instead. The name is retained for back-compat with existing
+ * imports; its behavior is not Claude-specific.
+ */
 export class ClaudeHookWatcher {
   private watching: boolean = false
   private stateFilePath: string

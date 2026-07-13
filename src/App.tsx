@@ -187,7 +187,8 @@ function App() {
 
     // Terminal operations
     'terminal.new': () => {
-      const { activeProjectId, getProjectTerminals, addTerminal } = useProjectStore.getState()
+      const { activeProjectId, getProjectTerminals, addTerminal, projects } =
+        useProjectStore.getState()
       if (!activeProjectId) return
 
       const projectTerminals = getProjectTerminals(activeProjectId)
@@ -199,8 +200,11 @@ function App() {
         return
       }
 
+      // Use the project's default agent for keyboard-created chats.
+      const agent = projects.find((p) => p.id === activeProjectId)?.settings?.defaultAgent ?? 'claude'
+
       ;(async () => {
-        const terminalId = await api.terminal.create(activeProjectId)
+        const terminalId = await api.terminal.create(activeProjectId, undefined, agent)
         if (!terminalId) return // spawn-failed event surfaces the error to the user
         const terminal: TerminalSession = {
           id: terminalId,
@@ -209,7 +213,7 @@ function App() {
           state: 'busy',
           lastActivity: Date.now(),
           title: `Chat ${projectTerminals.length + 1}`,
-          type: 'claude',
+          type: agent,
         }
         addTerminal(terminal)
       })()

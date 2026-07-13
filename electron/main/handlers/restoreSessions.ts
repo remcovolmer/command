@@ -11,6 +11,7 @@ import type { TerminalManager } from '../services/TerminalManager'
 import type { ProjectPersistence } from '../services/ProjectPersistence'
 import type { ClaudeHookWatcher } from '../services/ClaudeHookWatcher'
 import type { BrowserWindow } from 'electron'
+import type { AgentType } from '../../../shared/ipc-types'
 
 const log = createLogger('Session')
 
@@ -19,7 +20,7 @@ export interface RestoreSessionsDeps {
   terminalManager: TerminalManager | null
   hookWatcher: ClaudeHookWatcher | null
   getWindow: () => BrowserWindow | null
-  verifyClaudeSession: (cwd: string, sessionId: string) => Promise<boolean>
+  verifyAgentSession: (agentType: AgentType, cwd: string, sessionId: string) => Promise<boolean>
   pathExists: (p: string) => Promise<boolean>
   resolveEnvOverrides: (
     project: { settings?: { authMode?: string; profileId?: string } } | undefined
@@ -32,7 +33,7 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
     terminalManager,
     hookWatcher,
     getWindow,
-    verifyClaudeSession,
+    verifyAgentSession,
     pathExists,
     resolveEnvOverrides,
   } = deps
@@ -89,9 +90,14 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
         return { session, valid: false as const, reason: `cwd ${session.cwd} no longer exists` }
       }
 
-      const sessionFileExists = await verifyClaudeSession(session.cwd, session.claudeSessionId)
+      const agentType: AgentType = session.agentType ?? 'claude'
+      const sessionFileExists = await verifyAgentSession(
+        agentType,
+        session.cwd,
+        session.claudeSessionId
+      )
 
-      return { session, project, valid: true as const, sessionFileExists }
+      return { session, project, valid: true as const, sessionFileExists, agentType }
     })
   )
 
@@ -101,7 +107,7 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
       continue
     }
 
-    const { session, project, sessionFileExists } = result
+    const { session, project, sessionFileExists, agentType } = result
 
     try {
       if (!sessionFileExists) {
@@ -112,7 +118,7 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
 
       const terminalId = terminalManager.createTerminal({
         cwd: session.cwd,
-        type: 'claude',
+        type: agentType,
         initialTitle: session.title || undefined,
         projectId: session.projectId,
         worktreeId: session.worktreeId ?? undefined,

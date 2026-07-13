@@ -128,6 +128,24 @@ describe('terminal:create IPC handler body', () => {
     ).rejects.toThrow(/Invalid session ID/)
   })
 
+  test('accepts agent types codex and pi and forwards the type to createTerminal', async () => {
+    for (const type of ['claude', 'codex', 'pi', 'normal'] as const) {
+      const createTerminal = vi.fn((_opts: { cwd: string; type?: string }) => 'tid')
+      const { deps } = makeDeps({ createTerminal })
+      const result = await handleTerminalCreate(deps, { projectId: VALID_PROJECT_ID, type })
+      expect(result).toBe('tid')
+      expect(createTerminal.mock.calls[0][0]).toMatchObject({ type })
+    }
+  })
+
+  test('rejects an unknown terminal type', async () => {
+    const { deps } = makeDeps()
+    await expect(
+      // @ts-expect-error — exercising the runtime guard with an invalid type
+      handleTerminalCreate(deps, { projectId: VALID_PROJECT_ID, type: 'gpt' })
+    ).rejects.toThrow(/Invalid terminal type/)
+  })
+
   // Use the spy variable so eslint doesn't flag it; vitest will auto-restore
   // between tests but we hold a reference for assertions above.
   void consoleWarnSpy

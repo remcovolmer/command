@@ -142,6 +142,94 @@ describe('TerminalManager CLI flag construction', () => {
     expect(command).not.toContain('--resume')
     expect(command).toContain('--enable-auto-mode')
   })
+
+  test('codex terminal → launches interactive "codex\\r" (no claude flags)', () => {
+    manager.createTerminal({ cwd: '/test', type: 'codex' })
+    flushTimers()
+    expect(mockWrite).toHaveBeenCalledWith('codex\r')
+  })
+
+  test('codex resume → "codex resume \\"id\\"\\r" subcommand form', () => {
+    manager.createTerminal({ cwd: '/test', type: 'codex', resumeSessionId: 'uuid-1' })
+    flushTimers()
+    expect(mockWrite).toHaveBeenCalledWith('codex resume "uuid-1"\r')
+  })
+
+  test('pi terminal → launches "pi\\r"', () => {
+    manager.createTerminal({ cwd: '/test', type: 'pi' })
+    flushTimers()
+    expect(mockWrite).toHaveBeenCalledWith('pi\r')
+  })
+})
+
+describe('TerminalManager hookless agent (pi) state heuristic', () => {
+  let manager: TerminalManager
+  const send = vi.fn()
+  const mockWindow = { isDestroyed: vi.fn(() => false), webContents: { send } }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockWrite.mockClear()
+    mockOnData.mockClear()
+    mockOnExit.mockClear()
+    send.mockClear()
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // The states emitted via the 'terminal:state' channel, in order.
+  function emittedStates(): string[] {
+    return send.mock.calls.filter((c) => c[0] === 'terminal:state').map((c) => c[2] as string)
+  }
+
+  test('pi cycles busy → done → busy as output flows and pauses (AE2)', () => {
+    manager.createTerminal({ cwd: '/test', type: 'pi' })
+    const onData = mockOnData.mock.calls[0][0] as (d: string) => void
+    send.mockClear()
+
+    // Terminal is already 'busy' from spawn; first output arms the quiet timer.
+    onData('pi is working...')
+    vi.advanceTimersByTime(1500)
+    expect(emittedStates()).toContain('done') // went idle
+
+    // New output transitions done → busy (an observable state change).
+    send.mockClear()
+    onData('more output')
+    expect(emittedStates()).toContain('busy')
+
+    // Quiet again → back to done.
+    send.mockClear()
+    vi.advanceTimersByTime(1500)
+    expect(emittedStates()).toContain('done')
+  })
+
+  test('sustained pi output stays busy until output stops', () => {
+    manager.createTerminal({ cwd: '/test', type: 'pi' })
+    const onData = mockOnData.mock.calls[0][0] as (d: string) => void
+    send.mockClear()
+
+    onData('chunk 1')
+    vi.advanceTimersByTime(1000)
+    onData('chunk 2') // re-arms the quiet timer
+    vi.advanceTimersByTime(1000)
+    expect(emittedStates()).not.toContain('done')
+
+    vi.advanceTimersByTime(600)
+    expect(emittedStates()).toContain('done')
+  })
+
+  test('claude output does not trigger the heuristic (state comes from its hook)', () => {
+    manager.createTerminal({ cwd: '/test', type: 'claude' })
+    const onData = mockOnData.mock.calls[0][0] as (d: string) => void
+    send.mockClear()
+
+    onData('claude output')
+    vi.advanceTimersByTime(2000)
+    expect(emittedStates()).toHaveLength(0)
+  })
 })
 
 describe('TerminalManager writeToTerminal chunking', () => {

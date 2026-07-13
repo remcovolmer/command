@@ -8,6 +8,7 @@ import {
   MAX_CLIPBOARD_TEXT_BYTES,
   sanitizeClipboardText,
 } from '../electron/main/utils/clipboardLimits'
+import { isAgentType } from '../shared/agents'
 
 /**
  * Extracted validation logic matching the IPC handler in electron/main/index.ts (line ~484):
@@ -62,6 +63,32 @@ describe('claudeMode IPC validation', () => {
       expect(validateClaudeMode(['auto'])).toBe('chat')
     })
   })
+})
+
+/**
+ * Matches the project:update settings validator in electron/main/index.ts:
+ *   defaultAgent: isAgentType(s.defaultAgent) ? s.defaultAgent : 'claude'
+ * Uses the real guard rather than a copy.
+ */
+function validateDefaultAgent(input: unknown): string {
+  return isAgentType(input) ? input : 'claude'
+}
+
+describe('defaultAgent IPC validation', () => {
+  test.each(['claude', 'codex', 'pi'])('"%s" passes through unchanged', (agent) => {
+    expect(validateDefaultAgent(agent)).toBe(agent)
+  })
+
+  test.each(['normal', 'gpt', '', 'Claude', 'CODEX'])('"%s" falls back to claude', (agent) => {
+    expect(validateDefaultAgent(agent)).toBe('claude')
+  })
+
+  test.each([null, undefined, 42, true, { a: 1 }, ['codex']])(
+    'non-string %s falls back to claude',
+    (value) => {
+      expect(validateDefaultAgent(value)).toBe('claude')
+    }
+  )
 })
 
 /**

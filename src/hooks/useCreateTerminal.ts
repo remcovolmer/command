@@ -1,10 +1,16 @@
 import { useCallback, useMemo } from 'react'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
-import type { TerminalSession } from '../types'
+import type { AgentType, TerminalSession } from '../types'
 
 interface CreateTerminalOptions {
   worktreeId?: string
+  /**
+   * Which agent this chat runs. Omit to use the project's default agent
+   * (settings.defaultAgent, falling back to 'claude'). Pass a value to override
+   * the default for this one chat (e.g. from the sidebar agent picker).
+   */
+  agent?: AgentType
   /** Called after the terminal is created and added to the store */
   onCreated?: (terminalId: string) => void
 }
@@ -28,6 +34,13 @@ export function useCreateTerminal() {
   const createTerminal = useCallback(
     async (projectId: string, options?: CreateTerminalOptions) => {
       const { worktreeId, onCreated } = options ?? {}
+
+      // Resolve the agent: explicit override → project default → 'claude'.
+      const agent: AgentType =
+        options?.agent ??
+        useProjectStore.getState().projects.find((p) => p.id === projectId)?.settings
+          ?.defaultAgent ??
+        'claude'
 
       // Always read fresh state to avoid stale closures
       const currentTerminals = () => useProjectStore.getState().terminals
@@ -55,7 +68,7 @@ export function useCreateTerminal() {
 
       let terminalId: string | null
       try {
-        terminalId = await api.terminal.create(projectId, worktreeId)
+        terminalId = await api.terminal.create(projectId, worktreeId, agent)
       } catch {
         api.notification.show('Error', 'Failed to create terminal')
         return null
@@ -84,7 +97,7 @@ export function useCreateTerminal() {
         state: 'busy',
         lastActivity: Date.now(),
         title,
-        type: 'claude',
+        type: agent,
       }
       addTerminal(terminal)
 

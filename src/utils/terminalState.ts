@@ -11,6 +11,16 @@ export const STATE_DOT_COLORS: Record<TerminalState, string> = {
   stopped: 'bg-[var(--status-stopped)]',
 }
 
+// Same palette as text color, for tinting the agent logo by state (the logo
+// doubles as the status indicator, so no separate dot is needed).
+export const STATE_TEXT_COLORS: Record<TerminalState, string> = {
+  busy: 'text-[var(--status-busy)]',
+  permission: 'text-[var(--status-attention)]',
+  question: 'text-[var(--status-attention)]',
+  done: 'text-[var(--status-done)]',
+  stopped: 'text-[var(--status-stopped)]',
+}
+
 // States that require user input (show blinking indicator)
 export const INPUT_STATES = ['done', 'permission', 'question'] as const
 export const isInputState = (state: TerminalState): boolean =>
