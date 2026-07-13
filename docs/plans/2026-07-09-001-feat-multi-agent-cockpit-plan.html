@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-Agent Cockpit - Plan</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f1f1ee; --ink: #1a1a1a;
+    --ink-soft: #565651; --ink-faint: #8a8a83; --line: #e2e2dc; --line-strong: #cfcfc7;
+    --accent: #1f6feb; --accent-soft: #eaf1fd; --accent-ink: #14509c; --ok: #17794a;
+    --ok-soft: #e6f3ec; --warn: #9a6a00; --warn-soft: #fbf1dc; --danger: #b02a2a; --danger-soft: #f9e7e5;
+    --radius: 8px; --measure: 72ch;
+    --mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a; --surface: #1e1f23; --surface-2: #26272c; --ink: #ececea;
+      --ink-soft: #b4b4ae; --ink-faint: #86867f; --line: #33343a; --line-strong: #43444b;
+      --accent: #6ea8ff; --accent-soft: #1b2740; --accent-ink: #a9c9ff; --ok: #59c98d;
+      --ok-soft: #16301f; --warn: #e0b25a; --warn-soft: #322709; --danger: #ec8080; --danger-soft: #351a19;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16171a; --surface: #1e1f23; --surface-2: #26272c; --ink: #ececea;
+    --ink-soft: #b4b4ae; --ink-faint: #86867f; --line: #33343a; --line-strong: #43444b;
+    --accent: #6ea8ff; --accent-soft: #1b2740; --accent-ink: #a9c9ff; --ok: #59c98d;
+    --ok-soft: #16301f; --warn: #e0b25a; --warn-soft: #322709; --danger: #ec8080; --danger-soft: #351a19;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f1f1ee; --ink: #1a1a1a;
+    --ink-soft: #565651; --ink-faint: #8a8a83; --line: #e2e2dc; --line-strong: #cfcfc7;
+    --accent: #1f6feb; --accent-soft: #eaf1fd; --accent-ink: #14509c; --ok: #17794a;
+    --ok-soft: #e6f3ec; --warn: #9a6a00; --warn-soft: #fbf1dc; --danger: #b02a2a; --danger-soft: #f9e7e5;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin-inline: auto; padding: 40px 24px 80px; }
+  p, li { max-width: var(--measure); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--surface-2);
+    padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
+
+  h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.42rem; margin: 52px 0 4px; letter-spacing: -0.01em;
+    padding-top: 18px; border-top: 2px solid var(--line-strong); }
+  h3 { font-size: 1.1rem; margin: 30px 0 8px; }
+  h4 { margin: 0; }
+  .eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--ink-faint); font-weight: 600; margin-bottom: 6px; }
+  .lede { font-size: 1.06rem; color: var(--ink-soft); max-width: var(--measure); }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 8px; }
+  .chip { font-size: 0.74rem; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-soft); }
+  .chip.k { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+  .chip.rdy { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+  .metagrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+    margin-top: 14px; background: var(--surface); }
+  .metagrid > div { padding: 10px 14px; border-right: 1px solid var(--line); }
+  .metagrid dt { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-faint); font-weight: 600; margin: 0 0 2px; }
+  .metagrid dd { margin: 0; font-size: 0.86rem; font-family: var(--mono); }
+
+  nav.toc { margin: 24px 0 0; padding: 12px 16px; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: var(--radius); font-size: 0.9rem; }
+  nav.toc strong { display: block; font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 6px; }
+  nav.toc a { margin-right: 16px; white-space: nowrap; display: inline-block; }
+
+  section { margin-top: 8px; }
+  .note { font-size: 0.86rem; color: var(--ink-faint); font-style: italic; margin: 6px 0 0; }
+
+  .card { background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px; margin: 14px 0; }
+  .kd { display: grid; gap: 12px; }
+  .kd .card, .ktd .card { margin: 0; }
+  .id { font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
+    color: var(--accent-ink); background: var(--accent-soft); padding: 2px 7px;
+    border-radius: 5px; margin-right: 8px; }
+  .kd h4, .ktd h4 { margin: 0 0 6px; font-size: 1rem; }
+  .kd p, .ktd p { margin: 0; color: var(--ink-soft); }
+
+  .tablewrap { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-faint); font-weight: 600; border-bottom: 1px solid var(--line-strong); }
+  td .rid { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .grouphdr { font-family: var(--mono); font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.02em; color: var(--ink); background: var(--surface-2); }
+
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  .d-busy { background: #8a8a83; } .d-perm { background: var(--warn); }
+  .d-done { background: var(--ok); } .d-full { background: var(--ok); } .d-part { background: var(--warn); }
+
+  ol.flows { list-style: none; padding: 0; }
+  ol.flows > li { background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 14px 16px; margin: 12px 0; }
+  .fid { font-family: var(--mono); font-weight: 700; color: var(--accent-ink);
+    background: var(--accent-soft); padding: 2px 7px; border-radius: 5px; font-size: 0.74rem; }
+  .lead { font-weight: 600; }
+  .flowsteps { margin: 8px 0 0; padding-left: 18px; color: var(--ink-soft); font-size: 0.92rem; }
+  .flowsteps li { margin: 3px 0; }
+
+  .callout { border-radius: var(--radius); padding: 14px 16px; margin: 12px 0;
+    border: 1px solid var(--line); background: var(--surface-2); }
+  .callout .lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em;
+    font-weight: 700; margin-bottom: 6px; }
+  .callout.ok { background: var(--ok-soft); } .callout.ok .lbl { color: var(--ok); }
+  .callout.warn { background: var(--warn-soft); } .callout.warn .lbl { color: var(--warn); }
+  .callout.info { background: var(--accent-soft); } .callout.info .lbl { color: var(--accent-ink); }
+  .callout.danger { background: var(--danger-soft); } .callout.danger .lbl { color: var(--danger); }
+  .callout ul { margin: 4px 0 0; padding-left: 18px; }
+  .callout li { margin: 4px 0; }
+
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .cols2 { grid-template-columns: 1fr; } }
+
+  figure { margin: 18px 0; }
+  figure svg { width: 100%; height: auto; display: block; background: var(--surface);
+    border: 1px solid var(--line); border-radius: var(--radius); }
+  figcaption { font-size: 0.82rem; color: var(--ink-faint); margin-top: 8px; }
+  .svg-box { fill: var(--surface-2); stroke: var(--line-strong); }
+  .svg-box-a { fill: var(--accent-soft); stroke: var(--accent); }
+  .svg-box-ok { fill: var(--ok-soft); stroke: var(--ok); }
+  .svg-t { fill: var(--ink); font-family: var(--sans); }
+  .svg-ts { fill: var(--ink-soft); font-family: var(--sans); }
+  .svg-tm { fill: var(--ink-faint); font-family: var(--mono); }
+  .svg-arrow { stroke: var(--ink-faint); stroke-width: 1.6; fill: none; }
+  .wf { fill: var(--surface-2); stroke: var(--line-strong); }
+  .wf-a { fill: var(--accent-soft); stroke: var(--accent); }
+  .wf-panel { fill: var(--surface); stroke: var(--line-strong); }
+
+  /* implementation units */
+  .subnav { font-size: 0.85rem; margin: 10px 0 18px; padding: 12px 16px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); }
+  .subnav a { margin-right: 14px; white-space: nowrap; display: inline-block; }
+  .phase { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em;
+    font-weight: 700; color: var(--accent-ink); margin: 26px 0 6px; }
+  article.unit { background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
+  article.unit > h3 { margin-top: 0; }
+  .uid { font-family: var(--mono); font-weight: 700; color: #fff; background: var(--accent);
+    padding: 2px 8px; border-radius: 5px; font-size: 0.78rem; margin-right: 8px; }
+  article.unit dl.strip { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px;
+    margin: 10px 0 4px; font-size: 0.9rem; }
+  article.unit dl.strip dt { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-faint); font-weight: 700; padding-top: 2px; }
+  article.unit dl.strip dd { margin: 0; }
+  article.unit dl.strip code { font-size: 0.82em; }
+  details { margin: 8px 0 0; border-top: 1px solid var(--line); padding-top: 8px; }
+  summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--accent-ink); }
+  details[open] summary { margin-bottom: 8px; }
+  details ul { margin: 6px 0; padding-left: 18px; font-size: 0.9rem; }
+  details li { margin: 4px 0; }
+  .covers { font-family: var(--mono); font-size: 0.72rem; color: var(--ok);
+    font-weight: 700; }
+
+  footer.sig { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 0.8rem; color: var(--ink-faint); }
+  ul.tight li { margin: 5px 0; }
+  .refs li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Unified plan · implementation-ready · ce-plan</div>
+  <h1>Multi-Agent Cockpit — Plan</h1>
+  <p class="lede">Command uitbreiden van Claude-Code-manager naar agent-agnostische cockpit: codex en pi.dev als eerste-klas agents naast Claude, met een attention-indicator die per agent best-effort werkt.</p>
+
+  <div class="meta">
+    <span class="chip k">feat</span>
+    <span class="chip">artifact_contract: ce-unified-plan/v1</span>
+    <span class="chip rdy">artifact_readiness: implementation-ready</span>
+    <span class="chip">product_contract_source: ce-brainstorm</span>
+    <span class="chip">execution: code</span>
+  </div>
+
+  <dl class="metagrid">
+    <div><dt>title</dt><dd>Multi-Agent Cockpit - Plan</dd></div>
+    <div><dt>type</dt><dd>feat</dd></div>
+    <div><dt>date</dt><dd><time datetime="2026-07-09">2026-07-09</time></dd></div>
+    <div><dt>topic</dt><dd>multi-agent-cockpit</dd></div>
+    <div><dt>depth</dt><dd>deep · 9 units</dd></div>
+  </dl>
+
+  <nav class="toc">
+    <strong>Secties</strong>
+    <a href="#goal-capsule">Goal Capsule</a>
+    <a href="#product-contract">Product Contract</a>
+    <a href="#planning-contract">Planning Contract</a>
+    <a href="#implementation-units">Implementation Units</a>
+    <a href="#verification-contract">Verification Contract</a>
+    <a href="#definition-of-done">Definition of Done</a>
+  </nav>
+
+  <!-- ============ GOAL CAPSULE ============ -->
+  <h2 id="goal-capsule">Goal Capsule</h2>
+  <section>
+    <div class="card">
+      <p><strong>Objective.</strong> Codex en pi.dev toevoegen als eerste-klas agents in Command, met best-effort attention-state per agent, zodat één cockpit meerdere coding-agents naast elkaar draait — Claude niet langer als enige.</p>
+      <p><strong>Product authority.</strong> Remco (owner Command). Product Contract komt uit de brainstorm-fase en blijft leidend voor het <em>wat</em>.</p>
+      <p><strong>Stop conditions.</strong> Stop en overleg bij: een wijziging die Claude-chats zou laten regresseren (state, resume, auto-naming); een codex/pi CLI-contract dat materieel afwijkt van wat dit plan aanneemt (andere hook-payload, ander resume-mechanisme); of scope-uitbreiding voorbij codex+pi.</p>
+      <p><strong>Product Contract preservation.</strong> Ongewijzigd — dit plan verrijkt hetzelfde artifact met de <em>hoe</em> (Planning Contract, Implementation Units, Verification, Definition of Done); R-IDs en Product-Contract-tekst blijven intact.</p>
+      <p><strong>Volgorde.</strong> Codex eerst end-to-end (Phase 1 = fundament + codex), pi als dunne toevoeging (Phase 2). Pi's spawn komt gratis uit de descriptor; alleen de busy/done-heuristiek is pi-specifiek.</p>
+    </div>
+  </section>
+
+  <!-- ============ PRODUCT CONTRACT ============ -->
+  <h2 id="product-contract">Product Contract</h2>
+
+  <section>
+    <h3>Summary</h3>
+    <p>Command wordt agent-agnostisch. <code>TerminalType</code> krijgt naast <code>claude</code> en <code>normal</code> ook <code>codex</code> en <code>pi</code>, elk gespawnd als PTY-sessie via het eigen CLI-commando. De attention-indicator werkt best-effort per agent: heeft de agent een hook-mechanisme, dan volle staten (busy/permission/question/done); zo niet, dan busy/done. Codex en pi zijn in v1 hardcoded — geen generieke registry — maar per-agent gedrag staat op één plek (een <code>AGENTS</code>-descriptor), zodat die registry later een refactor is, geen herbouw.</p>
+  </section>
+
+  <section>
+    <h3>Key Decisions</h3>
+    <div class="kd">
+      <div class="card"><h4><span class="id">KD1</span>Command wordt agent-agnostisch, niet Claude-met-plug-ins</h4>
+        <p>Codex en pi zijn volwaardige alternatieven, geen add-ons op Claude. Herpositionering van "Claude-Code-manager" naar cockpit voor coding-agents. Driver: agent-diversiteit als principe.</p></div>
+      <div class="card"><h4><span class="id">KD2</span>Best-effort state per agent verslaat geforceerde pariteit</h4>
+        <p>Hook aanwezig → volle staten; anders busy/done. Elke agent doet mee zonder dat de zwakste (pi) de lat voor de sterkste (codex) verlaagt.</p></div>
+      <div class="card"><h4><span class="id">KD3</span>Hardcoded codex + pi, maar per-agent gedrag gecentraliseerd</h4>
+        <p>Geen generieke config-registry vooraf. Wél: spawn/resume/state/badge/mode per agent in één <code>AGENTS</code>-descriptor. Snelste weg naar waarde zonder het "agnostisch"-fundament te verraden.</p></div>
+      <div class="card"><h4><span class="id">KD4</span>Wrap de CLI, niet de SDK</h4>
+        <p>Codex en pi worden PTY-sessies zoals Claude — consistent met Command's terminal-first-architectuur. Geen embedded agent-runtime.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h3>High-Level Concept — gedeelde state-laag</h3>
+    <p>De kern-refactor: alle agents voeden dezelfde attention-indicator via één gedeelde state-file. De watcher hoeft niet te weten wélke agent een entry produceerde — hij mapt op <code>session_id</code>. Codex sluit hier naadloos op aan (identiek hook-contract als Claude); pi voedt busy/done via heuristiek.</p>
+    <figure>
+      <svg viewBox="0 0 920 400" role="img" aria-label="Architectuur: drie agent-bronnen voeden een gedeelde state-file, die de watcher naar de attention-indicator routeert.">
+        <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+          <path d="M0,0 L9,4.5 L0,9 z" fill="var(--ink-faint)"></path></marker></defs>
+        <text x="20" y="26" class="svg-tm" font-size="12">BRON PER AGENT</text>
+        <rect x="20" y="40" width="196" height="66" rx="7" class="svg-box-ok"></rect>
+        <text x="34" y="66" class="svg-t" font-size="15" font-weight="700">Claude</text>
+        <text x="34" y="88" class="svg-ts" font-size="12">hooks (bestaand) → volle staten</text>
+        <rect x="20" y="150" width="196" height="66" rx="7" class="svg-box-ok"></rect>
+        <text x="34" y="176" class="svg-t" font-size="15" font-weight="700">Codex</text>
+        <text x="34" y="198" class="svg-ts" font-size="12">config-hooks → near-parity</text>
+        <rect x="20" y="260" width="196" height="66" rx="7" class="svg-box"></rect>
+        <text x="34" y="286" class="svg-t" font-size="15" font-weight="700">Pi</text>
+        <text x="34" y="308" class="svg-ts" font-size="12">heuristiek → busy·done</text>
+        <path d="M216,73 C250,73 250,175 296,178" class="svg-arrow" marker-end="url(#ah)"></path>
+        <path d="M216,183 L296,190" class="svg-arrow" marker-end="url(#ah)"></path>
+        <path d="M216,293 C250,293 250,205 296,200" class="svg-arrow" marker-end="url(#ah)"></path>
+        <rect x="300" y="120" width="188" height="130" rx="7" class="svg-box-a"></rect>
+        <text x="394" y="158" text-anchor="middle" class="svg-t" font-size="15" font-weight="700">Gedeelde state-file</text>
+        <text x="394" y="180" text-anchor="middle" class="svg-ts" font-size="12">command-center-state.json</text>
+        <text x="394" y="202" text-anchor="middle" class="svg-tm" font-size="11.5">keyed op session_id</text>
+        <text x="394" y="222" text-anchor="middle" class="svg-tm" font-size="11.5">{ cwd, state, event, ts }</text>
+        <path d="M488,185 L556,185" class="svg-arrow" marker-end="url(#ah)"></path>
+        <text x="522" y="176" text-anchor="middle" class="svg-tm" font-size="11">poll 250ms</text>
+        <rect x="560" y="140" width="160" height="90" rx="7" class="svg-box"></rect>
+        <text x="640" y="176" text-anchor="middle" class="svg-t" font-size="14" font-weight="700">Agent-agnostische</text>
+        <text x="640" y="195" text-anchor="middle" class="svg-t" font-size="14" font-weight="700">watcher</text>
+        <text x="640" y="215" text-anchor="middle" class="svg-ts" font-size="11.5">session → terminal</text>
+        <path d="M720,185 L788,185" class="svg-arrow" marker-end="url(#ah)"></path>
+        <text x="754" y="176" text-anchor="middle" class="svg-tm" font-size="10.5">terminal:state</text>
+        <rect x="792" y="140" width="112" height="90" rx="7" class="svg-box-a"></rect>
+        <text x="848" y="172" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">Attention-</text>
+        <text x="848" y="189" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">indicator</text>
+        <text x="848" y="212" text-anchor="middle" class="svg-ts" font-size="11">per chat</text>
+      </svg>
+      <figcaption>Eén gedeelde state-file als source-of-truth; elke agent is een interchangeable bron. Codex hergebruikt het Claude-hookcontract volledig; pi is best-effort.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h3>Wat elke agent feitelijk levert</h3>
+    <p>Geverifieerd tegen de agent-docs (zie <a href="#sources">Sources</a>). Dit bepaalt de haalbare fidelity per agent.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Agent</th><th>Spawn</th><th>State-mechanisme</th><th>Haalbare staten</th><th>Resume</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Claude</strong></td><td><code>claude</code></td><td>Hooks (bestaand) → state-file</td><td><span class="dot d-full"></span>volledig</td><td><code>--resume &lt;uuid&gt;</code></td></tr>
+          <tr><td><strong>Codex</strong></td><td><code>codex</code></td><td>config-hooks (<code>~/.codex/hooks.json</code>), stdin-JSON met <code>session_id</code>+<code>cwd</code>; events ≈ 1:1 met Claude</td><td><span class="dot d-full"></span>near-parity</td><td>codex resume (SessionStart <code>resume</code>)</td></tr>
+          <tr><td><strong>Pi</strong></td><td><code>pi</code></td><td>Geen config-hook; output-heuristiek (extensie-events = deferred spike)</td><td><span class="dot d-part"></span>busy/done</td><td><code>pi --session &lt;id&gt;</code> / <code>pi -c</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h3 id="product-requirements">Requirements</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th style="width:52px">ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td colspan="2" class="grouphdr">Agent-types &amp; spawning</td></tr>
+          <tr><td><span class="rid">R1</span></td><td>Command ondersteunt codex en pi als eerste-klas agent-types: <code>TerminalType</code> = <code>'claude' | 'codex' | 'pi' | 'normal'</code>.</td></tr>
+          <tr><td><span class="rid">R2</span></td><td>Elke agent-chat spawnt via het eigen CLI-commando in een PTY, volgens het bestaande wrap-de-CLI-patroon — geen SDK/API-integratie.</td></tr>
+          <tr><td colspan="2" class="grouphdr">Agent-keuze (UX) — sidebar-first</td></tr>
+          <tr><td><span class="rid">R3</span></td><td>Elk project heeft een default-agent als project-setting (naast <code>claudeMode</code>); nieuwe chats gebruiken die default.</td></tr>
+          <tr><td><span class="rid">R4</span></td><td>De gebruiker kan de agent per nieuwe chat overriden bij het aanmaken vanuit de sidebar (per-project <code>+</code>) en de tab-<code>+</code>.</td></tr>
+          <tr><td><span class="rid">R5</span></td><td>Elke chat toont een agent-badge/icoon zodat Claude-, codex- en pi-sessies naast elkaar direct te onderscheiden zijn.</td></tr>
+          <tr><td colspan="2" class="grouphdr">State-detectie (best-effort per agent)</td></tr>
+          <tr><td><span class="rid">R6</span></td><td>State-detectie is best-effort per agent: hook aanwezig → volle staten; anders → busy/done.</td></tr>
+          <tr><td><span class="rid">R7</span></td><td>Alle agent-hooks schrijven naar één gedeelde state-file, keyed op <code>session_id</code>; de watcher is agent-agnostisch.</td></tr>
+          <tr><td><span class="rid">R8</span></td><td>Codex bereikt near-parity via een eigen hook-script dat Command in de codex-config installeert; events mappen op dezelfde staten als Claude.</td></tr>
+          <tr><td><span class="rid">R9</span></td><td>Pi toont minimaal busy/done in v1; volle staten alleen als de pi-extensie-API lifecycle-events blootlegt (spike, deferred).</td></tr>
+          <tr><td colspan="2" class="grouphdr">Session-resume (best-effort per agent)</td></tr>
+          <tr><td><span class="rid">R10</span></td><td>Command hervat sessies per agent met het native mechanisme: Claude <code>--resume &lt;id&gt;</code>, codex resume, pi <code>--session &lt;id&gt;</code>.</td></tr>
+          <tr><td><span class="rid">R11</span></td><td>Session-ID-validatie generaliseert per agent; de huidige strikte UUID-check mag codex/pi-sessie-IDs niet blokkeren.</td></tr>
+          <tr><td colspan="2" class="grouphdr">Architectuur (agnostisch fundament, geen registry)</td></tr>
+          <tr><td><span class="rid">R12</span></td><td>Per-agent gedrag (spawn-commando, resume-flag, state-mechanisme, badge, mode-flags) staat op één centrale plek per agent, niet als verspreide type-condities.</td></tr>
+          <tr><td><span class="rid">R13</span></td><td><code>ClaudeHookWatcher</code> en <code>HookInstaller</code> generaliseren naar een agent-agnostische watcher en per-agent installers, zodat een latere generieke registry een refactor is en geen herbouw.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h3>Key Flows</h3>
+    <ol class="flows">
+      <li><p><span class="fid">F1</span> &nbsp;<span class="lead">Nieuwe agent-chat aanmaken (sidebar-first)</span></p>
+        <ul class="flowsteps">
+          <li><strong>Trigger:</strong> gebruiker klikt de per-project <code>+</code> in de sidebar (of maakt een worktree aan).</li>
+          <li>Command pakt de project-default-agent (R3); een picker op de <code>+</code> laat eenmalig overriden (R4). Worktree-chats erven de project-default.</li>
+          <li>PTY spawnt het CLI-commando van de gekozen agent (R2); de chat-tab toont de agent-badge (R5); state start op <code>busy</code>.</li>
+        </ul></li>
+      <li><p><span class="fid">F2</span> &nbsp;<span class="lead">Codex state-lifecycle (volle staten)</span></p>
+        <ul class="flowsteps">
+          <li><strong>Trigger:</strong> codex vuurt een hook-event (SessionStart, PreToolUse, PermissionRequest, Stop, …).</li>
+          <li>Het codex-hook-script schrijft <code>{session_id, cwd, state, event, ts}</code> naar de gedeelde state-file (R7, R8).</li>
+          <li>De watcher pollt, mapt session→terminal, emit <code>terminal:state</code> → indicator (busy/permission/done).</li>
+        </ul></li>
+      <li><p><span class="fid">F3</span> &nbsp;<span class="lead">Pi state-lifecycle (best-effort)</span></p>
+        <ul class="flowsteps">
+          <li><strong>Trigger:</strong> pi-chat produceert output of valt stil.</li>
+          <li>Geen config-hook → Command leidt busy/done af uit PTY-output-activiteit (R6, R9).</li>
+          <li>Indicator toont busy/done; permission/question niet apart voor pi in v1.</li>
+        </ul></li>
+    </ol>
+  </section>
+
+  <section>
+    <h3>Agent-keuze &amp; badges (wireframe, sidebar-first)</h3>
+    <figure>
+      <svg viewBox="0 0 920 360" role="img" aria-label="Wireframe: sidebar met project, chats met agent-badges, per-project plus-knop die een agent-picker opent; worktree-creatie erft de default.">
+        <!-- sidebar panel -->
+        <rect x="20" y="20" width="300" height="320" rx="8" class="wf-panel"></rect>
+        <text x="36" y="46" class="svg-tm" font-size="12">SIDEBAR</text>
+        <!-- project header row with + -->
+        <text x="36" y="74" class="svg-t" font-size="13" font-weight="700">▾ command</text>
+        <rect x="270" y="60" width="34" height="22" rx="5" class="wf-a"></rect>
+        <text x="287" y="76" text-anchor="middle" class="svg-t" font-size="14">+</text>
+        <!-- chat rows with agent badges + state dot -->
+        <rect x="40" y="94" width="264" height="30" rx="5" class="wf-a"></rect>
+        <circle cx="58" cy="109" r="7" class="wf-a"></circle>
+        <text x="70" y="113" class="svg-t" font-size="12">[C] Refactor auth</text>
+        <circle cx="292" cy="109" r="5" fill="#8a8a83"></circle>
+        <rect x="40" y="128" width="264" height="30" rx="5" class="wf"></rect>
+        <circle cx="58" cy="143" r="7" class="wf"></circle>
+        <text x="70" y="147" class="svg-t" font-size="12">[Cx] Fix flaky test</text>
+        <circle cx="292" cy="143" r="5" fill="var(--ok)"></circle>
+        <rect x="40" y="162" width="264" height="30" rx="5" class="wf"></rect>
+        <circle cx="58" cy="177" r="7" class="wf"></circle>
+        <text x="70" y="181" class="svg-t" font-size="12">[Pi] Draft README</text>
+        <circle cx="292" cy="177" r="5" fill="#8a8a83"></circle>
+        <!-- worktree row -->
+        <text x="40" y="216" class="svg-ts" font-size="11.5">▾ worktree: feat/pi-agent</text>
+        <rect x="52" y="226" width="252" height="28" rx="5" class="wf"></rect>
+        <circle cx="70" cy="240" r="6" class="wf"></circle>
+        <text x="82" y="244" class="svg-t" font-size="12">[Cx] erft project-default</text>
+
+        <!-- agent picker popover anchored to + -->
+        <path d="M304,71 L360,110" class="svg-arrow"></path>
+        <text x="360" y="60" class="svg-tm" font-size="12">AGENT-PICKER (op de +)</text>
+        <rect x="360" y="70" width="250" height="150" rx="8" class="wf-panel"></rect>
+        <rect x="372" y="82" width="226" height="32" rx="5" class="wf-a"></rect>
+        <text x="384" y="103" class="svg-t" font-size="12.5">[C] Claude — projectdefault</text>
+        <rect x="372" y="120" width="226" height="30" rx="5" class="wf"></rect>
+        <text x="384" y="140" class="svg-ts" font-size="12.5">[Cx] Codex</text>
+        <rect x="372" y="156" width="226" height="30" rx="5" class="wf"></rect>
+        <text x="384" y="176" class="svg-ts" font-size="12.5">[Pi] Pi</text>
+        <text x="384" y="205" class="svg-tm" font-size="11">override eenmalig deze chat</text>
+
+        <!-- tabstrip echo: badges also on center tabs -->
+        <text x="360" y="250" class="svg-tm" font-size="12">CENTER-TABS — zelfde badge per chat</text>
+        <rect x="360" y="262" width="170" height="40" rx="6" class="wf-a"></rect>
+        <text x="376" y="286" class="svg-t" font-size="12">[C] Refactor auth</text>
+        <rect x="538" y="262" width="150" height="40" rx="6" class="wf"></rect>
+        <text x="554" y="286" class="svg-t" font-size="12">[Cx] Fix flaky</text>
+        <rect x="696" y="262" width="150" height="40" rx="6" class="wf"></rect>
+        <text x="712" y="286" class="svg-t" font-size="12">[Pi] README</text>
+      </svg>
+      <figcaption><em>Directional only — illustreert de bedoelde user-facing shape. Exacte kleuren, spacing, copy en componentkeuzes zijn placeholders voor review, geen requirements.</em> Primaire creatie-surface is de sidebar-<code>+</code> per project; dezelfde agent-badge verschijnt op de center-tabs. Worktree-chats erven de project-default.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h3>Acceptance Examples</h3>
+    <div class="card"><p><span class="rid">AE1</span> &nbsp;<strong>Covers R6, R8.</strong> Een codex-chat roept een tool aan → indicator wordt <span class="dot d-busy"></span>busy. Codex vraagt approval → <span class="dot d-perm"></span>permission. De turn stopt → <span class="dot d-done"></span>done.</p></div>
+    <div class="card"><p><span class="rid">AE2</span> &nbsp;<strong>Covers R6, R9.</strong> Een pi-chat produceert output → <span class="dot d-busy"></span>busy. Pi is ≥ de stil-drempel inactief → <span class="dot d-done"></span>done. Permission/question niet apart voor pi.</p></div>
+    <div class="card"><p><span class="rid">AE3</span> &nbsp;<strong>Covers R3, R4.</strong> Project-default = codex, sidebar-<code>+</code> zonder override → codex-chat. Met override = pi → pi-chat. Beide tonen de juiste badge.</p></div>
+    <div class="card"><p><span class="rid">AE4</span> &nbsp;<strong>Covers R10, R11.</strong> Command herstart met een openstaande codex-chat → hervat via codex' resume-mechanisme (niet vers), en de codex-sessie-ID passeert validatie.</p></div>
+  </section>
+
+  <section>
+    <h3>Success Criteria</h3>
+    <ul class="tight">
+      <li>Je start vanuit de sidebar een codex- én pi-chat naast Claude, in dezelfde cockpit.</li>
+      <li>Codex-sessies tonen de volledige attention-staten; pi-sessies minimaal busy/done.</li>
+      <li>Per chat zie je direct welke agent draait (badge op sidebar-rij én tab).</li>
+      <li>Geen regressie op Claude-chats: state, resume en auto-naming blijven werken.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h3>Scope Boundaries</h3>
+    <div class="cols2">
+      <div class="callout warn"><div class="lbl">Deferred for later — niet v1</div>
+        <ul>
+          <li>Generieke, config-toevoegbare agent-registry (elke CLI zonder code).</li>
+          <li>Volle permission/question-pariteit voor pi (extensie-API-spike).</li>
+          <li>1:1 mapping van Command-modes (chat/auto/full-auto) naar codex/pi permission-modes.</li>
+          <li>Auto-naming voor codex/pi — nice-to-have (zie U2-notitie).</li>
+        </ul></div>
+      <div class="callout danger"><div class="lbl">Outside this product's identity</div>
+        <ul>
+          <li>SDK/API-integratie van agents — Command blijft terminal-first: wrap de CLI, geen embedded runtime.</li>
+          <li>Een eigen agent/model bouwen — Command orkestreert bestaande CLI-agents.</li>
+        </ul></div>
+    </div>
+  </section>
+
+  <!-- ============ PLANNING CONTRACT ============ -->
+  <h2 id="planning-contract">Planning Contract</h2>
+
+  <section>
+    <h3>Key Technical Decisions</h3>
+    <div class="kd ktd">
+      <div class="card"><h4><span class="id">KTD1</span>Verbreed <code>TerminalType</code> i.p.v. een apart <code>agent</code>-veld</h4>
+        <p><code>type</code> loopt al end-to-end door IPC (<code>terminal:create</code> arg 3), preload, store en UI. Verbreden naar <code>'claude'|'codex'|'pi'|'normal'</code> is de laagste frictie: de <code>!== 'normal'</code>-filters blijven kloppen; alleen de <code>=== 'claude'</code>-filters verbreden. Terminals worden niet gepersisteerd (<code>partialize</code> in <code>src/stores/projectStore.ts</code> laat <code>terminals</code> weg) → geen store-migratie voor de sessie-shape.</p></div>
+      <div class="card"><h4><span class="id">KTD2</span>Eén gedeelde state-file; watcher blijft agent-agnostisch</h4>
+        <p>Alle agent-hooks schrijven naar <code>~/.claude/command-center-state.json</code>, keyed op <code>session_id</code>. De watcher leest die al zo — het mechanisme is al agnostisch; alleen de <em>registratie</em> (nu claude-only in <code>TerminalManager</code>) verbreedt naar hook-capabele agents.</p></div>
+      <div class="card"><h4><span class="id">KTD3</span>Codex hergebruikt het Claude-hookcontract ~1:1</h4>
+        <p>Kloon <code>electron/main/hooks/claude-state-hook.cjs</code> → <code>codex-state-hook.cjs</code>. Codex-events (SessionStart/PreToolUse/PermissionRequest/Stop) mappen op dezelfde staten; payload heeft <code>session_id</code>+<code>cwd</code>. Installeer in <code>~/.codex/hooks.json</code> via een gegeneraliseerde <code>HookInstaller</code>.</p></div>
+      <div class="card"><h4><span class="id">KTD4</span>Centrale <code>AGENTS</code>-descriptor als enige per-agent-naad</h4>
+        <p>Eén map met per agent: binary, resume-flag-builder, mode-flags, <code>hasHook</code>/hook-config, en (renderer-zijde) badge/label. Spawn, resume, install en UI lezen hieruit. De latere generieke registry = deze map vervangen door config-geladen entries (KD3).</p></div>
+      <div class="card"><h4><span class="id">KTD5</span>Pi-state = output-heuristiek; extensie-spike deferred</h4>
+        <p>Voor pi (geen config-hook): busy op PTY-output, done na een stil-timeout. Permission/question niet gesurfaced in v1. Als de pi-extensie-API lifecycle-events blijkt bloot te leggen, kan een pi-extensie later naar dezelfde state-file schrijven voor vollere staten — dat is een aparte spike, geen v1-blocker.</p></div>
+      <div class="card"><h4><span class="id">KTD6</span>Sessie-persistence generaliseert weg van Claude-hardcoding</h4>
+        <p><code>PersistedSession</code> krijgt een <code>agentType</code>; <code>verifyClaudeSessionAsync</code> wordt per-agent transcript-pad; <code>restoreSessions</code> gebruikt de opgeslagen agent i.p.v. hardcoded <code>type: 'claude'</code>; de before-quit-save en <code>getClaudeTerminalIds</code> dekken alle agent-chats. Resume-commando komt uit de descriptor.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h3>Unit-afhankelijkheden &amp; volgorde</h3>
+    <figure>
+      <svg viewBox="0 0 920 300" role="img" aria-label="Afhankelijkheidsgraaf: U1 voedt U2, U7, U9; U2 voedt U3, U6, U5; U3 voedt U4, U5; U7 voedt U8. Phase 1 is codex; Phase 2 is pi (U5).">
+        <defs><marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+          <path d="M0,0 L9,4.5 L0,9 z" fill="var(--ink-faint)"></path></marker></defs>
+        <text x="20" y="24" class="svg-tm" font-size="12">PHASE 1 — fundament &amp; codex</text>
+        <text x="20" y="250" class="svg-tm" font-size="12">PHASE 2 — pi (best-effort)</text>
+        <!-- nodes -->
+        <rect x="40" y="120" width="80" height="42" rx="6" class="svg-box-a"></rect><text x="80" y="146" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U1</text>
+        <rect x="170" y="120" width="80" height="42" rx="6" class="svg-box-a"></rect><text x="210" y="146" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U2</text>
+        <rect x="300" y="120" width="80" height="42" rx="6" class="svg-box-a"></rect><text x="340" y="146" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U3</text>
+        <rect x="430" y="120" width="80" height="42" rx="6" class="svg-box-ok"></rect><text x="470" y="146" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U4</text>
+        <rect x="300" y="40" width="80" height="42" rx="6" class="svg-box-a"></rect><text x="340" y="66" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U6</text>
+        <rect x="560" y="40" width="80" height="42" rx="6" class="svg-box-a"></rect><text x="600" y="66" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U7</text>
+        <rect x="690" y="40" width="80" height="42" rx="6" class="svg-box-a"></rect><text x="730" y="66" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U8</text>
+        <rect x="560" y="120" width="80" height="42" rx="6" class="svg-box-a"></rect><text x="600" y="146" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U9</text>
+        <rect x="300" y="220" width="80" height="42" rx="6" class="svg-box"></rect><text x="340" y="246" text-anchor="middle" class="svg-t" font-size="13" font-weight="700">U5</text>
+        <!-- edges -->
+        <path d="M120,141 L170,141" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M250,141 L300,141" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M380,141 L430,141" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M250,132 C275,110 275,72 300,64" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M120,132 C300,95 460,70 560,60" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M640,61 L690,61" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M120,150 C300,175 460,150 560,143" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M340,162 L340,220" class="svg-arrow" marker-end="url(#ah2)"></path>
+        <path d="M250,150 C270,185 285,205 300,235" class="svg-arrow" marker-end="url(#ah2)"></path>
+      </svg>
+      <figcaption>Codex is volledig werkend na U1–U4, U6, U7–U9. Pi-spawn komt gratis uit U2/descriptor; U5 voegt pi's busy/done-heuristiek toe. Groen = codex-specifiek; grijs = pi-specifiek.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h3>Assumptions</h3>
+    <ul class="tight">
+      <li><strong>Codex-hooks (geverifieerd):</strong> stdin-JSON met <code>session_id</code>+<code>cwd</code>+<code>hook_event_name</code>; install-pad <code>~/.codex/hooks.json</code> idempotent te mergen náást bestaande gebruikersconfig, net als de Claude-installer.</li>
+      <li><strong>Pi-events (onbevestigd):</strong> geen gedocumenteerd config-hook-mechanisme; v1 = output-heuristiek. De extensie-API-spike is deferred.</li>
+      <li><strong>Agents geïnstalleerd:</strong> <code>codex</code> en <code>pi</code> op PATH; Command spawnt de CLI maar installeert die niet.</li>
+      <li><strong>Terminals niet gepersisteerd:</strong> alleen <code>ProjectSettings</code> (incl. nieuwe <code>defaultAgent</code>) migreert — geen sessie-shape-migratie nodig.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h3>Open Questions</h3>
+    <div class="callout"><div class="lbl">Deferred to implementation</div>
+      <ul>
+        <li>Exact codex <code>session_id</code>-formaat en hoe de UUID-validatie in de hook/persistence per agent generaliseert (regex verruimen vs per-agent validator).</li>
+        <li>Idempotente install én de-install van de codex-hook náást bestaande codex-config; en of Command de codex-hook bij afsluiten opruimt.</li>
+        <li>Pi stil-timeout-drempel voor de busy/done-heuristiek (start ~1,5–2s; kalibreren tijdens smoke).</li>
+        <li>Codex resume-invocatie: exacte flag/subcommando (<code>codex resume</code> vs <code>--resume</code>) verifiëren tegen de geïnstalleerde CLI-versie in U6.</li>
+      </ul></div>
+  </section>
+
+  <!-- ============ IMPLEMENTATION UNITS ============ -->
+  <h2 id="implementation-units">Implementation Units</h2>
+  <div class="subnav">
+    <strong style="display:block;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-faint);margin-bottom:6px;">Units</strong>
+    <a href="#u1">U1. Type-model + descriptor</a>
+    <a href="#u2">U2. Spawn &amp; resume</a>
+    <a href="#u3">U3. Agnostische watcher</a>
+    <a href="#u4">U4. Codex-hook + installer</a>
+    <a href="#u6">U6. Sessie-persistence</a>
+    <a href="#u7">U7. Default-agent setting</a>
+    <a href="#u8">U8. Agent-keuze (sidebar)</a>
+    <a href="#u9">U9. Badge + filters</a>
+    <a href="#u5">U5. Pi-heuristiek</a>
+  </div>
+
+  <div class="phase">Phase 1 — Fundament &amp; codex (ship first)</div>
+
+  <article class="unit" id="u1">
+    <h3><span class="uid">U1</span>Agent-type-model + centrale descriptor</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Codex/pi in het type-systeem brengen en één <code>AGENTS</code>-descriptor als enige per-agent-naad neerzetten.</dd>
+      <dt>Requirements</dt><dd>R1, R12, R13</dd>
+      <dt>Dependencies</dt><dd>—</dd>
+      <dt>Files</dt><dd><code>shared/ipc-types.ts</code> (verbreed <code>TerminalType</code>; voeg <code>ProjectSettings.defaultAgent?</code> toe), <code>shared/agents.ts</code> (nieuw — display-descriptor: id, label, badge-key), <code>electron/main/services/agents.ts</code> (nieuw — spawn-descriptor: binary, resumeFlag-builder, modeFlags, hasHook, hookConfig), <code>src/types/index.ts</code> (re-exports lopen door)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Splits de descriptor: display-bits in <code>shared/</code> (renderer + main lezen), spawn-bits main-only. Descriptor-keys zijn de niet-<code>normal</code> <code>TerminalType</code>-leden, zodat een ontbrekende agent een type-fout geeft. Geen gedrag verplaatsen in deze unit — alleen het model + lege/plausibele descriptor-entries.</p>
+      <ul>
+        <li><span class="covers">Test</span> unit: <code>AGENTS</code>-map heeft een entry voor elk agent-<code>TerminalType</code>-lid (claude/codex/pi), geen voor <code>normal</code>.</li>
+        <li>Type-niveau: <code>TerminalType</code> bevat de vier waarden; <code>ProjectSettings.defaultAgent</code> is optioneel en van het agent-type.</li>
+        <li>Geen <code>any</code>; descriptor-type expliciet.</li>
+      </ul>
+      <p><strong>Verification.</strong> <code>tsc</code> schoon; nieuwe descriptor-test groen; geen gedragswijziging elders.</p>
+    </details>
+  </article>
+
+  <article class="unit" id="u2">
+    <h3><span class="uid">U2</span>Per-agent spawn &amp; resume in TerminalManager</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Het hardcoded <code>claude</code>-commando vervangen door descriptor-gedreven spawn; sessie-ID-validatie generaliseren; claude-only PTY-gates verbreden.</dd>
+      <dt>Requirements</dt><dd>R2, R6 (deels), R10, R11</dd>
+      <dt>Dependencies</dt><dd>U1</dd>
+      <dt>Files</dt><dd><code>electron/main/services/TerminalManager.ts</code> (spawn-string uit descriptor ~r275–281; <code>SESSION_ID_REGEX</code> generaliseren; <code>FORCE_HYPERLINK</code>/auto-naming/busy-op-Enter/register-gates van <code>=== 'claude'</code> → <code>type !== 'normal'</code> of <code>descriptor.hasHook</code>), <code>electron/main/handlers/terminalCreate.ts</code> (type-validatie verbreden voorbij <code>'claude'|'normal'</code>)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Bouw het spawn-commando uit <code>AGENTS[type]</code>: binary + resume-flag (claude <code>--resume</code>, codex resume, pi <code>--session</code>) + mode-flags. Busy-op-Enter en register-bij-watcher gelden voor alle agent-types (niet <code>normal</code>). Auto-naming voor codex/pi: verbreden mag, maar staat als nice-to-have in Scope — minimaal niet breken voor claude.</p>
+      <ul>
+        <li><span class="covers">Covers R2</span> spawnt het juiste binary + flags per agent (unit met een fake/observeerbare pty).</li>
+        <li><span class="covers">Covers R10</span> resume-flag correct gebouwd per descriptor.</li>
+        <li><span class="covers">Covers R11</span> codex/pi sessie-IDs passeren validatie; ongeldige input valt terug op verse sessie.</li>
+        <li>Busy-op-Enter vuurt voor codex/pi net als claude; <code>normal</code> ongewijzigd.</li>
+      </ul>
+      <p><strong>Verification.</strong> <code>test/terminalManager.test.ts</code> + <code>test/terminalCreateHandler.test.ts</code> uitgebreid en groen; handmatige smoke: codex-chat spawnt en draait.</p>
+    </details>
+  </article>
+
+  <article class="unit" id="u3">
+    <h3><span class="uid">U3</span>Agent-agnostische state-watcher-registratie</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>De watcher zo generaliseren dat alle hook-capabele agents registreren; hij blijft de ene gedeelde state-file lezen, keyed op <code>session_id</code>.</dd>
+      <dt>Requirements</dt><dd>R6, R7</dd>
+      <dt>Dependencies</dt><dd>U1, U2</dd>
+      <dt>Files</dt><dd><code>electron/main/services/ClaudeHookWatcher.ts</code> (registratie-gating; optioneel hernoemen naar agent-agnostische naam met re-export voor back-compat), <code>electron/main/services/TerminalManager.ts</code> (register voor hook-capabele agents, niet alleen claude)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Het lees-/map-mechanisme is al agnostisch (session_id → terminal via cwd/SessionStart). Enige koppeling: registratie gebeurt nu alleen voor <code>type === 'claude'</code>. Verbreed naar <code>descriptor.hasHook</code>. Als hernoemen: houd <code>ClaudeHookWatcher</code> als alias om diff klein te houden.</p>
+      <ul>
+        <li><span class="covers">Covers R7</span> een codex-terminal registreert bij de watcher; entries keyed op session_id routeren naar de juiste terminal ongeacht bron-agent.</li>
+        <li>Claude-routing ongewijzigd (regressie-check).</li>
+        <li>Een pi-terminal (geen hook) registreert niet bij de watcher (state komt in U5).</li>
+      </ul>
+      <p><strong>Verification.</strong> Watcher-tests dekken multi-agent-routering; claude-pad groen.</p>
+    </details>
+  </article>
+
+  <article class="unit" id="u4">
+    <h3><span class="uid">U4</span>Codex state-hook + gegeneraliseerde installer</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Codex emit volle staten via een hook-script dat naar de gedeelde state-file schrijft; Command installeert het idempotent.</dd>
+      <dt>Requirements</dt><dd>R6, R8</dd>
+      <dt>Dependencies</dt><dd>U3</dd>
+      <dt>Files</dt><dd><code>electron/main/hooks/codex-state-hook.cjs</code> (nieuw — kloon van <code>claude-state-hook.cjs</code>; codex-event-namen mappen op dezelfde staten; schrijft naar <code>command-center-state.json</code>), <code>electron/main/services/HookInstaller.ts</code> (generaliseer naar per-agent install: <code>~/.codex/hooks.json</code>/config.toml, idempotente merge, uninstall), <code>electron/main/index.ts</code> (install bij startup naast <code>installClaudeHooks</code>)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Execution note.</strong> Begin met een test op de event→state-mapping van <code>codex-state-hook.cjs</code> (pure functie, net als de claude-hook), vóór de installer-plumbing.</p>
+      <p><strong>Approach.</strong> Codex-events ≈ Claude's: SessionStart/UserPromptSubmit/PreToolUse→busy, PermissionRequest→permission, Stop→done. Hergebruik de <code>mapEventToState</code>/<code>shouldSkipWrite</code>-vorm. Installer wordt parametrisch over (config-pad, hook-events, script-pad) uit de descriptor.</p>
+      <ul>
+        <li><span class="covers">Covers AE1</span> codex SessionStart/PreToolUse/PermissionRequest/Stop → busy/permission/done.</li>
+        <li>Installer merget idempotent in bestaande codex-config; herhaald draaien verandert niets.</li>
+        <li>Uninstall verwijdert alleen Command's entries, laat gebruikersconfig intact.</li>
+      </ul>
+      <p><strong>Verification.</strong> Hook-mapping-unit + installer-merge/uninstall-test groen; handmatige smoke: codex-chat toont busy→permission→done live.</p>
+    </details>
+  </article>
+
+  <article class="unit" id="u6">
+    <h3><span class="uid">U6</span>Sessie-persistence &amp; resume generaliseren</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Sessies persisteren en herstellen voor elke agent, niet alleen claude.</dd>
+      <dt>Requirements</dt><dd>R10, R11</dd>
+      <dt>Dependencies</dt><dd>U2</dd>
+      <dt>Files</dt><dd><code>electron/main/services/ProjectPersistence.ts</code> (<code>PersistedSession</code> + <code>agentType</code>; validatie-regex generaliseren; migratie als het veld-schema wijzigt), <code>electron/main/handlers/restoreSessions.ts</code> (opgeslagen agent-type i.p.v. hardcoded <code>type: 'claude'</code>; per-agent resume), <code>electron/main/index.ts</code> (<code>verifyClaudeSessionAsync</code> → per-agent transcript-pad; before-quit-save &amp; <code>getClaudeTerminalIds</code>/<code>type === 'claude'</code>-filter → alle agent-chats)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Voeg <code>agentType</code> toe aan <code>PersistedSession</code> (behoud <code>claudeSessionId</code>-veldnaam voor back-compat, of hernoem met migratie — kleinste diff wint). Transcript-verificatie per agent: claude <code>~/.claude/projects/…</code>, codex zijn eigen pad, pi <code>~/.pi/agent/sessions/</code>. Resume-commando uit descriptor (U1/U2).</p>
+      <ul>
+        <li><span class="covers">Covers AE4</span> codex-chat gepersisteerd bij quit en hersteld met codex-resume; sessie-ID gevalideerd.</li>
+        <li>Claude-chats herstellen ongewijzigd (regressie).</li>
+        <li>before-quit slaat codex/pi-chats óók op (niet meer claude-only).</li>
+      </ul>
+      <p><strong>Verification.</strong> <code>test/projectPersistence.test.ts</code> uitgebreid (agent-getagde sessies, migratie); handmatige smoke: herstart met open codex-chat → hervat.</p>
+    </details>
+  </article>
+
+  <article class="unit" id="u7">
+    <h3><span class="uid">U7</span>Project default-agent-setting</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Per-project default-agent, gepersisteerd en gevalideerd, met UI naast Claude Mode.</dd>
+      <dt>Requirements</dt><dd>R3</dd>
+      <dt>Dependencies</dt><dd>U1</dd>
+      <dt>Files</dt><dd><code>electron/main/services/ProjectPersistence.ts</code> (<code>STATE_VERSION</code> 7→8, v7→v8-migratie: backfill <code>defaultAgent='claude'</code>), <code>electron/main/index.ts</code> (<code>project:update</code>-validator: valideer <code>defaultAgent</code> tegen de agent-set, coerce ongeldig), <code>src/components/Settings/GeneralSection.tsx</code> (Default-Agent-dropdown naast Claude Mode)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Spiegel de <code>claudeMode</code>-flow exact: migratie als v5→v6 (map over projects, backfill <code>p.settings.defaultAgent</code>); validator als <code>VALID_CLAUDE_MODES</code>; UI-dropdown die <code>updateProject(id, { settings: { ...settings, defaultAgent } })</code> schrijft. Setting geldt voor nieuwe chats (bestaand gedrag).</p>
+      <ul>
+        <li><span class="covers">Covers AE3</span> (default-pad) migratie backfilt <code>defaultAgent='claude'</code> voor v7-state.</li>
+        <li>Ongeldige <code>defaultAgent</code> door validator gecoerced/afgewezen.</li>
+        <li>Settings-UI schrijft <code>defaultAgent</code>; persisteert over herstart.</li>
+      </ul>
+      <p><strong>Verification.</strong> <code>test/projectPersistence.test.ts</code> (migratie 7→8) + <code>test/ipcValidation.test.ts</code> (validator) groen.</p>
+    </details>
+  </article>
+
+  <article class="unit" id="u8">
+    <h3><span class="uid">U8</span>Agent-keuze bij chat/worktree-creatie (sidebar-first)</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Nieuwe chats/worktrees gebruiken de project-default, met per-creatie override; de vier creatie-paden centraliseren.</dd>
+      <dt>Requirements</dt><dd>R3, R4</dd>
+      <dt>Dependencies</dt><dd>U1, U7</dd>
+      <dt>Files</dt><dd><code>src/hooks/useCreateTerminal.ts</code> (<code>agent</code>-optie; default uit project-settings; als <code>type</code> naar <code>api.terminal.create</code>), <code>src/components/Sidebar/Sidebar.tsx</code> + <code>src/components/Sidebar/SortableProjectList.tsx</code> + <code>SortableProjectItem.tsx</code> (agent-picker op de per-project <code>+</code> — primaire surface; worktree-creatie erft default), <code>src/App.tsx</code> (route <code>terminal.new</code>-hotkey en startup-pad via de hook), <code>src/components/Layout/TerminalArea.tsx</code> (tab-<code>+</code> en resume-pad geven agent door), <code>src/utils/hotkeys.ts</code> + <code>src/types/hotkeys.ts</code> (optioneel per-agent new-chat-hotkeys)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Centraliseer eerst de vier creatie-paden (App.tsx dupliceert nu de hook-logica) op <code>useCreateTerminal</code>. Voeg een <code>agent</code>-optie toe die default uit <code>project.settings.defaultAgent</code> haalt. De sidebar-<code>+</code> krijgt een split-button/popover (Claude default / Codex / Pi). Worktree-chats lezen dezelfde default.</p>
+      <ul>
+        <li><span class="covers">Covers AE3</span> sidebar-<code>+</code> met default=codex → codex-chat; override → gekozen agent.</li>
+        <li>Worktree-chat erft de project-default-agent.</li>
+        <li>Tab-<code>+</code> en resume-pad geven de agent correct door (geen stille terugval naar claude).</li>
+      </ul>
+      <p><strong>Verification.</strong> Store/hook-tests voor agent-resolutie; handmatige smoke: sidebar-creatie met override en met default.</p>
+    </details>
+  </article>
+
+  <article class="unit" id="u9">
+    <h3><span class="uid">U9</span>Agent-badge + verbreed claude-only UI-filters</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Agents onderscheiden op sidebar-rij én tab; claude-only UI-surfaces agent-aware maken.</dd>
+      <dt>Requirements</dt><dd>R5</dd>
+      <dt>Dependencies</dt><dd>U1</dd>
+      <dt>Files</dt><dd><code>src/components/Terminal/TerminalTabBar.tsx</code> (per-agent icon/badge op de tab), <code>src/components/Sidebar/TerminalListItem.tsx</code> (badge + <code>isClaude</code>-icon/label agent-aware), verbreed <code>=== 'claude'</code>: <code>src/components/FileExplorer/SessionsPanel.tsx</code>, <code>src/components/Sidebar/SortableProjectItem.tsx</code> (chat-counts), <code>src/utils/projectRollup.ts</code>, <code>src/utils/annotationMessage.ts</code>. Ongewijzigd: <code>src/utils/terminalState.ts</code> (al agent-agnostisch)</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Voeg een <code>AGENT_ICONS</code>-map (uit de shared descriptor) toe en render per <code>terminal.type</code>. Verbreed elke <code>=== 'claude'</code>-filter die codex/pi zou uitsluiten naar "is agent-chat" (<code>type !== 'normal'</code>). State-visuals blijven ongemoeid.</p>
+      <ul>
+        <li><span class="covers">Covers R5</span> tab en sidebar-rij renderen het agent-specifieke badge per type.</li>
+        <li>Chat-counts en de sessions-panel tellen/tonen codex/pi-chats mee.</li>
+        <li>Rollup en annotation-gate behandelen codex/pi als agent-chats.</li>
+      </ul>
+      <p><strong>Verification.</strong> Component-render met drie agent-types toont drie badges; count-utils dekken codex/pi.</p>
+    </details>
+  </article>
+
+  <div class="phase">Phase 2 — Pi (best-effort state)</div>
+
+  <article class="unit" id="u5">
+    <h3><span class="uid">U5</span>Pi busy/done-heuristiek</h3>
+    <dl class="strip">
+      <dt>Goal</dt><dd>Busy/done voor pi afleiden uit PTY-output-activiteit (geen hook).</dd>
+      <dt>Requirements</dt><dd>R6, R9</dd>
+      <dt>Dependencies</dt><dd>U2, U3</dd>
+      <dt>Files</dt><dd><code>electron/main/services/TerminalManager.ts</code> (voor pi-terminals: busy bij output, done na stil-timeout, emit <code>terminal:state</code>), optioneel een kleine helper naast de manager</dd>
+    </dl>
+    <details><summary>Approach · Test scenarios · Verification</summary>
+      <p><strong>Approach.</strong> Voor <code>type === 'pi'</code> (descriptor <code>hasHook === false</code>): markeer busy op elke PTY-output-chunk, plan een done na een stil-timeout (~1,5–2s, kalibreren). Permission/question niet surfacen. Claude/codex ongemoeid (die krijgen state uit hooks).</p>
+      <ul>
+        <li><span class="covers">Covers AE2</span> pi-output → busy; stilte ≥ timeout → done.</li>
+        <li>Geen permission/question voor pi.</li>
+        <li>Claude/codex-state-pad niet beïnvloed door de pi-heuristiek.</li>
+      </ul>
+      <p><strong>Verification.</strong> Unit met gesimuleerde output/stilte (fake timers) → busy/done-overgangen; handmatige smoke: pi-chat wisselt busy↔done realistisch.</p>
+    </details>
+  </article>
+
+  <!-- ============ VERIFICATION CONTRACT ============ -->
+  <h2 id="verification-contract">Verification Contract</h2>
+  <section>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Gate</th><th>Commando / check</th></tr></thead>
+        <tbody>
+          <tr><td>Unit &amp; integratietests</td><td><code>npm run test</code> — uitgebreid: <code>test/terminalManager.test.ts</code>, <code>test/terminalCreateHandler.test.ts</code>, <code>test/projectPersistence.test.ts</code>, <code>test/ipcValidation.test.ts</code>, + nieuwe descriptor/hook-mapping-tests</td></tr>
+          <tr><td>Typecheck</td><td><code>tsc</code> schoon; <strong>geen <code>any</code></strong> (concrete types of <code>unknown</code> + guards)</td></tr>
+          <tr><td>Lint</td><td>ESLint schoon (PostToolUse lint-fix hook leunt hierop)</td></tr>
+          <tr><td>Build</td><td><code>npm run build</code> (TypeScript + Vite + electron-builder)</td></tr>
+          <tr><td>Smoke — codex (volle staten)</td><td>Sidebar-<code>+</code> → codex-chat; verifieer busy → permission (bij approval) → done live in de attention-indicator</td></tr>
+          <tr><td>Smoke — pi (best-effort)</td><td>Sidebar-<code>+</code> met override pi; verifieer busy bij output, done na stilte</td></tr>
+          <tr><td>Smoke — resume</td><td>Herstart Command met open codex-chat; verifieer hervatting (niet vers)</td></tr>
+          <tr><td>Regressie — Claude</td><td>Claude-chat: state, resume en auto-naming ongewijzigd</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Hook/PTY-timing wordt via smoke geverifieerd, niet via brosse timing-unittests. State-detectie-logica (event→state mapping, heuristiek-overgangen met fake timers) wél unit-getest.</p>
+  </section>
+
+  <!-- ============ DEFINITION OF DONE ============ -->
+  <h2 id="definition-of-done">Definition of Done</h2>
+  <section>
+    <div class="callout ok"><div class="lbl">Klaar wanneer</div>
+      <ul>
+        <li>Alle unit-testscenario's groen; <code>npm run test</code>, <code>tsc</code>, ESLint en <code>npm run build</code> schoon.</li>
+        <li>Codex-chat aanmaakbaar vanuit de sidebar en toont de volledige attention-staten (smoke).</li>
+        <li>Pi-chat aanmaakbaar en toont busy/done via heuristiek (smoke).</li>
+        <li>Elke chat toont het juiste agent-badge op sidebar-rij én tab; default-agent + override werken (AE3).</li>
+        <li>Codex-sessie herstelt na herstart via het native resume-mechanisme (AE4); Claude-resume ongewijzigd.</li>
+        <li>Geen regressie op Claude-chats (state, resume, auto-naming).</li>
+        <li>Per-agent gedrag zit in de <code>AGENTS</code>-descriptor, niet in verspreide <code>if type === 'claude'</code>-condities (R12/R13).</li>
+        <li>Dead-end / experimentele code van niet-gekozen aanpakken verwijderd; geen achtergelaten TODO's of ongebruikte imports.</li>
+        <li>Keyboard Shortcuts-tabel in <code>CLAUDE.md</code> bijgewerkt als er per-agent new-chat-hotkeys zijn toegevoegd.</li>
+      </ul></div>
+    <p class="note">Per-unit "done" = de unit z'n testscenario's groen + de bijbehorende smoke waar van toepassing. Pi (U5) mag na codex landen; de cockpit is al bruikbaar met claude+codex vóór U5.</p>
+  </section>
+
+  <!-- ============ SOURCES ============ -->
+  <h2 id="sources">Sources / Research</h2>
+  <section>
+    <h3>Code — de wrap-architectuur die dit plan raakt</h3>
+    <ul class="refs">
+      <li><a href="https://github.com/remcovolmer/command/blob/main/shared/ipc-types.ts"><code>shared/ipc-types.ts</code></a> — <code>TerminalType</code> (r69), <code>ProjectSettings</code> (r26–30), <code>ClaudeMode</code> (r18). Uitbreidingspunt R1/U1.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/TerminalManager.ts"><code>electron/main/services/TerminalManager.ts</code></a> — spawn/flags (r275–281), claude-only gates (FORCE_HYPERLINK r138, register r205/237, auto-naming r298, busy-op-Enter r304). U2/U5.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/handlers/terminalCreate.ts"><code>electron/main/handlers/terminalCreate.ts</code></a> — server-side resolutie van <code>claudeMode</code> uit settings (r101), type-validatie. Patroon voor default-agent. U2/U8.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/ClaudeHookWatcher.ts"><code>electron/main/services/ClaudeHookWatcher.ts</code></a> — pollt state-file, session→terminal-mapping (al agnostisch mechanisme). U3.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/HookInstaller.ts"><code>electron/main/services/HookInstaller.ts</code></a> — injecteert Claude-hook in settings; generaliseren naar per-agent installer. U4.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/hooks/claude-state-hook.cjs"><code>electron/main/hooks/claude-state-hook.cjs</code></a> — <code>mapEventToState</code>/<code>shouldSkipWrite</code>; template voor <code>codex-state-hook.cjs</code>. U4.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/ProjectPersistence.ts"><code>electron/main/services/ProjectPersistence.ts</code></a> — <code>STATE_VERSION=7</code> (r74), migratie-cascade (v5→v6 r197–220), <code>PersistedSession</code> (r19–36). U6/U7.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/handlers/restoreSessions.ts"><code>electron/main/handlers/restoreSessions.ts</code></a> — hardcoded <code>type: 'claude'</code> (r115), resume-injectie. U6.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/hooks/useCreateTerminal.ts"><code>src/hooks/useCreateTerminal.ts</code></a> — gedeeld creatie-pad; hardcoded <code>type: 'claude'</code>. U8.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Sidebar/Sidebar.tsx"><code>src/components/Sidebar/Sidebar.tsx</code></a> — <code>handleCreateTerminal</code>/<code>handleCreateWorktree</code>; primaire creatie-surface. U8.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Terminal/TerminalTabBar.tsx"><code>src/components/Terminal/TerminalTabBar.tsx</code></a> — tab-render + state-dot; badge-insertiepunt. U9.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Settings/GeneralSection.tsx"><code>src/components/Settings/GeneralSection.tsx</code></a> — Claude Mode-selector; plek voor Default-Agent-dropdown. U7.</li>
+    </ul>
+    <h3>Extern — agent-mechanismen (geverifieerd juli 2026)</h3>
+    <ul class="refs">
+      <li><a href="https://developers.openai.com/codex/hooks">Codex — Hooks</a>: stdin-JSON met <code>session_id</code>/<code>cwd</code>, events PreToolUse/PermissionRequest/SessionStart/Stop, config in <code>~/.codex/hooks.json</code>.</li>
+      <li><a href="https://developers.openai.com/codex/config-reference">Codex — Configuration Reference</a>: <code>notify</code> + hooks in <code>config.toml</code>.</li>
+      <li><a href="https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/usage.md">Pi — Usage</a>: <code>pi</code>/<code>pi -c</code>/<code>pi --session &lt;id&gt;</code>, sessies in <code>~/.pi/agent/sessions/</code>, <code>--mode json|rpc</code>.</li>
+      <li><a href="https://github.com/earendil-works/pi">Pi — repo</a>: open-source TS coding-agent, extensies (tools/commands/event-handlers).</li>
+    </ul>
+    <h3>Prior art in deze repo</h3>
+    <ul class="refs">
+      <li><a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-03-24-001-feat-claude-mode-selector-plan.md"><code>docs/plans/2026-03-24-001-feat-claude-mode-selector-plan.md</code></a> — de <code>claudeMode</code>-feature: exact het settings→store→IPC→spawn-patroon dat U7/U8 spiegelen.</li>
+    </ul>
+  </section>
+
+  <footer class="sig">
+    Enriched <time datetime="2026-07-09">2026-07-09</time> by <code>ce-plan</code> to implementation-ready, from the requirements-only Product Contract by <code>ce-brainstorm</code> (same artifact, enriched in place).
+  </footer>
+
+</div>
+</body>
+</html>
