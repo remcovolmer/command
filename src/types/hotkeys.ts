@@ -33,6 +33,7 @@ export type HotkeyAction =
   | 'nav.focusTerminal'
   | 'nav.focusFileExplorer'
   | 'nav.projectOverview'
+  | 'automations.showOverview'
   // Terminal operations
   | 'terminal.new'
   | 'terminal.close'
@@ -51,7 +52,6 @@ export type HotkeyAction =
   | 'fileExplorer.filesTab'
   | 'fileExplorer.gitTab'
   | 'fileExplorer.tasksTab'
-  | 'fileExplorer.automationsTab'
   | 'fileExplorer.newFile'
   | 'fileExplorer.newFolder'
   | 'fileExplorer.rename'

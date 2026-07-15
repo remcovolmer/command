@@ -465,7 +465,8 @@ ipcMain.handle(
     projectId: string,
     worktreeId?: string,
     type: 'claude' | 'normal' = 'claude',
-    resumeSessionId?: string
+    resumeSessionId?: string,
+    initialPrompt?: string
   ) => {
     return handleTerminalCreate(
       {
@@ -476,7 +477,7 @@ ipcMain.handle(
         resolveEnvOverrides,
         isValidUUID,
       },
-      { projectId, worktreeId, type, resumeSessionId }
+      { projectId, worktreeId, type, resumeSessionId, initialPrompt }
     )
   }
 )
@@ -1635,15 +1636,17 @@ ipcMain.handle('automation:create', async (_event, data: Record<string, unknown>
   const prompt = typeof data.prompt === 'string' ? data.prompt.slice(0, 50000) : ''
   if (!name || !prompt) throw new Error('Name and prompt are required')
 
-  const projectIds = Array.isArray(data.projectIds)
-    ? data.projectIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id as string))
-    : []
-  if (projectIds.length === 0) throw new Error('At least one project is required')
+  const projectId =
+    typeof data.projectId === 'string' && isValidUUID(data.projectId) ? data.projectId : ''
+  if (!projectId) throw new Error('A valid project is required')
+
+  const defaultTarget: 'chat' | 'worktree' = data.defaultTarget === 'chat' ? 'chat' : 'worktree'
 
   return automationService.createAutomation({
     name,
     prompt,
-    projectIds: projectIds as string[],
+    projectId,
+    defaultTarget,
     trigger: validateTrigger(data.trigger),
     enabled: data.enabled !== false,
     baseBranch: typeof data.baseBranch === 'string' ? data.baseBranch : undefined,
@@ -1660,10 +1663,10 @@ ipcMain.handle(
     const allowedUpdates: Record<string, unknown> = {}
     if (typeof updates.name === 'string') allowedUpdates.name = updates.name.slice(0, 100)
     if (typeof updates.prompt === 'string') allowedUpdates.prompt = updates.prompt.slice(0, 50000)
-    if (Array.isArray(updates.projectIds))
-      allowedUpdates.projectIds = updates.projectIds.filter(
-        (id: unknown) => typeof id === 'string' && isValidUUID(id as string)
-      )
+    if (typeof updates.projectId === 'string' && isValidUUID(updates.projectId))
+      allowedUpdates.projectId = updates.projectId
+    if (updates.defaultTarget === 'chat' || updates.defaultTarget === 'worktree')
+      allowedUpdates.defaultTarget = updates.defaultTarget
     if (updates.trigger) allowedUpdates.trigger = validateTrigger(updates.trigger)
     if (typeof updates.enabled === 'boolean') allowedUpdates.enabled = updates.enabled
     if (typeof updates.baseBranch === 'string') allowedUpdates.baseBranch = updates.baseBranch
@@ -1690,18 +1693,32 @@ ipcMain.handle('automation:trigger', async (_event, id: string) => {
   const automation = automationService.getAutomation(id)
   if (!automation) throw new Error('Automation not found')
 
-  // Trigger for each assigned project
-  const projects = projectPersistence.getProjects()
-  for (const projectId of automation.projectIds) {
-    const project = projects.find((p) => p.id === projectId)
-    if (project) {
-      // Fire and forget - don't await, let it run in background
-      automationService.triggerRun(id, project.path, projectId).catch((err) => {
-        automationLog.error(`Run failed for ${id}:`, err)
-      })
-    }
-  }
+  // Single-project model: run headless for the automation's one project.
+  const project = projectPersistence.getProjects().find((p) => p.id === automation.projectId)
+  if (!project) throw new Error('Automation project not found')
+
+  // Fire and forget - don't await, let it run in background
+  automationService.triggerRun(id, project.path, project.id).catch((err) => {
+    automationLog.error(`Run failed for ${id}:`, err)
+  })
 })
+
+ipcMain.handle(
+  'automation:record-launch',
+  async (_event, automationId: string, opts: { terminalId?: string; worktreeBranch?: string }) => {
+    if (!isValidUUID(automationId)) throw new Error('Invalid automation ID')
+    if (!opts || !isValidUUID(opts.terminalId ?? '')) throw new Error('Invalid terminal ID')
+    return (
+      automationService?.recordForegroundLaunch(automationId, {
+        terminalId: opts.terminalId as string,
+        worktreeBranch:
+          typeof opts.worktreeBranch === 'string'
+            ? opts.worktreeBranch.slice(0, 200)
+            : undefined,
+      }) ?? null
+    )
+  }
+)
 
 ipcMain.handle('automation:stop-run', async (_event, runId: string) => {
   if (!isValidUUID(runId)) throw new Error('Invalid run ID')

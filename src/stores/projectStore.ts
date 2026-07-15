@@ -92,7 +92,7 @@ interface ProjectStore {
 
   // File explorer state
   fileExplorerVisible: boolean
-  fileExplorerActiveTab: 'files' | 'git' | 'tasks' | 'automations'
+  fileExplorerActiveTab: 'files' | 'git' | 'tasks'
   expandedPaths: Record<string, Record<string, true>>
   directoryCache: Record<string, FileSystemEntry[]>
   directoryCacheVersion: number
@@ -126,6 +126,9 @@ interface ProjectStore {
   activeContentTabId: Record<string, string | null>
   // Show the project overview in place of the chat (hotkey/sidebar toggled)
   projectOverviewVisible: boolean
+  // Show the global automations overview in the center (sidebar entry toggled).
+  // Independent of the active project — opening it never changes the project.
+  automationsOverviewVisible: boolean
 
   // Hotkey configuration
   hotkeyConfig: HotkeyConfig
@@ -170,6 +173,7 @@ interface ProjectStore {
   setEditorTabDeletedExternally: (tabId: string, isDeleted: boolean) => void
   setActiveContentTab: (tabId: string) => void
   setProjectOverviewVisible: (visible: boolean) => void
+  setAutomationsOverviewVisible: (visible: boolean) => void
 
   // Hotkey actions
   updateHotkey: (action: HotkeyAction, binding: Partial<HotkeyBinding>) => void
@@ -237,7 +241,7 @@ interface ProjectStore {
   // File explorer actions
   toggleFileExplorer: () => void
   setFileExplorerVisible: (visible: boolean) => void
-  setFileExplorerActiveTab: (tab: 'files' | 'git' | 'tasks' | 'automations') => void
+  setFileExplorerActiveTab: (tab: 'files' | 'git' | 'tasks') => void
   toggleExpandedPath: (projectId: string, path: string) => void
   setDirectoryContents: (path: string, entries: FileSystemEntry[]) => void
   clearDirectoryCache: (projectId?: string, rootPath?: string) => void
@@ -319,7 +323,7 @@ interface ProjectStore {
   reorderProjects: (projectIds: string[]) => Promise<void>
 
   // Terminal actions
-  addTerminal: (terminal: TerminalSession) => void
+  addTerminal: (terminal: TerminalSession, options?: { activate?: boolean }) => void
   removeTerminal: (id: string) => void
   updateTerminalState: (id: string, state: TerminalState) => void
   updateTerminalWorktree: (id: string, worktreeId: string) => void
@@ -414,6 +418,7 @@ export const useProjectStore = create<ProjectStore>()(
       editorTabs: {},
       activeContentTabId: {},
       projectOverviewVisible: false,
+      automationsOverviewVisible: false,
 
       // Hotkey configuration
       hotkeyConfig: DEFAULT_HOTKEY_CONFIG,
@@ -634,7 +639,23 @@ export const useProjectStore = create<ProjectStore>()(
           }
         }),
 
-      setProjectOverviewVisible: (visible) => set({ projectOverviewVisible: visible }),
+      // The project overview and the automations overview are mutually-exclusive
+      // center overlays — opening one must close the other, or the hidden one
+      // (automations wins render precedence in TerminalArea) silently swallows
+      // the other's toggle. Clearing on open keeps the two flags consistent.
+      setProjectOverviewVisible: (visible) =>
+        set(
+          visible
+            ? { projectOverviewVisible: true, automationsOverviewVisible: false }
+            : { projectOverviewVisible: false }
+        ),
+
+      setAutomationsOverviewVisible: (visible) =>
+        set(
+          visible
+            ? { automationsOverviewVisible: true, projectOverviewVisible: false }
+            : { automationsOverviewVisible: false }
+        ),
 
       // Hotkey actions
       updateHotkey: (action, binding) =>
@@ -1529,6 +1550,7 @@ export const useProjectStore = create<ProjectStore>()(
             collapsedProjects: newCollapsedProjects,
             activeTerminalId: newActiveTerminalId,
             projectOverviewVisible: false,
+            automationsOverviewVisible: false,
             directoryCache: {},
             // Clear ephemeral file explorer state to prevent cross-project operations
             fileExplorerSelectedPath: null,
@@ -1577,13 +1599,21 @@ export const useProjectStore = create<ProjectStore>()(
       },
 
       // Terminal actions
-      addTerminal: (terminal) =>
-        set((state) => ({
-          terminals: { ...state.terminals, [terminal.id]: terminal },
-          activeProjectId: terminal.projectId,
-          activeTerminalId: terminal.id,
-          projectOverviewVisible: false,
-        })),
+      addTerminal: (terminal, options) =>
+        set((state) => {
+          // Focus-neutral insert (automation launch): register the terminal but
+          // don't switch the active project/terminal or dismiss any overview.
+          if (options?.activate === false) {
+            return { terminals: { ...state.terminals, [terminal.id]: terminal } }
+          }
+          return {
+            terminals: { ...state.terminals, [terminal.id]: terminal },
+            activeProjectId: terminal.projectId,
+            activeTerminalId: terminal.id,
+            projectOverviewVisible: false,
+            automationsOverviewVisible: false,
+          }
+        }),
 
       removeTerminal: (id) =>
         set((state) => {
@@ -1740,7 +1770,7 @@ export const useProjectStore = create<ProjectStore>()(
 
           const terminal = state.terminals[id]
           if (!terminal) {
-            return { activeTerminalId: id, projectOverviewVisible: false }
+            return { activeTerminalId: id, projectOverviewVisible: false, automationsOverviewVisible: false }
           }
 
           // Als terminal in ander project zit, wissel ook van project
@@ -1749,10 +1779,11 @@ export const useProjectStore = create<ProjectStore>()(
               activeProjectId: terminal.projectId,
               activeTerminalId: id,
               projectOverviewVisible: false,
+              automationsOverviewVisible: false,
             }
           }
 
-          return { activeTerminalId: id, projectOverviewVisible: false }
+          return { activeTerminalId: id, projectOverviewVisible: false, automationsOverviewVisible: false }
         }),
 
       getProjectTerminals: (projectId) => {
@@ -1986,6 +2017,13 @@ export const useProjectStore = create<ProjectStore>()(
               ;(state.expandedPaths as Record<string, Record<string, true>>)[key] = migrated
             }
           }
+        }
+        // The 'automations' file-explorer tab was removed (automations moved to
+        // the sidebar/overview). Coerce a stale persisted value so upgrading
+        // users whose last tab was Automations don't hit an undefined TAB_META
+        // lookup on the always-mounted FileExplorerHeader.
+        if (state && (state.fileExplorerActiveTab as string) === 'automations') {
+          state.fileExplorerActiveTab = 'files'
         }
         // Signal main process that store is hydrated (triggers session restoration)
         try {

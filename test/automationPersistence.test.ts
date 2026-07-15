@@ -24,6 +24,7 @@ function addCompletedRun(p: AutomationPersistence, automationId: string, started
   return p.addRun({
     automationId,
     projectId: 'project-1',
+    mode: 'headless',
     status: 'completed',
     startedAt,
     read: false,
@@ -45,6 +46,7 @@ describe('AutomationPersistence.pruneRuns', () => {
     const oldRunning = persistence.addRun({
       automationId,
       projectId: 'project-1',
+      mode: 'headless',
       status: 'running',
       startedAt: '2026-05-21T00:00:00.000Z',
       read: false,
@@ -74,6 +76,7 @@ describe('AutomationPersistence.pruneRuns', () => {
     persistence.addRun({
       automationId,
       projectId: 'project-1',
+      mode: 'headless',
       status: 'running',
       startedAt: '2026-05-21T00:00:00.000Z',
       read: false,

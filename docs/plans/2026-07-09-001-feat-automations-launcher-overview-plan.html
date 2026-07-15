@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Automations Launcher &amp; Overview - Plan</title>
+<style>
+  :root {
+    --bg: #ffffff; --surface: #f7f8fa; --surface2: #eef1f5; --card: #ffffff;
+    --fg: #1c2430; --mut: #5b6472; --dim: #8a93a3; --line: #e2e6ec;
+    --acc: #2563eb; --acc-soft: #eaf1ff; --acc-text: #1d4ed8;
+    --green: #16a34a; --green-soft:#e8f7ee; --amber:#d97706; --amber-soft:#fdf3e3;
+    --red:#dc2626; --red-soft:#fdeaea; --violet:#7c3aed; --violet-soft:#f2ecfd;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#14161b; --surface:#191c22; --surface2:#20242c; --card:#1a1d24;
+      --fg:#dce1e9; --mut:#9aa3b2; --dim:#6b7484; --line:#2a2f39;
+      --acc:#6ea8fe; --acc-soft:#1a2740; --acc-text:#8fbcff;
+      --green:#4ade80; --green-soft:#132a1d; --amber:#fbbf24; --amber-soft:#2c2412;
+      --red:#f87171; --red-soft:#2c1717; --violet:#a78bfa; --violet-soft:#241a3a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#14161b; --surface:#191c22; --surface2:#20242c; --card:#1a1d24;
+    --fg:#dce1e9; --mut:#9aa3b2; --dim:#6b7484; --line:#2a2f39;
+    --acc:#6ea8fe; --acc-soft:#1a2740; --acc-text:#8fbcff;
+    --green:#4ade80; --green-soft:#132a1d; --amber:#fbbf24; --amber-soft:#2c2412;
+    --red:#f87171; --red-soft:#2c1717; --violet:#a78bfa; --violet-soft:#241a3a;
+  }
+  :root[data-theme="light"] {
+    --bg:#ffffff; --surface:#f7f8fa; --surface2:#eef1f5; --card:#ffffff;
+    --fg:#1c2430; --mut:#5b6472; --dim:#8a93a3; --line:#e2e6ec;
+    --acc:#2563eb; --acc-soft:#eaf1ff; --acc-text:#1d4ed8;
+    --green:#16a34a; --green-soft:#e8f7ee; --amber:#d97706; --amber-soft:#fdf3e3;
+    --red:#dc2626; --red-soft:#fdeaea; --violet:#7c3aed; --violet-soft:#f2ecfd;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:15.5px; line-height:1.6; }
+  .wrap { max-width:940px; margin-inline:auto; padding:44px 26px 80px; }
+  h1 { font-size:29px; line-height:1.2; margin:0 0 6px; letter-spacing:-.01em; }
+  h2 { font-size:21px; margin:44px 0 14px; padding-bottom:7px; border-bottom:2px solid var(--line); letter-spacing:-.01em; }
+  h3 { font-size:16px; margin:26px 0 8px; }
+  h4 { font-size:13.5px; margin:18px 0 6px; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
+  p { max-width:74ch; }
+  hr { border:none; border-top:1px solid var(--line); margin:34px 0; }
+  .eyebrow { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--acc-text); margin:0 0 4px; }
+  a { color:var(--acc-text); text-decoration:none; } a:hover { text-decoration:underline; }
+  code { font-family:var(--mono); font-size:.86em; background:var(--surface2); padding:1px 5px; border-radius:5px; }
+  .meta { display:flex; flex-wrap:wrap; gap:7px 8px; margin:16px 0 6px; }
+  .meta .pill { font-size:11.5px; background:var(--surface); border:1px solid var(--line); border-radius:99px; padding:3px 11px; color:var(--mut); }
+  .meta .pill b { color:var(--fg); font-weight:600; }
+  .meta .pill.rd { background:var(--green-soft); color:var(--green); border-color:transparent; }
+  nav.toc { margin:20px 0 8px; padding:12px 16px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); font-size:13.5px; }
+  nav.toc b { display:block; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+  nav.toc a { margin-right:14px; white-space:nowrap; line-height:1.9; }
+  section { scroll-margin-top:16px; }
+  .capsule { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:6px 20px 14px; margin-top:8px; }
+  dl.fields { margin:0; }
+  dl.fields dt { font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--dim); margin-top:14px; }
+  dl.fields dd { margin:3px 0 0; }
+  .kd { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px 18px; margin:12px 0; }
+  .kd .t { font-weight:700; margin-bottom:4px; }
+  .kd .t .kid { font-family:var(--mono); color:var(--acc-text); margin-right:8px; }
+  .kd p { margin:0; color:var(--mut); }
+  .callout { border:1px solid var(--line); border-radius:var(--radius); padding:12px 16px; margin:10px 0; }
+  .callout .lbl { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin-bottom:5px; }
+  .c-defer { background:var(--amber-soft); } .c-defer .lbl { color:var(--amber); }
+  .c-out { background:var(--violet-soft); } .c-out .lbl { color:var(--violet); }
+  .c-note { background:var(--acc-soft); } .c-note .lbl { color:var(--acc-text); }
+  .c-risk { background:var(--red-soft); } .c-risk .lbl { color:var(--red); }
+  .callout ul { margin:4px 0 0; padding-left:18px; } .callout li { margin:3px 0; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  td.id, .rid { font-family:var(--mono); font-size:12.5px; color:var(--acc-text); white-space:nowrap; font-weight:600; }
+  .reqgroup { font-size:12.5px; font-weight:700; letter-spacing:.02em; margin:22px 0 2px; }
+  .flow, .ae { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:12px 16px; margin:10px 0; }
+  .flow .fid, .ae .aeid { font-family:var(--mono); font-weight:700; color:var(--acc-text); }
+  .ae .cov { font-size:11.5px; color:var(--dim); font-family:var(--mono); }
+  .lead { font-weight:600; }
+  figure { margin:16px 0; }
+  figcaption { font-size:12px; color:var(--mut); font-style:italic; margin-top:8px; max-width:74ch; }
+  .wf { border:1px dashed var(--line); border-radius:var(--radius); background:var(--surface); padding:14px; overflow-x:auto; }
+  .wfwin { display:flex; min-width:640px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--card); }
+  .wfsb { width:170px; background:var(--surface2); border-right:1px solid var(--line); padding:8px; flex-shrink:0; }
+  .wfsb .brand { font-weight:700; font-size:12px; padding:4px 6px 8px; }
+  .wfnav { font-size:11.5px; padding:6px 8px; border-radius:6px; color:var(--mut); display:flex; align-items:center; gap:6px; }
+  .wfnav.on { background:var(--acc-soft); color:var(--acc-text); font-weight:600; border:1px solid var(--line); }
+  .wfnav .bdg { margin-left:auto; background:var(--acc); color:#fff; border-radius:99px; font-size:9.5px; padding:0 6px; }
+  .wfhr { height:1px; background:var(--line); margin:8px 4px; }
+  .wflabel { font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); padding:3px 8px; }
+  .wfproj { font-size:11.5px; color:var(--mut); padding:4px 8px; }
+  .wfproj .mk { font-size:8.5px; background:var(--acc-soft); color:var(--acc-text); border-radius:3px; padding:0 4px; margin-left:6px; }
+  .wfmain { flex:1; min-width:0; }
+  .wfhd { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line); font-size:12.5px; font-weight:600; }
+  .wftabs { margin-left:auto; display:flex; gap:5px; font-weight:400; }
+  .wftabs span { font-size:11px; color:var(--mut); padding:2px 8px; border-radius:5px; }
+  .wftabs span.on { background:var(--surface2); color:var(--fg); }
+  .wftbl { width:100%; border-collapse:collapse; font-size:11.5px; margin:0; }
+  .wftbl th { font-size:9px; padding:6px 10px; border-bottom:1px solid var(--line); }
+  .wftbl td { padding:7px 10px; border-bottom:1px solid var(--line); }
+  .wfchip { font-size:9.5px; padding:1px 6px; border-radius:99px; background:var(--surface2); color:var(--mut); }
+  .wfchip.trg { background:var(--acc-soft); color:var(--acc-text); }
+  .wfchip.tgt { background:var(--green-soft); color:var(--green); }
+  .wfbtn { font-size:10px; padding:2px 8px; border-radius:5px; background:var(--acc); color:#fff; }
+  .wfbtn.sec { background:var(--surface2); color:var(--mut); }
+  .wftog { display:inline-block; width:22px; height:13px; border-radius:99px; background:var(--acc); position:relative; }
+  .wftog.off { background:var(--dim); }
+  article.unit { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px 18px; margin:12px 0; }
+  article.unit > .uhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  article.unit .uid { font-family:var(--mono); font-weight:700; color:var(--acc-text); font-size:14px; }
+  article.unit .utitle { font-weight:700; font-size:15px; }
+  article.unit dl.strip { display:grid; grid-template-columns:max-content 1fr; gap:3px 14px; margin:10px 0 4px; font-size:13.5px; }
+  article.unit dl.strip dt { color:var(--dim); font-size:11px; letter-spacing:.05em; text-transform:uppercase; padding-top:2px; }
+  article.unit dl.strip dd { margin:0; }
+  article.unit dl.strip dd code { font-size:12px; }
+  details { margin:8px 0 0; border-top:1px solid var(--line); padding-top:6px; }
+  summary { cursor:pointer; font-size:12px; font-weight:600; color:var(--acc-text); }
+  details ul { margin:8px 0; padding-left:18px; } details li { margin:4px 0; font-size:13.5px; }
+  .execnote { background:var(--amber-soft); border-radius:8px; padding:8px 12px; margin:8px 0 0; font-size:13px; }
+  .execnote b { color:var(--amber); }
+  .deps { font-family:var(--mono); font-size:12px; color:var(--mut); }
+  footer.composition-signal { margin-top:48px; padding-top:14px; border-top:1px solid var(--line); font-size:12px; color:var(--dim); }
+  .subtle { color:var(--mut); }
+  svg { max-width:100%; height:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Implementation-ready plan · ce-plan (from ce-brainstorm)</p>
+  <h1>Automations Launcher &amp; Overview - Plan</h1>
+  <p class="subtle">Move automations from the project-scoped right rail to a global left-sidebar surface, and add a focus-neutral foreground launch mode that spawns a live chat or worktree in the automation's project — with execution still coupled to one project.</p>
+
+  <div class="meta">
+    <span class="pill"><b>type</b> feat</span>
+    <span class="pill"><b>date</b> <time datetime="2026-07-09">2026-07-09</time></span>
+    <span class="pill"><b>topic</b> automations-launcher-overview</span>
+    <span class="pill"><b>execution</b> code</span>
+    <span class="pill"><b>artifact_contract</b> ce-unified-plan/v1</span>
+    <span class="pill rd"><b>artifact_readiness</b> implementation-ready</span>
+    <span class="pill"><b>product_contract_source</b> ce-brainstorm</span>
+  </div>
+
+  <div class="callout c-note">
+    <div class="lbl">Product Contract preservation</div>
+    <div>Changed from the brainstorm: <b>R12</b> (foreground launch is now focus-neutral and started via the positional <code>claude "&lt;prompt&gt;"</code> argument) and two new requirements — <b>R21</b> (no automation-initiated run switches focus) and <b>R22</b> (spawn animation + origin marker). Change authorized by the user during planning; the brainstorm had launch switching to the new session. All other Product Contract IDs unchanged.</div>
+  </div>
+
+  <nav class="toc">
+    <b>Contents</b>
+    <a href="#goal-capsule">Goal Capsule</a>
+    <a href="#product-contract">Product Contract</a>
+    <a href="#product-requirements">Requirements</a>
+    <a href="#planning-contract">Planning Contract</a>
+    <a href="#ktd">Key Technical Decisions</a>
+    <a href="#htd">Technical Design</a>
+    <a href="#impact">System-Wide Impact</a>
+    <a href="#risks">Risks</a>
+    <a href="#implementation-units">Implementation Units</a>
+    <a href="#verification-contract">Verification Contract</a>
+    <a href="#definition-of-done">Definition of Done</a>
+    <a href="#appendix">Sources</a>
+  </nav>
+
+  <section id="goal-capsule">
+    <h2>Goal Capsule</h2>
+    <div class="capsule">
+      <dl class="fields">
+        <dt>Objective</dt>
+        <dd>Relocate automations to a global left-sidebar entry with a full-area management overview (decoupled from the active project), and add a focus-neutral foreground launch that spawns a live chat or worktree in the automation's project. Execution stays coupled to exactly one project per automation.</dd>
+        <dt>Product authority</dt>
+        <dd>Remco (owner)</dd>
+        <dt>Open blockers</dt>
+        <dd>None. Two runtime edges are carried as deferred implementation detail (very-long-prompt command-line limit; prompt shell-quoting) — see Risks.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <hr />
+
+  <section id="product-contract">
+    <h2>Product Contract</h2>
+
+    <section id="summary">
+      <h3>Summary</h3>
+      <p>Promote automations to a global, top-level surface: a sidebar entry above the projects list that opens a flat-table overview of every automation, independent of the active project. Each automation belongs to exactly one project and can be <b>launched on demand</b> into a live, permission-gated chat or worktree (foreground — the primary use), or run <b>headless on a trigger</b> (secondary). Launches never steal focus; a spawn animation signals the new session. One run-history timeline covers both kinds of run.</p>
+    </section>
+
+    <section id="problem-frame">
+      <h3>Problem Frame</h3>
+      <p>The automation data model is already global — an automation stores its own project associations and the panel already lists every automation. But the only UI lives inside the right-side file-explorer flyout, behind an activity-rail icon. That surface reads as belonging to the active project, so managing automations across projects means hunting through a per-project flyout, and there is no single place to see everything.</p>
+      <p>Runs are headless-only: a <code>claude -p</code> process in a throwaway worktree whose output you read after the fact. You cannot launch a saved automation as a live, interactive session and let it run while you keep working. The net effect is that automations feel like a hidden, fire-and-forget corner rather than a first-class way to launch work.</p>
+    </section>
+
+    <section id="key-decisions">
+      <h3>Key Decisions</h3>
+      <div class="kd"><div class="t">Launch-template model, not a cron manager</div><p>On-demand foreground firing is the primary interaction; scheduled/event triggers are secondary. The overview is a launcher-with-management, not a schedule dashboard.</p></div>
+      <div class="kd"><div class="t">Single project per automation</div><p>Each automation belongs to exactly one project, replacing today's many-to-many <code>projectIds[]</code>. Simplest data model and UI; reuse means duplicating a template.</p></div>
+      <div class="kd"><div class="t">Foreground is an interactive, permission-gated chat</div><p>A foreground launch behaves like a normal chat: it runs under the project's Claude mode and prompts for permissions, unlike headless runs which skip permissions.</p></div>
+      <div class="kd"><div class="t">Focus-neutral launch</div><p>No automation-initiated run — manual or triggered — changes the active project or terminal. The spawned session appears in the sidebar, selectable, but never interrupts what you're doing. A spawn animation plus an origin marker make it noticeable.</p></div>
+      <div class="kd"><div class="t">Interface decoupled, execution coupled</div><p>The overview is global and does not depend on the active project. Every run still executes against exactly one project.</p></div>
+      <div class="kd"><div class="t">Move, not duplicate</div><p>The Automations tab is removed from the right-rail flyout and the activity rail entirely; the overview is the single home for automations.</p></div>
+    </section>
+
+    <section id="flows">
+      <h3>Key Flows</h3>
+      <div class="flow"><p><span class="fid">F1.</span> <span class="lead">Foreground launch.</span> Overview → row <b>Launch</b> → optionally override target for this run → a chat spawns (project working dir or a new worktree) started via <code>claude "&lt;prompt&gt;"</code>, running under the project's Claude mode → it appears in the sidebar with a spawn animation and origin marker, <em>without</em> switching focus → run history logs an entry linked to that session.</p></div>
+      <div class="flow"><p><span class="fid">F2.</span> <span class="lead">Headless triggered run.</span> A schedule or event trigger fires → the runner creates a throwaway worktree → <code>claude -p</code> runs headless with captured output → run history logs an entry with output. No visible chat, no focus change. (Unchanged from today.)</p></div>
+      <div class="flow"><p><span class="fid">F3.</span> <span class="lead">Manage.</span> Overview → create or edit an automation → set its single project, trigger, default target, and prompt → enable/disable via the row toggle. All from the global overview, without touching the active project.</p></div>
+    </section>
+
+    <section id="product-requirements">
+      <h2 style="border:none;margin-bottom:0;font-size:21px;">Requirements</h2>
+
+      <div class="reqgroup">Placement &amp; navigation</div>
+      <table><thead><tr><th style="width:44px">ID</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td class="id" id="r1">R1.</td><td><b>Automations</b> is a top-level entry in the left sidebar, positioned above the project list, present regardless of which project is active.</td></tr>
+        <tr><td class="id" id="r2">R2.</td><td>The entry shows a badge reflecting in-flight and/or unread runs.</td></tr>
+        <tr><td class="id" id="r3">R3.</td><td>Selecting Automations opens the overview in the main content area without changing the active project or its chats/worktrees.</td></tr>
+        <tr><td class="id" id="r4">R4.</td><td>The Automations tab is removed from the right-side file-explorer flyout and from the activity rail; the former <code>Ctrl+Shift+A</code> shortcut opens the new overview.</td></tr>
+      </tbody></table>
+
+      <div class="reqgroup">Overview surface</div>
+      <table><thead><tr><th style="width:44px">ID</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td class="id" id="r5">R5.</td><td>The overview lists every automation across all projects in a single flat table, independent of the active project.</td></tr>
+        <tr><td class="id" id="r6">R6.</td><td>Each row shows the automation name, its owning project, trigger, default target (chat or worktree), an enabled toggle, and last-run status.</td></tr>
+        <tr><td class="id" id="r7">R7.</td><td>Each row exposes a primary <b>Launch</b> (foreground) action and a secondary run-headless action.</td></tr>
+        <tr><td class="id" id="r8">R8.</td><td>The overview supports create, edit, delete, and enable/disable for automations.</td></tr>
+        <tr><td class="id" id="r9">R9.</td><td>The overview has a Run-history tab alongside the table.</td></tr>
+      </tbody></table>
+
+      <div class="reqgroup">Automation ↔ project coupling</div>
+      <table><thead><tr><th style="width:44px">ID</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td class="id" id="r10">R10.</td><td>Each automation belongs to exactly one project, set and changed from the overview.</td></tr>
+        <tr><td class="id" id="r11">R11.</td><td>Existing automations associated with multiple projects migrate to their first associated project; other associations are dropped.</td></tr>
+      </tbody></table>
+
+      <div class="reqgroup">Foreground launch</div>
+      <table><thead><tr><th style="width:44px">ID</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td class="id" id="r12">R12.</td><td>Launching an automation in the foreground spawns a visible, interactive chat the user owns — started by running <code>claude</code> with the automation's prompt as its initial argument, in the automation's project — <b>without switching to it</b>.</td></tr>
+        <tr><td class="id" id="r13">R13.</td><td>A foreground launch runs under the project's normal Claude mode and is permission-gated — it does not skip permissions.</td></tr>
+        <tr><td class="id" id="r14">R14.</td><td>Each automation stores a default target: a chat in the project working directory, or a new worktree. A launch uses this default.</td></tr>
+        <tr><td class="id" id="r15">R15.</td><td>At launch, a quick override lets the user switch the target for that one run without changing the stored default.</td></tr>
+        <tr><td class="id" id="r16">R16.</td><td>A foreground worktree launch creates a normal, persistent worktree that appears in the sidebar and is not subject to headless auto-garbage-collection.</td></tr>
+      </tbody></table>
+
+      <div class="reqgroup">Focus &amp; spawn feedback</div>
+      <table><thead><tr><th style="width:44px">ID</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td class="id" id="r21">R21.</td><td>No automation-initiated run — manual Launch or a cron/event trigger — changes the active project or active terminal. The spawned chat/worktree is selectable in the sidebar but the user is never switched mid-task.</td></tr>
+        <tr><td class="id" id="r22">R22.</td><td>A chat or worktree created by an automation plays a brief appearance animation in the sidebar and carries an automation-origin marker, so a focus-neutral launch is still noticeable.</td></tr>
+      </tbody></table>
+
+      <div class="reqgroup">Headless / triggered runs (preserve today's behavior)</div>
+      <table><thead><tr><th style="width:44px">ID</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td class="id" id="r17">R17.</td><td>Scheduled and event triggers continue to run headless in a throwaway worktree with captured output — behavior unchanged.</td></tr>
+        <tr><td class="id" id="r18">R18.</td><td>Headless concurrency stays capped at the current limit, and headless worktrees keep their auto-GC lifecycle.</td></tr>
+      </tbody></table>
+
+      <div class="reqgroup">Run history</div>
+      <table><thead><tr><th style="width:44px">ID</th><th>Requirement</th></tr></thead><tbody>
+        <tr><td class="id" id="r19">R19.</td><td>Run history records both foreground launches and headless runs in one timeline.</td></tr>
+        <tr><td class="id" id="r20">R20.</td><td>Headless entries show captured output; foreground entries link back to the spawned chat/worktree session, whether it is still live or has finished.</td></tr>
+      </tbody></table>
+    </section>
+
+    <figure>
+      <div class="wf">
+        <div class="wfwin">
+          <div class="wfsb">
+            <div class="brand">◆ Command</div>
+            <div class="wfnav on">⚡ Automations <span class="bdg">2</span></div>
+            <div class="wfhr"></div>
+            <div class="wflabel">Projects</div>
+            <div class="wfproj">▾ riverwise-site</div>
+            <div class="wfproj" style="padding-left:20px">Chat 1</div>
+            <div class="wfproj" style="padding-left:20px">Lint &amp; fix <span class="mk">⚡ auto</span></div>
+            <div class="wfproj">▸ command</div>
+          </div>
+          <div class="wfmain">
+            <div class="wfhd">Automations<span class="wftabs"><span class="on">All</span><span>Run history</span></span></div>
+            <table class="wftbl">
+              <thead><tr><th>Name</th><th>Project</th><th>Trigger</th><th>Target</th><th>Last</th><th>Actions</th></tr></thead>
+              <tbody>
+                <tr><td><span class="wftog"></span> PR triage</td><td><span class="wfchip">command</span></td><td><span class="wfchip trg">cron</span></td><td><span class="wfchip tgt">worktree</span></td><td>2h ✓</td><td><span class="wfbtn">▶ Launch</span> <span class="wfbtn sec">⚙</span></td></tr>
+                <tr><td><span class="wftog off"></span> Lint &amp; fix</td><td><span class="wfchip">riverwise-site</span></td><td><span class="wfchip trg">manual</span></td><td><span class="wfchip tgt">chat</span></td><td>now ⟳</td><td><span class="wfbtn">▶ Launch</span> <span class="wfbtn sec">⚙</span></td></tr>
+                <tr><td><span class="wftog"></span> Weekly audit</td><td><span class="wfchip">riverwise-site</span></td><td><span class="wfchip trg">cron</span></td><td><span class="wfchip tgt">worktree</span></td><td>fail ✕</td><td><span class="wfbtn">▶ Launch</span> <span class="wfbtn sec">⚙</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <figcaption>Directional only — illustrates the intended user-facing shape (sidebar entry above projects; the spawned "Lint &amp; fix" chat appears under its project with an origin marker but focus stays on the overview; flat table with per-row Launch + secondary headless action; run-history tab). Exact colors, spacing, copy, icons, and component choices are placeholders for review, not requirements.</figcaption>
+    </figure>
+
+    <section id="acceptance">
+      <h3>Acceptance Examples</h3>
+      <div class="ae"><p><span class="aeid">AE1.</span> <span class="lead">Foreground launch, worktree default, no override.</span> <span class="cov">Covers R12, R13, R16, R21, R22, R20.</span></p><p>An automation whose default target is a worktree is launched from its row. A new persistent worktree is created and a chat spawns inside it via <code>claude "&lt;prompt&gt;"</code> under the project's Claude mode; permission prompts apply when the session hits a gated tool. The active project/terminal do not change; the new worktree+chat appear in the sidebar with a spawn animation and origin marker, and a run-history entry links to that session.</p></div>
+      <div class="ae"><p><span class="aeid">AE2.</span> <span class="lead">Per-run target override.</span> <span class="cov">Covers R14, R15.</span></p><p>At launch the user overrides a chat-default automation to run in a worktree for this one launch. The run uses the worktree target; the automation's stored default remains "chat" for the next launch.</p></div>
+      <div class="ae"><p><span class="aeid">AE3.</span> <span class="lead">Scheduled trigger fires while the user works.</span> <span class="cov">Covers R17, R18, R19, R20, R21.</span></p><p>A cron trigger fires mid-task. The run executes headless in a throwaway worktree, output is captured, and a run-history entry shows it. No visible chat opens, the active project/terminal are untouched, and the throwaway worktree is auto-GC'd per existing rules.</p></div>
+      <div class="ae"><p><span class="aeid">AE4.</span> <span class="lead">Migrating a multi-project automation.</span> <span class="cov">Covers R10, R11.</span></p><p>An existing automation associated with two projects is loaded after the change. It is bound to the first associated project; the second association is dropped, and the overview shows it under that one project.</p></div>
+      <div class="ae"><p><span class="aeid">AE5.</span> <span class="lead">Open the overview while another project is active.</span> <span class="cov">Covers R3, R5.</span></p><p>Project B is active with open chats. Opening Automations shows every automation across all projects; project B stays active and its chats/worktrees are untouched. Leaving the overview returns to project B unchanged.</p></div>
+    </section>
+
+    <section id="scope">
+      <h3>Scope Boundaries</h3>
+      <div class="callout c-out"><div class="lbl">Outside this change</div><ul>
+        <li>Trigger types stay as they are — no new trigger kinds (cron / claude-done / git-event / file-change unchanged).</li>
+        <li>The headless execution mechanism, concurrency cap, and worktree GC lifecycle are unchanged.</li>
+        <li>No cross-project reuse of a single automation, no chaining, no import / export / sharing.</li>
+      </ul></div>
+      <div class="callout c-defer"><div class="lbl">Deferred to follow-up work</div><ul>
+        <li>Temp-file / stdin fallback for prompts that exceed the OS command-line length limit (basic positional-arg path ships in U3; the fallback is follow-up unless the simple path proves insufficient).</li>
+        <li>Cron/event triggers that spawn a foreground chat instead of headless — triggers stay headless for now.</li>
+        <li>Configurable spawn animation and richer run-history filtering.</li>
+      </ul></div>
+    </section>
+
+    <section id="assumptions">
+      <h3>Dependencies &amp; Assumptions</h3>
+      <div class="callout c-note"><div class="lbl">Assumptions</div><ul>
+        <li><code>claude "&lt;prompt&gt;"</code> starts an interactive session with the prompt auto-submitted (verified via <code>claude --help</code>: "starts an interactive session by default", positional <code>[prompt]</code>).</li>
+        <li>The project's Claude mode is already resolved into the standard chat-create path (<code>handleTerminalCreate</code> → <code>TerminalManager.createTerminal</code>'s <code>claudeMode</code> option), so a foreground launch inherits permission-gating without new wiring.</li>
+        <li>Multi-project automations are rare in practice, so migrating to the first associated project is acceptable without a per-automation prompt.</li>
+      </ul></div>
+    </section>
+  </section>
+
+  <hr />
+
+  <section id="planning-contract">
+    <h2>Planning Contract</h2>
+
+    <section id="ktd">
+      <h3>Key Technical Decisions</h3>
+      <div class="kd"><div class="t"><span class="kid">KTD1.</span>Launch via positional <code>claude "&lt;prompt&gt;"</code>, not timed PTY injection</div><p>The existing PTY writes the <code>claude</code> command after a shell-ready delay; a foreground launch appends the automation prompt as the positional argument so the interactive session starts with the prompt already submitted. This removes any need to detect REPL readiness before injecting keystrokes. The prompt must be shell-quoted safely; very long prompts risk exceeding OS argument limits (see Risks, temp-file fallback deferred).</p></div>
+      <div class="kd"><div class="t"><span class="kid">KTD2.</span>Single-project data model with in-place migration</div><p><code>Automation.projectIds: string[]</code> becomes <code>projectId: string</code> plus a new <code>defaultTarget: 'chat' | 'worktree'</code>; <code>AutomationRun</code> gains <code>mode: 'foreground' | 'headless'</code> and <code>terminalId?: string</code>. <code>AutomationPersistence</code> bumps its state version and migrates on load: first <code>projectIds</code> entry → <code>projectId</code>, missing <code>defaultTarget</code> → <code>worktree</code>, existing runs → <code>headless</code>.</p></div>
+      <div class="kd"><div class="t"><span class="kid">KTD3.</span>Focus-neutral launch, compensated by a spawn cue</div><p>The launch path never calls <code>setActiveProject</code>/<code>setActiveTerminal</code>. Because focus stays put, the spawned sidebar item plays an appearance animation and carries an origin marker (a new <code>origin: 'automation'</code> field on <code>TerminalSession</code>) so the user notices. This rule is universal — manual launches and any triggered run.</p></div>
+      <div class="kd"><div class="t"><span class="kid">KTD4.</span>Overview as a project-independent center overlay</div><p>A new <code>automationsOverviewVisible</code> store flag mirrors <code>projectOverviewVisible</code>. <code>TerminalArea</code> renders <code>&lt;AutomationsOverview /&gt;</code> at the top of its render — <em>before</em> the "no active project" welcome branch — so the overview shows regardless of active project (R3, R5, AE5). The flag is not cleared by a launch (launch is focus-neutral).</p></div>
+      <div class="kd"><div class="t"><span class="kid">KTD5.</span>Foreground orchestration is renderer-side; main only records the run</div><p>A <code>useLaunchAutomation</code> hook resolves project + target (+ override), creates the worktree when needed (reusing the existing worktree-create path), creates the chat via <code>useCreateTerminal</code> with an <code>initialPrompt</code> and <em>without</em> activating it, then calls a new <code>automation:record-launch</code> IPC so the main process logs a <code>foreground</code> run linked to the terminal. The headless <code>AutomationRunner</code> is untouched.</p></div>
+      <div class="kd"><div class="t"><span class="kid">KTD6.</span>Move, not copy — delete the panel</div><p><code>AutomationsPanel.tsx</code> is deleted; its markdown-render/status-icon/formatter helpers move into the new overview. The activity-rail entry, the <code>ExplorerTab</code> 'automations' member, and the file-explorer tab case are removed.</p></div>
+    </section>
+
+    <section id="htd">
+      <h3>High-Level Technical Design</h3>
+      <figure>
+        <svg viewBox="0 0 860 320" role="img" aria-label="Launch and trigger flow across renderer and main process" font-family="system-ui, sans-serif" font-size="12">
+          <defs>
+            <marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8a93a3"/></marker>
+          </defs>
+          <text x="16" y="20" font-weight="700" fill="#8a93a3" font-size="11">RENDERER</text>
+          <text x="16" y="188" font-weight="700" fill="#8a93a3" font-size="11">MAIN PROCESS</text>
+          <line x1="0" y1="168" x2="860" y2="168" stroke="#e2e6ec" stroke-dasharray="4 4"/>
+
+          <!-- renderer boxes -->
+          <rect x="16" y="34" width="150" height="46" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
+          <text x="91" y="55" text-anchor="middle" fill="#1d4ed8" font-weight="600">Sidebar entry</text>
+          <text x="91" y="70" text-anchor="middle" fill="#5b6472" font-size="10">sets overviewVisible</text>
+
+          <rect x="200" y="34" width="160" height="46" rx="8" fill="#ffffff" stroke="#e2e6ec"/>
+          <text x="280" y="55" text-anchor="middle" fill="#1c2430" font-weight="600">AutomationsOverview</text>
+          <text x="280" y="70" text-anchor="middle" fill="#5b6472" font-size="10">flat table · Launch</text>
+
+          <rect x="396" y="34" width="170" height="46" rx="8" fill="#ffffff" stroke="#e2e6ec"/>
+          <text x="481" y="52" text-anchor="middle" fill="#1c2430" font-weight="600">useLaunchAutomation</text>
+          <text x="481" y="67" text-anchor="middle" fill="#5b6472" font-size="10">target + override; no focus</text>
+
+          <rect x="600" y="24" width="150" height="30" rx="8" fill="#ffffff" stroke="#e2e6ec"/>
+          <text x="675" y="43" text-anchor="middle" fill="#1c2430" font-size="11">worktree.create?</text>
+          <rect x="600" y="62" width="150" height="30" rx="8" fill="#ffffff" stroke="#e2e6ec"/>
+          <text x="675" y="81" text-anchor="middle" fill="#1c2430" font-size="11">useCreateTerminal</text>
+
+          <!-- main boxes -->
+          <rect x="600" y="200" width="230" height="46" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
+          <text x="715" y="221" text-anchor="middle" fill="#1d4ed8" font-weight="600">TerminalManager.createTerminal</text>
+          <text x="715" y="236" text-anchor="middle" fill="#5b6472" font-size="10">claude "&lt;prompt&gt;" · claudeMode</text>
+
+          <rect x="330" y="200" width="200" height="46" rx="8" fill="#ffffff" stroke="#e2e6ec"/>
+          <text x="430" y="221" text-anchor="middle" fill="#1c2430" font-weight="600">AutomationService</text>
+          <text x="430" y="236" text-anchor="middle" fill="#5b6472" font-size="10">record-launch → run(foreground)</text>
+
+          <rect x="40" y="200" width="200" height="46" rx="8" fill="#f7f8fa" stroke="#e2e6ec"/>
+          <text x="140" y="221" text-anchor="middle" fill="#1c2430" font-weight="600">AutomationRunner</text>
+          <text x="140" y="236" text-anchor="middle" fill="#5b6472" font-size="10">headless claude -p (unchanged)</text>
+
+          <rect x="330" y="272" width="200" height="34" rx="8" fill="#e8f7ee" stroke="#16a34a"/>
+          <text x="430" y="293" text-anchor="middle" fill="#16a34a" font-weight="600">Run history (both modes)</text>
+
+          <!-- arrows -->
+          <line x1="166" y1="57" x2="198" y2="57" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <line x1="360" y1="57" x2="394" y2="57" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <line x1="566" y1="52" x2="598" y2="42" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <line x1="566" y1="62" x2="598" y2="72" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <line x1="675" y1="92" x2="715" y2="198" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <line x1="481" y1="80" x2="450" y2="198" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <text x="452" y="140" fill="#5b6472" font-size="10">record-launch (IPC)</text>
+          <line x1="430" y1="246" x2="430" y2="270" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <line x1="140" y1="246" x2="380" y2="274" stroke="#8a93a3" marker-end="url(#arw)"/>
+          <text x="150" y="188" fill="#5b6472" font-size="10">cron/event trigger</text>
+        </svg>
+        <figcaption>Foreground launch (top path) is renderer-orchestrated and reuses the standard terminal/worktree creation; the headless runner (bottom-left) is untouched. Both write into one run-history timeline.</figcaption>
+      </figure>
+    </section>
+
+    <section id="impact">
+      <h3>System-Wide Impact</h3>
+      <ul>
+        <li><b>Persisted data migration.</b> <code>automations.json</code> and <code>automation-runs.json</code> migrate on first load (new state version). One-way; safe defaults.</li>
+        <li><b>IPC contract.</b> <code>terminal:create</code> gains an <code>initialPrompt</code> parameter; a new <code>automation:record-launch</code> channel is added. Preload + renderer types update in lockstep.</li>
+        <li><b>Layout.</b> A new sidebar entry and a new center overlay; the right-rail activity icon and file-explorer tab are removed.</li>
+        <li><b>Hotkey + docs.</b> <code>Ctrl+Shift+A</code> rebinds from "automations tab" to "show automations overview"; the CLAUDE.md shortcuts table updates.</li>
+      </ul>
+    </section>
+
+    <section id="risks">
+      <h3>Risks &amp; Mitigations</h3>
+      <div class="callout c-risk"><div class="lbl">Risk · prompt quoting</div><div>The automation prompt is interpolated into a shell command line written to the PTY. Unsafe quoting could break the command or allow injection. <b>Mitigation:</b> quote the prompt as a single argument with proper escaping; unit-test the command builder with quotes, newlines, backticks, and <code>$</code>.</div></div>
+      <div class="callout c-risk"><div class="lbl">Risk · very long prompts</div><div>The dialog allows prompts up to 50,000 chars; a positional argument that long can exceed OS command-line limits. <b>Mitigation:</b> ship the positional-arg path for normal sizes; carry a temp-file/stdin fallback as deferred follow-up and cap or warn if the limit is approached.</div></div>
+      <div class="callout c-risk"><div class="lbl">Risk · migration data loss</div><div>Collapsing <code>projectIds[]</code> to a single <code>projectId</code> drops extra associations. <b>Mitigation:</b> accepted per R11; migration keeps the first project and is covered by a migration test against a v1 fixture.</div></div>
+    </section>
+
+    <section id="implementation-units">
+      <h2 style="border:none;margin-bottom:4px;font-size:21px;">Implementation Units</h2>
+      <p class="subtle" style="font-size:13px">Dependency order: U1 → (U2, U3) → U4 → U5 → U6 → U7; U8 after U1. Each is roughly one atomic commit.</p>
+
+      <article class="unit" id="u1">
+        <div class="uhead"><span class="uid">U1.</span><span class="utitle">Data model &amp; persistence migration</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>Single-project automations, default target, and run mode/link fields, with a safe in-place migration.</dd>
+          <dt>Requirements</dt><dd>R10, R11, R14, R16, R19, R20</dd>
+          <dt>Dependencies</dt><dd class="deps">none</dd>
+          <dt>Files</dt><dd><code>electron/main/services/AutomationPersistence.ts</code>, <code>src/types/index.ts</code>, <code>test/</code> (new migration test)</dd>
+        </dl>
+        <div class="execnote"><b>Execution note:</b> write the migration test first against a v1 fixture — persistence is data-lossy if the migration is wrong.</div>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Change <code>Automation.projectIds: string[]</code> → <code>projectId: string</code>; add <code>defaultTarget: 'chat' | 'worktree'</code>. Add <code>mode: 'foreground' | 'headless'</code> and <code>terminalId?: string</code> to <code>AutomationRun</code>. Bump <code>STATE_VERSION</code> and implement migration in <code>migrateAutomationState</code>/<code>migrateRunState</code>: <code>projectIds[0]</code> → <code>projectId</code> (drop entries with none, mark <code>enabled:false</code>), missing <code>defaultTarget</code> → <code>worktree</code>, existing runs → <code>mode:'headless'</code>. Keep the duplicated type block in sync with <code>src/types/index.ts</code>.</li>
+            <li><b>Patterns to follow:</b> existing <code>migrateAutomationState</code>/<code>atomicWrite</code> in the same file.</li>
+            <li><b>Test scenarios:</b> v1 state with a two-project automation → migrates to first project; automation with empty <code>projectIds</code> → disabled; missing <code>defaultTarget</code> → <code>worktree</code>; v1 run without <code>mode</code> → <code>headless</code>; round-trip save/load preserves new fields. <span class="deps">Covers AE4.</span></li>
+          </ul>
+        </details>
+      </article>
+
+      <article class="unit" id="u2">
+        <div class="uhead"><span class="uid">U2.</span><span class="utitle">AutomationService: single-project + foreground run recording</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>Service reads a single <code>projectId</code>; add a method + IPC to record a foreground launch as a run.</dd>
+          <dt>Requirements</dt><dd>R17, R18, R19, R20</dd>
+          <dt>Dependencies</dt><dd class="deps">U1</dd>
+          <dt>Files</dt><dd><code>electron/main/services/AutomationService.ts</code>, <code>electron/main/index.ts</code>, <code>electron/preload/index.ts</code>, <code>src/types/index.ts</code></dd>
+        </dl>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Replace <code>triggerForAllProjects</code> with <code>triggerForProject</code> using <code>automation.projectId</code>; update <code>handleClaudeDoneTrigger</code>, <code>handleGitEventTrigger</code>, <code>handleFileChangeTrigger</code>, and the <code>automation:trigger</code> handler to the single project. Add <code>recordForegroundLaunch(automationId, { terminalId, worktreeBranch })</code> that creates an <code>AutomationRun</code> with <code>mode:'foreground'</code> and emits <code>automation:run-started</code>; expose it via a new <code>automation:record-launch</code> IPC + preload method. Adjust <code>removeProjectFromAutomations</code> for single project (disable when its project is removed).</li>
+            <li><b>Patterns to follow:</b> existing <code>triggerRun</code> run-record creation and <code>sendToRenderer</code> emission.</li>
+            <li><b>Test scenarios:</b> git-event trigger runs only for the automation's project; <code>recordForegroundLaunch</code> creates a run with <code>mode:'foreground'</code> and the given <code>terminalId</code>; deleting the project disables its automation. <span class="deps">Covers AE3 (headless path unchanged).</span></li>
+          </ul>
+        </details>
+      </article>
+
+      <article class="unit" id="u3">
+        <div class="uhead"><span class="uid">U3.</span><span class="utitle">Foreground launch via positional prompt in terminal creation</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>Let a new chat start with the automation prompt as <code>claude</code>'s initial argument.</dd>
+          <dt>Requirements</dt><dd>R12, R13</dd>
+          <dt>Dependencies</dt><dd class="deps">none (parallel with U2)</dd>
+          <dt>Files</dt><dd><code>electron/main/services/TerminalManager.ts</code>, <code>electron/main/index.ts</code>, <code>electron/preload/index.ts</code>, <code>src/types/index.ts</code></dd>
+        </dl>
+        <div class="execnote"><b>Execution note:</b> unit-test the command-string builder for quoting; then smoke-verify one real launch (the prompt actually runs, permissions still prompt).</div>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Add <code>initialPrompt?: string</code> to the terminal-create options through <code>terminal:create</code> IPC → <code>handleTerminalCreate</code> → <code>TerminalManager.createTerminal</code>. When present and <code>type === 'claude'</code>, build the command as <code>claude [flags] &lt;quoted-prompt&gt;\r</code> using safe single-quote escaping. <code>claudeMode</code> is already resolved by <code>handleTerminalCreate</code>, so permission-gating (R13) needs no new work. Do not touch the headless <code>-p</code> path.</li>
+            <li><b>Patterns to follow:</b> existing flag assembly at the <code>claude</code>-command build site in <code>createTerminal</code>; the <code>resumeSessionId</code> threading as the shape for a new optional arg.</li>
+            <li><b>Test scenarios:</b> builder quotes a prompt containing double quotes, single quotes, newlines, backticks, and <code>$</code> into one argument; no <code>initialPrompt</code> → command identical to today; full-auto project still adds <code>--dangerously-skip-permissions</code>. Smoke: launch runs the prompt in an interactive session.</li>
+          </ul>
+        </details>
+      </article>
+
+      <article class="unit" id="u4">
+        <div class="uhead"><span class="uid">U4.</span><span class="utitle">Overview visibility state + focus-neutral launch hook</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>A project-independent overview flag, and a launch orchestrator that never changes focus.</dd>
+          <dt>Requirements</dt><dd>R3, R12, R15, R21, R22 (data)</dd>
+          <dt>Dependencies</dt><dd class="deps">U2, U3</dd>
+          <dt>Files</dt><dd><code>src/stores/projectStore.ts</code>, <code>src/hooks/useLaunchAutomation.ts</code> (new), <code>src/types/index.ts</code></dd>
+        </dl>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Add <code>automationsOverviewVisible</code> + <code>setAutomationsOverviewVisible</code> mirroring <code>projectOverviewVisible</code> (ephemeral, not persisted). Add <code>origin?: 'automation'</code> to <code>TerminalSession</code>. New <code>useLaunchAutomation</code> hook: resolve project + effective target (default or per-launch override), create a worktree when target is worktree (reuse the sidebar's worktree-create path), then <code>useCreateTerminal</code> with <code>initialPrompt</code> and <b>without</b> calling <code>setActiveTerminal</code>/<code>setActiveProject</code>; tag the created <code>TerminalSession</code> with <code>origin:'automation'</code>; call <code>automation:record-launch</code>. Do not clear <code>automationsOverviewVisible</code> on launch.</li>
+            <li><b>Patterns to follow:</b> <code>setProjectOverviewVisible</code>; <code>handleWorktreeCreated</code> in <code>Sidebar.tsx</code> (but omit the <code>setActiveTerminal</code> call).</li>
+            <li><b>Test scenarios:</b> launch does not change <code>activeProjectId</code>/<code>activeTerminalId</code>; chat target creates a terminal with <code>initialPrompt</code> and <code>origin:'automation'</code>; worktree target creates worktree then chat; override changes only this run's target. <span class="deps">Covers AE1, AE2, R21.</span></li>
+          </ul>
+        </details>
+      </article>
+
+      <article class="unit" id="u5">
+        <div class="uhead"><span class="uid">U5.</span><span class="utitle">AutomationsOverview center component</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>The new flat-table management surface with a run-history tab, rendered project-independently.</dd>
+          <dt>Requirements</dt><dd>R5, R6, R7, R8, R9, R19, R20</dd>
+          <dt>Dependencies</dt><dd class="deps">U2, U4</dd>
+          <dt>Files</dt><dd><code>src/components/Automations/AutomationsOverview.tsx</code> (new), <code>src/components/Layout/TerminalArea.tsx</code></dd>
+        </dl>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Build a flat table (name, project, trigger, target, enabled toggle, last-run status) with a primary <b>Launch</b> (calls <code>useLaunchAutomation</code>) and a secondary headless action (<code>api.automation.trigger</code>) per row, plus a <b>Run history</b> tab. Foreground history entries render an "open chat" link that calls <code>setActiveTerminal(run.terminalId)</code> when that terminal still exists. Migrate <code>RunResultContent</code>, <code>statusIcon</code>, and the time/duration formatters out of <code>AutomationsPanel</code>. In <code>TerminalArea</code>, render <code>&lt;AutomationsOverview /&gt;</code> as the first branch, before the <code>!activeProjectId</code> welcome check.</li>
+            <li><b>Patterns to follow:</b> <code>ProjectOverview</code> as the center-overlay precedent; the run-list rendering already in <code>AutomationsPanel</code>.</li>
+            <li><b>Test scenarios:</b> table lists automations from multiple projects; Launch calls the launch hook, headless action calls <code>api.automation.trigger</code>; run-history tab shows foreground + headless entries; foreground entry's open-chat link activates the terminal; overview renders with no active project. <span class="deps">Covers AE5, R5, R7, R9, R20.</span></li>
+          </ul>
+        </details>
+      </article>
+
+      <article class="unit" id="u6">
+        <div class="uhead"><span class="uid">U6.</span><span class="utitle">Sidebar Automations entry + spawn animation &amp; marker</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>Top-level sidebar entry above projects with a badge; visible cue for automation-spawned sessions.</dd>
+          <dt>Requirements</dt><dd>R1, R2, R3, R22</dd>
+          <dt>Dependencies</dt><dd class="deps">U4, U5</dd>
+          <dt>Files</dt><dd><code>src/components/Sidebar/Sidebar.tsx</code>, <code>src/components/Sidebar/TerminalListItem.tsx</code>, <code>src/index.css</code> (or Tailwind config for keyframes)</dd>
+        </dl>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Add an Automations entry above <code>SortableProjectList</code> (Zap icon + label + badge from <code>useAutomationUnreadCount</code>) whose click calls <code>setAutomationsOverviewVisible(true)</code> and does <b>not</b> change the active project. In <code>TerminalListItem</code>, when <code>terminal.origin === 'automation'</code>, render an origin marker and play a one-shot appearance animation on mount.</li>
+            <li><b>Patterns to follow:</b> the logo-header block and footer in <code>Sidebar.tsx</code>; the badge markup in <code>ActivityRail</code>.</li>
+            <li><b>Test scenarios:</b> clicking the entry sets <code>automationsOverviewVisible</code> without changing <code>activeProjectId</code>; badge reflects unread count; an <code>origin:'automation'</code> terminal renders the marker. <span class="deps">Covers R1, R2, R3, R22.</span></li>
+          </ul>
+        </details>
+      </article>
+
+      <article class="unit" id="u7">
+        <div class="uhead"><span class="uid">U7.</span><span class="utitle">Remove right-rail Automations tab + rebind hotkey</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>Remove the old surface and repurpose its shortcut to open the overview.</dd>
+          <dt>Requirements</dt><dd>R4</dd>
+          <dt>Dependencies</dt><dd class="deps">U5, U6</dd>
+          <dt>Files</dt><dd><code>src/components/Layout/ActivityRail.tsx</code>, <code>src/components/FileExplorer/FileExplorer.tsx</code>, <code>src/components/FileExplorer/AutomationsPanel.tsx</code> (delete), <code>src/utils/hotkeys.ts</code>, <code>src/types/hotkeys.ts</code>, <code>src/App.tsx</code>, <code>CLAUDE.md</code></dd>
+        </dl>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Remove the <code>automations</code> member from <code>ExplorerTab</code>, the <code>ITEMS</code> entry, and the <code>counts</code> map in <code>ActivityRail</code>; remove the automations tab case and <code>AutomationsPanel</code> usage from <code>FileExplorer</code>; delete <code>AutomationsPanel.tsx</code> (helpers already migrated in U5). Rename the <code>fileExplorer.automationsTab</code> action to <code>automations.showOverview</code> in <code>DEFAULT_HOTKEY_CONFIG</code> and the <code>HotkeyAction</code> union; point the <code>App.tsx</code> handler at <code>setAutomationsOverviewVisible(true)</code>; update the CLAUDE.md shortcuts table.</li>
+            <li><b>Patterns to follow:</b> existing hotkey action registration in <code>App.tsx</code> and <code>DEFAULT_HOTKEY_CONFIG</code>; the persisted-config fallback note for renamed actions.</li>
+            <li><b>Test scenarios:</b> <code>Test expectation: none</code> for the removals (compile-time + manual); verify the rebinding — <code>Ctrl+Shift+A</code> opens the overview. <span class="deps">Covers R4.</span></li>
+          </ul>
+        </details>
+      </article>
+
+      <article class="unit" id="u8">
+        <div class="uhead"><span class="uid">U8.</span><span class="utitle">Edit dialog: single project + default target selector</span></div>
+        <dl class="strip">
+          <dt>Goal</dt><dd>Create/edit an automation with one project and a default target.</dd>
+          <dt>Requirements</dt><dd>R8, R10, R14</dd>
+          <dt>Dependencies</dt><dd class="deps">U1</dd>
+          <dt>Files</dt><dd><code>src/components/FileExplorer/AutomationCreateDialog.tsx</code> (invoked from <code>AutomationsOverview</code>)</dd>
+        </dl>
+        <details>
+          <summary>Approach, patterns, test scenarios</summary>
+          <ul>
+            <li><b>Approach:</b> Replace the multi-project checkbox group with a single-project select (default to the first project when creating). Add a default-target control (chat / worktree). <code>handleSave</code> sends <code>projectId</code> and <code>defaultTarget</code> instead of <code>projectIds</code>. Update <code>canSubmit</code> to require a selected project.</li>
+            <li><b>Patterns to follow:</b> the existing trigger-type button group in the same dialog for the target selector; the git-event <code>&lt;select&gt;</code> for the project select.</li>
+            <li><b>Test scenarios:</b> creating an automation sends a single <code>projectId</code> + <code>defaultTarget</code>; editing pre-populates both; submit disabled with no project selected.</li>
+          </ul>
+        </details>
+      </article>
+    </section>
+
+    <section id="verification-contract">
+      <h2>Verification Contract</h2>
+      <ul>
+        <li><code>npm run test</code> — Vitest suite green, including the new persistence-migration and service single-project tests.</li>
+        <li><code>npm run build</code> — TypeScript + Vite build clean (no <code>projectIds</code> references remain; hotkey union updated).</li>
+        <li><b>Smoke — foreground chat launch:</b> Launch a chat-target automation; the prompt runs in an interactive session, permission prompts appear, focus does not switch, the sidebar item animates with an origin marker (AE1, R12, R13, R21, R22).</li>
+        <li><b>Smoke — worktree launch:</b> Launch a worktree-target automation; a persistent worktree + chat appear in the sidebar without focus change (AE1, R16).</li>
+        <li><b>Smoke — headless trigger:</b> A cron/manual headless run still executes and captures output with no chat and no focus change (AE3, R17, R18).</li>
+        <li><b>Smoke — migration:</b> A pre-change <code>automations.json</code> with a multi-project automation loads bound to its first project (AE4).</li>
+        <li><b>Smoke — overview independence:</b> Open the overview with a different project active and with no project active; both render (AE5, R5).</li>
+      </ul>
+    </section>
+
+    <section id="definition-of-done">
+      <h2>Definition of Done</h2>
+      <ul>
+        <li>R1–R22 satisfied; AE1–AE5 pass by manual smoke.</li>
+        <li>Automations reachable only from the sidebar entry + overview; right-rail tab and activity-rail icon gone; <code>AutomationsPanel.tsx</code> deleted.</li>
+        <li><code>Ctrl+Shift+A</code> opens the overview; CLAUDE.md shortcuts table updated.</li>
+        <li>Persistence migrates cleanly from a v1 fixture; no data-loss beyond the accepted first-project rule.</li>
+        <li>Foreground launches never change active focus; spawned sessions carry the animation + origin marker.</li>
+        <li><code>npm run test</code> and <code>npm run build</code> both pass.</li>
+      </ul>
+    </section>
+  </section>
+
+  <hr />
+
+  <section id="appendix">
+    <h2>Sources</h2>
+    <ul>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/AutomationService.ts"><code>electron/main/services/AutomationService.ts</code></a> — triggers, per-project fan-out, run orchestration (U2).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/AutomationRunner.ts"><code>electron/main/services/AutomationRunner.ts</code></a> — headless <code>claude -p</code>, throwaway worktrees, GC (unchanged).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/AutomationPersistence.ts"><code>electron/main/services/AutomationPersistence.ts</code></a> — <code>Automation</code>/<code>AutomationRun</code> shapes + migration (U1).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/TerminalManager.ts"><code>electron/main/services/TerminalManager.ts</code></a> — <code>createTerminal</code> command build, <code>claudeMode</code>, <code>writeToPty</code> (U3).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/hooks/useCreateTerminal.ts"><code>src/hooks/useCreateTerminal.ts</code></a> and <a href="https://github.com/remcovolmer/command/blob/main/src/components/Sidebar/Sidebar.tsx"><code>src/components/Sidebar/Sidebar.tsx</code></a> — chat/worktree creation pattern (U4, U6).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/TerminalArea.tsx"><code>src/components/Layout/TerminalArea.tsx</code></a> — center-overlay render gate (U5).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Layout/ActivityRail.tsx"><code>src/components/Layout/ActivityRail.tsx</code></a> and <a href="https://github.com/remcovolmer/command/blob/main/src/components/FileExplorer/AutomationsPanel.tsx"><code>src/components/FileExplorer/AutomationsPanel.tsx</code></a> — surface being removed (U7).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/docs/plans/2026-02-23-feat-automations-plan.md"><code>docs/plans/2026-02-23-feat-automations-plan.md</code></a> — original automations plan.</li>
+    </ul>
+  </section>
+
+  <footer class="composition-signal">Composed 2026-07-09 by ce-plan, enriching the ce-brainstorm requirements-only plan in place to implementation-ready. Foreground-launch design (positional <code>claude</code> prompt, focus-neutral, spawn cue) refined with the user during planning.</footer>
+
+</div>
+</body>
+</html>

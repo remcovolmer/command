@@ -3,7 +3,7 @@ import { X, Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import { useProjectStore } from '../../stores/projectStore'
-import type { Automation, AutomationTrigger, GitEvent } from '../../types'
+import type { Automation, AutomationTrigger, AutomationTarget, GitEvent } from '../../types'
 
 interface AutomationCreateDialogProps {
   isOpen: boolean
@@ -23,7 +23,8 @@ export function AutomationCreateDialog({
 
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
+  const [projectId, setProjectId] = useState<string>('')
+  const [defaultTarget, setDefaultTarget] = useState<AutomationTarget>('worktree')
   const [triggerType, setTriggerType] = useState<TriggerType>('schedule')
   const [cron, setCron] = useState('0 9 * * *')
   const [gitEvent, setGitEvent] = useState<GitEvent>('pr-merged')
@@ -35,13 +36,18 @@ export function AutomationCreateDialog({
 
   const isEditing = !!editAutomation
 
+  // Worktree launches need a Git repo, which only Code-type projects have.
+  const selectedProject = projects.find((p) => p.id === projectId)
+  const canUseWorktree = selectedProject?.type === 'code'
+
   // Populate form when editing
   useEffect(() => {
     if (!isOpen) return
     if (editAutomation) {
       setName(editAutomation.name)
       setPrompt(editAutomation.prompt)
-      setSelectedProjectIds(editAutomation.projectIds)
+      setProjectId(editAutomation.projectId)
+      setDefaultTarget(editAutomation.defaultTarget)
       setTriggerType(editAutomation.trigger.type)
       setTimeoutMinutes(editAutomation.timeoutMinutes)
       if (editAutomation.trigger.type === 'schedule') {
@@ -53,10 +59,9 @@ export function AutomationCreateDialog({
         setCooldownSeconds(editAutomation.trigger.cooldownSeconds)
       }
     } else {
-      // Default to first project selected
-      if (projects.length > 0) {
-        setSelectedProjectIds([projects[0].id])
-      }
+      // Default to the first project and a worktree launch target
+      setProjectId(projects.length > 0 ? projects[0].id : '')
+      setDefaultTarget('worktree')
     }
   }, [isOpen, editAutomation, projects])
 
@@ -65,7 +70,8 @@ export function AutomationCreateDialog({
     if (!isOpen) {
       setName('')
       setPrompt('')
-      setSelectedProjectIds([])
+      setProjectId('')
+      setDefaultTarget('worktree')
       setTriggerType('schedule')
       setCron('0 9 * * *')
       setGitEvent('pr-merged')
@@ -81,7 +87,7 @@ export function AutomationCreateDialog({
     !saving &&
     name.trim().length > 0 &&
     prompt.trim().length > 0 &&
-    selectedProjectIds.length > 0 &&
+    projectId.length > 0 &&
     (triggerType !== 'schedule' || cron.trim().length > 0) &&
     (triggerType !== 'file-change' || filePatterns.trim().length > 0)
 
@@ -114,7 +120,8 @@ export function AutomationCreateDialog({
       const data = {
         name: name.trim(),
         prompt: prompt.trim(),
-        projectIds: selectedProjectIds,
+        projectId,
+        defaultTarget,
         trigger: buildTrigger(),
         enabled: editAutomation?.enabled ?? true,
         timeoutMinutes,
@@ -136,7 +143,8 @@ export function AutomationCreateDialog({
     canSubmit,
     name,
     prompt,
-    selectedProjectIds,
+    projectId,
+    defaultTarget,
     triggerType,
     cron,
     gitEvent,
@@ -151,12 +159,6 @@ export function AutomationCreateDialog({
   useDialogHotkeys(onClose, handleSave, { enabled: isOpen, canConfirm: canSubmit })
 
   if (!isOpen) return null
-
-  const toggleProject = (id: string) => {
-    setSelectedProjectIds((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    )
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -183,7 +185,7 @@ export function AutomationCreateDialog({
               onChange={(e) => setName(e.target.value)}
               maxLength={100}
               placeholder="e.g. Daily code review"
-              className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
               autoFocus
             />
           </div>
@@ -197,26 +199,73 @@ export function AutomationCreateDialog({
               maxLength={50000}
               rows={4}
               placeholder="What should Claude do?"
-              className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
+              className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
             />
           </div>
 
-          {/* Projects */}
+          {/* Project (single) */}
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Projects</label>
-            <div className="space-y-1 max-h-24 overflow-y-auto">
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Project</label>
+            <select
+              value={projectId}
+              onChange={(e) => {
+                const id = e.target.value
+                setProjectId(id)
+                // Snap to chat when the chosen project has no Git repo.
+                if (projects.find((p) => p.id === id)?.type !== 'code') {
+                  setDefaultTarget('chat')
+                }
+              }}
+              className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">Select a project...</option>
               {projects.map((project) => (
-                <label key={project.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedProjectIds.includes(project.id)}
-                    onChange={() => toggleProject(project.id)}
-                    className="rounded border-border"
-                  />
-                  <span className="truncate">{project.name}</span>
-                </label>
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
               ))}
+            </select>
+          </div>
+
+          {/* Default launch target */}
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              Default launch target
+            </label>
+            <div className="grid grid-cols-2 gap-1">
+              {(
+                [
+                  { value: 'worktree', label: 'New worktree' },
+                  { value: 'chat', label: 'Chat in project' },
+                ] as const
+              ).map((opt) => {
+                const disabled = opt.value === 'worktree' && !canUseWorktree
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => !disabled && setDefaultTarget(opt.value)}
+                    disabled={disabled}
+                    title={
+                      disabled ? 'Worktree launches need a Git (Code-type) project' : undefined
+                    }
+                    className={`px-2 py-1.5 text-xs rounded border ${
+                      disabled
+                        ? 'border-border text-muted-foreground/40 cursor-not-allowed'
+                        : defaultTarget === opt.value
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {canUseWorktree
+                ? 'Used when you launch this automation in the foreground; override per launch.'
+                : 'This project has no Git repo, so foreground launches run as a chat in the project.'}
+            </p>
           </div>
 
           {/* Trigger type */}
@@ -257,7 +306,7 @@ export function AutomationCreateDialog({
                 value={cron}
                 onChange={(e) => setCron(e.target.value)}
                 placeholder="0 9 * * *"
-                className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+                className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring font-mono"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 e.g. "0 9 * * *" = every day at 9am, "*/30 * * * *" = every 30 minutes
@@ -273,7 +322,7 @@ export function AutomationCreateDialog({
               <select
                 value={gitEvent}
                 onChange={(e) => setGitEvent(e.target.value as typeof gitEvent)}
-                className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="pr-merged">PR Merged</option>
                 <option value="pr-opened">PR Opened</option>
@@ -304,7 +353,7 @@ export function AutomationCreateDialog({
                   onChange={(e) => setFilePatterns(e.target.value)}
                   rows={3}
                   placeholder={'**/*.ts\nsrc/**/*.tsx'}
-                  className="w-full px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
+                  className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
                 />
               </div>
               <div>
@@ -316,7 +365,7 @@ export function AutomationCreateDialog({
                   value={cooldownSeconds}
                   onChange={(e) => setCooldownSeconds(Math.max(10, parseInt(e.target.value) || 60))}
                   min={10}
-                  className="w-20 px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-20 px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
             </div>
@@ -335,7 +384,7 @@ export function AutomationCreateDialog({
               }
               min={1}
               max={120}
-              className="w-20 px-2 py-1.5 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-20 px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
 

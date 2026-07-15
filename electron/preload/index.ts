@@ -77,9 +77,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       projectId: string,
       worktreeId?: string,
       type?: TerminalType,
-      resumeSessionId?: string
+      resumeSessionId?: string,
+      initialPrompt?: string
     ): Promise<string | null> =>
-      ipcRenderer.invoke('terminal:create', projectId, worktreeId, type, resumeSessionId),
+      ipcRenderer.invoke(
+        'terminal:create',
+        projectId,
+        worktreeId,
+        type,
+        resumeSessionId,
+        initialPrompt
+      ),
 
     write: (terminalId: string, data: string): void =>
       ipcRenderer.send('terminal:write', terminalId, data),
@@ -572,6 +580,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     toggle: (id: string): Promise<unknown> => ipcRenderer.invoke('automation:toggle', id),
 
     trigger: (id: string): Promise<void> => ipcRenderer.invoke('automation:trigger', id),
+
+    recordLaunch: (
+      automationId: string,
+      opts: { terminalId: string; worktreeBranch?: string }
+    ): Promise<unknown> => ipcRenderer.invoke('automation:record-launch', automationId, opts),
 
     stopRun: (runId: string): Promise<void> => ipcRenderer.invoke('automation:stop-run', runId),
 

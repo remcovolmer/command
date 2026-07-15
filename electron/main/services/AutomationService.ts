@@ -89,7 +89,7 @@ export class AutomationService {
         const prevRunTime = prevRun.getTime()
         if (prevRunTime > lastRunTime && now - prevRunTime < MISSED_RUN_MAX_AGE_MS) {
           log.info(`Missed run detected for "${automation.name}", triggering`)
-          this.triggerForAllProjects(automation)
+          this.triggerForProject(automation)
         }
       } catch (error) {
         log.error(`Error checking missed runs for ${automation.id}:`, error)
@@ -113,7 +113,7 @@ export class AutomationService {
     try {
       const cron = new Cron(automation.trigger.cron, () => {
         log.info(`Cron fired for "${automation.name}"`)
-        this.triggerForAllProjects(automation)
+        this.triggerForProject(automation)
       })
       this.schedulerMap.set(automation.id, cron)
     } catch (error) {
@@ -136,17 +136,16 @@ export class AutomationService {
     this.schedulerMap.clear()
   }
 
-  private triggerForAllProjects(automation: Automation): void {
+  private triggerForProject(automation: Automation): void {
     if (!this.projectPersistence) return
 
-    const projects = this.projectPersistence.getProjects()
-    for (const projectId of automation.projectIds) {
-      const project = projects.find((p) => p.id === projectId)
-      if (project) {
-        this.triggerRun(automation.id, project.path, project.id).catch((err) => {
-          log.error(`Trigger failed for project ${projectId}:`, err)
-        })
-      }
+    const project = this.projectPersistence
+      .getProjects()
+      .find((p) => p.id === automation.projectId)
+    if (project) {
+      this.triggerRun(automation.id, project.path, project.id).catch((err) => {
+        log.error(`Trigger failed for project ${automation.projectId}:`, err)
+      })
     }
   }
 
@@ -185,7 +184,7 @@ export class AutomationService {
     const automations = this.persistence.getAutomations()
     for (const automation of automations) {
       if (!automation.enabled || automation.trigger.type !== 'claude-done') continue
-      this.triggerForAllProjects(automation)
+      this.triggerForProject(automation)
     }
   }
 
@@ -204,7 +203,7 @@ export class AutomationService {
     for (const automation of automations) {
       if (!automation.enabled || automation.trigger.type !== 'git-event') continue
       if (automation.trigger.event !== event) continue
-      if (!automation.projectIds.includes(project.id)) continue
+      if (automation.projectId !== project.id) continue
 
       this.triggerRun(automation.id, project.path, project.id, prContext).catch((err) => {
         log.error(`Git event trigger failed:`, err)
@@ -231,9 +230,9 @@ export class AutomationService {
       const lastTriggered = this.fileChangeCooldowns.get(automation.id) ?? 0
       if (now - lastTriggered < cooldownMs) continue
 
-      // Check if any events match this automation's projects and patterns
+      // Check if any events match this automation's project and patterns
       for (const projectId of projectIds) {
-        if (!automation.projectIds.includes(projectId)) continue
+        if (automation.projectId !== projectId) continue
 
         const projectEvents = events.filter((e) => e.projectId === projectId)
         const matches = projectEvents.some(
@@ -370,6 +369,46 @@ export class AutomationService {
     this.runner.stopRun(runId)
   }
 
+  /**
+   * Record a foreground launch as a run in the shared history timeline.
+   * Foreground launches are interactive chats the user owns — there is no
+   * headless process to track. The record is a "launched" marker linked to the
+   * spawned terminal (link-back for the overview), so it is written as a
+   * terminal-state run (completed) immediately: the live state lives in the
+   * chat itself in the sidebar. Modeling it as a long-lived 'running' run would
+   * never transition (no process to watch), so it would spin forever, never be
+   * pruned, and grow automation-runs.json without bound. Not subject to the
+   * headless concurrency cap.
+   */
+  recordForegroundLaunch(
+    automationId: string,
+    opts: { terminalId: string; worktreeBranch?: string }
+  ): AutomationRun | null {
+    const automation = this.persistence.getAutomation(automationId)
+    if (!automation) {
+      log.warn(`recordForegroundLaunch: automation ${automationId} not found`)
+      return null
+    }
+
+    const now = new Date().toISOString()
+    const run = this.persistence.addRun({
+      automationId,
+      projectId: automation.projectId,
+      mode: 'foreground',
+      status: 'completed',
+      startedAt: now,
+      completedAt: now,
+      result: 'Launched in the foreground — opened an interactive session.',
+      read: true, // user initiated it and is looking at it — nothing to triage
+      terminalId: opts.terminalId,
+      worktreeBranch: opts.worktreeBranch,
+    })
+
+    this.persistence.updateAutomation(automationId, { lastRunAt: now })
+    this.sendToRenderer('automation:run-started', run)
+    return run
+  }
+
   // --- Trigger a run ---
 
   async triggerRun(
@@ -426,6 +465,7 @@ export class AutomationService {
     const run = this.persistence.addRun({
       automationId,
       projectId,
+      mode: 'headless',
       status: 'running',
       startedAt: new Date().toISOString(),
       read: false,

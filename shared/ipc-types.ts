@@ -81,6 +81,7 @@ export interface TerminalSession {
   type: TerminalType // 'claude' or 'normal' shell
   summary?: string // Session summary from Claude Code's sessions-index.json
   generatedTitle?: string // LLM-generated title from Ollama via session-summary-hook
+  origin?: 'automation' // set when spawned by an automation launch (drives the spawn cue)
 }
 
 /** Session metadata extracted from Claude Code JSONL transcripts. */

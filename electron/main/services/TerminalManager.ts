@@ -8,7 +8,7 @@ import { type ClaudeHookWatcher } from './ClaudeHookWatcher'
 import { SpawnError } from './errors'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
 import { createLogger } from './Logger'
-import { deriveShellSpec } from '../utils/shell'
+import { deriveShellSpec, quotePromptForShell } from '../utils/shell'
 
 const log = createLogger('TerminalManager')
 
@@ -25,6 +25,9 @@ export interface CreateTerminalOptions {
   worktreeId?: string
   resumeSessionId?: string
   claudeMode?: ClaudeMode
+  /** When set, start the interactive Claude session with this prompt as its
+   *  positional argument (foreground automation launch). */
+  initialPrompt?: string
   envOverrides?: Record<string, string>
 }
 
@@ -278,9 +281,22 @@ export class TerminalManager {
       if (resumeSessionId) flags.push(`--resume "${resumeSessionId}"`)
       if (options.claudeMode === 'auto') flags.push('--enable-auto-mode')
       else if (options.claudeMode === 'full-auto') flags.push('--dangerously-skip-permissions')
-      const claudeCommand = `claude${flags.length ? ' ' + flags.join(' ') : ''}\r`
+      // Foreground automation launch: pass the prompt as claude's positional
+      // argument so the interactive session starts with it already submitted.
+      // The `--` end-of-options separator is required: without it a prompt that
+      // starts with a dash (e.g. "--dangerously-skip-permissions", "--mcp-config=…")
+      // would be parsed by claude as a FLAG, bypassing the project's permission
+      // mode. `--` forces everything after it to be positional.
+      const promptArg = options.initialPrompt
+        ? ' -- ' + quotePromptForShell(options.initialPrompt, shell)
+        : ''
+      const claudeCommand = `claude${flags.length ? ' ' + flags.join(' ') : ''}${promptArg}\r`
+      // Route through writePtySafe (chunked, backpressure-aware) rather than a
+      // raw write: the prompt can be large and a single raw write can be
+      // truncated under ConPTY/node-pty backpressure, dropping the trailing CR
+      // and hanging the launch on an unterminated quote.
       const claudeTimeout = setTimeout(() => {
-        if (this.terminals.has(id)) ptyProcess.write(claudeCommand)
+        if (this.terminals.has(id)) void this.writePtySafe(id, claudeCommand)
       }, SHELL_READY_DELAY_MS)
       terminal.timeouts.push(claudeTimeout)
     } else {
