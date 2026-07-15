@@ -1,14 +1,12 @@
-import { FolderTree, GitBranch, ListChecks, Zap, TerminalSquare, Globe } from 'lucide-react'
+import { FolderTree, GitBranch, ListChecks, TerminalSquare, Globe } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
-import { useAutomationUnreadCount } from '../../hooks/useAutomationUnreadCount'
 
-type ExplorerTab = 'files' | 'git' | 'tasks' | 'automations'
+type ExplorerTab = 'files' | 'git' | 'tasks'
 
 const ITEMS: { tab: ExplorerTab; icon: typeof FolderTree; label: string }[] = [
   { tab: 'files', icon: FolderTree, label: 'Files' },
   { tab: 'git', icon: GitBranch, label: 'Git' },
   { tab: 'tasks', icon: ListChecks, label: 'Tasks' },
-  { tab: 'automations', icon: Zap, label: 'Automations' },
 ]
 
 /**
@@ -51,7 +49,6 @@ export function ActivityRail() {
   const taskNowCount = useProjectStore((s) =>
     activeProjectId ? (s.tasksData[activeProjectId]?.nowCount ?? 0) : 0
   )
-  const automationUnread = useAutomationUnreadCount()
 
   // Limited ('project'-type) folders have no git tab. Tab switching now lives in
   // this rail, so hide the Git entry entirely for them (not just its badge) —
@@ -66,7 +63,6 @@ export function ActivityRail() {
     files: 0,
     git: isLimitedProject ? 0 : gitChangeCount,
     tasks: taskNowCount,
-    automations: automationUnread,
   }
 
   const handleOpenBrowser = () => {

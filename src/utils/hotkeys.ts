@@ -177,11 +177,11 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'file-explorer',
     enabled: true,
   },
-  'fileExplorer.automationsTab': {
+  'automations.showOverview': {
     key: 'a',
     modifiers: ['ctrl', 'shift'],
-    description: 'Switch to automations tab',
-    category: 'file-explorer',
+    description: 'Show automations overview',
+    category: 'navigation',
     enabled: true,
   },
   'fileExplorer.newFile': {

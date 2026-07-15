@@ -10,6 +10,7 @@ import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
 import { SecondPanel } from './SecondPanel'
 import { ProjectOverview } from '../ProjectOverview'
+import { AutomationsOverview } from '../Automations/AutomationsOverview'
 import { TerminalIcon, Plus, Sparkles } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
@@ -26,6 +27,7 @@ export function TerminalArea() {
     editorTabs,
     activeContentTabId,
     projectOverviewVisible,
+    automationsOverviewVisible,
     setActiveTerminal,
     removeTerminal,
     setActiveContentTab,
@@ -43,6 +45,7 @@ export function TerminalArea() {
       editorTabs: s.editorTabs,
       activeContentTabId: s.activeContentTabId,
       projectOverviewVisible: s.projectOverviewVisible,
+      automationsOverviewVisible: s.automationsOverviewVisible,
       setActiveTerminal: s.setActiveTerminal,
       removeTerminal: s.removeTerminal,
       setActiveContentTab: s.setActiveContentTab,
@@ -132,6 +135,12 @@ export function TerminalArea() {
     },
     [activeProjectId, api, addTerminal]
   )
+
+  // Global automations overview — independent of the active project (R3, R5, AE5).
+  // Rendered before the no-project branch so it shows regardless of selection.
+  if (automationsOverviewVisible) {
+    return <AutomationsOverview />
+  }
 
   // No project selected - show welcome
   if (!activeProjectId || !activeProject) {

@@ -11,6 +11,9 @@ const log = createLogger('AutomationPersistence')
 // Types duplicated here due to Electron process isolation. Keep in sync with src/types/index.ts
 type AutomationRunStatus = 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled'
 
+type AutomationTarget = 'chat' | 'worktree'
+type AutomationRunMode = 'foreground' | 'headless'
+
 type AutomationTrigger =
   | { type: 'schedule'; cron: string }
   | { type: 'claude-done'; projectId?: string }
@@ -21,7 +24,8 @@ interface Automation {
   id: string
   name: string
   prompt: string
-  projectIds: string[]
+  projectId: string
+  defaultTarget: AutomationTarget
   trigger: AutomationTrigger
   enabled: boolean
   baseBranch?: string
@@ -35,6 +39,7 @@ interface AutomationRun {
   id: string
   automationId: string
   projectId: string
+  mode: AutomationRunMode
   status: AutomationRunStatus
   startedAt: string
   completedAt?: string
@@ -44,9 +49,19 @@ interface AutomationRun {
   durationMs?: number
   error?: string
   read: boolean
+  terminalId?: string
   worktreeBranch?: string
   prUrl?: string
   prNumber?: number
+}
+
+// v1 shapes retained for migration only (many-to-many projects, no mode/target)
+interface AutomationV1 {
+  projectIds?: string[]
+  projectId?: string
+  defaultTarget?: AutomationTarget
+  enabled?: boolean
+  [key: string]: unknown
 }
 
 interface AutomationState {
@@ -59,7 +74,7 @@ interface AutomationRunState {
   runs: AutomationRun[]
 }
 
-const STATE_VERSION = 1
+const STATE_VERSION = 2
 const MAX_RUNS_PER_AUTOMATION = 50
 
 export class AutomationPersistence {
@@ -123,14 +138,12 @@ export class AutomationPersistence {
   }
 
   removeProjectFromAutomations(projectId: string): void {
+    // Single-project model: an automation whose only project is deleted is
+    // disabled (its projectId is kept so the overview can flag it for reassignment).
     let changed = false
     for (const automation of this.automationState.automations) {
-      const idx = automation.projectIds.indexOf(projectId)
-      if (idx !== -1) {
-        automation.projectIds.splice(idx, 1)
-        if (automation.projectIds.length === 0) {
-          automation.enabled = false
-        }
+      if (automation.projectId === projectId && automation.enabled) {
+        automation.enabled = false
         automation.updatedAt = new Date().toISOString()
         changed = true
       }
@@ -204,9 +217,12 @@ export class AutomationPersistence {
   }
 
   markRunningAsFailed(): number {
+    // Only headless runs represent a tracked process that dies with the app.
+    // Foreground launches are interactive chats that may restore across restarts,
+    // so leave them alone.
     let count = 0
     for (const run of this.runState.runs) {
-      if (run.status === 'running') {
+      if (run.status === 'running' && run.mode !== 'foreground') {
         run.status = 'failed'
         run.error = 'App closed during execution'
         run.completedAt = new Date().toISOString()
@@ -279,19 +295,40 @@ export class AutomationPersistence {
     return { version: STATE_VERSION, runs: [] }
   }
 
-  private migrateAutomationState(_oldState: {
+  private migrateAutomationState(oldState: {
     version: number
-    automations: Automation[]
+    automations: unknown[]
   }): AutomationState {
-    // v1 is the first version, no migrations needed yet
-    return { version: STATE_VERSION, automations: _oldState.automations ?? [] }
+    // v1 → v2: collapse projectIds[] to a single projectId (first entry),
+    // default the new defaultTarget to 'worktree' (matches prior headless behavior),
+    // and disable any automation left without a project.
+    const automations = (oldState.automations ?? []).map((raw) => {
+      const a = raw as AutomationV1
+      const projectId =
+        typeof a.projectId === 'string'
+          ? a.projectId
+          : Array.isArray(a.projectIds)
+            ? (a.projectIds[0] ?? '')
+            : ''
+      const defaultTarget: AutomationTarget = a.defaultTarget ?? 'worktree'
+      const enabled = projectId ? (a.enabled ?? true) : false
+      const { projectIds: _drop, ...rest } = a
+      void _drop
+      return { ...rest, projectId, defaultTarget, enabled } as unknown as Automation
+    })
+    return { version: STATE_VERSION, automations }
   }
 
-  private migrateRunState(_oldState: {
+  private migrateRunState(oldState: {
     version: number
-    runs: AutomationRun[]
+    runs: unknown[]
   }): AutomationRunState {
-    return { version: STATE_VERSION, runs: _oldState.runs ?? [] }
+    // v1 → v2: pre-foreground runs were all headless.
+    const runs = (oldState.runs ?? []).map((raw) => {
+      const r = raw as Partial<AutomationRun>
+      return { ...r, mode: r.mode ?? 'headless' } as AutomationRun
+    })
+    return { version: STATE_VERSION, runs }
   }
 
   private saveAutomations(): void {
@@ -317,4 +354,11 @@ export class AutomationPersistence {
   }
 }
 
-export type { Automation, AutomationTrigger, AutomationRun, AutomationRunStatus }
+export type {
+  Automation,
+  AutomationTrigger,
+  AutomationRun,
+  AutomationRunStatus,
+  AutomationTarget,
+  AutomationRunMode,
+}

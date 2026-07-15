@@ -3,13 +3,13 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 
-// The rail reads many store selectors and the automation-unread hook. Mock the
-// store with a controllable fake-state object (selectors run against it) and the
-// hook with a settable count, so the badge + git-gating logic is tested in isolation.
-const { fakeState, setAutomationCount } = vi.hoisted(() => {
+// The rail reads many store selectors. Mock the store with a controllable
+// fake-state object (selectors run against it) so the badge + git-gating logic
+// is tested in isolation.
+const { fakeState } = vi.hoisted(() => {
   const state = {
     fileExplorerVisible: false,
-    fileExplorerActiveTab: 'files' as 'files' | 'git' | 'tasks' | 'automations',
+    fileExplorerActiveTab: 'files' as 'files' | 'git' | 'tasks',
     setFileExplorerActiveTab: () => {},
     setFileExplorerVisible: () => {},
     activeProjectId: 'proj-1' as string | null,
@@ -26,29 +26,24 @@ const { fakeState, setAutomationCount } = vi.hoisted(() => {
       { staged: unknown[]; modified: unknown[]; untracked: unknown[]; conflicted: unknown[] }
     >,
     tasksData: {} as Record<string, { nowCount: number }>,
-    _automationCount: 0,
   }
-  return {
-    fakeState: state,
-    setAutomationCount: (n: number) => {
-      state._automationCount = n
-    },
-  }
+  return { fakeState: state }
 })
 
 vi.mock('../src/stores/projectStore', () => ({
   useProjectStore: (selector: (s: typeof fakeState) => unknown) => selector(fakeState),
 }))
 
-vi.mock('../src/hooks/useAutomationUnreadCount', () => ({
-  useAutomationUnreadCount: () => fakeState._automationCount,
-}))
-
 import { ActivityRail } from '../src/components/Layout/ActivityRail'
 
 function gitStatus(staged: number, modified: number, untracked: number, conflicted: number) {
   const arr = (n: number) => Array.from({ length: n }, (_, i) => i)
-  return { staged: arr(staged), modified: arr(modified), untracked: arr(untracked), conflicted: arr(conflicted) }
+  return {
+    staged: arr(staged),
+    modified: arr(modified),
+    untracked: arr(untracked),
+    conflicted: arr(conflicted),
+  }
 }
 
 function resetState() {
@@ -59,7 +54,6 @@ function resetState() {
   fakeState.projects = []
   fakeState.gitStatus = {}
   fakeState.tasksData = {}
-  fakeState._automationCount = 0
 }
 
 beforeEach(resetState)
@@ -68,7 +62,7 @@ afterEach(() => cleanup())
 describe('ActivityRail badges', () => {
   test('no counts: no numeric badge on any panel icon', () => {
     render(<ActivityRail />)
-    for (const label of ['Files', 'Git', 'Tasks', 'Automations']) {
+    for (const label of ['Files', 'Git', 'Tasks']) {
       expect(within(screen.getByTitle(label)).queryByText(/^\d+$/)).toBeNull()
     }
   })
@@ -85,10 +79,9 @@ describe('ActivityRail badges', () => {
     expect(within(screen.getByTitle('Tasks')).getByText('5')).toBeTruthy()
   })
 
-  test('automations badge shows the unread-hook count', () => {
-    setAutomationCount(2)
+  test('automations is no longer a rail entry (moved to the sidebar)', () => {
     render(<ActivityRail />)
-    expect(within(screen.getByTitle('Automations')).getByText('2')).toBeTruthy()
+    expect(screen.queryByTitle('Automations')).toBeNull()
   })
 
   test('non-limited project keeps the git badge', () => {
@@ -98,10 +91,9 @@ describe('ActivityRail badges', () => {
     expect(within(screen.getByTitle('Git')).getByText('3')).toBeTruthy()
   })
 
-  test('files icon is never badged, even with git/task/automation activity', () => {
+  test('files icon is never badged, even with git/task activity', () => {
     fakeState.gitStatus = { 'proj-1': gitStatus(4, 0, 0, 0) }
     fakeState.tasksData = { 'proj-1': { nowCount: 5 } }
-    setAutomationCount(2)
     render(<ActivityRail />)
     expect(screen.getByTitle('Files').textContent).toBe('')
   })
@@ -119,7 +111,6 @@ describe('ActivityRail git entry gating', () => {
     // The other rail entries remain.
     expect(screen.queryByTitle('Files')).not.toBeNull()
     expect(screen.queryByTitle('Tasks')).not.toBeNull()
-    expect(screen.queryByTitle('Automations')).not.toBeNull()
   })
 
   test('shows the Git entry for a Code-type project', () => {

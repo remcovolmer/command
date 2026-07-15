@@ -166,6 +166,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + 2` | Focus terminal |
 | `Ctrl + 3` | Focus file explorer |
 | `Ctrl + Shift + O` | Show project overview |
+| `Ctrl + Shift + A` | Show automations overview |
 
 ### Terminal
 | Shortcut | Action |
@@ -182,7 +183,6 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + Shift + E` | Switch to files tab |
 | `Ctrl + Shift + G` | Switch to git tab |
 | `Ctrl + Shift + K` | Switch to tasks tab |
-| `Ctrl + Shift + A` | Switch to automations tab |
 | `Ctrl + Alt + N` | New file |
 | `Ctrl + Alt + Shift + N` | New folder |
 | `F2` | Rename selected |

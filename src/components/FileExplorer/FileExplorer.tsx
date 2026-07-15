@@ -4,9 +4,7 @@ import { useProjectStore } from '../../stores/projectStore'
 import { FileTree } from './FileTree'
 import { GitStatusPanel } from './GitStatusPanel'
 import { TasksPanel } from './TasksPanel'
-import { AutomationsPanel } from './AutomationsPanel'
 import { SessionsPanel } from './SessionsPanel'
-import { AutomationCreateDialog } from './AutomationCreateDialog'
 import { FileExplorerHeader } from './FileExplorerHeader'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { getElectronAPI } from '../../utils/electron'
@@ -112,8 +110,6 @@ export function FileExplorer() {
       handleFilesRefresh()
     } else if (activeTab === 'tasks') {
       handleTasksRefresh()
-    } else if (activeTab === 'automations') {
-      // AutomationsPanel manages its own data loading
     } else {
       handleGitRefresh()
     }
@@ -177,12 +173,6 @@ export function FileExplorer() {
     return () => clearInterval(interval)
   }, [watcherFailed, gitContextId])
 
-  // Automation dialog state
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [editingAutomation, setEditingAutomation] = useState<
-    import('../../types').Automation | null
-  >(null)
-
   const handleTasksRefresh = useCallback(async () => {
     if (!activeProject) return
     const { setTasksLoading, setTasksData } = useProjectStore.getState()
@@ -210,17 +200,9 @@ export function FileExplorer() {
         worktreeBranch={activeWorktree?.branch}
       />
 
-      {/* Files/Git/Tasks/Automations Content - takes remaining space */}
+      {/* Files/Git/Tasks Content - takes remaining space */}
       <div className="flex-1 min-h-0 overflow-auto">
-        {activeTab === 'automations' ? (
-          <AutomationsPanel
-            onCreateClick={() => setShowCreateDialog(true)}
-            onEditClick={(automation) => {
-              setEditingAutomation(automation)
-              setShowCreateDialog(true)
-            }}
-          />
-        ) : activeProject ? (
+        {activeProject ? (
           activeTab === 'tasks' ? (
             <TasksPanel project={activeProject} />
           ) : isLimitedProject || activeTab === 'files' ? (
@@ -254,16 +236,6 @@ export function FileExplorer() {
           contextKey={fileTreeContextKey ?? activeProjectId}
         />
       )}
-
-      {/* Automation Create/Edit Dialog */}
-      <AutomationCreateDialog
-        isOpen={showCreateDialog}
-        onClose={() => {
-          setShowCreateDialog(false)
-          setEditingAutomation(null)
-        }}
-        editAutomation={editingAutomation}
-      />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { deriveShellSpec } from '../electron/main/utils/shell'
+import { deriveShellSpec, quotePromptForShell } from '../electron/main/utils/shell'
 
 describe('deriveShellSpec', () => {
   test('Windows Git Bash (bin/bash.exe) starts as a login shell with CHERE_INVOKING', () => {
@@ -61,5 +61,38 @@ describe('deriveShellSpec', () => {
     const a = deriveShellSpec('C:\\Program Files\\Git\\bin\\bash.exe', 'win32')
     const b = deriveShellSpec('C:\\Program Files\\Git\\bin\\bash.exe', 'win32')
     expect(a.env).not.toBe(b.env)
+  })
+})
+
+describe('quotePromptForShell', () => {
+  const bash = 'C:\\Program Files\\Git\\bin\\bash.exe'
+  const pwsh = 'powershell.exe'
+
+  test('wraps a plain prompt in single quotes (POSIX)', () => {
+    expect(quotePromptForShell('review the open PRs', bash)).toBe("'review the open PRs'")
+  })
+
+  test('POSIX: escapes embedded single quotes as \\047\\134\\047\\047', () => {
+    // it's → 'it'\''s'
+    expect(quotePromptForShell("it's broken", bash)).toBe("'it'\\''s broken'")
+  })
+
+  test('POSIX: leaves $, backticks, and double quotes untouched inside single quotes', () => {
+    const prompt = 'run `git log` for $USER and say "hi"'
+    expect(quotePromptForShell(prompt, bash)).toBe(
+      "'run `git log` for $USER and say \"hi\"'"
+    )
+  })
+
+  test('POSIX: preserves embedded newlines literally', () => {
+    expect(quotePromptForShell('line one\nline two', bash)).toBe("'line one\nline two'")
+  })
+
+  test('PowerShell: single-quoted literal, doubling embedded single quotes', () => {
+    expect(quotePromptForShell("it's broken", pwsh)).toBe("'it''s broken'")
+  })
+
+  test('PowerShell: metacharacters stay literal inside single quotes', () => {
+    expect(quotePromptForShell('cost is $5 `now`', pwsh)).toBe("'cost is $5 `now`'")
   })
 })

@@ -180,11 +180,20 @@ export type AutomationTrigger =
   | { type: 'git-event'; event: GitEvent }
   | { type: 'file-change'; patterns: string[]; cooldownSeconds: number }
 
+/** Where a foreground launch runs: a chat in the project dir, or a fresh worktree. */
+export type AutomationTarget = 'chat' | 'worktree'
+
+/** How a run executed: an interactive foreground session, or a headless -p run. */
+export type AutomationRunMode = 'foreground' | 'headless'
+
 export interface Automation {
   id: string
   name: string
   prompt: string
-  projectIds: string[]
+  /** Each automation belongs to exactly one project (single-project model). */
+  projectId: string
+  /** Default target for a foreground launch; overridable per launch. */
+  defaultTarget: AutomationTarget
   trigger: AutomationTrigger
   enabled: boolean
   baseBranch?: string
@@ -198,6 +207,8 @@ export interface AutomationRun {
   id: string
   automationId: string
   projectId: string
+  /** Foreground launches and headless runs share one timeline. */
+  mode: AutomationRunMode
   status: AutomationRunStatus
   startedAt: string
   completedAt?: string
@@ -207,6 +218,8 @@ export interface AutomationRun {
   durationMs?: number
   error?: string
   read: boolean
+  /** For foreground runs: the chat/terminal this launch spawned (link-back). */
+  terminalId?: string
   worktreeBranch?: string
   prUrl?: string
   prNumber?: number
@@ -226,7 +239,8 @@ export interface ElectronAPI {
       projectId: string,
       worktreeId?: string,
       type?: TerminalType,
-      resumeSessionId?: string
+      resumeSessionId?: string,
+      initialPrompt?: string
     ) => Promise<string | null>
     write: (terminalId: string, data: string) => void
     resize: (terminalId: string, cols: number, rows: number) => void
@@ -413,6 +427,10 @@ export interface ElectronAPI {
     delete: (id: string) => Promise<void>
     toggle: (id: string) => Promise<Automation | null>
     trigger: (id: string) => Promise<void>
+    recordLaunch: (
+      automationId: string,
+      opts: { terminalId: string; worktreeBranch?: string }
+    ) => Promise<AutomationRun | null>
     stopRun: (runId: string) => Promise<void>
     listRuns: (automationId?: string, limit?: number) => Promise<AutomationRun[]>
     markRead: (runId: string) => Promise<void>
