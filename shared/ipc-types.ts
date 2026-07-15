@@ -308,6 +308,7 @@ export interface UpdateErrorInfo {
 // IPC event payloads
 export interface RestoredSession {
   terminalId: string
+  agentType?: AgentType // which agent this restored chat runs (absent → 'claude')
   projectId: string
   worktreeId: string | null
   title: string

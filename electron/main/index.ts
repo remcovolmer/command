@@ -22,7 +22,7 @@ import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
-import type { AgentType } from '../../shared/ipc-types'
+import type { AgentType, TerminalType } from '../../shared/ipc-types'
 import { isAgentType } from '../../shared/agents'
 import { isHookCapableAgent } from './services/agents'
 import { GitService } from './services/GitService'
@@ -478,7 +478,7 @@ ipcMain.handle(
     _event,
     projectId: string,
     worktreeId?: string,
-    type: 'claude' | 'normal' = 'claude',
+    type: TerminalType = 'claude',
     resumeSessionId?: string
   ) => {
     return handleTerminalCreate(

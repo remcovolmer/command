@@ -135,6 +135,7 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
 
       win.webContents.send('session:restored', {
         terminalId,
+        agentType,
         projectId: session.projectId,
         worktreeId: session.worktreeId,
         title: session.title,

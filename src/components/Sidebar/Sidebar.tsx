@@ -182,7 +182,7 @@ export function Sidebar() {
         state: 'busy', // Restored sessions start in busy state
         lastActivity: Date.now(),
         title: session.title || 'Restored',
-        type: 'claude',
+        type: session.agentType ?? 'claude',
         summary: session.summary,
       }
       addTerminal(terminal)

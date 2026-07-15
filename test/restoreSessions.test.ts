@@ -221,7 +221,10 @@ describe('restoreSessions handler', () => {
       resumeSessionId: 'codexuuid1',
     })
     expect(preAssociateSession).toHaveBeenCalledWith('codexuuid1', 'cx-terminal')
-    expect(send.mock.calls.filter((c) => c[0] === 'session:restored')).toHaveLength(1)
+    const restored = send.mock.calls.filter((c) => c[0] === 'session:restored')
+    expect(restored).toHaveLength(1)
+    // The renderer needs agentType to label the restored chat with the right agent.
+    expect(restored[0][1]).toMatchObject({ agentType: 'codex' })
   })
 
   // Suppress the unused-var lint warning for the spies; jsdom isn't loaded here so

@@ -657,15 +657,6 @@ export class TerminalManager {
   }
 
   /**
-   * Get all Claude terminal IDs (for session persistence)
-   */
-  getClaudeTerminalIds(): string[] {
-    return Array.from(this.terminals.values())
-      .filter((t) => t.type === 'claude')
-      .map((t) => t.id)
-  }
-
-  /**
    * Update a terminal's worktree assignment (chat-to-worktree upgrade).
    * Enforces 1:1 constraint: no two terminals may share the same worktreeId.
    */
