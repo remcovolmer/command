@@ -5,6 +5,7 @@ export type {
   ProjectType,
   AuthMode,
   ClaudeMode,
+  AgentType,
   AccountProfile,
   ProjectSettings,
   Project,

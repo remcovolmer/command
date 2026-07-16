@@ -12,6 +12,8 @@ import type { TerminalManager } from '../services/TerminalManager'
 import type { ProjectPersistence } from '../services/ProjectPersistence'
 import type { CrashLogger } from '../services/CrashLogger'
 import type { BrowserWindow } from 'electron'
+import type { TerminalType } from '../../../src/types'
+import { isAgentType } from '../../../shared/agents'
 
 const log = createLogger('Terminal')
 
@@ -29,7 +31,7 @@ export interface TerminalCreateDeps {
 export interface TerminalCreateArgs {
   projectId: string
   worktreeId?: string
-  type?: 'claude' | 'normal'
+  type?: TerminalType
   resumeSessionId?: string
   /** Foreground automation launch: start `claude` with this prompt submitted. */
   initialPrompt?: string
@@ -60,7 +62,7 @@ export async function handleTerminalCreate(
   if (worktreeId && !isValidUUID(worktreeId)) {
     throw new Error('Invalid worktree ID')
   }
-  if (type !== undefined && type !== 'claude' && type !== 'normal') {
+  if (type !== undefined && type !== 'normal' && !isAgentType(type)) {
     throw new Error('Invalid terminal type')
   }
   if (

@@ -27,6 +27,7 @@ export interface ProjectSettings {
   claudeMode?: ClaudeMode
   authMode?: AuthMode
   profileId?: string
+  defaultAgent?: AgentType // agent used for new chats in this project (default: 'claude')
 }
 
 export interface Project {
@@ -65,8 +66,13 @@ export type TerminalState =
   | 'done' // Green - Claude finished, waiting for new prompt
   | 'stopped' // Red - Terminal stopped or error
 
-// Terminal type: 'claude' runs Claude Code, 'normal' is a plain shell
-export type TerminalType = 'claude' | 'normal'
+// Coding agents Command can drive as a chat session. Each is a CLI wrapped in a
+// PTY. Display metadata lives in shared/agents.ts; spawn spec (binary, resume,
+// mode flags, hook capability) in electron/main/services/agents.ts.
+export type AgentType = 'claude' | 'codex' | 'pi'
+
+// Terminal type: an agent chat ('claude' | 'codex' | 'pi') or a plain shell ('normal').
+export type TerminalType = AgentType | 'normal'
 
 // Unsubscribe function type for IPC listeners
 export type Unsubscribe = () => void
@@ -78,7 +84,7 @@ export interface TerminalSession {
   state: TerminalState
   lastActivity: number
   title: string
-  type: TerminalType // 'claude' or 'normal' shell
+  type: TerminalType // agent chat ('claude' | 'codex' | 'pi') or 'normal' shell
   summary?: string // Session summary from Claude Code's sessions-index.json
   generatedTitle?: string // LLM-generated title from Ollama via session-summary-hook
   origin?: 'automation' // set when spawned by an automation launch (drives the spawn cue)
@@ -303,6 +309,7 @@ export interface UpdateErrorInfo {
 // IPC event payloads
 export interface RestoredSession {
   terminalId: string
+  agentType?: AgentType // which agent this restored chat runs (absent → 'claude')
   projectId: string
   worktreeId: string | null
   title: string

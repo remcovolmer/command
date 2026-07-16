@@ -3,7 +3,7 @@ import {
   buildCommentMessage,
   buildEditMessage,
   buildDrawMessage,
-  resolveActiveClaudeTerminalId,
+  resolveActiveAgentTerminalId,
   sendAnnotationToChat,
   fileUrlToLocalPath,
   applyDirectEdit,
@@ -65,29 +65,36 @@ describe('sanitizeField', () => {
   })
 })
 
-describe('resolveActiveClaudeTerminalId', () => {
+describe('resolveActiveAgentTerminalId', () => {
   const claude = { id: 't1', type: 'claude' }
   const normal = { id: 't2', type: 'normal' }
+  const codex = { id: 't3', type: 'codex' }
 
   test('returns the id when the active terminal is a Claude chat', () => {
     expect(
-      resolveActiveClaudeTerminalId({ activeTerminalId: 't1', terminals: { t1: claude } })
+      resolveActiveAgentTerminalId({ activeTerminalId: 't1', terminals: { t1: claude } })
     ).toBe('t1')
+  })
+
+  test('returns the id when the active terminal is a codex chat', () => {
+    expect(
+      resolveActiveAgentTerminalId({ activeTerminalId: 't3', terminals: { t3: codex } })
+    ).toBe('t3')
   })
 
   test('returns null when the active terminal is a plain shell', () => {
     expect(
-      resolveActiveClaudeTerminalId({ activeTerminalId: 't2', terminals: { t2: normal } })
+      resolveActiveAgentTerminalId({ activeTerminalId: 't2', terminals: { t2: normal } })
     ).toBeNull()
   })
 
   test('returns null when there is no active terminal', () => {
-    expect(resolveActiveClaudeTerminalId({ activeTerminalId: null, terminals: {} })).toBeNull()
+    expect(resolveActiveAgentTerminalId({ activeTerminalId: null, terminals: {} })).toBeNull()
   })
 
   test('returns null when the active id is not in the terminal map', () => {
     expect(
-      resolveActiveClaudeTerminalId({ activeTerminalId: 'gone', terminals: { t1: claude } })
+      resolveActiveAgentTerminalId({ activeTerminalId: 'gone', terminals: { t1: claude } })
     ).toBeNull()
   })
 })

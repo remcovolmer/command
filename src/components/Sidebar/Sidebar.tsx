@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
-import type { TerminalSession, Worktree, Project } from '../../types'
+import type { AgentType, TerminalSession, Worktree, Project } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { terminalEvents } from '../../utils/terminalEvents'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
@@ -189,7 +189,7 @@ export function Sidebar() {
         state: 'busy', // Restored sessions start in busy state
         lastActivity: Date.now(),
         title: session.title || 'Restored',
-        type: 'claude',
+        type: session.agentType ?? 'claude',
         summary: session.summary,
       }
       addTerminal(terminal)
@@ -296,8 +296,26 @@ export function Sidebar() {
     }
   }
 
-  const handleCreateTerminal = async (projectId: string, worktreeId?: string) => {
-    await createTerminal(projectId, { worktreeId })
+  const handleCreateTerminal = async (projectId: string, worktreeId?: string, agent?: AgentType) => {
+    await createTerminal(projectId, { worktreeId, agent })
+  }
+
+  // Switch a chat's agent: close it and start a fresh chat with the chosen agent
+  // in the same project/worktree/cwd. Agents can't be swapped in place (each has
+  // its own session format), so this is a clean restart. Git/worktree state stays.
+  const handleSwitchAgent = async (terminal: TerminalSession, agent: AgentType) => {
+    if (terminal.type === agent) return
+    try {
+      await api.terminal.close(terminal.id)
+    } catch {
+      // Terminal may already be gone; proceed to recreate.
+    }
+    removeTerminal(terminal.id)
+    await createTerminal(terminal.projectId, {
+      worktreeId: terminal.worktreeId ?? undefined,
+      agent,
+      onCreated: (terminalId) => setActiveTerminal(terminalId),
+    })
   }
 
   const handleCloseTerminal = async (e: React.MouseEvent, terminalId: string) => {
@@ -314,11 +332,12 @@ export function Sidebar() {
     setWorktreeDialogProjectId(projectId)
   }
 
-  const handleWorktreeCreated = (worktree: Worktree) => {
+  const handleWorktreeCreated = (worktree: Worktree, agent: AgentType) => {
     addWorktree(worktree)
-    // Automatically create a terminal in the new worktree and switch to it
+    // Automatically create a chat (with the chosen agent) in the new worktree and switch to it
     createTerminal(worktree.projectId, {
       worktreeId: worktree.id,
+      agent,
       onCreated: (terminalId) => setActiveTerminal(terminalId),
     })
   }
@@ -455,6 +474,7 @@ export function Sidebar() {
               onRemoveWorktree={handleRemoveWorktree}
               onSelectTerminal={setActiveTerminal}
               onCloseTerminal={handleCloseTerminal}
+              onSwitchAgent={handleSwitchAgent}
               onReorder={reorderProjects}
             />
           )}

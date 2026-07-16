@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable'
 import { LayoutGroup, AnimatePresence } from 'motion/react'
 import { ChevronRight } from 'lucide-react'
-import type { Project, TerminalSession, Worktree } from '../../types'
+import type { AgentType, Project, TerminalSession, Worktree } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { SortableProjectItem } from './SortableProjectItem'
 import { ProjectDragPreview } from './ProjectDragPreview'
@@ -33,11 +33,12 @@ interface SortableProjectListProps {
   activeTerminalId: string | null
   onSelect: (projectId: string) => void
   onRemove: (projectId: string) => void
-  onCreateTerminal: (projectId: string, worktreeId?: string) => void
+  onCreateTerminal: (projectId: string, worktreeId?: string, agent?: AgentType) => void
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (terminalId: string) => void
   onCloseTerminal: (e: React.MouseEvent, terminalId: string) => void
+  onSwitchAgent: (terminal: TerminalSession, agent: AgentType) => void
   onReorder: (projectIds: string[]) => void
 }
 
@@ -56,6 +57,7 @@ export function SortableProjectList({
   onRemoveWorktree,
   onSelectTerminal,
   onCloseTerminal,
+  onSwitchAgent,
   onReorder,
 }: SortableProjectListProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -163,6 +165,7 @@ export function SortableProjectList({
       onRemoveWorktree={onRemoveWorktree}
       onSelectTerminal={onSelectTerminal}
       onCloseTerminal={onCloseTerminal}
+      onSwitchAgent={onSwitchAgent}
     />
   )
 

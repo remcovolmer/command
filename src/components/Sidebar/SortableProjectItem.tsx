@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   ChevronRight,
 } from 'lucide-react'
-import type { Project, TerminalSession, Worktree } from '../../types'
+import type { AgentType, Project, TerminalSession, Worktree } from '../../types'
+import { AGENT_DISPLAY, AGENT_IDS, isAgentType } from '@shared/agents'
 import { useProjectStore } from '../../stores/projectStore'
 import { getProjectRollupState } from '../../utils/projectRollup'
 import { WorktreeItem } from '../Worktree/WorktreeItem'
@@ -32,11 +33,12 @@ interface SortableProjectItemProps {
   isDragging: boolean
   onSelect: (projectId: string) => void
   onRemove: (projectId: string) => void
-  onCreateTerminal: (projectId: string, worktreeId?: string) => void
+  onCreateTerminal: (projectId: string, worktreeId?: string, agent?: AgentType) => void
   onCreateWorktree: (projectId: string) => void
   onRemoveWorktree: (worktreeId: string) => void
   onSelectTerminal: (id: string) => void
   onCloseTerminal: (e: React.MouseEvent, id: string) => void
+  onSwitchAgent: (terminal: TerminalSession, agent: AgentType) => void
 }
 
 export const SortableProjectItem = memo(function SortableProjectItem({
@@ -57,6 +59,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   onRemoveWorktree,
   onSelectTerminal,
   onCloseTerminal,
+  onSwitchAgent,
 }: SortableProjectItemProps) {
   const shouldReduceMotion = useReducedMotion()
   const { attributes, listeners, setNodeRef, transform, transition, isOver } = useSortable({
@@ -131,7 +134,19 @@ export const SortableProjectItem = memo(function SortableProjectItem({
     setContextMenu({ x: e.clientX, y: e.clientY })
   }, [])
 
+  // Override the project's default agent for a single new chat. The + button
+  // always uses the default; these items cover the other agents.
+  const defaultAgent = project.settings?.defaultAgent ?? 'claude'
+  const agentOverrideItems: ContextMenuEntry[] = AGENT_IDS.filter((a) => a !== defaultAgent).map(
+    (a) => ({
+      label: `New ${AGENT_DISPLAY[a].label} chat`,
+      onClick: () => onCreateTerminal(project.id, undefined, a),
+    })
+  )
+
   const contextMenuItems: ContextMenuEntry[] = [
+    ...agentOverrideItems,
+    ...(agentOverrideItems.length ? [{ type: 'separator' as const }] : []),
     {
       label: 'Show overview',
       shortcut: 'Ctrl+Shift+O',
@@ -202,7 +217,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   const rollupState = effectiveCollapsed ? getProjectRollupState(terminals) : null
 
   // Counter chip counts Claude chats only — sidecar 'normal' shells are not chats.
-  const chatCount = terminals.filter((t) => t.type === 'claude').length
+  const chatCount = terminals.filter((t) => isAgentType(t.type)).length
 
   // Collapsed-summary count. Inactive projects (0 chats by definition) show no chip:
   // the "0" is noise, and a worktree count would render inconsistently since
@@ -218,7 +233,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
   // on disk with no chat (sidecar 'normal' shells don't count, matching chatCount)
   // collapse under a toggle to keep an active project's tree readable.
   const hasClaudeSession = (worktreeId: string) =>
-    getWorktreeTerminals(worktreeId).some((t) => t.type === 'claude')
+    getWorktreeTerminals(worktreeId).some((t) => isAgentType(t.type))
   const activeWorktrees = worktrees.filter((w) => hasClaudeSession(w.id))
   const inactiveWorktrees = worktrees.filter((w) => !hasClaudeSession(w.id))
 
@@ -231,6 +246,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
       activeTerminalId={activeTerminalId}
       onCreateTerminal={() => onCreateTerminal(project.id, worktree.id)}
       onSelectTerminal={onSelectTerminal}
+      onSwitchAgent={onSwitchAgent}
       onRemove={() => onRemoveWorktree(worktree.id)}
     />
   )
@@ -425,6 +441,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                   isActive={terminal.id === activeTerminalId}
                   onSelect={() => onSelectTerminal(terminal.id)}
                   onClose={(e) => onCloseTerminal(e, terminal.id)}
+                  onSwitchAgent={(agent) => onSwitchAgent(terminal, agent)}
                 />
               ))}
             </ul>

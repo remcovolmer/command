@@ -1,5 +1,5 @@
 // Builds the chat messages the browser annotation modes send, and routes them
-// to the active Claude chat. Pure + dependency-injected so it needs no store or
+// to the active agent chat. Pure + dependency-injected so it needs no store or
 // IPC mock to test — the caller passes the store snapshot and the write fn.
 //
 // Note on chunking: we deliberately do NOT chunk here. terminal.write reaches
@@ -185,19 +185,19 @@ interface ChatStateLike {
   terminals: Record<string, TerminalLike>
 }
 
-/** The active terminal's id when it is a Claude chat (type 'claude'), else null. */
-export function resolveActiveClaudeTerminalId(state: ChatStateLike): string | null {
+/** The active terminal's id when it is an agent chat (any type except 'normal'), else null. */
+export function resolveActiveAgentTerminalId(state: ChatStateLike): string | null {
   const id = state.activeTerminalId
   if (!id) return null
   const terminal = state.terminals[id]
-  return terminal && terminal.type === 'claude' ? terminal.id : null
+  return terminal && terminal.type !== 'normal' ? terminal.id : null
 }
 
 export type SendResult = { ok: true; terminalId: string } | { ok: false; reason: 'no-active-chat' }
 
 /**
- * Write an annotation message to the active Claude chat. Returns a guard result
- * (no write) when there is no active Claude terminal, so the UI can prompt the
+ * Write an annotation message to the active agent chat. Returns a guard result
+ * (no write) when there is no active agent terminal, so the UI can prompt the
  * user to focus a chat first (R3).
  */
 export function sendAnnotationToChat(
@@ -205,7 +205,7 @@ export function sendAnnotationToChat(
   state: ChatStateLike,
   write: (terminalId: string, data: string) => void
 ): SendResult {
-  const terminalId = resolveActiveClaudeTerminalId(state)
+  const terminalId = resolveActiveAgentTerminalId(state)
   if (!terminalId) return { ok: false, reason: 'no-active-chat' }
   write(terminalId, text)
   return { ok: true, terminalId }

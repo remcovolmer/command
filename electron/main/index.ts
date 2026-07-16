@@ -22,10 +22,13 @@ import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
+import type { AgentType, TerminalType } from '../../shared/ipc-types'
+import { isAgentType } from '../../shared/agents'
+import { isHookCapableAgent } from './services/agents'
 import { GitService } from './services/GitService'
 import { WorktreeService } from './services/WorktreeService'
 import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
-import { installClaudeHooks } from './services/HookInstaller'
+import { installAgentHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
 import { GitHubService, type GitEvent, VALID_GIT_EVENTS } from './services/GitHubService'
 import { UsageService } from './services/UsageService'
@@ -250,21 +253,32 @@ let commandServer: CommandServer | null = null
 let skillInstaller: SkillInstaller | null = null
 
 /**
- * Verify that a Claude session file exists (async version)
- * Sessions are stored in ~/.claude/projects/{encoded-path}/
+ * Verify that an agent session's transcript still exists, so restore knows
+ * whether to resume it or start fresh. Per-agent because each agent stores
+ * transcripts differently:
+ *  - claude: ~/.claude/projects/{encoded-cwd}/{sessionId}.json
+ *  - codex:  ~/.codex/sessions/**\/rollout-*-{sessionId}.jsonl (date-nested)
+ *  - pi:     no reliable id-based transcript lookup → treated as not resumable
  */
-async function verifyClaudeSessionAsync(cwd: string, sessionId: string): Promise<boolean> {
+async function verifyAgentSessionAsync(
+  agentType: AgentType,
+  cwd: string,
+  sessionId: string
+): Promise<boolean> {
   try {
-    // Claude encodes the path for the session directory
-    // The session file is stored as {sessionId}.json
-    const claudeDir = path.join(os.homedir(), '.claude', 'projects')
-
-    // Claude encodes the path by replacing certain characters
-    const encodedPath = cwd.replace(/[/\\\\:]/g, '-').replace(/^-/, '')
-    const sessionPath = path.join(claudeDir, encodedPath, `${sessionId}.json`)
-
-    await fs.access(sessionPath)
-    return true
+    if (agentType === 'claude') {
+      const claudeDir = path.join(os.homedir(), '.claude', 'projects')
+      const encodedPath = cwd.replace(/[/\\\\:]/g, '-').replace(/^-/, '')
+      const sessionPath = path.join(claudeDir, encodedPath, `${sessionId}.json`)
+      await fs.access(sessionPath)
+      return true
+    }
+    if (agentType === 'codex') {
+      const codexSessions = path.join(os.homedir(), '.codex', 'sessions')
+      const entries = await fs.readdir(codexSessions, { recursive: true })
+      return entries.some((e) => typeof e === 'string' && e.includes(sessionId))
+    }
+    return false
   } catch {
     return false
   }
@@ -292,7 +306,7 @@ async function restoreSessions(): Promise<void> {
     terminalManager,
     hookWatcher,
     getWindow: () => win,
-    verifyClaudeSession: verifyClaudeSessionAsync,
+    verifyAgentSession: verifyAgentSessionAsync,
     pathExists: pathExistsAsync,
     resolveEnvOverrides,
   })
@@ -325,8 +339,8 @@ async function createWindow() {
     },
   })
 
-  // Install Claude Code hooks for state detection
-  installClaudeHooks()
+  // Install hooks for every hook-capable agent (Claude, Codex) for state detection
+  installAgentHooks()
 
   // Initialize hook watcher
   hookWatcher = new ClaudeHookWatcher(win)
@@ -464,7 +478,7 @@ ipcMain.handle(
     _event,
     projectId: string,
     worktreeId?: string,
-    type: 'claude' | 'normal' = 'claude',
+    type: TerminalType = 'claude',
     resumeSessionId?: string,
     initialPrompt?: string
   ) => {
@@ -597,6 +611,7 @@ ipcMain.handle('project:update', async (_event, id: string, updates: Record<stri
     const VALID_CLAUDE_MODES = ['chat', 'auto', 'full-auto']
     const settings: Record<string, unknown> = {
       claudeMode: VALID_CLAUDE_MODES.includes(s.claudeMode as string) ? s.claudeMode : 'chat',
+      defaultAgent: isAgentType(s.defaultAgent) ? s.defaultAgent : 'claude',
     }
     // Auth mode settings
     if (s.authMode === 'subscription' || s.authMode === 'profile') {
@@ -1851,13 +1866,16 @@ app.on('before-quit', () => {
 
     for (const { terminalId, sessionId } of terminalSessions) {
       const info = terminalManager.getTerminalInfo(terminalId)
-      if (info && info.type === 'claude') {
+      // Only hook-capable agents (claude, codex) report a session id and can be
+      // resumed. Others never reach getTerminalSessions, but gate defensively.
+      if (info && isHookCapableAgent(info.type)) {
         const summaryData = sessionIndexService?.getSessionSummary(sessionId)
         sessionsToSave.push({
           terminalId,
           projectId: info.projectId,
           worktreeId: info.worktreeId ?? null,
           claudeSessionId: sessionId,
+          agentType: info.type,
           cwd: info.cwd,
           title: info.title ?? '',
           closedAt: Date.now(),

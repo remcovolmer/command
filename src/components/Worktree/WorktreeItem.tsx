@@ -1,10 +1,13 @@
 import { memo, useState, useEffect, useCallback } from 'react'
 import { GitBranch, Trash2, ExternalLink, GitMerge, RefreshCw, Loader2 } from 'lucide-react'
-import type { Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
+import type { AgentType, Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
-import { STATE_DOT_COLORS, isAttentionState, isVisibleState } from '../../utils/terminalState'
+import { isAttentionState } from '../../utils/terminalState'
 import { closeWorktreeTerminals } from '../../utils/worktreeCleanup'
+import { AgentBadge } from '../AgentBadge'
+import { ContextMenu, type ContextMenuEntry } from '../Sidebar/ContextMenu'
+import { AGENT_DISPLAY, AGENT_IDS, isAgentType } from '@shared/agents'
 import {
   getPRBadge,
   shouldShowMergeButton,
@@ -20,6 +23,7 @@ interface WorktreeItemProps {
   activeTerminalId: string | null
   onCreateTerminal: () => void
   onSelectTerminal: (id: string) => void
+  onSwitchAgent: (terminal: TerminalSession, agent: AgentType) => void
   onRemove: () => void
 }
 
@@ -155,6 +159,7 @@ export const WorktreeItem = memo(function WorktreeItem({
   activeTerminalId,
   onCreateTerminal,
   onSelectTerminal,
+  onSwitchAgent,
   onRemove,
 }: WorktreeItemProps) {
   const prStatus = useProjectStore((s) => s.prStatus[worktree.id])
@@ -166,9 +171,32 @@ export const WorktreeItem = memo(function WorktreeItem({
   const removeWorktree = useProjectStore((s) => s.removeWorktree)
 
   const [isMerging, setIsMerging] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   // The single terminal for this worktree (1:1 model)
   const terminal = terminals[0] ?? null
+
+  // Right-click the worktree row to switch its chat's agent (close + restart with
+  // the chosen agent in the same worktree; git state stays).
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (!terminal || !isAgentType(terminal.type)) return
+      e.preventDefault()
+      e.stopPropagation()
+      setContextMenu({ x: e.clientX, y: e.clientY })
+    },
+    [terminal]
+  )
+  const agentItems: ContextMenuEntry[] =
+    terminal && isAgentType(terminal.type)
+      ? AGENT_IDS.filter((a) => a !== terminal.type).map((a) => ({
+          label: `Switch to ${AGENT_DISPLAY[a].label}`,
+          onClick: () => {
+            setContextMenu(null)
+            onSwitchAgent(terminal, a)
+          },
+        }))
+      : []
 
   // Check gh availability once
   useEffect(() => {
@@ -315,10 +343,12 @@ export const WorktreeItem = memo(function WorktreeItem({
   const isAttention = terminal ? isAttentionState(terminal.state) : false
 
   return (
-    <div className="mt-0.5 border-l border-primary/30 ml-6">
+    <>
+      <div className="mt-0.5 border-l border-primary/30 ml-6">
       {/* Row 1: Branch info + hover actions */}
       <div
         onClick={handleRowClick}
+        onContextMenu={handleContextMenu}
         className={`
           group relative flex items-center gap-2 px-3 py-1.5 cursor-pointer
           transition-colors duration-150 rounded-t-md
@@ -340,13 +370,11 @@ export const WorktreeItem = memo(function WorktreeItem({
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* Attention chip - permission/question rows say what they need */}
           {isAttention && <AttentionChip />}
-          {/* Terminal state dot - only for visible non-attention states (busy/done) */}
-          {terminal && !isAttention && isVisibleState(terminal.state) && (
-            <span
-              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
-                terminal.state === 'done' ? 'needs-input-indicator' : ''
-              }`}
-            />
+          {/* The chat's agent logo, tinted by state (green=done, gray=busy,
+              orange=needs input, red=stopped) — doubles as the status indicator,
+              so no separate dot. Right-click the row to switch agent. */}
+          {terminal && isAgentType(terminal.type) && (
+            <AgentBadge type={terminal.type} state={terminal.state} />
           )}
 
           {/* Hover actions */}
@@ -419,6 +447,15 @@ export const WorktreeItem = memo(function WorktreeItem({
           )}
         </div>
       )}
-    </div>
+      </div>
+      {contextMenu && agentItems.length > 0 && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={agentItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </>
   )
 })

@@ -7,6 +7,8 @@ import * as pty from 'node-pty'
 import { type ClaudeHookWatcher } from './ClaudeHookWatcher'
 import { SpawnError } from './errors'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
+import { isAgentType } from '../../../shared/agents'
+import { buildAgentCommand, isHookCapableAgent } from './agents'
 import { createLogger } from './Logger'
 import { deriveShellSpec, quotePromptForShell } from '../utils/shell'
 
@@ -75,6 +77,11 @@ export class TerminalManager {
   private sidecarBuffers: Map<string, string> = new Map()
   private readonly MAX_SIDECAR_BUFFER_SIZE = 1_048_576 // 1MB per terminal
 
+  // Output-based state heuristic for hookless agents (pi): busy while output
+  // flows, done after a quiet gap. Keyed terminalId -> pending done-timer.
+  private hooklessQuietTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private readonly HOOKLESS_QUIET_MS = 1500
+
   // Defensive PTY write chunking. See writePtySafe() for rationale.
   private readonly PTY_CHUNK_THRESHOLD = 512
   private readonly PTY_CHUNK_SIZE = 512
@@ -102,6 +109,30 @@ export class TerminalManager {
 
     terminal.state = newState
     this.sendToRenderer('terminal:state', terminalId, newState)
+  }
+
+  /**
+   * Drive busy/done for a hookless agent terminal (pi) from PTY output: mark it
+   * busy on output, then schedule 'done' after a quiet gap. Re-armed on every
+   * chunk, so sustained output keeps it busy and a pause returns it to done.
+   * updateTerminalState no-ops when the state is unchanged, so per-chunk calls
+   * are cheap.
+   */
+  private bumpHooklessActivity(terminalId: string): void {
+    this.updateTerminalState(terminalId, 'busy')
+    const existing = this.hooklessQuietTimers.get(terminalId)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      this.hooklessQuietTimers.delete(terminalId)
+      this.updateTerminalState(terminalId, 'done')
+    }, this.HOOKLESS_QUIET_MS)
+    this.hooklessQuietTimers.set(terminalId, timer)
+  }
+
+  private clearHooklessQuietTimer(terminalId: string): void {
+    const timer = this.hooklessQuietTimers.get(terminalId)
+    if (timer) clearTimeout(timer)
+    this.hooklessQuietTimers.delete(terminalId)
   }
 
   createTerminal(options: CreateTerminalOptions): string {
@@ -138,7 +169,7 @@ export class TerminalManager {
     // the linkHandler in useXtermInstance routes md/html clicks into the editor.
     // Without this, Claude detects xterm-256color as a non-hyperlink terminal
     // and falls back to plain "label (url)" prose.
-    if (type === 'claude') {
+    if (isAgentType(type)) {
       env.FORCE_HYPERLINK = '1'
     }
 
@@ -204,8 +235,9 @@ export class TerminalManager {
       killedDeliberately: false,
     }
 
-    // Register with hook watcher for state detection (only for Claude terminals)
-    if (type === 'claude' && this.hookWatcher) {
+    // Register with hook watcher for state detection (hook-capable agents only:
+    // claude, codex). Hookless agents (pi) get state from output heuristics.
+    if (isHookCapableAgent(type) && this.hookWatcher) {
       this.hookWatcher.registerTerminal(id, cwd)
     }
 
@@ -226,6 +258,11 @@ export class TerminalManager {
         // Forward data to renderer
         this.sendToRenderer('terminal:data', id, data)
       }
+
+      // Hookless agents (pi) have no state hook — infer busy/done from output.
+      if (isAgentType(terminal.type) && !isHookCapableAgent(terminal.type)) {
+        this.bumpHooklessActivity(id)
+      }
     })
 
     ptyProcess.onExit(({ exitCode }) => {
@@ -236,8 +273,8 @@ export class TerminalManager {
       // — that escapes the pre-flight try/catch and lands here as a bare exit.
       const orphanedSpawnFailure = !terminal.dataReceived && !terminal.killedDeliberately
 
-      // Unregister from hook watcher (only for Claude terminals)
-      if (terminal.type === 'claude' && this.hookWatcher) {
+      // Unregister from hook watcher (hook-capable agents only)
+      if (isHookCapableAgent(terminal.type) && this.hookWatcher) {
         this.hookWatcher.unregisterTerminal(id)
       }
 
@@ -259,6 +296,7 @@ export class TerminalManager {
         this.sendToRenderer('terminal:exit', id, exitCode)
       }
 
+      this.clearHooklessQuietTimer(id)
       this.terminals.delete(id)
       this.terminalInputBuffers.delete(id)
       this.terminalTitled.delete(id)
@@ -274,31 +312,32 @@ export class TerminalManager {
       this.sendToRenderer('terminal:title', id, initialTitle)
     }
 
-    // Send initial state and start Claude Code (only for Claude terminals)
-    if (type === 'claude') {
+    // Send initial state and start the agent CLI (agent chats only; 'normal' is a
+    // plain shell). The launch command comes from the per-agent descriptor.
+    if (isAgentType(type)) {
       this.sendToRenderer('terminal:state', id, 'busy')
-      const flags: string[] = []
-      if (resumeSessionId) flags.push(`--resume "${resumeSessionId}"`)
-      if (options.claudeMode === 'auto') flags.push('--enable-auto-mode')
-      else if (options.claudeMode === 'full-auto') flags.push('--dangerously-skip-permissions')
-      // Foreground automation launch: pass the prompt as claude's positional
+      const command = buildAgentCommand(type, {
+        resumeSessionId,
+        claudeMode: options.claudeMode,
+      })
+      // Foreground automation launch: pass the prompt as the agent's positional
       // argument so the interactive session starts with it already submitted.
       // The `--` end-of-options separator is required: without it a prompt that
       // starts with a dash (e.g. "--dangerously-skip-permissions", "--mcp-config=…")
-      // would be parsed by claude as a FLAG, bypassing the project's permission
-      // mode. `--` forces everything after it to be positional.
+      // would be parsed as a FLAG, bypassing the project's permission mode. `--`
+      // forces everything after it to be positional.
       const promptArg = options.initialPrompt
         ? ' -- ' + quotePromptForShell(options.initialPrompt, shell)
         : ''
-      const claudeCommand = `claude${flags.length ? ' ' + flags.join(' ') : ''}${promptArg}\r`
+      const startCommand = `${command}${promptArg}\r`
       // Route through writePtySafe (chunked, backpressure-aware) rather than a
       // raw write: the prompt can be large and a single raw write can be
       // truncated under ConPTY/node-pty backpressure, dropping the trailing CR
       // and hanging the launch on an unterminated quote.
-      const claudeTimeout = setTimeout(() => {
-        if (this.terminals.has(id)) void this.writePtySafe(id, claudeCommand)
+      const startTimeout = setTimeout(() => {
+        if (this.terminals.has(id)) void this.writePtySafe(id, startCommand)
       }, SHELL_READY_DELAY_MS)
-      terminal.timeouts.push(claudeTimeout)
+      terminal.timeouts.push(startTimeout)
     } else {
       this.sendToRenderer('terminal:state', id, 'done')
     }
@@ -310,14 +349,15 @@ export class TerminalManager {
     const terminal = this.terminals.get(terminalId)
     if (!terminal?.pty) return
 
-    // Auto-naming: buffer input and extract title on Enter (only for Claude terminals)
-    if (terminal.type === 'claude' && !this.terminalTitled.get(terminalId)) {
+    // Auto-naming: buffer input and extract title on Enter (agent chats only)
+    if (isAgentType(terminal.type) && !this.terminalTitled.get(terminalId)) {
       this.handleAutoNaming(terminalId, data)
     }
 
-    // When user presses Enter, set to busy immediately (only for Claude terminals)
-    // The hook system will update to done when Claude finishes
-    if (terminal.type === 'claude' && (data.includes('\r') || data.includes('\n'))) {
+    // When the user presses Enter, set to busy immediately (agent chats only).
+    // Hook-capable agents get corrected by their hook; pi relies on this plus the
+    // output heuristic to return to done.
+    if (isAgentType(terminal.type) && (data.includes('\r') || data.includes('\n'))) {
       this.updateTerminalState(terminalId, 'busy')
     }
 
@@ -538,6 +578,9 @@ export class TerminalManager {
       // Clean up sidecar buffer
       this.sidecarBuffers.delete(terminalId)
 
+      // Clean up hookless quiet timer (pi)
+      this.clearHooklessQuietTimer(terminalId)
+
       if (terminal.pty) {
         // On Windows, kill the entire process tree to ensure child processes (like claude) are cleaned up
         if (process.platform === 'win32') {
@@ -628,15 +671,6 @@ export class TerminalManager {
     terminal.title = title
     this.terminalTitled.set(terminalId, true)
     this.sendToRenderer('terminal:title', terminalId, title)
-  }
-
-  /**
-   * Get all Claude terminal IDs (for session persistence)
-   */
-  getClaudeTerminalIds(): string[] {
-    return Array.from(this.terminals.values())
-      .filter((t) => t.type === 'claude')
-      .map((t) => t.id)
   }
 
   /**

@@ -89,7 +89,7 @@ describe('restoreSessions handler', () => {
       terminalManager,
       hookWatcher,
       getWindow: () => win,
-      verifyClaudeSession: async () => true,
+      verifyAgentSession: async () => true,
       pathExists: async () => true,
       resolveEnvOverrides: () => undefined,
     })
@@ -134,7 +134,7 @@ describe('restoreSessions handler', () => {
       terminalManager,
       hookWatcher: null,
       getWindow: () => win,
-      verifyClaudeSession: async () => true,
+      verifyAgentSession: async () => true,
       pathExists: async () => true,
       resolveEnvOverrides: () => undefined,
     })
@@ -158,11 +158,73 @@ describe('restoreSessions handler', () => {
         terminalManager,
         hookWatcher: null,
         getWindow: () => null,
-        verifyClaudeSession: async () => true,
+        verifyAgentSession: async () => true,
         pathExists: async () => true,
         resolveEnvOverrides: () => undefined,
       })
     ).resolves.toBeUndefined()
+  })
+
+  test('restores a codex session with type codex and resumes via its own transcript check', async () => {
+    const { send, win } = makeWindow()
+    const sessions = [
+      {
+        terminalId: '44444444-4444-4444-4444-444444444444',
+        projectId: '22222222-2222-2222-2222-222222222222',
+        worktreeId: null,
+        claudeSessionId: 'codexuuid1',
+        agentType: 'codex',
+        cwd: '/ok',
+        title: 'Cx',
+        closedAt: 3,
+      },
+    ]
+    const projects = [
+      {
+        id: '22222222-2222-2222-2222-222222222222',
+        name: 'p',
+        path: '/p',
+        type: 'project',
+        createdAt: 0,
+        sortOrder: 0,
+      },
+    ]
+    const createTerminal = vi.fn(
+      (_opts: { cwd: string; type?: string; resumeSessionId?: string }) => 'cx-terminal'
+    )
+    const projectPersistence = {
+      getSessions: vi.fn(() => sessions),
+      getProjects: vi.fn(() => projects),
+      getWorktreeById: vi.fn(() => null),
+      clearSessions: vi.fn(),
+    } as unknown as ProjectPersistence
+    const terminalManager = { createTerminal } as unknown as TerminalManager
+    const preAssociateSession = vi.fn()
+    const hookWatcher = { preAssociateSession } as unknown as ClaudeHookWatcher
+
+    // Only codex verifies true — proves the agent type is threaded to verification.
+    const verifyAgentSession = vi.fn(async (agentType: string) => agentType === 'codex')
+
+    await restoreSessions({
+      projectPersistence,
+      terminalManager,
+      hookWatcher,
+      getWindow: () => win,
+      verifyAgentSession,
+      pathExists: async () => true,
+      resolveEnvOverrides: () => undefined,
+    })
+
+    expect(verifyAgentSession).toHaveBeenCalledWith('codex', '/ok', 'codexuuid1')
+    expect(createTerminal.mock.calls[0][0]).toMatchObject({
+      type: 'codex',
+      resumeSessionId: 'codexuuid1',
+    })
+    expect(preAssociateSession).toHaveBeenCalledWith('codexuuid1', 'cx-terminal')
+    const restored = send.mock.calls.filter((c) => c[0] === 'session:restored')
+    expect(restored).toHaveLength(1)
+    // The renderer needs agentType to label the restored chat with the right agent.
+    expect(restored[0][1]).toMatchObject({ agentType: 'codex' })
   })
 
   // Suppress the unused-var lint warning for the spies; jsdom isn't loaded here so

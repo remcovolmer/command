@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { TerminalIcon, Plus, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import type { TerminalSession } from '../../types'
-import { STATE_DOT_COLORS, isInputState } from '../../utils/terminalState'
+import { AgentBadge } from '../AgentBadge'
 
 interface TerminalTabBarProps {
   terminals: TerminalSession[]
@@ -52,15 +52,13 @@ export function TerminalTabBar({
               }
             `}
           >
-            <TerminalIcon className="w-3.5 h-3.5 flex-shrink-0" />
+            {/* The agent logo is tinted by state (green=done, gray=busy,
+                orange=needs input, red=stopped) — it is the status indicator, so
+                no separate dot. */}
+            <AgentBadge type={terminal.type} state={terminal.state} />
             <span className="text-xs font-medium whitespace-nowrap">
               {terminal.generatedTitle || terminal.title}
             </span>
-            <span
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]} ${
-                isInputState(terminal.state) ? `needs-input-indicator state-${terminal.state}` : ''
-              }`}
-            />
             <button
               onClick={(e) => {
                 e.stopPropagation()

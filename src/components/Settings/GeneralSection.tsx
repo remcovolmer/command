@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { AlertTriangle, Coins, Info } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
-import type { AuthMode, ClaudeMode } from '../../types'
+import type { AgentType, AuthMode, ClaudeMode } from '../../types'
+import { AGENT_DISPLAY, AGENT_IDS } from '@shared/agents'
 
 type ConfirmDialog = { projectId: string; mode: 'auto' | 'full-auto' } | null
 
@@ -83,6 +84,16 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
         // Clear profileId when switching to subscription
         profileId: authMode === 'subscription' ? undefined : project.settings?.profileId,
       },
+    })
+  }
+
+  const handleDefaultAgentChange = (
+    projectId: string,
+    project: (typeof projects)[0],
+    defaultAgent: AgentType
+  ) => {
+    updateProject(projectId, {
+      settings: { ...project.settings, defaultAgent },
     })
   }
 
@@ -245,6 +256,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
           const currentMode: ClaudeMode = project.settings?.claudeMode ?? 'chat'
           const authMode = project.settings?.authMode ?? 'subscription'
           const profileId = project.settings?.profileId
+          const defaultAgent = project.settings?.defaultAgent ?? 'claude'
           const hasVertexConfig = projectVertexConfigs[project.id] ?? false
 
           return (
@@ -266,7 +278,28 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 )}
               </div>
 
-              {/* Claude Mode selector */}
+              {/* Default Agent selector */}
+              <div className="mt-3">
+                <label className="text-sm font-medium text-foreground">Default Agent</label>
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  Which coding agent new chats use. Override per chat when creating one.
+                </p>
+                <select
+                  value={defaultAgent}
+                  onChange={(e) =>
+                    handleDefaultAgentChange(project.id, project, e.target.value as AgentType)
+                  }
+                  className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {AGENT_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {AGENT_DISPLAY[id].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Claude Mode selector (applies to Claude chats) */}
               <div className="mt-3">
                 <label className="text-sm font-medium text-foreground">Claude Mode</label>
                 <p className="text-xs text-muted-foreground mt-1 mb-2">

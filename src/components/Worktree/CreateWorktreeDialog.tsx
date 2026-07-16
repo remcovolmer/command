@@ -2,20 +2,26 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, GitBranch, Plus, Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
+import { useProjectStore } from '../../stores/projectStore'
+import { AGENT_DISPLAY, AGENT_IDS } from '@shared/agents'
+import type { AgentType } from '../../types'
 
 interface CreateWorktreeDialogProps {
   projectId: string
   isOpen: boolean
   onClose: () => void
-  onCreated: (worktree: {
-    id: string
-    projectId: string
-    name: string
-    branch: string
-    path: string
-    createdAt: number
-    isLocked: boolean
-  }) => void
+  onCreated: (
+    worktree: {
+      id: string
+      projectId: string
+      name: string
+      branch: string
+      path: string
+      createdAt: number
+      isLocked: boolean
+    },
+    agent: AgentType
+  ) => void
 }
 
 export function CreateWorktreeDialog({
@@ -25,6 +31,9 @@ export function CreateWorktreeDialog({
   onCreated,
 }: CreateWorktreeDialogProps) {
   const api = useMemo(() => getElectronAPI(), [])
+  const projectDefaultAgent =
+    useProjectStore((s) => s.projects.find((p) => p.id === projectId)?.settings?.defaultAgent) ??
+    'claude'
 
   const [localBranches, setLocalBranches] = useState<string[]>([])
   const [remoteBranches, setRemoteBranches] = useState<string[]>([])
@@ -38,6 +47,7 @@ export function CreateWorktreeDialog({
   const [customName, setCustomName] = useState('')
   const [isNewBranch, setIsNewBranch] = useState(false)
   const [sourceBranch, setSourceBranch] = useState('main')
+  const [agent, setAgent] = useState<AgentType>('claude')
 
   // Determine if form is valid for submission
   const canSubmit =
@@ -51,6 +61,7 @@ export function CreateWorktreeDialog({
 
     setLoading(true)
     setError(null)
+    setAgent(projectDefaultAgent)
 
     api.worktree
       .listBranches(projectId)
@@ -83,7 +94,7 @@ export function CreateWorktreeDialog({
       .finally(() => {
         setLoading(false)
       })
-  }, [isOpen, projectId, api])
+  }, [isOpen, projectId, api, projectDefaultAgent])
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -114,7 +125,7 @@ export function CreateWorktreeDialog({
         customName.trim() || undefined,
         isNewBranch ? sourceBranch || undefined : undefined
       )
-      onCreated(worktree)
+      onCreated(worktree, agent)
       onClose()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create worktree'
@@ -130,6 +141,7 @@ export function CreateWorktreeDialog({
     selectedBranch,
     customName,
     sourceBranch,
+    agent,
     onCreated,
     onClose,
   ])
@@ -291,6 +303,22 @@ export function CreateWorktreeDialog({
                   </div>
                 </>
               )}
+
+              {/* Agent for the worktree's chat */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Agent</label>
+                <select
+                  value={agent}
+                  onChange={(e) => setAgent(e.target.value as AgentType)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {AGENT_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {AGENT_DISPLAY[id].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {/* Custom Name (Optional) */}
               <div>
