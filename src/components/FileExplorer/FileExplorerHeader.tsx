@@ -1,6 +1,6 @@
-import { FolderTree, GitBranch, ListChecks, Zap, RefreshCw } from 'lucide-react'
+import { FolderTree, GitBranch, ListChecks, RefreshCw } from 'lucide-react'
 
-type ExplorerTab = 'files' | 'git' | 'tasks' | 'automations'
+type ExplorerTab = 'files' | 'git' | 'tasks'
 
 interface FileExplorerHeaderProps {
   activeTab: ExplorerTab
@@ -13,7 +13,6 @@ const TAB_META: Record<ExplorerTab, { label: string; icon: typeof FolderTree }> 
   files: { label: 'Files', icon: FolderTree },
   git: { label: 'Git', icon: GitBranch },
   tasks: { label: 'Tasks', icon: ListChecks },
-  automations: { label: 'Automations', icon: Zap },
 }
 
 /**
@@ -27,7 +26,7 @@ export function FileExplorerHeader({
   onRefresh,
   worktreeBranch,
 }: FileExplorerHeaderProps) {
-  const { label, icon: Icon } = TAB_META[activeTab]
+  const { label, icon: Icon } = TAB_META[activeTab] ?? TAB_META.files
   const title = activeTab === 'files' && worktreeBranch ? `${label} · ${worktreeBranch}` : label
   const gitRefreshing = activeTab === 'git' && isGitLoading
 

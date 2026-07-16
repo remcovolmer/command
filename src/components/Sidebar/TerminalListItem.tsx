@@ -1,5 +1,5 @@
 import { memo, useCallback, useState } from 'react'
-import { Terminal as TerminalIcon, X } from 'lucide-react'
+import { Terminal as TerminalIcon, X, Zap } from 'lucide-react'
 import type { AgentType, TerminalSession } from '../../types'
 import { isAttentionState } from '../../utils/terminalState'
 import { AttentionChip, AttentionRail, attentionRowBg } from './AttentionRail'
@@ -34,6 +34,7 @@ export const TerminalListItem = memo(function TerminalListItem({
   `
   const isClaude = terminal.type === 'claude'
   const showSummary = isClaude && isActive && Boolean(terminal.summary)
+  const isAutomation = terminal.origin === 'automation'
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
@@ -61,7 +62,7 @@ export const TerminalListItem = memo(function TerminalListItem({
       <li
         onClick={onSelect}
         onContextMenu={handleContextMenu}
-        className={`relative ${className ?? defaultClassName}`}
+        className={`relative ${className ?? defaultClassName} ${isAutomation ? 'automation-spawn' : ''}`}
         title={isClaude && !isActive && terminal.summary ? terminal.summary : undefined}
       >
         {isAttention && <AttentionRail />}
@@ -78,6 +79,10 @@ export const TerminalListItem = memo(function TerminalListItem({
                 : 'text-muted-foreground'
             }`}
           />
+        )}
+        {/* Origin marker: this chat/worktree was started by an automation (R22). */}
+        {isAutomation && (
+          <Zap className="w-3 h-3 flex-shrink-0 text-primary" aria-label="Started by an automation" />
         )}
         <div className="flex-1 min-w-0">
           <span className="text-xs truncate block">

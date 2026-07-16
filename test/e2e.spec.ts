@@ -69,5 +69,15 @@ if (process.platform === 'linux') {
         (await page!.$('.w-64'))
       expect(sidebar).not.toBeNull()
     })
+
+    test('opens the automations overview from the sidebar entry', async () => {
+      expect(page).toBeDefined()
+      // Click the top-level Automations entry (above the project list).
+      await page!.getByRole('button', { name: 'Automations' }).first().click()
+      // The center overview renders a Run-history tab — unique to the overview,
+      // so its presence confirms the overview opened (R1, R3, R5, R9).
+      await page!.waitForSelector('text=Run history', { timeout: 10000 })
+      expect(await page!.$('text=Run history')).not.toBeNull()
+    })
   })
 }

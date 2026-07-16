@@ -246,9 +246,8 @@ function App() {
       setFileExplorerVisible(true)
       setFileExplorerActiveTab('tasks')
     },
-    'fileExplorer.automationsTab': () => {
-      setFileExplorerVisible(true)
-      setFileExplorerActiveTab('automations')
+    'automations.showOverview': () => {
+      useProjectStore.getState().setAutomationsOverviewVisible(true)
     },
     'fileExplorer.newFile': () => {
       const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } =

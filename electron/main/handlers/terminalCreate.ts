@@ -33,6 +33,8 @@ export interface TerminalCreateArgs {
   worktreeId?: string
   type?: TerminalType
   resumeSessionId?: string
+  /** Foreground automation launch: start `claude` with this prompt submitted. */
+  initialPrompt?: string
 }
 
 /**
@@ -44,7 +46,7 @@ export async function handleTerminalCreate(
   deps: TerminalCreateDeps,
   args: TerminalCreateArgs
 ): Promise<string | null> {
-  const { projectId, worktreeId, type = 'claude', resumeSessionId } = args
+  const { projectId, worktreeId, type = 'claude', resumeSessionId, initialPrompt } = args
   const {
     terminalManager,
     projectPersistence,
@@ -68,6 +70,14 @@ export async function handleTerminalCreate(
     (typeof resumeSessionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(resumeSessionId))
   ) {
     throw new Error('Invalid session ID format')
+  }
+  if (
+    initialPrompt !== undefined &&
+    (typeof initialPrompt !== 'string' || initialPrompt.length > 50000)
+  ) {
+    // Bound at the renderer trust boundary (mirrors the automation prompt cap)
+    // so a compromised/buggy renderer can't feed an unbounded string to the PTY.
+    throw new Error('Invalid initial prompt')
   }
 
   // Look up project for settings and path
@@ -100,6 +110,7 @@ export async function handleTerminalCreate(
         projectId,
         worktreeId: worktreeId ?? undefined,
         resumeSessionId: resumeSessionId ?? undefined,
+        initialPrompt: initialPrompt ?? undefined,
         claudeMode: project?.settings?.claudeMode,
         envOverrides,
       }) ?? null

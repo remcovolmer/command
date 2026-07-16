@@ -46,14 +46,8 @@ vi.mock('../src/components/FileExplorer/GitStatusPanel', () => ({
 vi.mock('../src/components/FileExplorer/TasksPanel', () => ({
   TasksPanel: () => <div data-testid="tasks-panel" />,
 }))
-vi.mock('../src/components/FileExplorer/AutomationsPanel', () => ({
-  AutomationsPanel: () => <div data-testid="automations-panel" />,
-}))
 vi.mock('../src/components/FileExplorer/SessionsPanel', () => ({
   SessionsPanel: () => <div data-testid="sessions-panel" />,
-}))
-vi.mock('../src/components/FileExplorer/AutomationCreateDialog', () => ({
-  AutomationCreateDialog: () => null,
 }))
 vi.mock('../src/components/FileExplorer/DeleteConfirmDialog', () => ({
   DeleteConfirmDialog: () => null,

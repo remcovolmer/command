@@ -50,7 +50,18 @@ vi.mock('../src/utils/electron', () => ({
 import { useProjectStore } from '../src/stores/projectStore'
 import { DEFAULT_HOTKEY_CONFIG, mergeMissingHotkeyDefaults } from '../src/utils/hotkeys'
 import type { HotkeyAction, HotkeyConfig } from '../src/types/hotkeys'
-import type { Project, TerminalSession } from '../src/types'
+import type { Project, TerminalSession, Worktree } from '../src/types'
+
+function makeWorktree(overrides: Partial<Worktree> & { id: string; projectId: string }): Worktree {
+  return {
+    name: 'feature',
+    path: '/wt',
+    branch: 'feature',
+    createdAt: 0,
+    isLocked: false,
+    ...overrides,
+  }
+}
 
 function makeProject(overrides: Partial<Project> & { id: string }): Project {
   return {
@@ -110,6 +121,49 @@ describe('projectStore active terminal & content', () => {
       expect(ids).toContain('term-1')
       expect(ids).toContain('term-2')
       expect(ids).not.toContain('sidecar-1')
+    })
+  })
+
+  // The canonical order is the single source of truth the tab bar, arrow-key
+  // navigation, Alt+1-9, and the close/switch fallback all read; it must match
+  // the sidebar's top-to-bottom rendering: root chats first, then chats grouped
+  // per worktree in worktree-creation order.
+  describe('getProjectTerminals canonical ordering', () => {
+    test('root chats first, then chats grouped per worktree in worktree order', () => {
+      // Insertion order deliberately interleaves worktrees — the bug trigger.
+      const a = makeTerminal({ id: 'a', projectId: 'p', worktreeId: null })
+      const b = makeTerminal({ id: 'b', projectId: 'p', worktreeId: 'wt-W' })
+      const c = makeTerminal({ id: 'c', projectId: 'p', worktreeId: null })
+      const d = makeTerminal({ id: 'd', projectId: 'p', worktreeId: 'wt-W' })
+      const e = makeTerminal({ id: 'e', projectId: 'p', worktreeId: 'wt-X' })
+
+      useProjectStore.setState({
+        terminals: { a, b, c, d, e },
+        worktrees: {
+          'wt-W': makeWorktree({ id: 'wt-W', projectId: 'p' }),
+          'wt-X': makeWorktree({ id: 'wt-X', projectId: 'p' }),
+        },
+      })
+
+      const ids = useProjectStore
+        .getState()
+        .getProjectTerminals('p')
+        .map((t) => t.id)
+      // Root chats a, c in creation order; then wt-W's chats b, d; then wt-X's e.
+      expect(ids).toEqual(['a', 'c', 'b', 'd', 'e'])
+    })
+
+    test('appends chats of a not-yet-loaded worktree instead of dropping them', () => {
+      const a = makeTerminal({ id: 'a', projectId: 'p', worktreeId: null })
+      const b = makeTerminal({ id: 'b', projectId: 'p', worktreeId: 'wt-unloaded' })
+
+      useProjectStore.setState({ terminals: { a, b }, worktrees: {} })
+
+      const ids = useProjectStore
+        .getState()
+        .getProjectTerminals('p')
+        .map((t) => t.id)
+      expect(ids).toEqual(['a', 'b'])
     })
   })
 
@@ -334,6 +388,63 @@ describe('projectStore active terminal & content', () => {
       const state = useProjectStore.getState()
       // Should be null, NOT sidecar-1
       expect(state.activeTerminalId).toBeNull()
+    })
+
+    test('closing the active chat activates the neighbour in canonical order, not the top', () => {
+      // Canonical order is [r1, r2, w1]: root chats first, then the worktree chat.
+      // Closing r1 must land on r2 (its neighbour), never jump past it to w1.
+      const r1 = makeTerminal({ id: 'r1', projectId: 'proj-1', worktreeId: null })
+      const w1 = makeTerminal({ id: 'w1', projectId: 'proj-1', worktreeId: 'wt-1' })
+      const r2 = makeTerminal({ id: 'r2', projectId: 'proj-1', worktreeId: null })
+
+      useProjectStore.setState({
+        // Insertion order interleaves the worktree chat between the root chats.
+        terminals: { r1, w1, r2 },
+        worktrees: { 'wt-1': makeWorktree({ id: 'wt-1', projectId: 'proj-1' }) },
+        activeTerminalId: 'r1',
+        activeProjectId: 'proj-1',
+      })
+
+      useProjectStore.getState().removeTerminal('r1')
+
+      expect(useProjectStore.getState().activeTerminalId).toBe('r2')
+    })
+
+    test('closing the last chat in canonical order falls back to the previous one', () => {
+      // Canonical order [r2, w1]; w1 is last, so closing it lands on r2.
+      const r2 = makeTerminal({ id: 'r2', projectId: 'proj-1', worktreeId: null })
+      const w1 = makeTerminal({ id: 'w1', projectId: 'proj-1', worktreeId: 'wt-1' })
+
+      useProjectStore.setState({
+        terminals: { r2, w1 },
+        worktrees: { 'wt-1': makeWorktree({ id: 'wt-1', projectId: 'proj-1' }) },
+        activeTerminalId: 'w1',
+        activeProjectId: 'proj-1',
+      })
+
+      useProjectStore.getState().removeTerminal('w1')
+
+      expect(useProjectStore.getState().activeTerminalId).toBe('r2')
+    })
+
+    test('closing the active chat can activate a neighbour across a worktree-group boundary', () => {
+      // Canonical order [r1, r2, w1]: closing the last root chat (r2) must land on
+      // w1 — the first chat of the next worktree group — proving the neighbour
+      // formula holds across a group boundary, not just within the root group.
+      const r1 = makeTerminal({ id: 'r1', projectId: 'proj-1', worktreeId: null })
+      const r2 = makeTerminal({ id: 'r2', projectId: 'proj-1', worktreeId: null })
+      const w1 = makeTerminal({ id: 'w1', projectId: 'proj-1', worktreeId: 'wt-1' })
+
+      useProjectStore.setState({
+        terminals: { r1, r2, w1 },
+        worktrees: { 'wt-1': makeWorktree({ id: 'wt-1', projectId: 'proj-1' }) },
+        activeTerminalId: 'r2',
+        activeProjectId: 'proj-1',
+      })
+
+      useProjectStore.getState().removeTerminal('r2')
+
+      expect(useProjectStore.getState().activeTerminalId).toBe('w1')
     })
   })
 

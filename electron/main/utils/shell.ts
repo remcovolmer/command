@@ -37,3 +37,23 @@ export function deriveShellSpec(shell: string, platform: NodeJS.Platform): Shell
   }
   return { shell, args: [], env: {} }
 }
+
+/**
+ * Quote an arbitrary prompt as a single shell argument, so it can be appended
+ * to a `claude` command line written to the PTY. Interactive `claude "<prompt>"`
+ * starts a session with the prompt already submitted — which is how an
+ * automation foreground-launches without any PTY-timing injection.
+ *
+ * Shell-aware because the terminal may run a POSIX shell (Git Bash / bash / zsh:
+ * wrap in single quotes, escape embedded single quotes as '\'') or PowerShell
+ * (single-quoted literal where only the quote char is escaped, by doubling).
+ * Single quoting is used specifically so `$`, backticks, and other metacharacters
+ * in the prompt are never expanded.
+ */
+export function quotePromptForShell(prompt: string, shell: string): string {
+  const isPowerShell = /powershell|pwsh/i.test(shell)
+  if (isPowerShell) {
+    return `'${prompt.replace(/'/g, "''")}'`
+  }
+  return `'${prompt.replace(/'/g, "'\\''")}'`
+}

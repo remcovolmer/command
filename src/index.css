@@ -266,6 +266,21 @@ body {
   }
 }
 
+/* Automation-spawned chat/worktree: a brief highlight so a focus-neutral
+   launch is noticeable in the sidebar without stealing focus (R22). */
+@keyframes automation-spawn-flash {
+  0% {
+    background-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.automation-spawn {
+  animation: automation-spawn-flash 1.8s ease-out 1;
+}
+
 /* Focus styles */
 :focus-visible {
   outline: 2px solid var(--ring);

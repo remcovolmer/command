@@ -1,11 +1,16 @@
 import { useMemo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
-import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../../stores/projectStore'
+import {
+  useProjectStore,
+  MAX_TERMINALS_PER_PROJECT,
+  getVisibleTerminals,
+} from '../../stores/projectStore'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
 import { SecondPanel } from './SecondPanel'
 import { ProjectOverview } from '../ProjectOverview'
+import { AutomationsOverview } from '../Automations/AutomationsOverview'
 import { TerminalIcon, Plus, Sparkles } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
@@ -16,10 +21,13 @@ export function TerminalArea() {
     activeProjectId,
     activeTerminalId,
     terminals,
+    worktrees,
+    sidecarTerminals,
     projects,
     editorTabs,
     activeContentTabId,
     projectOverviewVisible,
+    automationsOverviewVisible,
     setActiveTerminal,
     removeTerminal,
     setActiveContentTab,
@@ -31,10 +39,13 @@ export function TerminalArea() {
       activeProjectId: s.activeProjectId,
       activeTerminalId: s.activeTerminalId,
       terminals: s.terminals,
+      worktrees: s.worktrees,
+      sidecarTerminals: s.sidecarTerminals,
       projects: s.projects,
       editorTabs: s.editorTabs,
       activeContentTabId: s.activeContentTabId,
       projectOverviewVisible: s.projectOverviewVisible,
+      automationsOverviewVisible: s.automationsOverviewVisible,
       setActiveTerminal: s.setActiveTerminal,
       removeTerminal: s.removeTerminal,
       setActiveContentTab: s.setActiveContentTab,
@@ -47,12 +58,14 @@ export function TerminalArea() {
   const { createTerminal } = useCreateTerminal()
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
+  // Tabs share the sidebar's canonical order via getVisibleTerminals, so
+  // left-to-right in the tab bar matches top-to-bottom in the sidebar.
   const projectTerminals = useMemo(
     () =>
-      Object.values(terminals).filter(
-        (t) => t.projectId === activeProjectId && t.type !== 'normal'
-      ),
-    [terminals, activeProjectId]
+      activeProjectId
+        ? getVisibleTerminals(terminals, worktrees, sidecarTerminals, activeProjectId)
+        : [],
+    [terminals, worktrees, sidecarTerminals, activeProjectId]
   )
 
   // Content tabs (editors/diffs) scoped to the active chat — the second panel.
@@ -122,6 +135,12 @@ export function TerminalArea() {
     },
     [activeProjectId, api, addTerminal]
   )
+
+  // Global automations overview — independent of the active project (R3, R5, AE5).
+  // Rendered before the no-project branch so it shows regardless of selection.
+  if (automationsOverviewVisible) {
+    return <AutomationsOverview />
+  }
 
   // No project selected - show welcome
   if (!activeProjectId || !activeProject) {

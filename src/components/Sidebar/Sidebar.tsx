@@ -9,6 +9,7 @@ import {
   Check,
   AlertCircle,
   Settings,
+  Zap,
 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
@@ -25,6 +26,7 @@ import { useCreateTerminal } from '../../hooks/useCreateTerminal'
 import { LogoIcon } from '../LogoIcon'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { isHtmlFile } from '../../utils/editorLanguages'
+import { useAutomationUnreadCount } from '../../hooks/useAutomationUnreadCount'
 
 export function Sidebar() {
   // Use granular selectors to prevent unnecessary re-renders
@@ -79,6 +81,11 @@ export function Sidebar() {
 
   const api = useMemo(() => getElectronAPI(), [])
   const { createTerminal } = useCreateTerminal()
+
+  // Global automations entry (above the project list).
+  const automationsOverviewVisible = useProjectStore((s) => s.automationsOverviewVisible)
+  const setAutomationsOverviewVisible = useProjectStore((s) => s.setAutomationsOverviewVisible)
+  const automationUnread = useAutomationUnreadCount()
 
   // State for worktree dialog
   const [worktreeDialogProjectId, setWorktreeDialogProjectId] = useState<string | null>(null)
@@ -405,6 +412,27 @@ export function Sidebar() {
             className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
           >
             <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Global Automations entry — above the project list. Opens the overview
+            in the center without changing the active project (R1, R3). */}
+        <div className="px-3 pt-1 pb-1">
+          <button
+            onClick={() => setAutomationsOverviewVisible(true)}
+            className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors ${
+              automationsOverviewVisible
+                ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
+                : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Zap className="w-4 h-4 shrink-0" />
+            <span className="flex-1 text-left font-medium">Automations</span>
+            {automationUnread > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-[18px] text-center">
+                {automationUnread}
+              </span>
+            )}
           </button>
         </div>
 
