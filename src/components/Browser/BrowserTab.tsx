@@ -118,6 +118,15 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
   const isActiveRef = useRef(isActive)
   const dispatchShortcutRef = useRef<(action: BrowserShortcutAction) => void>(() => {})
 
+  // Reset find-match state — used on close and on every navigation (the prior
+  // document's matches no longer apply). Declared here so the navigation
+  // listener below can reference it.
+  const resetFindState = () => {
+    setFindText('')
+    setFindActive(0)
+    setFindTotal(0)
+  }
+
   // Annotation state.
   const [mode, setMode] = useState<AnnotationMode>('none')
   const [status, setStatus] = useState<string | null>(null)
@@ -300,12 +309,6 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
   const handleZoomReset = () => applyZoom(DEFAULT_ZOOM)
 
   // ---- Find-in-page ---------------------------------------------------------
-
-  const resetFindState = () => {
-    setFindText('')
-    setFindActive(0)
-    setFindTotal(0)
-  }
 
   const openFind = () => setFindOpen(true)
 
