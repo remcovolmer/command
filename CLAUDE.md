@@ -198,6 +198,16 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + S` | Save file |
 | `Ctrl + Shift + B` | Open browser tab |
 
+### Browser
+Shortcuts fire while the built-in browser (webview) has focus, via a main-process `before-input-event` interceptor; they also fire from the app chrome when a browser tab is active. All new browser controls otherwise live behind the toolbar's `⋯` overflow menu.
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + =` | Browser: zoom in |
+| `Ctrl + -` | Browser: zoom out |
+| `Ctrl + 0` | Browser: reset zoom |
+| `Ctrl + F` | Browser: find in page |
+| `Ctrl + Shift + R` | Browser: hard reload (bypass cache) |
+
 ### Worktree
 | Shortcut | Action |
 |----------|--------|

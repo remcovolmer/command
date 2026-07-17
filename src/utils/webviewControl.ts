@@ -1,4 +1,4 @@
-import type { CommandWebviewElement, NativeImageLike } from '../types/webview'
+import type { CommandWebviewElement, NativeImageLike, FindInPageOptions } from '../types/webview'
 
 // Ready-guarded wrappers around the <webview>'s host-side control surface.
 //
@@ -39,5 +39,54 @@ export async function captureGuest(
     return image.isEmpty() ? null : image
   } catch {
     return null
+  }
+}
+
+// The methods below are synchronous WebviewTag calls that, like executeJavaScript,
+// throw synchronously before the guest's dom-ready. Each returns a sentinel
+// (false / null) instead of throwing when the ref is null or the guest isn't
+// attached yet, so callers off a timer or an early click don't leak an exception.
+
+/** Set the guest's zoom factor (1 = 100%). Returns false when not applied. */
+export function setZoom(
+  webview: CommandWebviewElement | null,
+  ready: boolean,
+  factor: number
+): boolean {
+  if (!webview || !ready) return false
+  try {
+    webview.setZoomFactor(factor)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Start/advance a find-in-page session. Returns the request id, or null. */
+export function findInGuest(
+  webview: CommandWebviewElement | null,
+  ready: boolean,
+  text: string,
+  options?: FindInPageOptions
+): number | null {
+  if (!webview || !ready || !text) return null
+  try {
+    return webview.findInPage(text, options)
+  } catch {
+    return null
+  }
+}
+
+/** Clear the active find-in-page session. No-op when the guest isn't ready. */
+export function stopFind(
+  webview: CommandWebviewElement | null,
+  ready: boolean,
+  action: 'clearSelection' | 'keepSelection' | 'activateSelection' = 'clearSelection'
+): void {
+  if (!webview || !ready) return
+  try {
+    webview.stopFindInPage(action)
+  } catch {
+    // guest torn down mid-call; nothing to clear
   }
 }

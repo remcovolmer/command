@@ -142,6 +142,10 @@ export interface BrowserTab {
   terminalId: string
   filePath?: string
   fileName?: string
+  // Zoom factor (1 = 100%). Kept per tab, in-memory only — deliberately absent
+  // from the store's `partialize`, so it survives tab switches but resets on
+  // app restart (like the tab itself, which is not persisted).
+  zoomFactor?: number
 }
 
 // Union of all center tab types
@@ -335,6 +339,9 @@ export interface ElectronAPI {
   }
   notification: {
     show: (title: string, body: string) => void
+  }
+  browser: {
+    onShortcut: (callback: (action: string) => void) => Unsubscribe
   }
   app: {
     onCloseRequest: (callback: () => void) => Unsubscribe

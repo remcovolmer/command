@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Browser Quality-of-Life Essentials - Plan</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --paper: #ffffff;
+    --ink: #1b2530;
+    --muted: #5b6b7b;
+    --line: #dde3ea;
+    --accent: #1d4ed8;
+    --accent-soft: #e7efff;
+    --accent-ink: #12379e;
+    --ok: #0f7b53;
+    --ok-soft: #e2f4ec;
+    --warn: #a25a00;
+    --warn-soft: #fbeedd;
+    --defer: #6d4bb3;
+    --defer-soft: #efe9fb;
+    --radius: 8px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: "SFMono-Regular", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #10151b; }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .page {
+    max-width: 940px;
+    margin: 32px auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 40px 48px 28px;
+  }
+  header.doc { border-bottom: 2px solid var(--ink); padding-bottom: 18px; margin-bottom: 8px; }
+  .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  h1 { font-size: 27px; line-height: 1.2; margin: 6px 0 14px; }
+  h2 { font-size: 20px; margin: 34px 0 10px; padding-top: 6px; border-top: 1px solid var(--line); }
+  h2:first-of-type { border-top: 0; }
+  h3 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 22px 0 8px; }
+  p { max-width: 72ch; }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 90%; background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
+  @media (prefers-color-scheme: dark) { code { background: #eef1f5; color: #1b2530; } }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 14px 0 4px; }
+  .meta .pill {
+    font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    background: #eef1f5; color: var(--muted); border: 1px solid var(--line);
+  }
+  .meta .pill b { color: var(--ink); font-weight: 600; }
+  .meta .pill.key { background: var(--accent-soft); color: var(--accent-ink); border-color: #cfe0ff; }
+  .meta .pill.ready { background: var(--ok-soft); color: var(--ok); border-color: #bfe6d5; }
+
+  nav.toc { margin: 18px 0 6px; font-size: 13px; line-height: 1.9; }
+  nav.toc a { margin-right: 16px; white-space: nowrap; }
+
+  .preserve { font-size: 12.5px; color: var(--ok); background: var(--ok-soft); border: 1px solid #bfe6d5; border-radius: 6px; padding: 6px 12px; margin: 10px 0 0; display: inline-block; }
+
+  .capsule { background: #f7f9fc; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+  .capsule dl { margin: 0; display: grid; grid-template-columns: 150px 1fr; gap: 6px 16px; }
+  .capsule dt { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; padding-top: 2px; }
+  .capsule dd { margin: 0; }
+
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 4px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  td.id { white-space: nowrap; font-family: var(--mono); font-weight: 700; color: var(--accent-ink); width: 46px; }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  .kd { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 14px 16px; margin: 12px 0; }
+  .kd .id { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); font-size: 12px; }
+  .kd h4 { margin: 4px 0 6px; font-size: 15px; }
+  .kd p { margin: 0; }
+
+  .flow { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; margin: 10px 0; }
+  .flow .id { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); font-size: 12px; }
+  .flow h4 { margin: 3px 0 6px; font-size: 15px; }
+  .flow ol { margin: 0; padding-left: 20px; }
+  .flow li { margin: 2px 0; }
+  .lead { font-weight: 600; }
+
+  .ae { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; margin: 10px 0; background: #fbfcfe; }
+  .ae .id { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); font-size: 12px; }
+  .ae .covers { font-size: 12px; color: var(--muted); }
+  .ae p { margin: 5px 0 0; }
+
+  .cards2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 680px) { .cards2 { grid-template-columns: 1fr; } }
+  .callout { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+  .callout .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  .callout.defer { background: var(--defer-soft); border-color: #ddd0f4; }
+  .callout.defer .tag { color: var(--defer); }
+  .callout.outside { background: #f2f4f7; }
+  .callout.outside .tag { color: var(--muted); }
+  .callout ul { margin: 6px 0 0; padding-left: 18px; }
+  .callout li { margin: 2px 0; }
+
+  .note { background: var(--warn-soft); border: 1px solid #f0dcc0; border-radius: var(--radius); padding: 12px 16px; margin: 12px 0; }
+  .note .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--warn); }
+
+  figure { margin: 16px 0; }
+  figure svg { width: 100%; height: auto; display: block; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
+  figcaption { font-size: 12.5px; color: var(--muted); margin-top: 6px; font-style: italic; }
+  .legend { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; margin: 0 4px 0 12px; border: 1px solid var(--line); }
+
+  .unit { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin: 12px 0; }
+  .unit > h4 { margin: 0 0 8px; font-size: 15px; }
+  .unit .uid { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); }
+  .unit dl.strip { display: grid; grid-template-columns: 118px 1fr; gap: 5px 14px; margin: 0; font-size: 13.5px; }
+  .unit dl.strip dt { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; padding-top: 2px; }
+  .unit dl.strip dd { margin: 0; }
+  .unit details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .unit summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); font-weight: 700; }
+  .unit details ul { margin: 8px 0 0; padding-left: 18px; }
+  .unit details li { margin: 3px 0; }
+  .unit .execnote { background: var(--warn-soft); border: 1px solid #f0dcc0; border-radius: 6px; padding: 8px 12px; margin: 10px 0 0; font-size: 13px; }
+  .unit .execnote b { color: var(--warn); }
+  .filechip { font-family: var(--mono); font-size: 12px; }
+  .fc-c { color: var(--ok); font-weight: 700; }
+  .fc-m { color: var(--accent); font-weight: 700; }
+
+  .gate { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin: 8px 0; }
+  .gate .id { font-family: var(--mono); font-weight: 700; color: var(--accent-ink); font-size: 12px; }
+  .gate p { margin: 4px 0 0; }
+
+  ul.dod { list-style: none; padding-left: 0; margin: 8px 0; }
+  ul.dod li { padding: 4px 0 4px 26px; position: relative; }
+  ul.dod li::before { content: "\2610"; position: absolute; left: 0; color: var(--muted); font-size: 15px; }
+
+  ul.reqgap { margin: 6px 0; }
+  .oq h3 { margin-top: 14px; }
+  hr.sec { border: 0; border-top: 1px solid var(--line); margin: 30px 0 0; }
+  footer.composition { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc">
+    <div class="eyebrow">Unified plan · implementation-ready · enriched by ce-plan</div>
+    <h1>Browser Quality-of-Life Essentials — Plan</h1>
+    <div class="meta">
+      <span class="pill"><b>Type</b> · feat</span>
+      <span class="pill"><b>Datum</b> · <time datetime="2026-07-17">2026-07-17</time></span>
+      <span class="pill"><b>Topic</b> · browser-qol-essentials</span>
+      <span class="pill key"><b>Contract</b> · ce-unified-plan/v1</span>
+      <span class="pill ready"><b>Readiness</b> · implementation-ready</span>
+      <span class="pill"><b>Execution</b> · code</span>
+      <span class="pill"><b>Units</b> · 7</span>
+    </div>
+    <span class="preserve">Product Contract unchanged — WHAT was fixed in ce-brainstorm; ce-plan added only the HOW.</span>
+    <nav class="toc">
+      <a href="#goal-capsule">Goal Capsule</a>
+      <a href="#product-contract">Product Contract</a>
+      <a href="#planning-contract">Planning Contract</a>
+      <a href="#implementation-units">Implementation Units</a>
+      <a href="#verification-contract">Verification</a>
+      <a href="#definition-of-done">Definition of Done</a>
+      <a href="#appendix">Sources</a>
+    </nav>
+  </header>
+
+  <section id="goal-capsule">
+    <h2>Goal Capsule</h2>
+    <div class="capsule">
+      <dl>
+        <dt>Objective</dt>
+        <dd>De ingebouwde browser uitbreiden met zes native-Chromium QoL-features (zoom, find-in-page, laadstatus + stop, hard reload, open-in-systeembrowser + URL kopiëren, generieke foutpagina) zodat het previewen van Claude-deliverables en het testen van localhost dev-servers pijnloos wordt.</dd>
+        <dt>Product authority</dt>
+        <dd>Remco (owner van Command). Scope bevestigd in brainstorm van 2026-07-17.</dd>
+        <dt>Open blockers</dt>
+        <dd>Geen blocker voor implementatie. Eén load-bearing aanname (A1): shortcuts werken pas terwijl de <code>&lt;webview&gt;</code> focus heeft als het main-proces toetsen onderschept. U7 valideert dit end-to-end als eerste stap.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <hr class="sec" />
+
+  <section id="product-contract">
+    <h2>Product Contract</h2>
+
+    <h3 id="summary">Summary</h3>
+    <p>Zes quality-of-life features bovenop de bestaande <code>&lt;webview&gt;</code>-toolbar: <b>zoom</b>, <b>find-in-page</b>, een <b>laadindicator met stop-knop</b>, <b>hard reload</b>, <b>open-in-systeembrowser + URL kopiëren</b>, en een <b>generieke foutpagina met retry</b>. Alles leunt op native Chromium-API's, dus de bouwkost is laag en er komt geen nieuwe persistentie- of bridge-laag bij.</p>
+    <p>Om de toolbar niet te laten vollopen landen de nieuwe controls achter één overflow-menu (<code>⋯</code>); alleen de laad/stop-status blijft inline op de reload-knop.</p>
+
+    <h3 id="problem-frame">Problem Frame</h3>
+    <p>De browser in Command is geen algemene web-browser maar een <b>preview-/QA-venster</b> voor twee taken: (1) HTML-deliverables lezen die Claude genereert, en (2) localhost dev-servers testen. Vandaag heeft hij alleen navigatie (terug/vooruit/reload), een adresbalk, DevTools en de annotatie-laag.</p>
+    <p>Daardoor wringen juist de dingen die die twee taken raken. Lange gegenereerde rapporten zijn niet in te zoomen of te doorzoeken. Bij het laden van een trage dev-server is er geen enkele feedback en geen manier om af te breken. Een dev-server die (nog) niet draait geeft een kale, verwarrende Chromium-foutpagina in plaats van een bruikbare hint. En er is geen snelle brug naar de systeembrowser voor de momenten dat je tóch echte Chrome nodig hebt (auth-flow, echte DevTools-sessie).</p>
+
+    <h3 id="key-decisions">Key Decisions</h3>
+
+    <div class="kd" id="kd1">
+      <span class="id">KD1</span>
+      <h4>Toolbar/menu is de bron van waarheid; shortcuts liggen erbovenop</h4>
+      <p>Elke feature krijgt een control in de toolbar of het overflow-menu als primaire trigger. Shortcuts (<code>Ctrl +/−/0</code>, <code>Ctrl+F</code>, <code>Ctrl+Shift+R</code>) zijn secundair — en het risico is dat toetsen naar de <em>guest-pagina</em> gaan zodra de webview focus heeft, niet naar de app. De shortcuts moeten dus in het main-proces onderschept worden (<code>before-input-event</code> of gelijkwaardig) en teruggerouteerd naar de handler. Dit is de belangrijkste technische keuze en het grootste risico voor implementatie (zie KTD1 / U7).</p>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 745 165" role="img" aria-label="Toetsafhandeling: van toetsaanslag in de webview via main-proces-onderschepping naar de handler of door naar de pagina.">
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#5b6b7b"/>
+          </marker>
+        </defs>
+        <rect x="10" y="50" width="150" height="52" rx="6" fill="#eef1f5" stroke="#c7d0da"/>
+        <text x="85" y="72" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="#1b2530">Toets in webview</text>
+        <text x="85" y="88" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="#5b6b7b">bv. Ctrl+=</text>
+
+        <line x1="160" y1="76" x2="182" y2="76" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah)"/>
+
+        <rect x="186" y="50" width="150" height="52" rx="6" fill="#e7efff" stroke="#cfe0ff"/>
+        <text x="261" y="72" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="#12379e">main-proces</text>
+        <text x="261" y="88" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="#12379e">before-input-event</text>
+
+        <line x1="336" y1="76" x2="358" y2="76" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah)"/>
+
+        <rect x="362" y="50" width="140" height="52" rx="6" fill="#eef1f5" stroke="#c7d0da"/>
+        <text x="432" y="72" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="#1b2530">Match met een</text>
+        <text x="432" y="88" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="#1b2530">browser-shortcut?</text>
+
+        <line x1="502" y1="64" x2="548" y2="34" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah)"/>
+        <text x="512" y="44" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0f7b53">Ja</text>
+        <rect x="552" y="8" width="183" height="44" rx="6" fill="#e2f4ec" stroke="#bfe6d5"/>
+        <text x="643" y="27" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0f7b53">preventDefault → IPC →</text>
+        <text x="643" y="42" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0f7b53">handler (zoom/find/reload)</text>
+
+        <line x1="502" y1="90" x2="548" y2="120" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah)"/>
+        <text x="510" y="114" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#a25a00">Nee</text>
+        <rect x="552" y="100" width="183" height="44" rx="6" fill="#f2f4f7" stroke="#c7d0da"/>
+        <text x="643" y="119" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5b6b7b">door naar de pagina</text>
+        <text x="643" y="134" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5b6b7b">(geen app-actie)</text>
+      </svg>
+      <figcaption>KD1 — waarom shortcuts main-proces-onderschepping nodig hebben: met focus op de webview gaan toetsen anders naar de pagina en bereiken ze de handler nooit. Menu-items zelf zijn app-chrome en werken los van webview-focus.</figcaption>
+    </figure>
+
+    <div class="kd" id="kd2">
+      <span class="id">KD2</span>
+      <h4>Zoom wordt per browser-tab onthouden, in-memory, voor de levensduur van de tab</h4>
+      <p>Niet per site en niet over herstarts. Browser-tabs worden sowieso niet gepersisteerd (<code>partialize</code> in de store slaat center-tabs niet op), dus er is geen nieuwe opslaglaag nodig — het zoomniveau leeft in het geheugen bij de tab en overleeft navigatie binnen diezelfde tab.</p>
+    </div>
+
+    <div class="kd" id="kd3">
+      <span class="id">KD3</span>
+      <h4>Native Chromium eerst, in het bestaande host-pull-patroon</h4>
+      <p>Alle features hergebruiken de WebviewTag/webContents-API's — <code>setZoomFactor</code>, <code>findInPage</code>/<code>stopFindInPage</code> + het <code>found-in-page</code>-event, <code>did-start-loading</code>/<code>did-stop-loading</code> + <code>stop()</code>, <code>reloadIgnoringCache()</code>, <code>did-fail-load</code> — plus bestaande IPC voor <code>shell.openExternal</code> en clipboard. Geen preload/bridge in de guest injecteren, zodat de webview-hardening intact blijft.</p>
+    </div>
+
+    <div class="kd" id="kd4">
+      <span class="id">KD4</span>
+      <h4>Eén generieke foutpagina, niet localhost-specifiek</h4>
+      <p>Elke mislukte load (connection refused, DNS-fout, timeout, certificaatfout, extern 4xx/5xx) toont dezelfde nette in-app foutstatus met de mislukte URL, een korte leesbare reden en een <em>Retry</em>. Dit vervangt de kale Chromium-foutpagina in álle gevallen — de "dev-server draait niet"-situatie is er één van, geen apart geval.</p>
+    </div>
+
+    <div class="kd" id="kd5">
+      <span class="id">KD5</span>
+      <h4>Nieuwe controls achter één overflow-menu (⋯), niet als losse knoppen</h4>
+      <p>De toolbar is al vol (navigatie, adresbalk, DevTools, annotatie). De nieuwe features — zoom, find, hard reload, open-in-systeembrowser, URL kopiëren — zitten daarom achter één <code>⋯</code>-knop rechts in de toolbar in plaats van elk een eigen knop. Alleen een state-verandering op een bestaande knop (reload → stop tijdens laden) blijft inline zichtbaar. De shortcuts (KD1) blijven de snelle route en staan los van het menu; de menu-items zijn app-chrome en werken onafhankelijk van webview-focus.</p>
+    </div>
+
+    <h3 id="product-requirements">Requirements</h3>
+
+    <p class="lead" style="margin-bottom:2px">Groep A — Lezen (rapporten &amp; deliverables)</p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr id="r1"><td class="id">R1.</td><td>Zoom in/uit/reset via het overflow-menu én <code>Ctrl+=</code> / <code>Ctrl+-</code> / <code>Ctrl+0</code>, met een zoom-indicator die op klik terugzet naar 100%. Zoom is geklemd binnen een redelijk bereik.</td></tr>
+        <tr id="r2"><td class="id">R2.</td><td>Het zoomniveau wordt onthouden per browser-tab voor de levensduur van die tab; navigeren binnen dezelfde tab behoudt de zoom.</td></tr>
+        <tr id="r3"><td class="id">R3.</td><td>Find-in-page: <code>Ctrl+F</code> (of de menu-optie) opent een find-balk over de pagina; typen markeert treffers en toont teller/positie, <code>Enter</code>/<code>Shift+Enter</code> springt naar volgende/vorige, <code>Esc</code> sluit en wist de markeringen.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="lead" style="margin-bottom:2px">Groep B — Dev-server-iteratie</p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr id="r4"><td class="id">R4.</td><td>Laadstatus: een indicator (spinner/voortgang) terwijl een pagina laadt; tijdens het laden wordt de reload-knop een <em>Stop</em>-knop die de lopende load afbreekt. Deze status blijft inline in de toolbar, niet in het menu.</td></tr>
+        <tr id="r5"><td class="id">R5.</td><td>Hard reload via <code>Ctrl+Shift+R</code> (plus een optie in het overflow-menu) herlaadt met omzeiling van de HTTP-cache; de gewone reload (<code>Ctrl+R</code>/knop) blijft een normale, cache-respecterende reload.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="lead" style="margin-bottom:2px">Groep C — Overdracht &amp; robuustheid</p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr id="r6"><td class="id">R6.</td><td>Open-in-systeembrowser: een menu-actie opent de huidige URL in de standaard-browser van het OS; werkt voor <code>file://</code>, localhost én externe URL's.</td></tr>
+        <tr id="r7"><td class="id">R7.</td><td>URL kopiëren: een menu-actie kopieert het huidige adres naar het klembord.</td></tr>
+        <tr id="r8"><td class="id">R8.</td><td>Generieke foutpagina: bij elke mislukte load toont de browser een nette in-app foutstatus met de mislukte URL, een korte leesbare reden en een <em>Retry</em>-actie — als vervanging van de kale Chromium-foutpagina, niet alleen voor localhost.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="lead" style="margin-bottom:2px">Groep D — Controls, shortcuts &amp; consistentie</p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr id="r9"><td class="id">R9.</td><td>De nieuwe features (zoom, find, hard reload, open-in-systeembrowser, URL kopiëren) zijn primair bereikbaar via één overflow-menu (<code>⋯</code>) in de toolbar; state-status (reload → stop) blijft inline. De bijbehorende shortcuts moeten óók afgaan terwijl de webview zelf focus heeft (zie KD1).</td></tr>
+        <tr id="r10"><td class="id">R10.</td><td>Nieuwe shortcuts lopen via het bestaande hotkey-systeem (configureerbaar, zichtbaar in de <code>Ctrl+/</code>-overlay, conflict-gecheckt) en worden gedocumenteerd in de Keyboard Shortcuts-tabel.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 840 250" role="img" aria-label="Wireframe van de browser-toolbar: bestaande controls plus één overflow-menu dat opengeklapt de nieuwe tools toont.">
+        <text x="12" y="18" font-family="sans-serif" font-size="13" font-weight="700" fill="#1b2530">Browser-toolbar — nieuwe controls achter één ⋯-menu</text>
+        <text x="76" y="34" font-family="sans-serif" font-size="8.5" letter-spacing="0.5" fill="#5b6b7b">NAVIGATIE (BESTAAT)</text>
+        <text x="644" y="34" font-family="sans-serif" font-size="8.5" letter-spacing="0.5" fill="#5b6b7b">ANNOT.</text>
+        <text x="722" y="34" font-family="sans-serif" font-size="8.5" letter-spacing="0.5" fill="#12379e">MEER (NIEUW)</text>
+        <g font-family="sans-serif" font-size="11" fill="#1b2530">
+          <rect x="12" y="40" width="26" height="30" rx="4" fill="#eef1f5" stroke="#c7d0da"/><text x="25" y="60" text-anchor="middle">◀</text>
+          <rect x="44" y="40" width="26" height="30" rx="4" fill="#eef1f5" stroke="#c7d0da"/><text x="57" y="60" text-anchor="middle">▶</text>
+          <rect x="76" y="40" width="44" height="30" rx="4" fill="#eef1f5" stroke="#c7d0da"/><text x="98" y="60" text-anchor="middle">⟳ / ■</text>
+          <rect x="126" y="40" width="430" height="30" rx="4" fill="#f7f9fc" stroke="#c7d0da"/><text x="136" y="60" fill="#5b6b7b">localhost:5173  ·  adresbalk</text>
+          <rect x="562" y="40" width="26" height="30" rx="4" fill="#eef1f5" stroke="#c7d0da"/><text x="575" y="60" text-anchor="middle">→</text>
+          <rect x="594" y="40" width="34" height="30" rx="4" fill="#eef1f5" stroke="#c7d0da"/><text x="611" y="60" text-anchor="middle">Dev</text>
+          <rect x="644" y="40" width="30" height="30" rx="4" fill="#eef1f5" stroke="#c7d0da"/><text x="659" y="60" text-anchor="middle">💬</text>
+          <rect x="680" y="40" width="30" height="30" rx="4" fill="#eef1f5" stroke="#c7d0da"/><text x="695" y="60" text-anchor="middle">🖊</text>
+          <rect x="728" y="40" width="34" height="30" rx="4" fill="#e7efff" stroke="#8fb2f5"/><text x="745" y="61" text-anchor="middle" fill="#12379e" font-size="15" font-weight="700">⋯</text>
+        </g>
+        <rect x="12" y="86" width="812" height="150" rx="6" fill="#fafbfc" stroke="#dde3ea" stroke-dasharray="4 3"/>
+        <text x="300" y="164" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#8a97a6">Pagina-viewport</text>
+        <text x="300" y="182" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#a3adba">(zoom toegepast · foutstatus vervangt kale Chromium-pagina)</text>
+        <path d="M745,70 L745,78 M739,78 L751,78 L745,84 Z" stroke="#8fb2f5" fill="#8fb2f5" stroke-width="1"/>
+        <rect x="600" y="84" width="224" height="150" rx="8" fill="#ffffff" stroke="#8fb2f5"/>
+        <g font-family="sans-serif" font-size="11.5" fill="#1b2530">
+          <text x="612" y="108" fill="#1b2530">Zoom</text>
+          <rect x="712" y="97" width="22" height="18" rx="3" fill="#eef1f5" stroke="#c7d0da"/><text x="723" y="110" text-anchor="middle" font-size="11">−</text>
+          <text x="760" y="110" text-anchor="middle" font-size="10.5" fill="#5b6b7b">100%</text>
+          <rect x="786" y="97" width="22" height="18" rx="3" fill="#eef1f5" stroke="#c7d0da"/><text x="797" y="110" text-anchor="middle" font-size="11">+</text>
+          <line x1="606" y1="122" x2="818" y2="122" stroke="#e3e8ee"/>
+          <text x="612" y="140">Find in page</text><text x="816" y="140" text-anchor="end" font-size="10" fill="#8a97a6">Ctrl+F</text>
+          <text x="612" y="164">Hard reload</text><text x="816" y="164" text-anchor="end" font-size="10" fill="#8a97a6">Ctrl+Shift+R</text>
+          <text x="612" y="188">Open in systeembrowser</text><text x="816" y="188" text-anchor="end" font-size="11" fill="#12379e">↗</text>
+          <text x="612" y="212">URL kopiëren</text>
+        </g>
+      </svg>
+      <figcaption>Directional only — illustreert de bedoelde vorm. De <code>⋯</code>-knop opent dit menu; de find-balk zelf verschijnt over de pagina wanneer geopend. Exacte kleuren, spacing, iconen en de volgorde van de menu-items zijn placeholders voor review, geen requirements.
+        <span class="legend"><span class="swatch" style="background:#eef1f5"></span>bestaat<span class="swatch" style="background:#e7efff"></span>nieuw</span>
+      </figcaption>
+    </figure>
+
+    <h3 id="flows">Key Flows</h3>
+
+    <div class="flow" id="f1">
+      <span class="id">F1</span>
+      <h4>Find-in-page</h4>
+      <ol>
+        <li><span class="lead">Trigger:</span> <code>Ctrl+F</code> (of "Find in page" in het ⋯-menu) → find-balk verschijnt over de pagina, invoer krijgt focus.</li>
+        <li>Typen → treffers gemarkeerd, teller toont positie/totaal (bv. <code>3 / 12</code>).</li>
+        <li><code>Enter</code>/<code>Shift+Enter</code> → volgende/vorige treffer; teller volgt.</li>
+        <li><code>Esc</code> of ✕ → balk sluit, markeringen gewist, focus terug naar de pagina.</li>
+      </ol>
+    </div>
+
+    <div class="flow" id="f2">
+      <span class="id">F2</span>
+      <h4>Laden &amp; afbreken</h4>
+      <ol>
+        <li><span class="lead">Trigger:</span> navigatie start → indicator actief, reload-knop wordt Stop (inline).</li>
+        <li>Load voltooit → indicator uit, knop terug naar reload.</li>
+        <li>Gebruiker klikt Stop tijdens laden → load afgebroken, huidige/lege staat blijft, knop terug naar reload.</li>
+      </ol>
+    </div>
+
+    <div class="flow" id="f3">
+      <span class="id">F3</span>
+      <h4>Load mislukt &amp; retry</h4>
+      <ol>
+        <li><span class="lead">Trigger:</span> <code>did-fail-load</code> (main-frame) → in-app foutstatus met mislukte URL + korte reden.</li>
+        <li>Gebruiker klikt <em>Retry</em> → dezelfde URL wordt opnieuw geladen (F2 begint opnieuw).</li>
+        <li>Slaagt de load → foutstatus verdwijnt, pagina toont normaal.</li>
+      </ol>
+    </div>
+
+    <h3 id="acceptance">Acceptance Examples</h3>
+
+    <div class="ae" id="ae1">
+      <span class="id">AE1</span> <span class="covers">— Covers R1, R2</span>
+      <p>Zoom naar 150% in tab A, navigeer binnen tab A naar een andere pagina → nog steeds 150%. Zoom voorbij het maximum → klemt op de bovengrens in plaats van door te schieten. Open een nieuwe browser-tab → die start op 100%.</p>
+    </div>
+    <div class="ae" id="ae2">
+      <span class="id">AE2</span> <span class="covers">— Covers R9, KD1</span>
+      <p>Klik ín de pagina (webview heeft focus), druk <code>Ctrl+=</code> → de pagina zoomt in. (Bewijst de main-proces-onderschepping; zonder die stap zou de toets in de pagina belanden.)</p>
+    </div>
+    <div class="ae" id="ae3">
+      <span class="id">AE3</span> <span class="covers">— Covers R4, R5</span>
+      <p>Open een trage dev-server → indicator loopt, klik Stop → load stopt. Klik daarna hard reload (<code>Ctrl+Shift+R</code>) → pagina laadt met omzeiling van de cache (gewijzigde assets zijn zichtbaar); gewone reload respecteert de cache.</p>
+    </div>
+    <div class="ae" id="ae4">
+      <span class="id">AE4</span> <span class="covers">— Covers R8, KD4</span>
+      <p><code>localhost:5173</code> met dev-server uit (connection refused) → generieke foutpagina met URL, reden en Retry. Een externe URL die faalt (DNS-fout of 5xx) → dezelfde foutvorm, geen kale Chromium-pagina. Retry na het starten van de server → pagina laadt.</p>
+    </div>
+    <div class="ae" id="ae5">
+      <span class="id">AE5</span> <span class="covers">— Covers R3</span>
+      <p>Find met een term die niet voorkomt → teller toont <code>0 / 0</code>, geen crash of vastgevroren markering. <code>Esc</code> → balk sluit en alle markeringen zijn weg.</p>
+    </div>
+    <div class="ae" id="ae6">
+      <span class="id">AE6</span> <span class="covers">— Covers R9, KD5</span>
+      <p>Klik op <code>⋯</code> → menu opent met zoom, find, hard reload, open-in-systeembrowser en URL kopiëren. De toolbar zelf toont daarbuiten geen losse knoppen voor die features; de reload→stop-status blijft wél inline zichtbaar.</p>
+    </div>
+  </section>
+
+  <hr class="sec" />
+
+  <section id="planning-contract">
+    <h2>Planning Contract</h2>
+
+    <h3 id="ktd">Key Technical Decisions</h3>
+
+    <div class="kd" id="ktd1">
+      <span class="id">KTD1</span>
+      <h4>Shortcut-levering via main-proces <code>before-input-event</code> (realiseert KD1 / A1)</h4>
+      <p>Haak in de bestaande <code>app.on('web-contents-created')</code>-handler (<code>electron/main/index.ts:1777</code>, waar nu al <code>will-attach-webview</code> hangt). Wanneer <code>contents.getType() === 'webview'</code>, registreer <code>contents.on('before-input-event', …)</code>. Match de geconfigureerde browser-shortcuts (zoom in/uit/reset, find, hard reload); bij een match <code>event.preventDefault()</code> en stuur de actie naar de host-renderer via <code>win.webContents.send('browser:shortcut', action)</code>. De renderer routeert die naar de handler van de actieve browser-tab — dezelfde functies die het ⋯-menu aanroept. Het app-chrome-focus-geval blijft via <code>useHotkeys</code> in <code>src/App.tsx</code> lopen. Richtinggevend; exacte match-tabel en routing worden in U7 uitgewerkt.</p>
+    </div>
+
+    <div class="kd" id="ktd2">
+      <span class="id">KTD2</span>
+      <h4>Zoom in-memory op het browser-center-tab-object (realiseert KD2)</h4>
+      <p>Voeg een optioneel <code>zoomFactor</code> toe aan het <code>BrowserTab</code>-center-tab-type (<code>src/types/index.ts</code>) plus een <code>setBrowserTabZoom</code>-action in <code>src/stores/projectStore.ts</code>, gemodelleerd naar het bestaande <code>setBrowserTabUrl</code>. Neem het veld <b>niet</b> op in <code>partialize</code>, zodat het per tab bewaard blijft over tab-wissels maar reset bij herstart. Pas toe via <code>webview.setZoomFactor(factor)</code> op <code>dom-ready</code> en bij elke wijziging.</p>
+    </div>
+
+    <div class="kd" id="ktd3">
+      <span class="id">KTD3</span>
+      <h4>Native WebviewTag-API's via het host-pull-patroon (realiseert KD3)</h4>
+      <p>Breid <code>src/types/webview.d.ts</code> uit met <code>setZoomFactor</code>/<code>getZoomFactor</code>, <code>findInPage</code>/<code>stopFindInPage</code>, <code>reloadIgnoringCache</code> en <code>stop</code>. Nieuwe host-pull-wrappers volgen het <code>execInGuest</code>/<code>captureGuest</code>-patroon in <code>src/utils/webviewControl.ts</code> (ready-guard → <code>null</code> als de guest niet klaar is). Events (<code>did-start-loading</code>, <code>did-stop-loading</code>, <code>did-fail-load</code>, <code>found-in-page</code>) worden via <code>addEventListener</code> in <code>BrowserTab</code> geconsumeerd. Geen preload/bridge in de guest — de hardening in <code>webviewSecurity.ts</code> blijft intact.</p>
+    </div>
+
+    <div class="kd" id="ktd4">
+      <span class="id">KTD4</span>
+      <h4>Hergebruik bestaande IPC voor open-external + kopiëren (realiseert R6, R7)</h4>
+      <p><code>shell:open-external</code> (preload <code>openExternal</code>, main <code>index.ts:1545</code>) en <code>clipboard.writeText</code> (preload <code>index.ts:299</code>, main <code>index.ts:1479</code>) bestaan al. Open-in-systeembrowser en URL kopiëren zijn dus louter menu-items die deze bestaande kanalen aanroepen — geen nieuw main-proces- of IPC-werk.</p>
+    </div>
+
+    <div class="kd" id="ktd5">
+      <span class="id">KTD5</span>
+      <h4>Foutpagina als host-overlay, niet als guest-injectie (realiseert KD4)</h4>
+      <p>Render de foutstatus als een React-overlay (absolute <code>inset-0</code>) bóven de <code>&lt;webview&gt;</code>, getoggled door <code>did-fail-load</code>. Negeer niet-main-frame-fouten en <code>ERR_ABORTED</code> (<code>errorCode -3</code>, van <code>stop()</code>/live-reload). Wis de overlay op <code>did-start-loading</code> en op een succesvolle load. Dit blijft binnen host-pull (geen executeJavaScript in de guest) en overleeft navigatie/hardening.</p>
+    </div>
+
+    <h3 id="htd">High-Level Technical Design</h3>
+    <p>Twee invoerpaden komen samen op één set gedeelde browser-actie-handlers. Het menu en de app-chrome-shortcut delen de renderer-route; de webview-focus-shortcut komt via het main-proces binnen. Alle drie roepen dezelfde handler-functies aan, zodat gedrag identiek is ongeacht waar de focus lag.</p>
+    <figure>
+      <svg viewBox="0 0 820 220" role="img" aria-label="Drie invoerpaden — ⋯-menu, app-chrome-shortcut en webview-focus-shortcut — convergeren op gedeelde browser-actie-handlers die de webview aansturen.">
+        <defs>
+          <marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#5b6b7b"/>
+          </marker>
+        </defs>
+        <rect x="12" y="16" width="210" height="40" rx="6" fill="#e7efff" stroke="#cfe0ff"/>
+        <text x="117" y="34" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="#12379e">⋯-menu-item (klik)</text>
+        <text x="117" y="49" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#5b6b7b">app-chrome</text>
+
+        <rect x="12" y="90" width="210" height="40" rx="6" fill="#eef1f5" stroke="#c7d0da"/>
+        <text x="117" y="108" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="#1b2530">shortcut · app-chrome-focus</text>
+        <text x="117" y="123" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#5b6b7b">useHotkeys (App.tsx)</text>
+
+        <rect x="12" y="164" width="210" height="44" rx="6" fill="#eef1f5" stroke="#c7d0da"/>
+        <text x="117" y="182" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="#1b2530">shortcut · webview-focus</text>
+        <text x="117" y="197" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#5b6b7b">main before-input-event → IPC</text>
+
+        <line x1="222" y1="36" x2="330" y2="100" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <line x1="222" y1="110" x2="330" y2="110" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <line x1="222" y1="186" x2="330" y2="120" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah2)"/>
+
+        <rect x="334" y="86" width="210" height="48" rx="6" fill="#e2f4ec" stroke="#bfe6d5"/>
+        <text x="439" y="106" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0f7b53">Gedeelde actie-handlers</text>
+        <text x="439" y="122" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="#0f7b53">zoom / find / hardReload / …</text>
+
+        <line x1="544" y1="110" x2="632" y2="110" stroke="#5b6b7b" stroke-width="1.4" marker-end="url(#ah2)"/>
+
+        <rect x="636" y="86" width="172" height="48" rx="6" fill="#eef1f5" stroke="#c7d0da"/>
+        <text x="722" y="106" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#1b2530">&lt;webview&gt; (host-pull)</text>
+        <text x="722" y="122" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="#5b6b7b">setZoomFactor / findInPage / …</text>
+      </svg>
+      <figcaption>Convergentie-ontwerp: menu-klik, app-chrome-shortcut en webview-focus-shortcut lopen alle drie naar dezelfde handlers, die de webview via het host-pull-oppervlak (KTD3) aansturen. U7 bouwt het onderste pad; U2–U5 leveren de handlers.</figcaption>
+    </figure>
+  </section>
+
+  <hr class="sec" />
+
+  <section id="implementation-units">
+    <h2>Implementation Units</h2>
+
+    <article class="unit" id="u1">
+      <h4><span class="uid">U1.</span> Webview-control-oppervlak (types + host-pull-wrappers)</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>De WebviewTag-typing en host-pull-wrappers uitbreiden zodat de features zoom/find/reload/stop native kunnen aansturen. Fundament voor U2–U6.</dd>
+        <dt>Requirements</dt><dd>Enabler voor R1–R5; realiseert KTD3.</dd>
+        <dt>Dependencies</dt><dd>Geen.</dd>
+        <dt>Files</dt><dd><span class="filechip"><span class="fc-m">M</span> src/types/webview.d.ts</span> · <span class="filechip"><span class="fc-m">M</span> src/utils/webviewControl.ts</span> · <span class="filechip"><span class="fc-m">M</span> test/webviewControl.test.ts</span></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <ul>
+          <li><b>Approach:</b> Voeg <code>setZoomFactor</code>/<code>getZoomFactor</code>, <code>findInPage</code>/<code>stopFindInPage</code>, <code>reloadIgnoringCache</code> en <code>stop</code> toe aan <code>CommandWebviewElement</code>. Voeg ready-guarded wrappers toe (bv. <code>setZoom</code>, <code>findInGuest</code>, <code>stopFind</code>) die <code>null</code> teruggeven als de webview null/niet-ready is — spiegel van <code>execInGuest</code>/<code>captureGuest</code>.</li>
+          <li><b>Patterns to follow:</b> de guard-stijl van <code>execInGuest</code>/<code>captureGuest</code> in <code>src/utils/webviewControl.ts</code>.</li>
+          <li><b>Test scenarios:</b> wrapper geeft <code>null</code> bij null-webview (edge); wrapper geeft <code>null</code> als <code>ready=false</code> (edge); roept de onderliggende webview-methode aan met de juiste args bij <code>ready=true</code> (happy, mock webview).</li>
+          <li><b>Verification:</b> <code>tsc</code> schoon; <code>test/webviewControl.test.ts</code> groen.</li>
+        </ul>
+      </details>
+    </article>
+
+    <article class="unit" id="u2">
+      <h4><span class="uid">U2.</span> Overflow-menu (⋯) + open-in-systeembrowser + URL kopiëren</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Eén ⋯-menu aan de toolbar toevoegen en vullen met de twee acties zonder nieuw backend-werk. Legt het menu-patroon vast waar U3–U5 op inpluggen.</dd>
+        <dt>Requirements</dt><dd>R6, R7, R9 (menu-als-primaire-surface); realiseert KD5, KTD4.</dd>
+        <dt>Dependencies</dt><dd>Geen (bestaande IPC).</dd>
+        <dt>Files</dt><dd><span class="filechip"><span class="fc-m">M</span> src/components/Browser/BrowserTab.tsx</span> · <span class="filechip"><span class="fc-c">C</span> src/components/Browser/BrowserOverflowMenu.tsx</span></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <ul>
+          <li><b>Approach:</b> ⋯-icoonknop (lucide <code>MoreHorizontal</code>) rechts in de toolbar; klik opent een dropdown (host-chrome). Eerste items: "Open in systeembrowser" → <code>getElectronAPI().shell.openExternal(getURL())</code>; "URL kopiëren" → <code>getElectronAPI().clipboard.writeText(getURL())</code>. Sluit op outside-click en <code>Esc</code>. Het menu is de container waar zoom/find/hard-reload later in landen.</li>
+          <li><b>Patterns to follow:</b> <code>iconBtn</code>-styling en <code>getElectronAPI()</code>-gebruik in <code>BrowserTab.tsx</code>; bestaande dropdown/outside-click-afhandeling elders in <code>src/components</code>.</li>
+          <li><b>Test scenarios:</b> "Open in systeembrowser" roept <code>openExternal</code> met de huidige URL (happy); "URL kopiëren" roept <code>writeText</code> met de huidige URL (happy); menu opent/sluit op klik en <code>Esc</code> (edge). Covers AE6 (deels).</li>
+          <li><b>Verification:</b> in-app smoke — items triggeren de juiste IPC; menu toggelt correct.</li>
+        </ul>
+      </details>
+    </article>
+
+    <article class="unit" id="u3">
+      <h4><span class="uid">U3.</span> Zoom (in/uit/reset, per-tab onthouden)</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Zoom met indicator, klemming en in-memory per-tab-onthouden.</dd>
+        <dt>Requirements</dt><dd>R1, R2; realiseert KTD2.</dd>
+        <dt>Dependencies</dt><dd>U1, U2.</dd>
+        <dt>Files</dt><dd><span class="filechip"><span class="fc-m">M</span> src/components/Browser/BrowserTab.tsx</span> · <span class="filechip"><span class="fc-m">M</span> src/stores/projectStore.ts</span> · <span class="filechip"><span class="fc-m">M</span> src/types/index.ts</span> · <span class="filechip"><span class="fc-c">C</span> src/utils/browserZoom.ts</span> · <span class="filechip"><span class="fc-c">C</span> test/browserZoom.test.ts</span></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <ul>
+          <li><b>Approach:</b> zoom-rij in het ⋯-menu (− / indicator / +), plus klik-indicator-om-te-resetten naar 100%. Pas <code>webview.setZoomFactor(factor)</code> toe op <code>dom-ready</code> én bij wijziging. Bewaar de factor op het browser-center-tab-object via <code>setBrowserTabZoom</code> (in-memory, buiten <code>partialize</code>). Klem via een pure helper <code>clampZoom</code> in <code>src/utils/browserZoom.ts</code> op bv. <code>[0.25, 5.0]</code> met een stap-ladder.</li>
+          <li><b>Patterns to follow:</b> <code>setBrowserTabUrl</code> in <code>projectStore.ts</code>; her-toepassen-op-dom-ready zoals de annotatie-injectie in <code>BrowserTab.tsx</code>.</li>
+          <li><b>Test scenarios:</b> <code>clampZoom</code> klemt onder min en boven max (edge); stapt correct in/uit (happy); reset → <code>1.0</code> (happy); factor opnieuw toegepast op <code>dom-ready</code> na navigatie (integration/smoke); nieuwe tab start op <code>1.0</code>. <b>Covers AE1.</b></li>
+          <li><b>Verification:</b> AE1 in-app.</li>
+        </ul>
+      </details>
+    </article>
+
+    <article class="unit" id="u4">
+      <h4><span class="uid">U4.</span> Find-in-page</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Find-balk over de pagina met teller en volgende/vorige-navigatie.</dd>
+        <dt>Requirements</dt><dd>R3.</dd>
+        <dt>Dependencies</dt><dd>U1, U2.</dd>
+        <dt>Files</dt><dd><span class="filechip"><span class="fc-m">M</span> src/components/Browser/BrowserTab.tsx</span> · <span class="filechip"><span class="fc-c">C</span> src/components/Browser/BrowserFindBar.tsx</span></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <ul>
+          <li><b>Approach:</b> find-balk-overlay (host-chrome) boven de webview; op input <code>webview.findInPage(term)</code>; luister <code>found-in-page</code> voor <code>activeMatchOrdinal</code>/<code>matches</code> → "3 / 12". <code>Enter</code>/<code>Shift+Enter</code> roept <code>findInPage</code> opnieuw met <code>{findNext, forward}</code>. <code>Esc</code>/✕ → <code>stopFindInPage('clearSelection')</code> + verbergen. Geopend via ⋯-menu-item of <code>Ctrl+F</code> (shortcut-pad in U7).</li>
+          <li><b>Patterns to follow:</b> event-listener-registratie in de <code>BrowserTab</code>-useEffect; status-line-styling.</li>
+          <li><b>Test scenarios:</b> 0 treffers → "0 / 0", geen crash (edge); <code>Esc</code> roept <code>stopFindInPage</code> en wist markeringen (happy); volgende/vorige verhoogt/verlaagt de ordinal (happy). <b>Covers AE5.</b></li>
+          <li><b>Verification:</b> AE5 in-app.</li>
+        </ul>
+      </details>
+    </article>
+
+    <article class="unit" id="u5">
+      <h4><span class="uid">U5.</span> Laadindicator + stop + hard reload</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Laadvoortgang tonen, reload↔stop wisselen, en hard reload toevoegen.</dd>
+        <dt>Requirements</dt><dd>R4, R5.</dd>
+        <dt>Dependencies</dt><dd>U1, U2.</dd>
+        <dt>Files</dt><dd><span class="filechip"><span class="fc-m">M</span> src/components/Browser/BrowserTab.tsx</span></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <ul>
+          <li><b>Approach:</b> houd <code>isLoading</code> bij via <code>did-start-loading</code>/<code>did-stop-loading</code>; tijdens laden wordt de reload-knop een Stop-knop die <code>webview.stop()</code> aanroept; toon een subtiele indicator (spinner bij reload of dunne balk onder de toolbar). Voeg een "Hard reload"-item toe aan het ⋯-menu dat <code>webview.reloadIgnoringCache()</code> aanroept; de gewone reload blijft ongewijzigd. Reset <code>isLoading</code> op <code>did-stop-loading</code> én <code>did-fail-load</code>.</li>
+          <li><b>Patterns to follow:</b> bestaande reload-knop en <code>readyRef</code>-guard in <code>BrowserTab.tsx</code>.</li>
+          <li><b>Test scenarios:</b> laden toggelt de knop naar Stop (happy); <code>stop()</code> aangeroepen op klik tijdens laden (happy); <code>reloadIgnoringCache</code> aangeroepen vanuit het menu (happy); indicator wist op <code>did-stop-loading</code>/<code>did-fail-load</code> (edge). <b>Covers AE3</b> (met U7 voor het <code>Ctrl+Shift+R</code>-pad).</li>
+          <li><b>Verification:</b> AE3 in-app.</li>
+        </ul>
+      </details>
+    </article>
+
+    <article class="unit" id="u6">
+      <h4><span class="uid">U6.</span> Generieke foutpagina + retry</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>De kale Chromium-foutpagina vervangen door een in-app overlay met reden en Retry voor elke main-frame-load-fout.</dd>
+        <dt>Requirements</dt><dd>R8; realiseert KD4, KTD5.</dd>
+        <dt>Dependencies</dt><dd>U1.</dd>
+        <dt>Files</dt><dd><span class="filechip"><span class="fc-m">M</span> src/components/Browser/BrowserTab.tsx</span> · <span class="filechip"><span class="fc-c">C</span> src/components/Browser/BrowserErrorState.tsx</span> · <span class="filechip"><span class="fc-c">C</span> src/utils/browserLoadError.ts</span> · <span class="filechip"><span class="fc-c">C</span> test/browserLoadError.test.ts</span></dd>
+      </dl>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <ul>
+          <li><b>Approach:</b> luister <code>did-fail-load</code>; negeer niet-main-frame-fouten en <code>ERR_ABORTED</code> (<code>errorCode -3</code>, van <code>stop()</code>/live-reload). Bij een fout: zet error-state <code>{url, code, description}</code> en render een host-overlay boven de webview met de mislukte URL, een korte reden (pure helper <code>describeLoadError</code> mapt <code>ERR_CONNECTION_REFUSED</code>, <code>ERR_NAME_NOT_RESOLVED</code>, timeouts, cert) en een Retry-knop (<code>loadURL(failedUrl)</code>). Wis op <code>did-start-loading</code> en op een succesvolle load.</li>
+          <li><b>Patterns to follow:</b> overlay/absolute-inset zoals de status-line; kleine pure-helper + test zoals <code>browserUrls.ts</code>/<code>browserUrls.test.ts</code>.</li>
+          <li><b>Test scenarios:</b> refused → overlay met reden + retry (happy); <code>ERR_ABORTED</code> genegeerd, geen overlay (edge); retry re-navigeert naar dezelfde URL (happy); overlay wist bij volgende succesvolle load (edge); subframe-fout genegeerd (edge); <code>describeLoadError</code> mapt bekende codes en valt terug op een generieke tekst (unit). <b>Covers AE4.</b></li>
+          <li><b>Verification:</b> AE4 in-app.</li>
+        </ul>
+      </details>
+    </article>
+
+    <article class="unit" id="u7">
+      <h4><span class="uid">U7.</span> Keyboard-shortcuts + main-proces-onderschepping</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Zoom/find/hard-reload-shortcuts laten afgaan ongeacht of de app-chrome of de webview focus heeft, via het hotkey-systeem + main-proces <code>before-input-event</code>.</dd>
+        <dt>Requirements</dt><dd>R9, R10; realiseert KD1, KTD1; valideert A1.</dd>
+        <dt>Dependencies</dt><dd>U3, U4, U5.</dd>
+        <dt>Files</dt><dd><span class="filechip"><span class="fc-m">M</span> electron/main/index.ts</span> · <span class="filechip"><span class="fc-m">M</span> electron/preload/index.ts</span> · <span class="filechip"><span class="fc-m">M</span> src/types/index.ts</span> · <span class="filechip"><span class="fc-m">M</span> src/App.tsx</span> · <span class="filechip"><span class="fc-m">M</span> src/utils/hotkeys.ts</span> · <span class="filechip"><span class="fc-m">M</span> src/types/hotkeys.ts</span> · <span class="filechip"><span class="fc-m">M</span> src/components/Browser/BrowserTab.tsx</span> · <span class="filechip"><span class="fc-m">M</span> CLAUDE.md</span> · <span class="filechip"><span class="fc-c">C</span> test/browserShortcutMatch.test.ts</span></dd>
+      </dl>
+      <div class="execnote"><b>Execution note:</b> valideer eerst het <code>before-input-event</code> → renderer → handler-rondje end-to-end met één shortcut (zoom in) — dat is de load-bearing A1-aanname — vóór je de rest bedraadt.</div>
+      <details>
+        <summary>Approach · Patterns · Test scenarios · Verification</summary>
+        <ul>
+          <li><b>Approach:</b> in main, binnen de bestaande <code>web-contents-created</code>-handler (<code>index.ts:1777</code>): als <code>contents.getType() === 'webview'</code>, registreer <code>before-input-event</code>; match de geconfigureerde browser-shortcuts via een extraheerbare pure matcher; bij een match <code>preventDefault()</code> + <code>win.webContents.send('browser:shortcut', action)</code>. Preload: expose een <code>onBrowserShortcut</code>-ontvangkanaal. Renderer: een listener routeert de actie naar de handler van de actieve browser-tab (dezelfde functies als het ⋯-menu). App-chrome-focus-geval: registreer dezelfde acties in de <code>useHotkeys</code>-map in <code>App.tsx</code>. Nieuwe <code>HotkeyAction</code>-leden: <code>browser.zoomIn</code>, <code>browser.zoomOut</code>, <code>browser.zoomReset</code>, <code>browser.find</code>, <code>browser.hardReload</code> (categorie <code>editor</code> of een nieuwe <code>browser</code>-categorie). Documenteer in de CLAUDE.md Keyboard-Shortcuts-tabel.</li>
+          <li><b>Patterns to follow:</b> hotkey-registratie <code>browser.open</code> (<code>App.tsx:383</code>, <code>hotkeys.ts:282</code>, union in <code>types/hotkeys.ts:70</code>); <code>web-contents-created</code>-handler (<code>index.ts:1777</code>); bestaande <code>ipcRenderer</code>-send/receive-conventies in de preload.</li>
+          <li><b>Test scenarios:</b> de pure shortcut-matcher mapt input-events op acties en negeert niet-matches (unit); <code>Ctrl+=</code> terwijl de webview focus heeft zoomt in (smoke — <b>Covers AE2</b>); shortcuts werken óók met app-chrome-focus (smoke); <code>mergeMissingHotkeyDefaults</code> vult de nieuwe acties bij voor bestaande persisted configs (edge).</li>
+          <li><b>Verification:</b> AE2 in-app met de webview gefocust; nieuwe shortcuts zichtbaar in de <code>Ctrl+/</code>-overlay.</li>
+        </ul>
+      </details>
+    </article>
+  </section>
+
+  <hr class="sec" />
+
+  <section id="verification-contract">
+    <h2>Verification Contract</h2>
+    <div class="gate">
+      <span class="id">G1</span>
+      <p><b>Unit tests groen.</b> <code>npm run test</code> — inclusief bestaande <code>webviewControl</code>/<code>browserUrls</code> plus nieuwe <code>browserZoom</code>, <code>browserLoadError</code> en <code>browserShortcutMatch</code>.</p>
+    </div>
+    <div class="gate">
+      <span class="id">G2</span>
+      <p><b>Type-check + build schoon.</b> <code>npm run build</code> (tsc strict + vite) zonder fouten. Geen nieuwe <code>any</code> (CLAUDE.md-regel) — gebruik concrete types of <code>unknown</code> + guards.</p>
+    </div>
+    <div class="gate">
+      <span class="id">G3</span>
+      <p><b>ESLint schoon.</b> Geen ongebruikte imports, geen dead code (PostToolUse lint-fix-hook leunt hierop).</p>
+    </div>
+    <div class="gate">
+      <span class="id">G4</span>
+      <p><b>In-app smoke van AE1–AE6.</b> Via <code>npm run dev</code>: zoom+onthouden (AE1), shortcut met webview-focus (AE2), stop + hard reload (AE3), foutpagina + retry (AE4), find edge cases (AE5), en het ⋯-menu-gedrag (AE6). Dit is het echte bewijs — het merendeel is UI.</p>
+    </div>
+  </section>
+
+  <hr class="sec" />
+
+  <section id="definition-of-done">
+    <h2>Definition of Done</h2>
+    <ul class="dod">
+      <li>R1–R10 geïmplementeerd; KD1–KD5 en KTD1–KTD5 gerespecteerd.</li>
+      <li>AE1–AE6 geverifieerd in de draaiende app.</li>
+      <li>Nieuwe controls zitten achter het ⋯-menu; alleen reload→stop is inline (KD5 visueel gecheckt).</li>
+      <li>Shortcuts gaan af met de webview gefocust (A1 bewezen via U7) én met app-chrome-focus.</li>
+      <li>G1–G4 gehaald: tests groen, tsc/build schoon, ESLint schoon, geen nieuwe <code>any</code>.</li>
+      <li>CLAUDE.md Keyboard-Shortcuts-tabel bijgewerkt met de nieuwe browser-shortcuts.</li>
+      <li>Product Contract ongewijzigd — WHAT bleef zoals in ce-brainstorm vastgesteld.</li>
+    </ul>
+  </section>
+
+  <hr class="sec" />
+
+  <section id="appendix">
+    <h2>Sources &amp; Research</h2>
+    <ul class="reqgap">
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/components/Browser/BrowserTab.tsx"><code>src/components/Browser/BrowserTab.tsx</code></a> — huidige browser-chrome en webview-event-wiring; waar de meeste controls en handlers landen.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/utils/webviewControl.ts"><code>src/utils/webviewControl.ts</code></a> — ready-guarded host-pull-wrappers; patroon voor U1.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/types/webview.d.ts"><code>src/types/webview.d.ts</code></a> — WebviewTag-oppervlak (U1 breidt uit).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts"><code>src/stores/projectStore.ts</code></a> — <code>openBrowserTab</code>/<code>setBrowserTabUrl</code> (~1237) en <code>partialize</code> (~1968); center-tabs niet gepersisteerd → zoom in-memory (KTD2).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/index.ts"><code>electron/main/index.ts</code></a> — <code>web-contents-created</code>/<code>will-attach-webview</code> (~1777), <code>shell:open-external</code> (~1545), <code>clipboard:writeText</code> (~1479); haakpunten voor U7 en KTD4.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/preload/index.ts"><code>electron/preload/index.ts</code></a> — bestaande <code>shell.openExternal</code>/<code>clipboard.writeText</code> (~291, ~299); U7 voegt het shortcut-ontvangkanaal toe.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/utils/webviewSecurity.ts"><code>electron/main/utils/webviewSecurity.ts</code></a> — hardening; U7/U1 mogen de guest niet verzwakken (KTD3).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/utils/hotkeys.ts"><code>src/utils/hotkeys.ts</code></a> · <a href="https://github.com/remcovolmer/command/blob/main/src/types/hotkeys.ts"><code>src/types/hotkeys.ts</code></a> · <a href="https://github.com/remcovolmer/command/blob/main/src/App.tsx"><code>src/App.tsx</code></a> — hotkey-registratiepad (<code>browser.open</code>) voor U7.</li>
+      <li>Electron <code>^40.1.0</code> (package.json) — WebviewTag levert <code>setZoomFactor</code>, <code>findInPage</code>/<code>stopFindInPage</code>, <code>reloadIgnoringCache</code>, <code>stop</code> en de <code>did-*</code>/<code>found-in-page</code>-events native.</li>
+    </ul>
+  </section>
+
+  <footer class="composition">
+    Composed 2026-07-17 by ce-brainstorm; enriched to implementation-ready by ce-plan (2026-07-17). Source: user prompt (browser QoL brainstorm — “zoom + wat is verder gebruikelijk en nuttig”, controls achter ⋯-menu).
+  </footer>
+
+</div>
+</body>
+</html>

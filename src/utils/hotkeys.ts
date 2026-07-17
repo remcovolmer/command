@@ -286,6 +286,41 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'editor',
     enabled: true,
   },
+  'browser.zoomIn': {
+    key: '=',
+    modifiers: ['ctrl'],
+    description: 'Browser: zoom in',
+    category: 'editor',
+    enabled: true,
+  },
+  'browser.zoomOut': {
+    key: '-',
+    modifiers: ['ctrl'],
+    description: 'Browser: zoom out',
+    category: 'editor',
+    enabled: true,
+  },
+  'browser.zoomReset': {
+    key: '0',
+    modifiers: ['ctrl'],
+    description: 'Browser: reset zoom',
+    category: 'editor',
+    enabled: true,
+  },
+  'browser.find': {
+    key: 'f',
+    modifiers: ['ctrl'],
+    description: 'Browser: find in page',
+    category: 'editor',
+    enabled: true,
+  },
+  'browser.hardReload': {
+    key: 'r',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Browser: hard reload (bypass cache)',
+    category: 'editor',
+    enabled: true,
+  },
 
   // Worktree
   'worktree.create': {

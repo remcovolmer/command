@@ -38,6 +38,7 @@ import { AutomationService } from './services/AutomationService'
 import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
 import { hardenWebviewPreferences, BROWSER_PARTITION } from './utils/webviewSecurity'
+import { matchBrowserShortcut } from './utils/browserShortcut'
 import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
 import { sanitizeClipboardText, sanitizeClipboardImage } from './utils/clipboardLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
@@ -1780,6 +1781,18 @@ app.on('web-contents-created', (_event, contents) => {
   })
 
   if (contents.getType() === 'webview') {
+    // Browser shortcuts pressed while the guest has focus never reach the host
+    // renderer (the guest captures its own key events), so intercept them here
+    // and forward the intent to the active browser tab. Default bindings only —
+    // see utils/browserShortcut.ts for the rationale on why config isn't synced.
+    contents.on('before-input-event', (event, input) => {
+      const action = matchBrowserShortcut(input)
+      if (action) {
+        event.preventDefault()
+        win?.webContents.send('browser:shortcut', action)
+      }
+    })
+
     // Popups open in the OS browser, never a new unsandboxed window. Mirror the
     // main window's credential guard so a hostile page can't hand
     // http://user:pass@... to the OS browser.

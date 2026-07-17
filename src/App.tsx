@@ -10,6 +10,7 @@ import { fileWatcherEvents } from './utils/fileWatcherEvents'
 import { useThemeResolver } from './hooks/useThemeResolver'
 import { dismissTopmostToast } from './utils/toastRegistry'
 import { DEFAULT_HOTKEY_CONFIG, matchesBinding } from './utils/hotkeys'
+import { emitBrowserShortcut, isBrowserShortcutAction } from './utils/browserShortcutBus'
 
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
@@ -95,6 +96,17 @@ function App() {
       store.startProjectRename(store.activeProjectId)
     }
   }
+
+  // Whether a browser tab is the active content tab. Gates the browser shortcut
+  // handlers below: when no browser is showing, the bindings are absent so
+  // useHotkeys never preventDefaults them and keys like Ctrl+F reach the
+  // terminal/editor. (The webview-focus path is handled in the main process.)
+  const activeIsBrowserTab = useProjectStore((s) => {
+    const chatId = s.activeTerminalId ?? ''
+    const contentId = s.activeContentTabId[chatId]
+    const tab = contentId ? s.editorTabs[contentId] : undefined
+    return tab?.type === 'browser'
+  })
 
   // Register all hotkeys
   useHotkeys({
@@ -439,6 +451,20 @@ function App() {
     'ui.toggleUsageIndicator': () => {
       useProjectStore.getState().toggleUsageIndicator()
     },
+
+    // Browser shortcuts, app-chrome-focus path — registered ONLY when a browser
+    // tab is active, so they don't swallow Ctrl+F (etc.) in the terminal/editor
+    // when no browser is open. When the webview itself has focus these are
+    // intercepted in the main process instead (forwarded via the effect below).
+    ...(activeIsBrowserTab
+      ? {
+          'browser.zoomIn': () => emitBrowserShortcut('browser.zoomIn'),
+          'browser.zoomOut': () => emitBrowserShortcut('browser.zoomOut'),
+          'browser.zoomReset': () => emitBrowserShortcut('browser.zoomReset'),
+          'browser.find': () => emitBrowserShortcut('browser.find'),
+          'browser.hardReload': () => emitBrowserShortcut('browser.hardReload'),
+        }
+      : {}),
   })
 
   // Close dialog with Escape
@@ -447,6 +473,15 @@ function App() {
     () => {}, // Don't confirm close on Enter
     { enabled: showCloseDialog, canConfirm: false }
   )
+
+  // Forward browser shortcuts intercepted in the main process (pressed while the
+  // <webview> guest had focus, so they never reached this renderer's keydown)
+  // onto the shortcut bus, where the active browser tab handles them.
+  useEffect(() => {
+    return api.browser.onShortcut((action) => {
+      if (isBrowserShortcutAction(action)) emitBrowserShortcut(action)
+    })
+  }, [api])
 
   // Escape → dismiss topmost toast (if any) BEFORE dialog-close handlers run.
   // A direct listener (capture, registered in useEffect) is used because the
