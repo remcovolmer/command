@@ -306,6 +306,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     show: (title: string, body: string): void => ipcRenderer.send('notification:show', title, body),
   },
 
+  // Built-in browser: shortcuts pressed while the <webview> guest has focus are
+  // intercepted in the main process (guest key events never reach this renderer)
+  // and forwarded here so the active browser tab can act on them.
+  browser: {
+    onShortcut: (callback: (action: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, action: string) => callback(action)
+      ipcRenderer.on('browser:shortcut', handler)
+      return () => ipcRenderer.removeListener('browser:shortcut', handler)
+    },
+  },
+
   // Editor events from CommandServer
   editor: {
     onOpenFile: (

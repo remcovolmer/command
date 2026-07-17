@@ -10,6 +10,7 @@ import { fileWatcherEvents } from './utils/fileWatcherEvents'
 import { useThemeResolver } from './hooks/useThemeResolver'
 import { dismissTopmostToast } from './utils/toastRegistry'
 import { DEFAULT_HOTKEY_CONFIG, matchesBinding } from './utils/hotkeys'
+import { emitBrowserShortcut, isBrowserShortcutAction } from './utils/browserShortcutBus'
 
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
@@ -439,6 +440,16 @@ function App() {
     'ui.toggleUsageIndicator': () => {
       useProjectStore.getState().toggleUsageIndicator()
     },
+
+    // Browser shortcuts, app-chrome-focus path. When the webview itself has
+    // focus these are intercepted in the main process instead (forwarded via the
+    // effect below). Both feed the same bus; only the active browser tab consumes
+    // it, so these no-op when no browser tab is showing.
+    'browser.zoomIn': () => emitBrowserShortcut('browser.zoomIn'),
+    'browser.zoomOut': () => emitBrowserShortcut('browser.zoomOut'),
+    'browser.zoomReset': () => emitBrowserShortcut('browser.zoomReset'),
+    'browser.find': () => emitBrowserShortcut('browser.find'),
+    'browser.hardReload': () => emitBrowserShortcut('browser.hardReload'),
   })
 
   // Close dialog with Escape
@@ -447,6 +458,15 @@ function App() {
     () => {}, // Don't confirm close on Enter
     { enabled: showCloseDialog, canConfirm: false }
   )
+
+  // Forward browser shortcuts intercepted in the main process (pressed while the
+  // <webview> guest had focus, so they never reached this renderer's keydown)
+  // onto the shortcut bus, where the active browser tab handles them.
+  useEffect(() => {
+    return api.browser.onShortcut((action) => {
+      if (isBrowserShortcutAction(action)) emitBrowserShortcut(action)
+    })
+  }, [api])
 
   // Escape → dismiss topmost toast (if any) BEFORE dialog-close handlers run.
   // A direct listener (capture, registered in useEffect) is used because the

@@ -340,6 +340,9 @@ export interface ElectronAPI {
   notification: {
     show: (title: string, body: string) => void
   }
+  browser: {
+    onShortcut: (callback: (action: string) => void) => Unsubscribe
+  }
   app: {
     onCloseRequest: (callback: () => void) => Unsubscribe
     confirmClose: () => void

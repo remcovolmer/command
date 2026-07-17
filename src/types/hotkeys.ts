@@ -68,6 +68,11 @@ export type HotkeyAction =
   | 'editor.previousTab'
   | 'editor.save'
   | 'browser.open'
+  | 'browser.zoomIn'
+  | 'browser.zoomOut'
+  | 'browser.zoomReset'
+  | 'browser.find'
+  | 'browser.hardReload'
   // Worktree
   | 'worktree.create'
   // Sidebar

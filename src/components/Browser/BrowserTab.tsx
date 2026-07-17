@@ -14,6 +14,7 @@ import {
   DEFAULT_ZOOM,
 } from '../../utils/browserZoom'
 import { describeLoadError, isAbort } from '../../utils/browserLoadError'
+import { onBrowserShortcut, type BrowserShortcutAction } from '../../utils/browserShortcutBus'
 import { BrowserOverflowMenu } from './BrowserOverflowMenu'
 import { BrowserFindBar } from './BrowserFindBar'
 import { BrowserErrorState } from './BrowserErrorState'
@@ -111,6 +112,11 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
   const [findActive, setFindActive] = useState(0)
   const [findTotal, setFindTotal] = useState(0)
   const findTextRef = useRef('')
+
+  // Read by the once-registered shortcut-bus subscription so only the active
+  // (visible) browser tab responds, and always via the latest handlers.
+  const isActiveRef = useRef(isActive)
+  const dispatchShortcutRef = useRef<(action: BrowserShortcutAction) => void>(() => {})
 
   // Annotation state.
   const [mode, setMode] = useState<AnnotationMode>('none')
@@ -361,6 +367,38 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
     webviewRef.current?.loadURL(target).catch(() => {})
   }
 
+  // Route a shortcut (from the app-chrome path or the forwarded webview-focus
+  // path) to the matching handler — the same ones the ⋯ menu calls.
+  const dispatchShortcut = (action: BrowserShortcutAction) => {
+    switch (action) {
+      case 'browser.zoomIn':
+        handleZoomIn()
+        break
+      case 'browser.zoomOut':
+        handleZoomOut()
+        break
+      case 'browser.zoomReset':
+        handleZoomReset()
+        break
+      case 'browser.find':
+        openFind()
+        break
+      case 'browser.hardReload':
+        handleHardReload()
+        break
+    }
+  }
+
+  // Subscribe once to the shortcut bus; only the active tab acts, via the latest
+  // handler set (both read through refs).
+  useEffect(
+    () =>
+      onBrowserShortcut((action) => {
+        if (isActiveRef.current) dispatchShortcutRef.current(action)
+      }),
+    []
+  )
+
   // ---- Annotation helpers (host-pull) -------------------------------------
 
   const runGuest = (code: string) => execInGuest(webviewRef.current, readyRef.current, code)
@@ -502,6 +540,8 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
     modeRef.current = mode
     zoomRef.current = zoom
     findTextRef.current = findText
+    isActiveRef.current = isActive
+    dispatchShortcutRef.current = dispatchShortcut
   })
 
   const iconBtn =
