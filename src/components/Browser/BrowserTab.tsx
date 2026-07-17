@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { RotateCw, ArrowRight, ArrowLeft, ChevronRight, Wrench, MessageSquare, Highlighter } from 'lucide-react'
+import { RotateCw, ArrowRight, ArrowLeft, ChevronRight, Wrench, MessageSquare, Highlighter, X } from 'lucide-react'
 import { normalizeAddressBarInput } from '../../utils/browserUrls'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { normalizeFilePath } from '../../utils/paths'
 import { getElectronAPI } from '../../utils/electron'
 import { useProjectStore } from '../../stores/projectStore'
-import { execInGuest, captureGuest } from '../../utils/webviewControl'
+import { execInGuest, captureGuest, setZoom, findInGuest, stopFind } from '../../utils/webviewControl'
+import {
+  clampZoom,
+  zoomIn as computeZoomIn,
+  zoomOut as computeZoomOut,
+  zoomLabel,
+  DEFAULT_ZOOM,
+} from '../../utils/browserZoom'
+import { describeLoadError, isAbort } from '../../utils/browserLoadError'
+import { BrowserOverflowMenu } from './BrowserOverflowMenu'
+import { BrowserFindBar } from './BrowserFindBar'
+import { BrowserErrorState } from './BrowserErrorState'
 import {
   installEditContextMenuScript,
   enableCommentInspectScript,
@@ -33,6 +44,8 @@ interface BrowserTabProps {
   url: string
   isActive: boolean
   onUrlChange: (url: string) => void
+  // Center-tab id — used to persist the tab's zoom on the store's tab object.
+  tabId: string
   // Set when the tab backs a local file — enables live-reload on disk change.
   filePath?: string
   projectId?: string
@@ -49,6 +62,11 @@ const PARTITION = 'persist:command-browser'
 // right-clicking a selection in the page (installEditContextMenuScript), with
 // an in-guest "Opslaan" overlay that signals back over console-message.
 type AnnotationMode = 'none' | 'comment' | 'draw'
+
+interface LoadError {
+  url: string
+  reason: string
+}
 
 // Fresh per-document token that authenticates the guest->host console-message
 // channel. 16 random bytes as hex, injected into the guest scripts and required
@@ -67,7 +85,7 @@ function makeNonce(): string {
  * — at the user's own risk — external URLs (guests are hardened in the main
  * process; see webviewSecurity.ts). Replaces the former sandboxed iframe.
  */
-export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: BrowserTabProps) {
+export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projectId }: BrowserTabProps) {
   const webviewRef = useRef<CommandWebviewElement>(null)
   // Flips true on the guest's dom-ready. Webview methods throw synchronously if
   // called before attach, so timer-driven calls (live-reload) must check this.
@@ -75,6 +93,24 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
   const [input, setInput] = useState(url)
   const [canBack, setCanBack] = useState(false)
   const [canForward, setCanForward] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState<LoadError | null>(null)
+
+  // Zoom is remembered per tab, in-memory (KD2): seed from the store's tab
+  // object so it survives tab switches (which remount this component), and
+  // write changes back. Not persisted — resets with the tab on app restart.
+  const [zoom, setZoomState] = useState<number>(() => {
+    const t = useProjectStore.getState().editorTabs[tabId]
+    return t && t.type === 'browser' && t.zoomFactor ? t.zoomFactor : DEFAULT_ZOOM
+  })
+  const zoomRef = useRef(zoom)
+
+  // Find-in-page state.
+  const [findOpen, setFindOpen] = useState(false)
+  const [findText, setFindText] = useState('')
+  const [findActive, setFindActive] = useState(0)
+  const [findTotal, setFindTotal] = useState(0)
+  const findTextRef = useRef('')
 
   // Annotation state.
   const [mode, setMode] = useState<AnnotationMode>('none')
@@ -95,12 +131,16 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
   }, [url])
 
   // Reflect the guest's navigation state, (re)install the right-click edit flow
-  // on each fresh document, and listen for the in-guest "save" signal.
+  // on each fresh document, drive loading/find/error state, and listen for the
+  // in-guest "save" signal.
   useEffect(() => {
     const wv = webviewRef.current
     if (!wv) return
     const onReady = () => {
       readyRef.current = true
+      // Re-apply the remembered zoom on every fresh document — the guest's
+      // zoom factor can reset across navigations.
+      setZoom(wv, true, zoomRef.current)
       // Mint a fresh nonce for this document; the guest echoes it on every
       // signal so a forged console-message (wrong/absent nonce) is rejected.
       const nonce = makeNonce()
@@ -118,6 +158,43 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     const resetAnnotation = () => {
       setMode('none')
       setStatus(null)
+    }
+    // A successful navigation clears any prior load error and the find session
+    // (its matches belong to the previous document).
+    const onNavigate = () => {
+      setLoadError(null)
+      resetFindState()
+    }
+    const onStartLoading = () => {
+      setIsLoading(true)
+      setLoadError(null)
+    }
+    const onStopLoading = () => setIsLoading(false)
+    const onFailLoad = (e: Event) => {
+      const ev = e as unknown as {
+        errorCode: number
+        errorDescription: string
+        validatedURL: string
+        isMainFrame: boolean
+      }
+      // Ignore subframe failures and aborts (stop(), live-reload, fast re-nav).
+      if (!ev.isMainFrame || isAbort(ev.errorCode)) return
+      setIsLoading(false)
+      setLoadError({
+        url: ev.validatedURL,
+        reason: describeLoadError({
+          url: ev.validatedURL,
+          errorCode: ev.errorCode,
+          errorDescription: ev.errorDescription,
+        }),
+      })
+    }
+    const onFoundInPage = (e: Event) => {
+      const result = (e as unknown as { result?: { activeMatchOrdinal: number; matches: number } })
+        .result
+      if (!result) return
+      setFindActive(result.activeMatchOrdinal)
+      setFindTotal(result.matches)
     }
     const onConsole = (e: Event) => {
       const message = (e as unknown as { message?: string }).message
@@ -142,13 +219,23 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     wv.addEventListener('dom-ready', onReady)
     wv.addEventListener('did-navigate', sync)
     wv.addEventListener('did-navigate', resetAnnotation)
+    wv.addEventListener('did-navigate', onNavigate)
     wv.addEventListener('did-navigate-in-page', sync)
+    wv.addEventListener('did-start-loading', onStartLoading)
+    wv.addEventListener('did-stop-loading', onStopLoading)
+    wv.addEventListener('did-fail-load', onFailLoad)
+    wv.addEventListener('found-in-page', onFoundInPage)
     wv.addEventListener('console-message', onConsole)
     return () => {
       wv.removeEventListener('dom-ready', onReady)
       wv.removeEventListener('did-navigate', sync)
       wv.removeEventListener('did-navigate', resetAnnotation)
+      wv.removeEventListener('did-navigate', onNavigate)
       wv.removeEventListener('did-navigate-in-page', sync)
+      wv.removeEventListener('did-start-loading', onStartLoading)
+      wv.removeEventListener('did-stop-loading', onStopLoading)
+      wv.removeEventListener('did-fail-load', onFailLoad)
+      wv.removeEventListener('found-in-page', onFoundInPage)
       wv.removeEventListener('console-message', onConsole)
     }
   }, [])
@@ -185,12 +272,93 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     const next = normalizeAddressBarInput(input)
     if (!next) return
     setInput(next)
+    setLoadError(null)
     if (next === url) {
       // Same string won't change the src prop; reload the guest directly.
       webviewRef.current?.loadURL(next).catch(() => {})
     } else {
       onUrlChange(next)
     }
+  }
+
+  // ---- Zoom -----------------------------------------------------------------
+
+  const applyZoom = (next: number) => {
+    const clamped = clampZoom(next)
+    setZoomState(clamped)
+    setZoom(webviewRef.current, readyRef.current, clamped)
+    useProjectStore.getState().setBrowserTabZoom(tabId, clamped)
+  }
+  const handleZoomIn = () => applyZoom(computeZoomIn(zoomRef.current))
+  const handleZoomOut = () => applyZoom(computeZoomOut(zoomRef.current))
+  const handleZoomReset = () => applyZoom(DEFAULT_ZOOM)
+
+  // ---- Find-in-page ---------------------------------------------------------
+
+  const resetFindState = () => {
+    setFindText('')
+    setFindActive(0)
+    setFindTotal(0)
+  }
+
+  const openFind = () => setFindOpen(true)
+
+  const closeFind = () => {
+    setFindOpen(false)
+    resetFindState()
+    stopFind(webviewRef.current, readyRef.current, 'clearSelection')
+  }
+
+  // Fresh search on each keystroke; empty term clears the highlight.
+  const handleFindChange = (text: string) => {
+    setFindText(text)
+    if (!text) {
+      setFindActive(0)
+      setFindTotal(0)
+      stopFind(webviewRef.current, readyRef.current, 'clearSelection')
+      return
+    }
+    findInGuest(webviewRef.current, readyRef.current, text)
+  }
+
+  const handleFindNext = () => {
+    if (findTextRef.current)
+      findInGuest(webviewRef.current, readyRef.current, findTextRef.current, {
+        findNext: true,
+        forward: true,
+      })
+  }
+  const handleFindPrev = () => {
+    if (findTextRef.current)
+      findInGuest(webviewRef.current, readyRef.current, findTextRef.current, {
+        findNext: true,
+        forward: false,
+      })
+  }
+
+  // ---- Reload / stop / hard reload / system browser -------------------------
+
+  const handleReloadOrStop = () => {
+    if (isLoading) webviewRef.current?.stop()
+    else webviewRef.current?.reload()
+  }
+  const handleHardReload = () => {
+    setLoadError(null)
+    webviewRef.current?.reloadIgnoringCache()
+  }
+  const handleOpenExternal = () => {
+    const target = webviewRef.current?.getURL() || url
+    void getElectronAPI().shell.openExternal(target)
+  }
+  const handleCopyUrl = () => {
+    const target = webviewRef.current?.getURL() || url
+    getElectronAPI().clipboard.writeText(target)
+    setStatus('URL gekopieerd naar klembord.')
+  }
+  const handleRetry = () => {
+    const target = loadError?.url || url
+    setLoadError(null)
+    webviewRef.current?.loadURL(target).catch(() => {})
   }
 
   // ---- Annotation helpers (host-pull) -------------------------------------
@@ -324,13 +492,16 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
     setStatus(null)
   }
 
-  // Keep the refs pointing at the latest handlers + mode for the console-message listener.
+  // Keep the refs pointing at the latest handlers + mode + zoom + find term for
+  // the once-registered listeners.
   useEffect(() => {
     handleEditSaveRef.current = handleEditSave
     handleCommentSendRef.current = handleCommentSend
     handleMarkupAddRef.current = handleMarkupAdd
     handleMarkupCancelRef.current = handleMarkupCancel
     modeRef.current = mode
+    zoomRef.current = zoom
+    findTextRef.current = findText
   })
 
   const iconBtn =
@@ -359,8 +530,12 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
         >
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => webviewRef.current?.reload()} title="Reload" className={iconBtn}>
-          <RotateCw className="w-3.5 h-3.5" />
+        <button
+          onClick={handleReloadOrStop}
+          title={isLoading ? 'Stop' : 'Reload'}
+          className={iconBtn}
+        >
+          {isLoading ? <X className="w-3.5 h-3.5" /> : <RotateCw className="w-3.5 h-3.5" />}
         </button>
         <input
           value={input}
@@ -396,7 +571,20 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
         >
           <Highlighter className="w-3.5 h-3.5" />
         </button>
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <BrowserOverflowMenu
+          zoomLabel={zoomLabel(zoom)}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onZoomReset={handleZoomReset}
+          onFind={openFind}
+          onHardReload={handleHardReload}
+          onOpenExternal={handleOpenExternal}
+          onCopyUrl={handleCopyUrl}
+        />
       </div>
+
+      {isLoading && <div className="h-0.5 bg-primary/60 animate-pulse" />}
 
       {status && (
         <div className="flex items-center px-2 py-1.5 border-b border-border bg-sidebar-accent text-xs">
@@ -404,13 +592,29 @@ export function BrowserTab({ url, isActive, onUrlChange, filePath, projectId }: 
         </div>
       )}
 
-      <webview
-        ref={webviewRef}
-        src={url}
-        partition={PARTITION}
-        className="flex-1 w-full bg-white"
-        style={{ border: 0, display: 'inline-flex' }}
-      />
+      <div className="relative flex-1 min-h-0 flex">
+        <webview
+          ref={webviewRef}
+          src={url}
+          partition={PARTITION}
+          className="flex-1 w-full bg-white"
+          style={{ border: 0, display: 'inline-flex' }}
+        />
+        {findOpen && (
+          <BrowserFindBar
+            value={findText}
+            activeMatch={findActive}
+            totalMatches={findTotal}
+            onChange={handleFindChange}
+            onNext={handleFindNext}
+            onPrev={handleFindPrev}
+            onClose={closeFind}
+          />
+        )}
+        {loadError && (
+          <BrowserErrorState url={loadError.url} reason={loadError.reason} onRetry={handleRetry} />
+        )}
+      </div>
     </div>
   )
 }

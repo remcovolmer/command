@@ -64,6 +64,7 @@ export function SecondPanel({
             ) : tab.type === 'browser' ? (
               <BrowserTab
                 key={tab.id}
+                tabId={tab.id}
                 url={(tab as BrowserTabType).url}
                 isActive={tab.id === activeContentId}
                 onUrlChange={(url) => onBrowserUrlChange(tab.id, url)}

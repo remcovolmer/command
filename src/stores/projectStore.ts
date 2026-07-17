@@ -294,6 +294,7 @@ interface ProjectStore {
   ) => void
   openUrlInBrowser: (url: string, projectId: string, terminalId?: string) => void
   setBrowserTabUrl: (tabId: string, url: string) => void
+  setBrowserTabZoom: (tabId: string, zoomFactor: number) => void
 
   // Discard confirmation state
   discardingFiles: { files: string[]; isUntracked: boolean } | null
@@ -1329,6 +1330,13 @@ export const useProjectStore = create<ProjectStore>()(
           const tab = state.editorTabs[tabId]
           if (!tab || tab.type !== 'browser') return state
           return { editorTabs: { ...state.editorTabs, [tabId]: { ...tab, url } } }
+        }),
+
+      setBrowserTabZoom: (tabId, zoomFactor) =>
+        set((state) => {
+          const tab = state.editorTabs[tabId]
+          if (!tab || tab.type !== 'browser') return state
+          return { editorTabs: { ...state.editorTabs, [tabId]: { ...tab, zoomFactor } } }
         }),
 
       // Discard confirmation actions
