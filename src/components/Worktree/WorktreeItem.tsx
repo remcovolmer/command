@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback } from 'react'
-import { GitBranch, Trash2, ExternalLink, GitMerge, RefreshCw, Loader2 } from 'lucide-react'
+import { Trash2, ExternalLink, GitMerge, RefreshCw, Loader2 } from 'lucide-react'
 import type { AgentType, Worktree, TerminalSession, PRStatus, PRCheckStatus } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
@@ -358,24 +358,38 @@ export const WorktreeItem = memo(function WorktreeItem({
         `}
       >
         {isAttention && <AttentionRail />}
-        {/* Branch icon */}
-        <GitBranch className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        {/* Status mark — leading column, shared with the chat rows so both row
+            types line up. The chat's agent sunburst doubles as the status
+            indicator (green=done, gray=busy, orange=needs input, red=stopped);
+            we mirror it here instead of the old branch icon. A worktree with no
+            live chat shows a dim placeholder so the column stays aligned.
+            Right-click the row to switch agent. */}
+        {terminal && isAgentType(terminal.type) ? (
+          <AgentBadge type={terminal.type} state={terminal.state} />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+          </span>
+        )}
 
-        {/* Branch name */}
-        <span className="flex-1 text-xs font-medium truncate" title={worktree.branch}>
+        {/* Branch name — no branch icon. "Worktree" is carried subtly: the
+            rust-tinted left rail (border-primary/30) plus this monospace,
+            faintly rust-tinted name read as a branch without a loud glyph. */}
+        <span
+          className="flex-1 text-xs font-mono truncate text-[color-mix(in_oklch,var(--primary)_55%,var(--sidebar-foreground))]"
+          title={worktree.branch}
+        >
           {worktree.name}
         </span>
 
-        {/* Right side: State dot + hover actions */}
+        {/* Right side: attention chip + hover actions (status now lives in the
+            leading mark above, matching the chat rows) */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* Attention chip - permission/question rows say what they need */}
           {isAttention && <AttentionChip />}
-          {/* The chat's agent logo, tinted by state (green=done, gray=busy,
-              orange=needs input, red=stopped) — doubles as the status indicator,
-              so no separate dot. Right-click the row to switch agent. */}
-          {terminal && isAgentType(terminal.type) && (
-            <AgentBadge type={terminal.type} state={terminal.state} />
-          )}
 
           {/* Hover actions */}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
