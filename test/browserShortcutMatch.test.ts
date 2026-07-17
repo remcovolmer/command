@@ -39,6 +39,18 @@ describe('matchBrowserShortcut', () => {
     )
   })
 
+  test('Ctrl+Shift+= ("Ctrl and +") zooms in', () => {
+    expect(matchBrowserShortcut(input({ control: true, shift: true, key: '+' }))).toBe(
+      'browser.zoomIn'
+    )
+  })
+
+  test('Ctrl+Shift+- ("Ctrl and _") zooms out', () => {
+    expect(matchBrowserShortcut(input({ control: true, shift: true, key: '_' }))).toBe(
+      'browser.zoomOut'
+    )
+  })
+
   test('Cmd (meta) works as the primary modifier too', () => {
     expect(matchBrowserShortcut(input({ meta: true, key: '=' }))).toBe('browser.zoomIn')
   })

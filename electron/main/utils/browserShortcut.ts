@@ -44,9 +44,12 @@ export function matchBrowserShortcut(input: KeyInputLike): BrowserShortcutAction
 
   const key = input.key.toLowerCase()
 
-  // Hard reload: Ctrl/Cmd + Shift + R.
+  // Shift combos. On US layouts the main-row `+` and `_` require Shift, so
+  // "Ctrl and +" arrives as Ctrl+Shift+= (key '+') and must still zoom.
   if (input.shift) {
     if (key === 'r') return 'browser.hardReload'
+    if (key === '+' || key === '=') return 'browser.zoomIn'
+    if (key === '-' || key === '_') return 'browser.zoomOut'
     return null
   }
 

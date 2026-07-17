@@ -27,15 +27,17 @@ export function emitBrowserShortcut(action: BrowserShortcutAction): void {
   for (const handler of listeners) handler(action)
 }
 
-const ACTIONS: ReadonlySet<string> = new Set<BrowserShortcutAction>([
-  'browser.zoomIn',
-  'browser.zoomOut',
-  'browser.zoomReset',
-  'browser.find',
-  'browser.hardReload',
-])
+// `satisfies Record<BrowserShortcutAction, true>` makes this a compile error to
+// forget when a new action is added to the union — the set can't silently drift.
+const ACTION_MAP = {
+  'browser.zoomIn': true,
+  'browser.zoomOut': true,
+  'browser.zoomReset': true,
+  'browser.find': true,
+  'browser.hardReload': true,
+} satisfies Record<BrowserShortcutAction, true>
 
 /** Narrow an untrusted string (e.g. an IPC payload) to a known action. */
 export function isBrowserShortcutAction(value: string): value is BrowserShortcutAction {
-  return ACTIONS.has(value)
+  return Object.prototype.hasOwnProperty.call(ACTION_MAP, value)
 }

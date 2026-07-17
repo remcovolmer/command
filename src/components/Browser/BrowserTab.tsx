@@ -389,6 +389,12 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
       case 'browser.hardReload':
         handleHardReload()
         break
+      default: {
+        // Exhaustiveness guard: a new BrowserShortcutAction without a case here
+        // becomes a compile error.
+        const _exhaustive: never = action
+        void _exhaustive
+      }
     }
   }
 

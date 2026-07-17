@@ -97,6 +97,17 @@ function App() {
     }
   }
 
+  // Whether a browser tab is the active content tab. Gates the browser shortcut
+  // handlers below: when no browser is showing, the bindings are absent so
+  // useHotkeys never preventDefaults them and keys like Ctrl+F reach the
+  // terminal/editor. (The webview-focus path is handled in the main process.)
+  const activeIsBrowserTab = useProjectStore((s) => {
+    const chatId = s.activeTerminalId ?? ''
+    const contentId = s.activeContentTabId[chatId]
+    const tab = contentId ? s.editorTabs[contentId] : undefined
+    return tab?.type === 'browser'
+  })
+
   // Register all hotkeys
   useHotkeys({
     // Navigation
@@ -441,15 +452,19 @@ function App() {
       useProjectStore.getState().toggleUsageIndicator()
     },
 
-    // Browser shortcuts, app-chrome-focus path. When the webview itself has
-    // focus these are intercepted in the main process instead (forwarded via the
-    // effect below). Both feed the same bus; only the active browser tab consumes
-    // it, so these no-op when no browser tab is showing.
-    'browser.zoomIn': () => emitBrowserShortcut('browser.zoomIn'),
-    'browser.zoomOut': () => emitBrowserShortcut('browser.zoomOut'),
-    'browser.zoomReset': () => emitBrowserShortcut('browser.zoomReset'),
-    'browser.find': () => emitBrowserShortcut('browser.find'),
-    'browser.hardReload': () => emitBrowserShortcut('browser.hardReload'),
+    // Browser shortcuts, app-chrome-focus path — registered ONLY when a browser
+    // tab is active, so they don't swallow Ctrl+F (etc.) in the terminal/editor
+    // when no browser is open. When the webview itself has focus these are
+    // intercepted in the main process instead (forwarded via the effect below).
+    ...(activeIsBrowserTab
+      ? {
+          'browser.zoomIn': () => emitBrowserShortcut('browser.zoomIn'),
+          'browser.zoomOut': () => emitBrowserShortcut('browser.zoomOut'),
+          'browser.zoomReset': () => emitBrowserShortcut('browser.zoomReset'),
+          'browser.find': () => emitBrowserShortcut('browser.find'),
+          'browser.hardReload': () => emitBrowserShortcut('browser.hardReload'),
+        }
+      : {}),
   })
 
   // Close dialog with Escape
