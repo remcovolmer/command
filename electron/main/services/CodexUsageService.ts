@@ -58,7 +58,14 @@ function mapWindow(raw: unknown): MappedWindow | null {
   if (typeof raw !== 'object' || raw === null) return null
   const r = raw as Record<string, unknown>
   if (typeof r.used_percent !== 'number' || typeof r.window_minutes !== 'number') return null
-  const resetEpoch = typeof r.resets_at === 'number' ? r.resets_at : null
+  // Guard the epoch to a sane range: an out-of-range or non-finite resets_at
+  // would make `new Date(x * 1000).toISOString()` throw a RangeError, and there
+  // is no catch on the poll path. Treat a bad value as "unknown" (no reset).
+  const rawReset = r.resets_at
+  const resetEpoch =
+    typeof rawReset === 'number' && Number.isFinite(rawReset) && Math.abs(rawReset) < 8.64e12
+      ? rawReset
+      : null
   const resetsAt = resetEpoch !== null ? new Date(resetEpoch * 1000).toISOString() : ''
   return {
     minutes: r.window_minutes,
@@ -235,6 +242,9 @@ export class CodexUsageService {
       const outcome = await this.fetchOutcome()
       if (outcome === 'transient' || outcome === 'skip') return
       this.emitIfChanged(outcome)
+    } catch {
+      // A malformed rollout must not wedge the poller or spam unhandled
+      // rejections — degrade to keep-last-good and retry on the next tick.
     } finally {
       this.polling = false
     }

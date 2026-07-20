@@ -186,6 +186,14 @@ describe('mapRateLimits', () => {
     expect(mapRateLimits('nope', 2000)).toBeNull()
     expect(mapRateLimits(null, 2000)).toBeNull()
   })
+
+  test('tolerates an out-of-range resets_at without throwing (RangeError guard)', () => {
+    // A microsecond-scale epoch overflows Date once multiplied by 1000.
+    const data = mapRateLimits(rl(win(5, 300, 1.78e15), null), 2000)
+    expect(data?.status).toBe('ok')
+    expect(data?.fiveHour?.utilization).toBe(5)
+    expect(data?.fiveHour?.resetsAt).toBe('') // bad epoch dropped to "unknown"
+  })
 })
 
 describe('CodexUsageService.pollOnce', () => {
