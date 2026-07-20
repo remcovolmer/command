@@ -10,6 +10,7 @@ import {
   clipboard,
   nativeImage,
   session,
+  Tray,
 } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -238,6 +239,10 @@ if (process.env.NODE_ENV !== 'test' && !app.requestSingleInstanceLock()) {
 
 let win: BrowserWindow | null = null
 let notchService: NotchService | null = null
+let tray: Tray | null = null
+// Set once an explicit quit is requested (tray → Afsluiten, or before-quit).
+// Until then, closing the main window hides it to the tray instead of quitting.
+let isQuitting = false
 let terminalManager: TerminalManager | null = null
 let projectPersistence: ProjectPersistence | null = null
 let gitService: GitService | null = null
@@ -318,6 +323,43 @@ async function restoreSessions(): Promise<void> {
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
+function createTray() {
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'build', 'icon.ico')
+    : path.join(process.env.APP_ROOT, 'build', 'icon.ico')
+  tray = new Tray(iconPath)
+  tray.setToolTip('Command')
+
+  const showWindow = () => {
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  }
+
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Command tonen', click: showWindow },
+      { type: 'separator' },
+      {
+        label: 'Afsluiten',
+        click: () => {
+          // Confirm before killing running agents (reuses the close dialog);
+          // otherwise quit straight away — before-quit persists sessions.
+          if (terminalManager?.hasActiveTerminals()) {
+            showWindow()
+            win?.webContents.send('app:close-request')
+          } else {
+            isQuitting = true
+            app.quit()
+          }
+        },
+      },
+    ]),
+  )
+  tray.on('double-click', showWindow)
+}
+
 async function createWindow() {
   Menu.setApplicationMenu(null)
 
@@ -350,6 +392,9 @@ async function createWindow() {
     indexHtml,
     devServerUrl: VITE_DEV_SERVER_URL,
   })
+
+  // Tray keeps Command resident so the notch survives closing the window.
+  if (!tray) createTray()
 
   // Install hooks for every hook-capable agent (Claude, Codex) for state detection
   installAgentHooks()
@@ -477,11 +522,13 @@ async function createWindow() {
     return { action: 'deny' }
   })
 
-  // Handle close request
+  // Close-to-tray: the X hides the window and keeps Command running so the
+  // notch stays alive. Only an explicit quit (tray → Afsluiten, or any
+  // app.quit() path, which sets isQuitting in before-quit) closes the window.
   win.on('close', (e) => {
-    if (terminalManager?.hasActiveTerminals()) {
+    if (!isQuitting) {
       e.preventDefault()
-      win?.webContents.send('app:close-request')
+      win?.hide()
     }
   })
 }
@@ -1901,6 +1948,10 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  // A real quit is underway — let the main window's close handler proceed
+  // instead of hiding to tray.
+  isQuitting = true
+
   // Skip cleanup and session persistence during update — services already
   // destroyed in update:install handler, sessions will be restored after restart
   if (updateService?.isUpdateInProgress) return
@@ -1955,6 +2006,7 @@ app.on('before-quit', () => {
   githubService?.destroy()
   usageService?.destroy()
   notchService?.destroy()
+  tray?.destroy()
   terminalManager?.destroy()
 })
 
