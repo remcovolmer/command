@@ -27,7 +27,7 @@ export const TerminalListItem = memo(function TerminalListItem({
 }: TerminalListItemProps) {
   const isAttention = isAttentionState(terminal.state)
   const defaultClassName = `
-    group flex items-center gap-2 px-3 py-1.5 cursor-pointer
+    group flex items-center gap-2 px-2 py-1.5 cursor-pointer
     transition-colors duration-150 rounded-md
     ${attentionRowBg(isAttention, isActive)}
     ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
