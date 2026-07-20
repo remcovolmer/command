@@ -8,7 +8,11 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { useProjectStore } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
 import { terminalEvents } from '../utils/terminalEvents'
-import { buildTerminalTheme, invalidateTerminalThemeCache } from '../utils/terminalTheme'
+import {
+  buildTerminalTheme,
+  buildTerminalThemeOptions,
+  invalidateTerminalThemeCache,
+} from '../utils/terminalTheme'
 import { createFileLinkProvider } from '../utils/fileLinkProvider'
 import { classifyOsc8Uri } from '../utils/osc8LinkRouter'
 import { isHtmlFile } from '../utils/editorLanguages'
@@ -160,7 +164,7 @@ export function useXtermInstance({
       fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace",
       lineHeight: 1.0,
       scrollback,
-      theme: buildTerminalTheme(resolvedTheme),
+      ...buildTerminalThemeOptions(resolvedTheme),
       allowProposedApi: true,
       letterSpacing: 0,
       customGlyphs: true,
