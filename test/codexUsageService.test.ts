@@ -3,17 +3,40 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 // Per-test stubs the mocked fs/promises functions delegate to.
 let accessStub: (p: string) => Promise<void> = async () => {}
 let readdirStub: (...args: unknown[]) => Promise<string[]> = async () => ['rollout-a.jsonl']
-let statStub: (p: string) => Promise<{ mtimeMs: number }> = async () => ({ mtimeMs: 1 })
+let statStub: (p: string) => Promise<{ mtimeMs: number; size: number }> = async () => ({
+  mtimeMs: 1,
+  size: 100,
+})
 let readFileStub: (p: string) => Promise<string> = async () => ''
 
 const accessSpy = vi.fn((p: string) => accessStub(p))
 const readFileSpy = vi.fn((p: string) => readFileStub(p))
+
+// Fake FileHandle for the tail-read path. Default throws so tests that keep
+// sizes under the tail threshold catch an accidental tail read.
+interface FakeHandle {
+  read: (buf: Buffer, offset: number, length: number, position: number) => Promise<{ bytesRead: number }>
+  close: () => Promise<void>
+}
+let openStub: () => Promise<FakeHandle> = async () => {
+  throw new Error('open should not be called for small rollout files')
+}
+const openSpy = vi.fn(() => openStub())
+
+/** A FileHandle whose read() fills the buffer with `tailContent`. */
+function fakeHandle(tailContent: string): FakeHandle {
+  return {
+    read: async (buf: Buffer) => ({ bytesRead: buf.write(tailContent, 0, 'utf-8') }),
+    close: async () => {},
+  }
+}
 
 vi.mock('fs/promises', () => ({
   access: (p: string) => accessSpy(p),
   readdir: (...args: unknown[]) => readdirStub(...args),
   stat: (p: string) => statStub(p),
   readFile: (p: string) => readFileSpy(p),
+  open: () => openSpy(),
 }))
 
 import {
@@ -65,8 +88,11 @@ beforeEach(() => {
   readFileSpy.mockClear()
   accessStub = async () => {} // auth present
   readdirStub = async () => ['2026/07/20/rollout-a.jsonl']
-  statStub = async () => ({ mtimeMs: 1 })
+  statStub = async () => ({ mtimeMs: 1, size: 100 })
   readFileStub = async () => rolloutLine(rl(win(37, 300, FUTURE), win(62, 10080, FUTURE)))
+  openStub = async () => {
+    throw new Error('open should not be called for small rollout files')
+  }
 })
 
 describe('windowLabelFromMinutes', () => {
@@ -220,7 +246,7 @@ describe('CodexUsageService.pollOnce', () => {
 
   test('falls back to the next-newest rollout when the newest has no rate_limits', async () => {
     readdirStub = async () => ['2026/07/20/rollout-new.jsonl', '2026/07/19/rollout-old.jsonl']
-    statStub = async (p: string) => ({ mtimeMs: p.includes('rollout-new') ? 200 : 100 })
+    statStub = async (p: string) => ({ mtimeMs: p.includes('rollout-new') ? 200 : 100, size: 100 })
     readFileStub = async (p: string) =>
       p.includes('rollout-new')
         ? '{"type":"event_msg","payload":{"type":"agent_message"}}'
@@ -229,6 +255,43 @@ describe('CodexUsageService.pollOnce', () => {
     expect(send).toHaveBeenCalledWith(
       'usage:update',
       expect.objectContaining({ provider: 'codex', status: 'ok', fiveHour: expect.objectContaining({ utilization: 44 }) })
+    )
+  })
+
+  test('transient readdir error keeps last-good after a prior emit (no re-emit)', async () => {
+    await service.pollOnce()
+    expect(send).toHaveBeenCalledTimes(1)
+    // A recoverable fs error (not ENOENT) must not flash the placeholder.
+    readdirStub = async () => {
+      throw Object.assign(new Error('EMFILE'), { code: 'EMFILE' })
+    }
+    await service.pollOnce()
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  test('reads only the tail of a large rollout and parses its snapshot', async () => {
+    statStub = async () => ({ mtimeMs: 1, size: 300_000 }) // > TAIL_BYTES → tail-read path
+    openStub = async () => fakeHandle(rolloutLine(rl(win(50, 300, FUTURE), null)))
+    readFileStub = async () => {
+      throw new Error('must not full-read when the tail carries a snapshot')
+    }
+    await service.pollOnce()
+    expect(openSpy).toHaveBeenCalled()
+    expect(send).toHaveBeenCalledWith(
+      'usage:update',
+      expect.objectContaining({ provider: 'codex', status: 'ok', fiveHour: expect.objectContaining({ utilization: 50 }) })
+    )
+  })
+
+  test('falls back to a full read when the tail carries no snapshot', async () => {
+    statStub = async () => ({ mtimeMs: 1, size: 300_000 })
+    openStub = async () => fakeHandle('{"partial malformed line with no rate_limits')
+    readFileStub = async () => rolloutLine(rl(win(70, 300, FUTURE), null))
+    await service.pollOnce()
+    expect(openSpy).toHaveBeenCalled()
+    expect(send).toHaveBeenCalledWith(
+      'usage:update',
+      expect.objectContaining({ provider: 'codex', status: 'ok', fiveHour: expect.objectContaining({ utilization: 70 }) })
     )
   })
 })

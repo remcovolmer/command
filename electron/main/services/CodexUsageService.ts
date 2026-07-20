@@ -1,4 +1,4 @@
-import { access, readdir, readFile, stat } from 'fs/promises'
+import { access, open, readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { type BrowserWindow } from 'electron'
@@ -15,6 +15,14 @@ const BLUR_POLL_INTERVAL = 300_000
  *  giving up. A just-started session may not have written one yet, so the
  *  newest file isn't guaranteed to carry the snapshot. */
 const MAX_ROLLOUTS_SCANNED = 5
+/** Only stat this many newest-by-name rollout candidates per poll — rollout
+ *  paths are time-ordered, so a name sort is a zero-syscall recency proxy that
+ *  avoids stat-ing the user's entire Codex history every tick. */
+const CANDIDATE_WINDOW = 20
+/** Read only this many trailing bytes of a rollout: `rate_limits` events are
+ *  written every turn, so a recent snapshot sits near EOF. Full-read fallback
+ *  covers the rare case where the only snapshot straddles the tail boundary. */
+const TAIL_BYTES = 256 * 1024
 
 const UNAVAILABLE: UsageData = { provider: 'codex', status: 'unavailable' }
 
@@ -115,7 +123,7 @@ export function mapRateLimits(raw: unknown, now: number = Date.now()): UsageData
  * Scans lines from the end and tolerates malformed lines. Returns null when the
  * file carries no `token_count` event with a `rate_limits` block.
  */
-export function parseRateLimitsFromContent(content: string): unknown | null {
+export function parseRateLimitsFromContent(content: string): unknown {
   const lines = content.split('\n')
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim()
@@ -245,19 +253,19 @@ export class CodexUsageService {
     let files: string[]
     try {
       files = await this.listRolloutFiles()
-    } catch {
-      // Missing/unreadable sessions dir — definitive, no data to show.
+    } catch (err) {
+      // A missing sessions dir is definitive (no data yet). Other fs errors —
+      // too-many-open-files, an AV/indexer lock — are transient: keep last-good
+      // rather than flash the placeholder for one tick.
+      const code = (err as { code?: string }).code
+      if (code && code !== 'ENOENT' && this.lastPushed !== null) return 'transient'
       return UNAVAILABLE
     }
     if (files.length === 0) return UNAVAILABLE
 
     for (const file of files.slice(0, MAX_ROLLOUTS_SCANNED)) {
-      let content: string
-      try {
-        content = await readFile(file, 'utf-8')
-      } catch {
-        continue
-      }
+      const content = await this.readRolloutContent(file)
+      if (content === null) continue
       const raw = parseRateLimitsFromContent(content)
       if (raw === null) continue
       return mapRateLimits(raw) ?? UNAVAILABLE
@@ -272,8 +280,13 @@ export class CodexUsageService {
     const rollouts = (entries as string[]).filter(
       (e) => typeof e === 'string' && /rollout-.*\.jsonl$/.test(e)
     )
+    // The dir (YYYY/MM/DD) and filename (rollout-<ISO>-<uuid>) are both
+    // lexicographically time-ordered, so a descending name sort is a
+    // zero-syscall proxy for recency. Stat only the newest candidates to
+    // resolve exact mtime order (an appended-to session can outrank its name).
+    rollouts.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
     const withMtime = await Promise.all(
-      rollouts.map(async (rel) => {
+      rollouts.slice(0, CANDIDATE_WINDOW).map(async (rel) => {
         const path = join(dir, rel)
         try {
           const s = await stat(path)
@@ -285,6 +298,48 @@ export class CodexUsageService {
     )
     withMtime.sort((a, b) => b.mtimeMs - a.mtimeMs)
     return withMtime.map((f) => f.path)
+  }
+
+  /**
+   * Read a rollout for its `rate_limits` snapshot without pulling a whole
+   * multi-MB transcript into memory each poll: read the trailing `TAIL_BYTES`
+   * (where recent snapshots live) and fall back to a full read only when the
+   * tail carries none. Returns null when the file can't be read.
+   */
+  private async readRolloutContent(file: string): Promise<string | null> {
+    let size: number
+    try {
+      size = (await stat(file)).size
+    } catch {
+      return null
+    }
+    if (size <= TAIL_BYTES) {
+      try {
+        return await readFile(file, 'utf-8')
+      } catch {
+        return null
+      }
+    }
+    let tail: string | null = null
+    try {
+      const handle = await open(file, 'r')
+      try {
+        const buf = Buffer.alloc(TAIL_BYTES)
+        const { bytesRead } = await handle.read(buf, 0, TAIL_BYTES, size - TAIL_BYTES)
+        tail = buf.toString('utf-8', 0, bytesRead)
+      } finally {
+        await handle.close()
+      }
+    } catch {
+      tail = null
+    }
+    if (tail !== null && parseRateLimitsFromContent(tail) !== null) return tail
+    // Tail had no snapshot (or the read failed) — fall back to the full file.
+    try {
+      return await readFile(file, 'utf-8')
+    } catch {
+      return tail
+    }
   }
 
   private emitIfChanged(data: UsageData) {

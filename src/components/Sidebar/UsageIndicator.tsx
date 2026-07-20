@@ -50,7 +50,15 @@ function Placeholder({ label }: { label?: string }) {
 function UsageBar({ data, label }: { data: UsageData; label?: string }) {
   const [hovered, setHovered] = useState(false)
 
-  if (data.status !== 'ok') return <Placeholder label={label} />
+  // The row stays mounted when a provider flips to unavailable (the store merges
+  // keys, never deletes), and the placeholder has no popover to fire
+  // onMouseLeave — so reset hover here or the popover would reappear open when
+  // data returns. Render-time state adjustment per the React "storing
+  // information from previous renders" pattern.
+  if (data.status !== 'ok') {
+    if (hovered) setHovered(false)
+    return <Placeholder label={label} />
+  }
 
   const short = data.fiveHour
   const long = data.sevenDay
