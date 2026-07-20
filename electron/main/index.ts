@@ -45,6 +45,7 @@ import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { CommandServer } from './services/CommandServer'
 import { SkillInstaller } from './services/SkillInstaller'
+import { NotchService } from './services/NotchService'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -236,6 +237,7 @@ if (process.env.NODE_ENV !== 'test' && !app.requestSingleInstanceLock()) {
 }
 
 let win: BrowserWindow | null = null
+let notchService: NotchService | null = null
 let terminalManager: TerminalManager | null = null
 let projectPersistence: ProjectPersistence | null = null
 let gitService: GitService | null = null
@@ -338,6 +340,15 @@ async function createWindow() {
       sandbox: false, // Required for node-pty terminal functionality
       webviewTag: true, // Enables the built-in browser (<webview>); guests are hardened below
     },
+  })
+
+  // Notch strip: a second frameless always-on-top window reusing this window's
+  // preload + renderer bundle via the `#strip` hash route. Foreground-driven
+  // visibility and the session feed are wired in later units.
+  notchService = new NotchService(win, {
+    preload,
+    indexHtml,
+    devServerUrl: VITE_DEV_SERVER_URL,
   })
 
   // Install hooks for every hook-capable agent (Claude, Codex) for state detection
@@ -1921,6 +1932,7 @@ app.on('before-quit', () => {
   hookWatcher?.destroy()
   githubService?.destroy()
   usageService?.destroy()
+  notchService?.destroy()
   terminalManager?.destroy()
 })
 
