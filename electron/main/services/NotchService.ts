@@ -168,6 +168,19 @@ export class NotchService {
     return !this.mainWindow.isDestroyed() && this.mainWindow.isFocused()
   }
 
+  /**
+   * Return to a session: raise and focus the main window, then tell its
+   * renderer to activate the terminal. Focusing the main window fires its
+   * `focus` handler, which hides the strip.
+   */
+  focusSession(terminalId: string): void {
+    if (this.mainWindow.isDestroyed()) return
+    if (this.mainWindow.isMinimized()) this.mainWindow.restore()
+    this.mainWindow.show()
+    this.mainWindow.focus()
+    this.mainWindow.webContents.send('notch:activate-terminal', terminalId)
+  }
+
   private updateVisibility(): void {
     if (this.destroyed) return
     const show = shouldShowStrip({

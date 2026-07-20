@@ -57,6 +57,13 @@ function App() {
     return unsubscribe
   }, [api])
 
+  // Return to a session when clicked in the notch strip.
+  useEffect(() => {
+    return api.notch.onActivateTerminal((terminalId) => {
+      useProjectStore.getState().setActiveTerminal(terminalId)
+    })
+  }, [api])
+
   // Helper to get visual order of projects (pinned → active → inactive)
   // When inactiveSectionCollapsed, inactive projects are skipped from keyboard navigation
   const getProjectVisualOrder = useCallback(() => {

@@ -498,6 +498,13 @@ ipcMain.on('notch:update', (_event, payload: unknown) => {
   }
 })
 
+// Notch strip click: raise the main window and activate the clicked session.
+ipcMain.on('notch:focus', (_event, terminalId: unknown) => {
+  if (typeof terminalId === 'string' && isValidUUID(terminalId)) {
+    notchService?.focusSession(terminalId)
+  }
+})
+
 // IPC Handlers for Terminal operations
 ipcMain.handle(
   'terminal:create',
