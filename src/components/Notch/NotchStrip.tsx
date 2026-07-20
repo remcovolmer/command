@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getElectronAPI } from '../../utils/electron'
 import { STATE_DOT_COLORS, STATE_TEXT_COLORS } from '../../utils/terminalState'
 import type { AgentType, NotchSession, TerminalState } from '../../types'
@@ -18,23 +18,26 @@ const STATE_LABEL: Record<TerminalState, string> = {
 }
 
 interface ProjectGroup {
+  projectId: string
   projectName: string
   sessions: NotchSession[]
 }
 
+// Group by projectId (stable identity) so two projects/worktrees sharing a
+// display name don't merge into one group.
 function groupByProject(sessions: NotchSession[]): ProjectGroup[] {
   const order: string[] = []
-  const byName = new Map<string, NotchSession[]>()
+  const byId = new Map<string, ProjectGroup>()
   for (const s of sessions) {
-    const existing = byName.get(s.projectName)
+    const existing = byId.get(s.projectId)
     if (existing) {
-      existing.push(s)
+      existing.sessions.push(s)
     } else {
-      byName.set(s.projectName, [s])
-      order.push(s.projectName)
+      byId.set(s.projectId, { projectId: s.projectId, projectName: s.projectName, sessions: [s] })
+      order.push(s.projectId)
     }
   }
-  return order.map((projectName) => ({ projectName, sessions: byName.get(projectName) ?? [] }))
+  return order.map((id) => byId.get(id)).filter((g): g is ProjectGroup => g !== undefined)
 }
 
 /**
@@ -42,19 +45,33 @@ function groupByProject(sessions: NotchSession[]): ProjectGroup[] {
  * (see src/main.tsx `#strip` branch). Collapsed it shows surfaced state dots
  * plus a summary; on hover it expands to the session list grouped by project.
  * Clicking a row returns to that session (U6); the hide button turns the notch
- * off (U8). Window visibility itself is driven by the main process.
+ * off (U8). Window visibility itself is driven by the main process, and the
+ * window is sized to this component's reported content.
  */
-export function NotchStrip(): React.JSX.Element {
+export function NotchStrip() {
+  const api = useMemo(() => getElectronAPI(), [])
+  const rootRef = useRef<HTMLDivElement>(null)
   const [sessions, setSessions] = useState<NotchSession[]>([])
   const [surfacedIds, setSurfacedIds] = useState<string[]>([])
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
-    return getElectronAPI().notch.onState((payload) => {
+    return api.notch.onState((payload) => {
       setSessions(payload.sessions)
       setSurfacedIds(payload.surfacedIds ?? [])
     })
-  }, [])
+  }, [api])
+
+  // Report the rendered content size so the main process fits the window to it.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const report = () => api.notch.resize(el.offsetWidth, el.offsetHeight)
+    report()
+    const observer = new ResizeObserver(report)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [api])
 
   const surfaced = useMemo(() => new Set(surfacedIds), [surfacedIds])
   const groups = useMemo(() => groupByProject(sessions), [sessions])
@@ -68,17 +85,16 @@ export function NotchStrip(): React.JSX.Element {
         ? `${doneCount} klaar`
         : `${sessions.length} ${sessions.length === 1 ? 'sessie' : 'sessies'}`
 
-  const api = getElectronAPI()
-
   return (
     <div
+      ref={rootRef}
       data-testid="notch-strip"
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
-      className="notch-strip overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg"
+      className="notch-strip w-full overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg"
     >
       {expanded ? (
-        <div className="max-h-[200px] overflow-y-auto p-2 text-xs">
+        <div className="max-h-[420px] overflow-y-auto p-2 text-xs">
           <div className="mb-1 flex items-center justify-between px-1">
             <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Notch</span>
             <button
@@ -91,7 +107,7 @@ export function NotchStrip(): React.JSX.Element {
             </button>
           </div>
           {groups.map((group) => (
-            <div key={group.projectName} className="mb-1.5">
+            <div key={group.projectId} className="mb-1.5">
               <div className="px-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 {group.projectName}
               </div>

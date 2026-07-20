@@ -8,6 +8,7 @@ import type { NotchPayload, NotchSession } from '@/types'
 let stateCb: ((payload: NotchPayload) => void) | null = null
 const focusSession = vi.fn()
 const setEnabled = vi.fn()
+const resize = vi.fn()
 
 const session = (over: Partial<NotchSession>): NotchSession => ({
   id: 'a',
@@ -19,10 +20,18 @@ const session = (over: Partial<NotchSession>): NotchSession => ({
   ...over,
 })
 
+class ResizeObserverStub {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
 beforeEach(() => {
   stateCb = null
   focusSession.mockReset()
   setEnabled.mockReset()
+  resize.mockReset()
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver
   // @ts-expect-error minimal stub — only the notch surface the component uses
   window.electronAPI = {
     notch: {
@@ -32,6 +41,7 @@ beforeEach(() => {
       },
       focusSession,
       setEnabled,
+      resize,
     },
   }
 })
@@ -73,5 +83,19 @@ describe('NotchStrip', () => {
     fireEvent.mouseEnter(screen.getByTestId('notch-strip'))
     fireEvent.click(screen.getByRole('button', { name: /Verberg notch/ }))
     expect(setEnabled).toHaveBeenCalledWith(false)
+  })
+
+  test('two projects sharing a display name stay separate groups (keyed by projectId)', () => {
+    render(<NotchStrip />)
+    push({
+      sessions: [
+        session({ id: 'a', projectId: 'p1', projectName: 'Alpha' }),
+        session({ id: 'b', projectId: 'p2', projectName: 'Alpha' }),
+      ],
+      surfacedIds: ['a', 'b'],
+    })
+    fireEvent.mouseEnter(screen.getByTestId('notch-strip'))
+    // Two distinct projects -> two group headers, even with the same name.
+    expect(screen.getAllByText('Alpha')).toHaveLength(2)
   })
 })

@@ -3,8 +3,11 @@ import { shouldShowStrip, computeStripBounds } from './notchVisibility'
 import { computeSurfaced, activeSurfacedIds, type SurfacedMap } from './notchPopPolicy'
 import type { NotchPayload, NotchSession } from '../../../shared/ipc-types'
 
-const STRIP_WIDTH = 380
-const STRIP_HEIGHT = 140
+const DEFAULT_WIDTH = 380
+const DEFAULT_HEIGHT = 140
+const MIN_WIDTH = 280
+const MAX_WIDTH = 560
+const MIN_HEIGHT = 44
 
 /**
  * Paths the strip window needs to load the renderer. Mirrors the resolution
@@ -26,6 +29,8 @@ export interface NotchServiceConfig {
  * Visibility is foreground-driven (U2): the strip appears only while the main
  * window is backgrounded, the notch is enabled, and there is content to show.
  * The session feed (U3), pop policy (U4), and click routing (U6) build on this.
+ * The window is sized to the strip's reported content so the expanded list is
+ * never clipped.
  */
 export class NotchService {
   private strip: BrowserWindow | null = null
@@ -41,6 +46,10 @@ export class NotchService {
   private surfacedIds: string[] = []
   private flashTimer: ReturnType<typeof setTimeout> | null = null
 
+  // Window size, driven by the strip's reported content size (setContentSize).
+  private contentWidth = DEFAULT_WIDTH
+  private contentHeight = DEFAULT_HEIGHT
+
   constructor(
     private readonly mainWindow: BrowserWindow,
     private readonly config: NotchServiceConfig,
@@ -54,8 +63,8 @@ export class NotchService {
     if (this.strip && !this.strip.isDestroyed()) return this.strip
 
     const strip = new BrowserWindow({
-      width: STRIP_WIDTH,
-      height: STRIP_HEIGHT,
+      width: this.contentWidth,
+      height: this.contentHeight,
       show: false,
       frame: false,
       resizable: false,
@@ -77,6 +86,9 @@ export class NotchService {
 
     // Keep the strip above normal windows without stealing focus.
     strip.setAlwaysOnTop(true, 'screen-saver')
+    // The strip renders no links; deny any window-open for parity with the
+    // main window's hardening.
+    strip.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
     if (this.config.devServerUrl) {
       void strip.loadURL(`${this.config.devServerUrl}#strip`)
@@ -94,6 +106,51 @@ export class NotchService {
 
     this.strip = strip
     return strip
+  }
+
+  /** Called from the main window's focus/blur (and hide/show) handlers. */
+  setMainForeground(foreground: boolean): void {
+    this.mainForeground = foreground
+    this.updateVisibility()
+  }
+
+  /** Notch enable/disable — wired to the sidebar toggle and hide button (U8). */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled
+    this.updateVisibility()
+  }
+
+  /** Whether any sessions are currently surfaced — driven by the feed (U3/U4). */
+  setHasContent(hasContent: boolean): void {
+    this.hasContent = hasContent
+    this.updateVisibility()
+  }
+
+  /**
+   * The strip reports its rendered content size so the window fits it exactly
+   * (the expanded list would otherwise clip against a fixed height). Clamped to
+   * sane bounds; the work-area clamp happens in computeStripBounds.
+   */
+  setContentSize(width: number, height: number): void {
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return
+    this.contentWidth = Math.min(Math.max(Math.round(width), MIN_WIDTH), MAX_WIDTH)
+    this.contentHeight = Math.max(Math.round(height), MIN_HEIGHT)
+    if (this.strip && !this.strip.isDestroyed() && this.strip.isVisible()) {
+      this.reposition(this.strip)
+    }
+  }
+
+  /**
+   * Return to a session: raise and focus the main window, then tell its
+   * renderer to activate the terminal. Focusing the main window fires its
+   * `focus` handler, which hides the strip.
+   */
+  focusSession(terminalId: string): void {
+    if (this.mainWindow.isDestroyed()) return
+    if (this.mainWindow.isMinimized()) this.mainWindow.restore()
+    this.mainWindow.show()
+    this.mainWindow.focus()
+    this.mainWindow.webContents.send('notch:activate-terminal', terminalId)
   }
 
   /**
@@ -145,42 +202,6 @@ export class NotchService {
     }
   }
 
-  /** Called from the main window's focus/blur handlers. */
-  setMainForeground(foreground: boolean): void {
-    this.mainForeground = foreground
-    this.updateVisibility()
-  }
-
-  /** Notch enable/disable — wired to the sidebar toggle and hide button (U8). */
-  setEnabled(enabled: boolean): void {
-    this.enabled = enabled
-    this.updateVisibility()
-  }
-
-  /** Whether any sessions are currently surfaced — driven by the feed (U3/U4). */
-  setHasContent(hasContent: boolean): void {
-    this.hasContent = hasContent
-    this.updateVisibility()
-  }
-
-  /** True when the main window is the focused window. */
-  isMainForeground(): boolean {
-    return !this.mainWindow.isDestroyed() && this.mainWindow.isFocused()
-  }
-
-  /**
-   * Return to a session: raise and focus the main window, then tell its
-   * renderer to activate the terminal. Focusing the main window fires its
-   * `focus` handler, which hides the strip.
-   */
-  focusSession(terminalId: string): void {
-    if (this.mainWindow.isDestroyed()) return
-    if (this.mainWindow.isMinimized()) this.mainWindow.restore()
-    this.mainWindow.show()
-    this.mainWindow.focus()
-    this.mainWindow.webContents.send('notch:activate-terminal', terminalId)
-  }
-
   private updateVisibility(): void {
     if (this.destroyed) return
     const show = shouldShowStrip({
@@ -190,19 +211,23 @@ export class NotchService {
     })
     if (show) {
       const strip = this.ensureStrip()
-      this.reposition(strip)
-      if (!strip.isVisible()) strip.showInactive()
+      // Reposition only on the hidden->visible transition so a visible strip
+      // doesn't teleport to another monitor on every feed update.
+      if (!strip.isVisible()) {
+        this.reposition(strip)
+        strip.showInactive()
+      }
     } else if (this.strip && !this.strip.isDestroyed() && this.strip.isVisible()) {
       this.strip.hide()
     }
   }
 
-  /** Place the strip top-center on the display under the cursor. */
+  /** Place the strip top-center on the display under the cursor, sized to content. */
   private reposition(strip: BrowserWindow): void {
     const point = screen.getCursorScreenPoint()
     const display = screen.getDisplayNearestPoint(point)
     strip.setBounds(
-      computeStripBounds(display.workArea, { width: STRIP_WIDTH, height: STRIP_HEIGHT }),
+      computeStripBounds(display.workArea, { width: this.contentWidth, height: this.contentHeight }),
     )
   }
 

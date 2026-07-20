@@ -23,7 +23,13 @@ import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
-import type { AgentType, TerminalType, NotchPayload } from '../../shared/ipc-types'
+import type {
+  AgentType,
+  TerminalType,
+  TerminalState,
+  NotchPayload,
+  NotchSession,
+} from '../../shared/ipc-types'
 import { isAgentType } from '../../shared/agents'
 import { isHookCapableAgent } from './services/agents'
 import { GitService } from './services/GitService'
@@ -387,6 +393,7 @@ async function createWindow() {
   // Notch strip: a second frameless always-on-top window reusing this window's
   // preload + renderer bundle via the `#strip` hash route. Foreground-driven
   // visibility and the session feed are wired in later units.
+  notchService?.destroy()
   notchService = new NotchService(win, {
     preload,
     indexHtml,
@@ -504,6 +511,11 @@ async function createWindow() {
     usageService?.resume()
     notchService?.setMainForeground(true)
   })
+  // hide() (close-to-tray) does not reliably emit blur on Windows, so drive the
+  // notch's foreground state from hide/show too — otherwise the strip would
+  // stay suppressed exactly when Command is minimized to the tray.
+  win.on('hide', () => notchService?.setMainForeground(false))
+  win.on('show', () => notchService?.setMainForeground(win?.isFocused() ?? false))
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -529,20 +541,56 @@ async function createWindow() {
     if (!isQuitting) {
       e.preventDefault()
       win?.hide()
+      notchService?.setMainForeground(false)
     }
   })
 }
 
 // Notch strip: receive the cross-project session snapshot from the main
-// renderer and relay it to the strip window.
+// renderer and relay it to the strip. Validate each element (same rigor as the
+// terminal:* handlers) rather than trusting the payload shape — the strip
+// consumes id/state/agentType directly.
+const VALID_NOTCH_STATES = new Set<TerminalState>([
+  'busy',
+  'permission',
+  'question',
+  'done',
+  'stopped',
+])
+
+function isValidNotchSession(value: unknown): value is NotchSession {
+  if (!value || typeof value !== 'object') return false
+  const s = value as Record<string, unknown>
+  return (
+    typeof s.id === 'string' &&
+    isValidUUID(s.id) &&
+    typeof s.projectId === 'string' &&
+    typeof s.projectName === 'string' &&
+    typeof s.title === 'string' &&
+    isAgentType(s.agentType) &&
+    typeof s.state === 'string' &&
+    VALID_NOTCH_STATES.has(s.state as TerminalState)
+  )
+}
+
+function sanitizeNotchPayload(payload: unknown): NotchPayload | null {
+  if (!payload || typeof payload !== 'object') return null
+  const raw = (payload as { sessions?: unknown }).sessions
+  if (!Array.isArray(raw)) return null
+  const sessions: NotchSession[] = raw.filter(isValidNotchSession).map((s) => ({
+    id: s.id,
+    projectId: s.projectId,
+    projectName: s.projectName,
+    title: s.title,
+    agentType: s.agentType,
+    state: s.state,
+  }))
+  return { sessions }
+}
+
 ipcMain.on('notch:update', (_event, payload: unknown) => {
-  if (
-    payload &&
-    typeof payload === 'object' &&
-    Array.isArray((payload as { sessions?: unknown }).sessions)
-  ) {
-    notchService?.setSessions(payload as NotchPayload)
-  }
+  const clean = sanitizeNotchPayload(payload)
+  if (clean) notchService?.setSessions(clean)
 })
 
 // Notch strip click: raise the main window and activate the clicked session.
@@ -559,6 +607,14 @@ ipcMain.on('notch:set-enabled', (event, enabled: unknown) => {
   notchService?.setEnabled(enabled)
   if (win && event.sender !== win.webContents) {
     win.webContents.send('notch:enabled', enabled)
+  }
+})
+
+// Notch strip reports its rendered content size so the window fits it exactly
+// (the expanded session list would otherwise clip against a fixed height).
+ipcMain.on('notch:resize', (_event, width: unknown, height: unknown) => {
+  if (typeof width === 'number' && typeof height === 'number') {
+    notchService?.setContentSize(width, height)
   }
 })
 

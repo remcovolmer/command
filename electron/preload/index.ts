@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     pushUpdate: (payload: NotchPayload): void => ipcRenderer.send('notch:update', payload),
     focusSession: (terminalId: string): void => ipcRenderer.send('notch:focus', terminalId),
     setEnabled: (enabled: boolean): void => ipcRenderer.send('notch:set-enabled', enabled),
+    resize: (width: number, height: number): void =>
+      ipcRenderer.send('notch:resize', width, height),
     onState: (callback: (payload: NotchPayload) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, payload: NotchPayload) => callback(payload)
       ipcRenderer.on('notch:state', handler)

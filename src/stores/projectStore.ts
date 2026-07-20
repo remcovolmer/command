@@ -1394,6 +1394,7 @@ export const useProjectStore = create<ProjectStore>()(
         get().setNotchEnabled(!get().notchEnabled)
       },
       setNotchEnabled: (enabled: boolean) => {
+        if (get().notchEnabled === enabled) return // no-op; also breaks the strip-echo round-trip
         set({ notchEnabled: enabled })
         try {
           getElectronAPI().notch.setEnabled(enabled)

@@ -278,6 +278,7 @@ export interface ElectronAPI {
     pushUpdate: (payload: NotchPayload) => void
     focusSession: (terminalId: string) => void
     setEnabled: (enabled: boolean) => void
+    resize: (width: number, height: number) => void
     onState: (callback: (payload: NotchPayload) => void) => Unsubscribe
     onActivateTerminal: (callback: (terminalId: string) => void) => Unsubscribe
     onEnabled: (callback: (enabled: boolean) => void) => Unsubscribe
