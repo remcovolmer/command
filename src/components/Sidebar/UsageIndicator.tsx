@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useProjectStore } from '../../stores/projectStore'
 import type { UsageData, UsageProvider } from '../../types'
+import { AgentBadge } from '../AgentBadge'
 import {
   formatResetTime,
   formatCredits,
@@ -15,11 +16,6 @@ const LEVEL_BAR: Record<UsageLevel, string> = {
   danger: 'bg-danger',
 }
 
-const PROVIDER_LABEL: Record<UsageProvider, string> = {
-  claude: 'Claude',
-  codex: 'Codex',
-}
-
 // Fixed order so rows don't reshuffle as each provider's data arrives.
 const PROVIDER_ORDER: readonly UsageProvider[] = ['claude', 'codex']
 
@@ -32,10 +28,16 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Placeholder({ label }: { label?: string }) {
+/** Provider brand mark (Claude / OpenAI logo) used as the row identifier — the
+ *  same marks the chat list uses, so a lone bar is never ambiguous. */
+function ProviderMark({ provider }: { provider: UsageProvider }) {
+  return <AgentBadge type={provider} className="text-muted-foreground" />
+}
+
+function Placeholder({ provider }: { provider?: UsageProvider }) {
   return (
     <div className="mb-1.5 flex items-center gap-2" title="Usage data unavailable — retrying">
-      {label && <span className="text-[10px] text-muted-foreground w-10 shrink-0">{label}</span>}
+      {provider && <ProviderMark provider={provider} />}
       <div className="flex-1 h-1 rounded-full bg-muted" />
       <span className="text-[10px] text-muted-foreground/50 shrink-0">usage n/a</span>
     </div>
@@ -43,11 +45,11 @@ function Placeholder({ label }: { label?: string }) {
 }
 
 /**
- * One provider's usage row: a thin bar showing the rendered (shortest present)
- * window's utilization, colored by whichever window is closest to binding, with
- * details on hover. `label` is shown only in a multi-provider footer.
+ * One provider's usage row: a brand mark + a thin bar showing the rendered
+ * (shortest present) window's utilization, colored by whichever window is
+ * closest to binding, with details on hover.
  */
-function UsageBar({ data, label }: { data: UsageData; label?: string }) {
+function UsageBar({ data, provider }: { data: UsageData; provider: UsageProvider }) {
   const [hovered, setHovered] = useState(false)
 
   // The row stays mounted when a provider flips to unavailable (the store merges
@@ -57,7 +59,7 @@ function UsageBar({ data, label }: { data: UsageData; label?: string }) {
   // information from previous renders" pattern.
   if (data.status !== 'ok') {
     if (hovered) setHovered(false)
-    return <Placeholder label={label} />
+    return <Placeholder provider={provider} />
   }
 
   const short = data.fiveHour
@@ -84,7 +86,7 @@ function UsageBar({ data, label }: { data: UsageData; label?: string }) {
       onMouseLeave={() => setHovered(false)}
     >
       <div className="flex items-center gap-2">
-        {label && <span className="text-[10px] text-muted-foreground w-10 shrink-0">{label}</span>}
+        <ProviderMark provider={provider} />
         <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${LEVEL_BAR[level]}`}
@@ -133,9 +135,8 @@ function UsageBar({ data, label }: { data: UsageData; label?: string }) {
 
 /**
  * Plan-usage bars in the sidebar footer: one row per provider whose data is
- * present (Claude, Codex), each colored by whichever limit is closest to
- * binding. Provider labels appear only when both rows are shown, so a
- * single-provider footer looks exactly as it did before Codex support.
+ * present (Claude, Codex), each led by its brand mark and colored by whichever
+ * limit is closest to binding.
  */
 export function UsageIndicator() {
   const usageData = useProjectStore((s) => s.usageData)
@@ -150,20 +151,12 @@ export function UsageIndicator() {
   // stays present and "off" remains distinguishable from "no data".
   if (present.length === 0) return <Placeholder />
 
-  const showLabels = present.length >= 2
-
   return (
     <>
       {present.map((provider) => {
         const data = usageData[provider]
         if (!data) return null
-        return (
-          <UsageBar
-            key={provider}
-            data={data}
-            label={showLabels ? PROVIDER_LABEL[provider] : undefined}
-          />
-        )
+        return <UsageBar key={provider} data={data} provider={provider} />
       })}
     </>
   )

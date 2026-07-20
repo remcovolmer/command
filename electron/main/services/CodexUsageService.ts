@@ -263,6 +263,11 @@ export class CodexUsageService {
     }
     if (files.length === 0) return UNAVAILABLE
 
+    // Use the freshest snapshot that carries a rate_limits block. It renders
+    // whatever windows Codex currently reports — the 5h window when OpenAI sends
+    // one (shown like the Claude bar), otherwise the weekly window. We show what
+    // the API reports; we don't dig older files for a window it has stopped
+    // sending.
     for (const file of files.slice(0, MAX_ROLLOUTS_SCANNED)) {
       const content = await this.readRolloutContent(file)
       if (content === null) continue

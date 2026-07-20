@@ -34,29 +34,29 @@ describe('UsageIndicator', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  test('empty map (enabled, no data yet) shows one muted placeholder, no provider label', () => {
+  test('empty map (enabled, no data yet) shows one muted placeholder, no brand mark', () => {
     setUsage({})
     render(<UsageIndicator />)
     expect(screen.getByText('usage n/a')).toBeTruthy()
-    expect(screen.queryByText('Claude')).toBeNull()
-    expect(screen.queryByText('Codex')).toBeNull()
+    expect(screen.queryByTitle('Claude chat')).toBeNull()
+    expect(screen.queryByTitle('Codex chat')).toBeNull()
   })
 
-  test('single provider renders a bar with no provider label (parity with today)', () => {
+  test('single provider still renders its brand mark so the lone bar is unambiguous', () => {
     setUsage({ claude: { provider: 'claude', status: 'ok', fiveHour: { utilization: 42, resetsAt: RESET } } })
     const { container } = render(<UsageIndicator />)
     expect(container.textContent).toContain('42%')
-    expect(screen.queryByText('Claude')).toBeNull()
+    expect(screen.getByTitle('Claude chat')).toBeTruthy()
   })
 
-  test('two providers render two labeled rows', () => {
+  test('two providers render two brand-marked rows', () => {
     setUsage({
       claude: { provider: 'claude', status: 'ok', fiveHour: { utilization: 42, resetsAt: RESET } },
       codex: { provider: 'codex', status: 'ok', sevenDay: { utilization: 62, resetsAt: RESET, label: 'wk' } },
     })
     render(<UsageIndicator />)
-    expect(screen.getByText('Claude')).toBeTruthy()
-    expect(screen.getByText('Codex')).toBeTruthy()
+    expect(screen.getByTitle('Claude chat')).toBeTruthy()
+    expect(screen.getByTitle('Codex chat')).toBeTruthy()
   })
 
   test('weekly-only Codex prefixes the percent with its window label', () => {
@@ -86,7 +86,7 @@ describe('UsageIndicator', () => {
       codex: { provider: 'codex', status: 'unavailable' },
     })
     render(<UsageIndicator />)
-    expect(screen.getByText('Codex')).toBeTruthy()
+    expect(screen.getByTitle('Codex chat')).toBeTruthy()
     expect(screen.getByText('usage n/a')).toBeTruthy()
   })
 
@@ -94,7 +94,7 @@ describe('UsageIndicator', () => {
     setUsage({ claude: { provider: 'claude', status: 'ok', fiveHour: { utilization: 42, resetsAt: RESET } } })
     render(<UsageIndicator />)
     // Claude-only: no Codex row, no Codex placeholder.
-    expect(screen.queryByText('Codex')).toBeNull()
+    expect(screen.queryByTitle('Codex chat')).toBeNull()
     expect(screen.queryByText('usage n/a')).toBeNull()
   })
 })
