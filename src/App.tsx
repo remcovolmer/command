@@ -64,6 +64,13 @@ function App() {
     })
   }, [api])
 
+  // Sync the notch toggle when the strip's hide button turns it off.
+  useEffect(() => {
+    return api.notch.onEnabled((enabled) => {
+      useProjectStore.getState().setNotchEnabled(enabled)
+    })
+  }, [api])
+
   // Helper to get visual order of projects (pinned → active → inactive)
   // When inactiveSectionCollapsed, inactive projects are skipped from keyboard navigation
   const getProjectVisualOrder = useCallback(() => {
@@ -461,6 +468,9 @@ function App() {
     },
     'ui.toggleUsageIndicator': () => {
       useProjectStore.getState().toggleUsageIndicator()
+    },
+    'ui.toggleNotch': () => {
+      useProjectStore.getState().toggleNotchEnabled()
     },
 
     // Browser shortcuts, app-chrome-focus path — registered ONLY when a browser

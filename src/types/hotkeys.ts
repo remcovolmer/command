@@ -87,6 +87,7 @@ export type HotkeyAction =
   | 'ui.showShortcuts'
   | 'ui.cycleClaudeMode'
   | 'ui.toggleUsageIndicator'
+  | 'ui.toggleNotch'
   // Dialogs
   | 'dialog.close'
   | 'dialog.confirm'

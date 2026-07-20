@@ -280,6 +280,7 @@ export interface ElectronAPI {
     setEnabled: (enabled: boolean) => void
     onState: (callback: (payload: NotchPayload) => void) => Unsubscribe
     onActivateTerminal: (callback: (terminalId: string) => void) => Unsubscribe
+    onEnabled: (callback: (enabled: boolean) => void) => Unsubscribe
   }
   editor: {
     onOpenFile: (

@@ -119,6 +119,12 @@ interface ProjectStore {
   showUsageIndicator: boolean
   toggleUsageIndicator: () => void
 
+  // Notch strip enable/disable — one shared setting driven by the sidebar
+  // toggle, the hotkey, and the strip's hide button (via a main-process echo).
+  notchEnabled: boolean
+  toggleNotchEnabled: () => void
+  setNotchEnabled: (enabled: boolean) => void
+
   // Editor tab state (includes both file editor and diff tabs)
   editorTabs: Record<string, CenterTab> // tabId -> EditorTab | DiffTab
   // Per-chat active content tab (chatId -> active content tab id). Rendered by the
@@ -407,6 +413,9 @@ export const useProjectStore = create<ProjectStore>()(
       // Plan-usage indicator
       usageData: null,
       showUsageIndicator: true,
+
+      // Notch strip enabled by default
+      notchEnabled: true,
 
       // Tasks state
       tasksData: {},
@@ -1377,6 +1386,22 @@ export const useProjectStore = create<ProjectStore>()(
 
       setUsageData: (data) => set({ usageData: data }),
 
+      // Single owner of the notch enable side effect: the sidebar toggle, the
+      // hotkey, and the strip hide button (echoed back from main) all route
+      // through setNotchEnabled, so the store and the main process cannot
+      // diverge.
+      toggleNotchEnabled: () => {
+        get().setNotchEnabled(!get().notchEnabled)
+      },
+      setNotchEnabled: (enabled: boolean) => {
+        set({ notchEnabled: enabled })
+        try {
+          getElectronAPI().notch.setEnabled(enabled)
+        } catch {
+          // electronAPI not available (e.g., in tests)
+        }
+      },
+
       // Single owner of the toggle side effect: Settings UI and the hotkey
       // both call this action, so main-process start/stop cannot diverge.
       toggleUsageIndicator: () => {
@@ -1995,6 +2020,8 @@ export const useProjectStore = create<ProjectStore>()(
         terminalPoolSize: state.terminalPoolSize,
         // Plan-usage indicator toggle
         showUsageIndicator: state.showUsageIndicator,
+        // Notch enable toggle
+        notchEnabled: state.notchEnabled,
         // Confirmed mode dialog keys
         confirmedModeKeys: state.confirmedModeKeys,
         // Profile state
@@ -2058,6 +2085,7 @@ export const useProjectStore = create<ProjectStore>()(
         try {
           const api = getElectronAPI()
           api.usage.setEnabled(state?.showUsageIndicator ?? true).catch(() => {})
+          api.notch.setEnabled(state?.notchEnabled ?? true)
           unsubUsageUpdate?.()
           unsubUsageUpdate = api.usage.onUpdate((data) => {
             useProjectStore.getState().setUsageData(data)

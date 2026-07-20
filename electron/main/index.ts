@@ -552,6 +552,16 @@ ipcMain.on('notch:focus', (_event, terminalId: unknown) => {
   }
 })
 
+// Notch enable/disable. Echo a strip-originated change (e.g. the hide button)
+// back to the main renderer so its store + sidebar toggle stay in sync.
+ipcMain.on('notch:set-enabled', (event, enabled: unknown) => {
+  if (typeof enabled !== 'boolean') return
+  notchService?.setEnabled(enabled)
+  if (win && event.sender !== win.webContents) {
+    win.webContents.send('notch:enabled', enabled)
+  }
+})
+
 // IPC Handlers for Terminal operations
 ipcMain.handle(
   'terminal:create',

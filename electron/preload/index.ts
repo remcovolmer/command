@@ -61,6 +61,7 @@ const ALLOWED_LISTENER_CHANNELS = [
   'usage:update',
   'notch:state',
   'notch:activate-terminal',
+  'notch:enabled',
   'fs:watch:changes',
   'fs:watch:error',
   'automation:run-started',
@@ -88,6 +89,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: Electron.IpcRendererEvent, terminalId: string) => callback(terminalId)
       ipcRenderer.on('notch:activate-terminal', handler)
       return () => ipcRenderer.removeListener('notch:activate-terminal', handler)
+    },
+    onEnabled: (callback: (enabled: boolean) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, enabled: boolean) => callback(enabled)
+      ipcRenderer.on('notch:enabled', handler)
+      return () => ipcRenderer.removeListener('notch:enabled', handler)
     },
   },
 
