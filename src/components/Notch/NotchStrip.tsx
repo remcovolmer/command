@@ -1,27 +1,139 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getElectronAPI } from '../../utils/electron'
-import type { NotchSession } from '../../types'
+import { STATE_DOT_COLORS, STATE_TEXT_COLORS } from '../../utils/terminalState'
+import type { AgentType, NotchSession, TerminalState } from '../../types'
+
+const AGENT_LABEL: Record<AgentType, string> = {
+  claude: 'C',
+  codex: 'Cx',
+  pi: 'π',
+}
+
+const STATE_LABEL: Record<TerminalState, string> = {
+  busy: 'bezig',
+  done: 'klaar',
+  permission: 'goedkeuring nodig',
+  question: 'vraag',
+  stopped: 'gestopt',
+}
+
+interface ProjectGroup {
+  projectName: string
+  sessions: NotchSession[]
+}
+
+function groupByProject(sessions: NotchSession[]): ProjectGroup[] {
+  const order: string[] = []
+  const byName = new Map<string, NotchSession[]>()
+  for (const s of sessions) {
+    const existing = byName.get(s.projectName)
+    if (existing) {
+      existing.push(s)
+    } else {
+      byName.set(s.projectName, [s])
+      order.push(s.projectName)
+    }
+  }
+  return order.map((projectName) => ({ projectName, sessions: byName.get(projectName) ?? [] }))
+}
 
 /**
  * The notch strip renderer view, mounted in the dedicated strip window
- * (see src/main.tsx `#strip` branch). U3 subscribes to the cross-project
- * session feed relayed from the main process; the collapsed/expanded UI, hide
- * button, and click routing arrive in U5/U6.
+ * (see src/main.tsx `#strip` branch). Collapsed it shows surfaced state dots
+ * plus a summary; on hover it expands to the session list grouped by project.
+ * Clicking a row returns to that session (U6); the hide button turns the notch
+ * off (U8). Window visibility itself is driven by the main process.
  */
 export function NotchStrip(): React.JSX.Element {
   const [sessions, setSessions] = useState<NotchSession[]>([])
+  const [surfacedIds, setSurfacedIds] = useState<string[]>([])
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
-    return getElectronAPI().notch.onState((payload) => setSessions(payload.sessions))
+    return getElectronAPI().notch.onState((payload) => {
+      setSessions(payload.sessions)
+      setSurfacedIds(payload.surfacedIds ?? [])
+    })
   }, [])
+
+  const surfaced = useMemo(() => new Set(surfacedIds), [surfacedIds])
+  const groups = useMemo(() => groupByProject(sessions), [sessions])
+  const attentionCount = sessions.filter((s) => surfaced.has(s.id) && s.state !== 'done').length
+  const doneCount = sessions.filter((s) => surfaced.has(s.id) && s.state === 'done').length
+
+  const summary =
+    attentionCount > 0
+      ? `${attentionCount} ${attentionCount === 1 ? 'vraagt' : 'vragen'} om je aandacht`
+      : doneCount > 0
+        ? `${doneCount} klaar`
+        : `${sessions.length} ${sessions.length === 1 ? 'sessie' : 'sessies'}`
+
+  const api = getElectronAPI()
 
   return (
     <div
       data-testid="notch-strip"
-      className="notch-strip flex select-none items-center gap-2 px-3 py-2 text-xs"
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+      className="notch-strip overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg"
     >
-      {/* Provisional readout; U5 renders the collapsed/expanded session UI. */}
-      <span data-testid="notch-count">{sessions.length}</span>
+      {expanded ? (
+        <div className="max-h-[200px] overflow-y-auto p-2 text-xs">
+          <div className="mb-1 flex items-center justify-between px-1">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Notch</span>
+            <button
+              type="button"
+              aria-label="Verberg notch"
+              onClick={() => api.notch.setEnabled(false)}
+              className="rounded px-1 leading-none text-muted-foreground hover:text-foreground"
+            >
+              ✕
+            </button>
+          </div>
+          {groups.map((group) => (
+            <div key={group.projectName} className="mb-1.5">
+              <div className="px-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {group.projectName}
+              </div>
+              {group.sessions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => api.notch.focusSession(s.id)}
+                  data-surfaced={surfaced.has(s.id) ? 'true' : undefined}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent"
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT_COLORS[s.state]}`} />
+                  <span className="shrink-0 rounded bg-sidebar-accent px-1 text-[10px] font-semibold text-muted-foreground">
+                    {AGENT_LABEL[s.agentType]}
+                  </span>
+                  <span className="flex-1 truncate">{s.title}</span>
+                  <span className={`shrink-0 text-[10px] ${STATE_TEXT_COLORS[s.state]}`}>
+                    {STATE_LABEL[s.state]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2 text-xs">
+          <div className="flex items-center gap-1">
+            {sessions
+              .filter((s) => surfaced.has(s.id))
+              .slice(0, 6)
+              .map((s) => (
+                <span
+                  key={s.id}
+                  className={`h-2 w-2 rounded-full ${STATE_DOT_COLORS[s.state]}`}
+                />
+              ))}
+          </div>
+          <span data-testid="notch-count" className="text-muted-foreground">
+            {summary}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
