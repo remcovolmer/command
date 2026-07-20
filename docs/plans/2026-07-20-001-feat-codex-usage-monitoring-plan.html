@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex usage monitoring - Plan</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f0f2f5;
+    --text: #1b1f24;
+    --muted: #5b636e;
+    --border: #dfe3e8;
+    --accent: #3355dd;
+    --accent-soft: #e9edfb;
+    --accent-text: #2942b8;
+    --warn: #b7791f;
+    --warn-soft: #fbf1dd;
+    --danger: #c0392b;
+    --danger-soft: #fbe5e2;
+    --ok: #2e7d4f;
+    --ok-soft: #e3f3ea;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216;
+      --surface: #171b21;
+      --surface-2: #1e242c;
+      --text: #e6e9ee;
+      --muted: #97a0ac;
+      --border: #2b323b;
+      --accent: #6c8cff;
+      --accent-soft: #1b2540;
+      --accent-text: #a8bbff;
+      --warn: #e0a44a;
+      --warn-soft: #33280f;
+      --danger: #ef6a5c;
+      --danger-soft: #3a1c18;
+      --ok: #5cc98a;
+      --ok-soft: #123023;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 940px; margin-inline: auto; padding: 40px 24px 80px; }
+  header.doc { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 8px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); font-weight: 700; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 8px 0 16px; font-weight: 750; }
+  h2 { font-size: 22px; margin: 40px 0 12px; padding-top: 8px; font-weight: 700; }
+  h3 { font-size: 16px; margin: 26px 0 8px; font-weight: 700; }
+  h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 20px 0 6px; }
+  p { max-width: 72ch; }
+  section p, section li { max-width: 72ch; }
+  a { color: var(--accent-text); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+  .meta .pill {
+    font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); display: inline-flex; gap: 6px; align-items: center;
+  }
+  .meta .pill b { color: var(--text); font-weight: 650; }
+  nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin: 20px 0 8px; }
+  nav.toc ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+  nav.toc a { font-size: 13.5px; color: var(--muted); }
+  nav.toc a:hover { color: var(--accent-text); }
+  section { scroll-margin-top: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin: 14px 0; }
+  .kd { margin: 12px 0; padding: 14px 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .kd .kid { font-family: var(--mono); font-size: 12px; color: var(--accent-text); font-weight: 700; }
+  .kd .ktitle { font-weight: 700; margin: 2px 0 6px; }
+  .kd p { margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  td.id, th.id { width: 48px; }
+  .rid { font-family: var(--mono); font-weight: 700; color: var(--accent-text); font-size: 13px; }
+  .group-h { font-weight: 700; margin: 22px 0 2px; font-size: 15px; }
+  .ae { border-left: 0; }
+  ul.clean { list-style: none; padding-left: 0; }
+  ul.clean li { margin: 8px 0; padding-left: 18px; position: relative; }
+  ul.clean li::before { content: "›"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+  .callout { border-radius: 10px; padding: 14px 18px; margin: 12px 0; border: 1px solid var(--border); }
+  .callout .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; margin-bottom: 4px; }
+  .callout.scope-in { background: var(--ok-soft); }
+  .callout.scope-in .lbl { color: var(--ok); }
+  .callout.scope-out { background: var(--surface-2); }
+  .callout.scope-out .lbl { color: var(--muted); }
+  .callout.defer { background: var(--accent-soft); }
+  .callout.defer .lbl { color: var(--accent-text); }
+  .callout.assume { background: var(--warn-soft); }
+  .callout.assume .lbl { color: var(--warn); }
+  .verified { color: var(--ok); font-weight: 700; }
+  figure { margin: 18px 0; }
+  figure svg { max-width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  figcaption { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  figcaption.directional { font-style: italic; }
+  .fig-svg text { font-family: var(--sans); }
+  footer.composition-signal { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .lead { font-size: 16.5px; color: var(--text); }
+  .overflow { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc">
+  <div class="eyebrow">Requirements-only unified plan · ce-brainstorm</div>
+  <h1 id="top">Codex usage monitoring - Plan</h1>
+  <div class="meta">
+    <span class="pill"><b>type</b> feat</span>
+    <span class="pill"><b>date</b> <time datetime="2026-07-20">2026-07-20</time></span>
+    <span class="pill"><b>topic</b> codex-usage-monitoring</span>
+    <span class="pill"><b>execution</b> code</span>
+    <span class="pill"><b>artifact_contract</b> ce-unified-plan/v1</span>
+    <span class="pill"><b>artifact_readiness</b> requirements-only</span>
+    <span class="pill"><b>product_contract_source</b> ce-brainstorm</span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <ul>
+    <li><a href="#goal-capsule">Goal Capsule</a></li>
+    <li><a href="#product-contract">Product Contract</a></li>
+    <li><a href="#summary">Summary</a></li>
+    <li><a href="#problem-frame">Problem Frame</a></li>
+    <li><a href="#key-decisions">Key Decisions</a></li>
+    <li><a href="#product-requirements">Requirements</a></li>
+    <li><a href="#acceptance-examples">Acceptance Examples</a></li>
+    <li><a href="#scope">Scope Boundaries</a></li>
+    <li><a href="#assumptions">Dependencies &amp; Assumptions</a></li>
+    <li><a href="#questions">Outstanding Questions</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ul>
+</nav>
+
+<section id="goal-capsule">
+  <h2>Goal Capsule</h2>
+  <p class="lead"><b>Objective.</b> Give Command the same ambient plan-usage awareness for Codex that it already has for Claude — a second labeled bar in the sidebar footer — fed from Codex's locally-persisted rate-limit snapshots rather than a network endpoint.</p>
+  <p><b>Product authority.</b> Remco (Command owner). Both product forks were resolved in the brainstorm dialogue.</p>
+  <p><b>Open blockers.</b> None. Feasibility and the data shape were verified live this session against <code>~/.codex</code>. Remaining choices are implementation-level (see Outstanding Questions) and belong to planning.</p>
+</section>
+
+<section id="product-contract">
+  <h2>Product Contract</h2>
+
+  <h3 id="summary">Summary</h3>
+  <p>Add a second usage row to the sidebar footer for <b>Codex</b>, mirroring the existing Claude bar (percentage + reset time, threshold colors, hover detail). Its data is read <b>locally</b> from the newest Codex session rollout file — <code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code> — by taking the last <code>rate_limits</code> block off its <code>token_count</code> events. No network call, no token, nothing but derived numbers crossing IPC. Each provider's row appears only when that provider's credentials exist, so a Claude-only machine looks exactly like today. Codex reuses Claude's two-state model (<code>ok</code> / <code>unavailable</code>) unchanged; a window whose <code>resets_at</code> is already in the past is treated as <code>unavailable</code>.</p>
+
+  <h3 id="problem-frame">Problem Frame</h3>
+  <p>Command already runs Codex chats as a first-class agent alongside Claude (<code>codex</code> binary, hooks in <code>~/.codex/hooks.json</code>). Codex's ChatGPT-plan limits bite the same way Claude's do — a 5-hour window and a weekly cap — and you only discover the wall when Codex refuses mid-session. The Claude usage indicator shipped that ambient warning for Claude alone, leaving Codex blind.</p>
+  <p>OpenAI exposes no clean usage endpoint equivalent to Anthropic's <code>oauth/usage</code>. But the Codex CLI persists a rate-limit snapshot into every session rollout after each turn. Verified this session: rollout files carry <code>token_count</code> events with a <code>rate_limits</code> block — <code>primary</code> and <code>secondary</code>, each <code>{ used_percent, window_minutes, resets_at }</code>, plus <code>credits</code> and <code>plan_type</code>. That local snapshot is exactly what the Codex CLI itself shows, and it is enough to drive the bar.</p>
+
+  <figure>
+    <svg class="fig-svg" viewBox="0 0 720 470" role="img" aria-label="Data flow for both providers into the sidebar footer">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+        </marker>
+      </defs>
+      <style>
+        .box { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+        .box-c { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+        .lane { font-size: 12px; font-weight: 700; }
+        .lbl { font-size: 12px; fill: var(--text); }
+        .sub { font-size: 10.5px; fill: var(--muted); font-family: var(--mono); }
+        .edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+        .cap  { fill: var(--text); }
+      </style>
+
+      <!-- lane titles -->
+      <text x="185" y="26" text-anchor="middle" class="lane" fill="var(--accent-text)">CLAUDE (live)</text>
+      <text x="535" y="26" text-anchor="middle" class="lane" fill="var(--accent-text)">CODEX (local)</text>
+
+      <!-- row 1: sources -->
+      <rect class="box" x="70" y="40" width="230" height="52" rx="8"/>
+      <text x="185" y="62" text-anchor="middle" class="lbl">credentials file</text>
+      <text x="185" y="80" text-anchor="middle" class="sub">~/.claude/.credentials.json</text>
+
+      <rect class="box" x="420" y="40" width="230" height="52" rx="8"/>
+      <text x="535" y="62" text-anchor="middle" class="lbl">newest rollout file</text>
+      <text x="535" y="80" text-anchor="middle" class="sub">~/.codex/sessions/**/rollout-*.jsonl</text>
+
+      <!-- row 2: fetch/read -->
+      <rect class="box" x="70" y="132" width="230" height="52" rx="8"/>
+      <text x="185" y="154" text-anchor="middle" class="lbl">GET oauth/usage (poll)</text>
+      <text x="185" y="172" text-anchor="middle" class="sub">Bearer token · network</text>
+
+      <rect class="box" x="420" y="132" width="230" height="52" rx="8"/>
+      <text x="535" y="154" text-anchor="middle" class="lbl">read last rate_limits</text>
+      <text x="535" y="172" text-anchor="middle" class="sub">filesystem · no network</text>
+
+      <!-- row 3: map -->
+      <rect class="box-c" x="70" y="224" width="230" height="52" rx="8"/>
+      <text x="185" y="246" text-anchor="middle" class="lbl">map → UsageData</text>
+      <text x="185" y="264" text-anchor="middle" class="sub">provider: 'claude'</text>
+
+      <rect class="box-c" x="420" y="224" width="230" height="52" rx="8"/>
+      <text x="535" y="246" text-anchor="middle" class="lbl">map → UsageData</text>
+      <text x="535" y="264" text-anchor="middle" class="sub">provider: 'codex'</text>
+
+      <!-- merge -->
+      <rect class="box" x="120" y="316" width="480" height="46" rx="8"/>
+      <text x="360" y="344" text-anchor="middle" class="lbl">usage:update &nbsp;·&nbsp; per provider, only when the payload changed</text>
+
+      <!-- store -->
+      <rect class="box" x="200" y="386" width="320" height="40" rx="8"/>
+      <text x="360" y="411" text-anchor="middle" class="lbl">projectStore.usageData[provider]</text>
+
+      <!-- footer -->
+      <rect class="box-c" x="150" y="440" width="420" height="26" rx="6"/>
+      <text x="360" y="457" text-anchor="middle" class="lbl">Sidebar footer — one row per provider (creds-gated)</text>
+
+      <!-- vertical edges: claude column -->
+      <line class="edge" x1="185" y1="92"  x2="185" y2="132" marker-end="url(#arrow)"/>
+      <line class="edge" x1="185" y1="184" x2="185" y2="224" marker-end="url(#arrow)"/>
+      <line class="edge" x1="185" y1="276" x2="185" y2="316" marker-end="url(#arrow)"/>
+      <!-- codex column -->
+      <line class="edge" x1="535" y1="92"  x2="535" y2="132" marker-end="url(#arrow)"/>
+      <line class="edge" x1="535" y1="184" x2="535" y2="224" marker-end="url(#arrow)"/>
+      <line class="edge" x1="535" y1="276" x2="535" y2="316" marker-end="url(#arrow)"/>
+      <!-- spine -->
+      <line class="edge" x1="360" y1="362" x2="360" y2="386" marker-end="url(#arrow)"/>
+      <line class="edge" x1="360" y1="426" x2="360" y2="440" marker-end="url(#arrow)"/>
+    </svg>
+    <figcaption>Both providers share one <code>usage:update</code> spine; only the source and the fetch/read step differ. Prose above is authoritative.</figcaption>
+  </figure>
+
+  <h3 id="key-decisions">Key Decisions</h3>
+
+  <div class="kd">
+    <div class="kid">KD1</div>
+    <div class="ktitle">Local rollout-file read, not a network endpoint.</div>
+    <p>OpenAI has no clean usage endpoint to mirror Anthropic's. The Codex CLI persists its rate-limit snapshot into session rollout files after every turn, and that snapshot is what the CLI's own status shows. Reading it is cheaper and simpler than the Claude path — no token handling, no auth-expiry classification, no network failure modes.</p>
+  </div>
+  <div class="kd">
+    <div class="kid">KD2</div>
+    <div class="ktitle">Two labeled rows in the footer, each shown only when its credentials exist.</div>
+    <p>Chosen over a single toggled bar or side-by-side segments: labeled stacked rows read cleanest and scale to a third agent later. Conditional visibility keeps a Claude-only machine identical to today and avoids a permanent "n/a" Codex row for people who never use Codex.</p>
+  </div>
+  <div class="kd">
+    <div class="kid">KD3</div>
+    <div class="ktitle">Codex reuses Claude's two-state model; a rolled-over window is <code>unavailable</code>.</div>
+    <p>No new "stale" UI state. Usage is monotonic within a window, so an old-but-not-yet-reset snapshot is still correct — the number only goes wrong once <code>resets_at</code> passes. That <code>resets_at &lt; now</code> check is Codex's structural equivalent of Claude's failed-poll → <code>unavailable</code>, collapsing into the muted placeholder that already exists. Symmetric with Claude, zero extra states.</p>
+  </div>
+  <div class="kd">
+    <div class="kid">KD4</div>
+    <div class="ktitle">Windows are keyed by <code>window_minutes</code>, not by fixed field names.</div>
+    <p>Codex reports generic <code>primary</code>/<code>secondary</code> windows. Verified values are <code>300</code> (5h) and <code>10080</code> (weekly) — the same two horizons Claude has — but the label is derived from the minutes rather than hardcoded, and a null/absent secondary (seen transiently at session start) is tolerated. This also nudges the shared <code>UsageData</code> shape toward a provider + generic-window-list model instead of Claude-specific <code>fiveHour</code>/<code>sevenDay</code> keys.</p>
+  </div>
+  <div class="kd">
+    <div class="kid">KD5</div>
+    <div class="ktitle">One indicator controls both providers in v1.</div>
+    <p>The existing <code>showUsageIndicator</code> setting and <code>Ctrl+Shift+U</code> hotkey toggle the whole indicator (both rows) together. A per-provider toggle is deferred — no evidence it's wanted yet.</p>
+  </div>
+
+  <h3 id="product-requirements">Requirements</h3>
+
+  <div class="group-h">Codex data source</div>
+  <div class="overflow">
+  <table>
+    <thead><tr><th class="id">ID</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><span class="rid" id="r1">R1</span></td><td>A main-process reader locates the most-recently-modified <code>rollout-*.jsonl</code> under <code>~/.codex/sessions/</code> and extracts the <code>rate_limits</code> block from the last <code>token_count</code> event in it.</td></tr>
+      <tr><td class="id"><span class="rid" id="r2">R2</span></td><td>The Codex bar renders the shortest available window (percentage + reset time) and colors by the highest utilization across all present windows — the same "closest-to-binding wins" rule as the Claude bar.</td></tr>
+      <tr><td class="id"><span class="rid" id="r3">R3</span></td><td>Each window's label is derived from its <code>window_minutes</code> (e.g. <code>300</code>→"5h", <code>10080</code>→"wk"); a <code>null</code> or absent <code>secondary</code> is tolerated without error.</td></tr>
+      <tr><td class="id"><span class="rid" id="r4">R4</span></td><td>Reading is local only: no network request, no credential token, and only derived numbers cross the IPC boundary.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="group-h">Freshness &amp; availability (symmetric with Claude)</div>
+  <div class="overflow">
+  <table>
+    <thead><tr><th class="id">ID</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><span class="rid" id="r5">R5</span></td><td>Codex usage has exactly two states, matching Claude: <code>ok</code> (render the bar) and <code>unavailable</code> (render the existing muted placeholder). No third "stale" state.</td></tr>
+      <tr><td class="id"><span class="rid" id="r6">R6</span></td><td>A snapshot whose relevant window <code>resets_at</code> is in the past counts as <code>unavailable</code> — the pre-reset percentage no longer reflects the current window.</td></tr>
+      <tr><td class="id"><span class="rid" id="r7">R7</span></td><td>Missing/unparseable <code>~/.codex/auth.json</code>, or no readable rollout with a <code>rate_limits</code> block, → <code>unavailable</code>; the row reappears automatically once a fresh snapshot lands. No re-auth flow.</td></tr>
+      <tr><td class="id"><span class="rid" id="r8">R8</span></td><td>Transient read errors keep the last-good value (never flash empty on one failed read); an update is pushed only when the payload actually changed.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="group-h">Sidebar presentation</div>
+  <div class="overflow">
+  <table>
+    <thead><tr><th class="id">ID</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><span class="rid" id="r9">R9</span></td><td>The footer shows one labeled row per provider (<code>Claude</code> / <code>Codex</code>). A row appears only when that provider's credentials exist (<code>~/.claude/.credentials.json</code> / <code>~/.codex/auth.json</code>). With only Claude present, the footer is identical to today.</td></tr>
+      <tr><td class="id"><span class="rid" id="r10">R10</span></td><td>Each row keeps the existing bar + percent + reset-time affordance and hover popover. The Codex popover shows its windows (derived labels), <code>plan_type</code>, and the credits balance when <code>has_credits</code> is true.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="group-h">Control &amp; conventions</div>
+  <div class="overflow">
+  <table>
+    <thead><tr><th class="id">ID</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><span class="rid" id="r11">R11</span></td><td>The existing <code>showUsageIndicator</code> setting and <code>Ctrl+Shift+U</code> hotkey control both rows together; no separate per-provider toggle in v1.</td></tr>
+      <tr><td class="id"><span class="rid" id="r12">R12</span></td><td>New decision logic — rollout selection, <code>rate_limits</code> parse, window-label derivation, the <code>resets_at</code> staleness check, and level→color mapping — is extracted as pure exported functions and unit-tested with Vitest, matching the Claude service.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure>
+    <svg class="fig-svg" viewBox="0 0 460 220" role="img" aria-label="Wireframe of the two-provider sidebar footer">
+      <style>
+        .wf-panel { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+        .wf-track { fill: var(--border); }
+        .wf-fill-a { fill: var(--accent); }
+        .wf-fill-w { fill: var(--warn); }
+        .wf-lab { font-size: 12px; fill: var(--text); font-weight: 650; }
+        .wf-val { font-size: 11px; fill: var(--muted); font-family: var(--mono); }
+        .wf-ph  { font-size: 10px; fill: var(--muted); }
+      </style>
+      <rect class="wf-panel" x="10" y="10" width="440" height="200" rx="10"/>
+      <text x="30" y="34" class="wf-ph">[ sidebar footer — bottom of project list ]</text>
+
+      <!-- Claude row -->
+      <text x="30" y="74" class="wf-lab">Claude</text>
+      <rect class="wf-track" x="96" y="66" width="250" height="8" rx="4"/>
+      <rect class="wf-fill-a" x="96" y="66" width="105" height="8" rx="4"/>
+      <text x="356" y="74" class="wf-val">42% · 19:50</text>
+
+      <!-- Codex row -->
+      <text x="30" y="112" class="wf-lab">Codex</text>
+      <rect class="wf-track" x="96" y="104" width="250" height="8" rx="4"/>
+      <rect class="wf-fill-w" x="96" y="104" width="155" height="8" rx="4"/>
+      <text x="356" y="112" class="wf-val">wk 62% · 5h</text>
+
+      <line x1="30" y1="140" x2="430" y2="140" stroke="var(--border)" stroke-width="1"/>
+      <text x="30" y="164" class="wf-ph">Codex row absent when ~/.codex/auth.json is missing;</text>
+      <text x="30" y="182" class="wf-ph">both rows hidden on stale/unavailable, per the existing placeholder.</text>
+      <text x="30" y="200" class="wf-ph">Colour driven by the closest-to-binding window (here: weekly 62%).</text>
+    </svg>
+    <figcaption class="directional">Directional only — illustrates the intended user-facing shape. Exact colors, spacing, copy, and component choices are placeholders for review, not requirements.</figcaption>
+  </figure>
+
+  <h3 id="acceptance-examples">Acceptance Examples</h3>
+  <ul class="clean">
+    <li class="ae"><b>AE1 · Covers R6.</b> Newest rollout's driving window <code>resets_at</code> is yesterday → the Codex row shows the muted placeholder, not the stale percentage.</li>
+    <li class="ae"><b>AE2 · Covers R6, R8.</b> <code>resets_at</code> is in the future and no newer rollout exists → the row keeps showing the last snapshot's percentage unchanged (still correct — usage only rises within a window).</li>
+    <li class="ae"><b>AE3 · Covers R9.</b> Only <code>~/.claude/.credentials.json</code> exists → the footer shows the Claude row only; no Codex row, no placeholder for it. Matches today's behavior.</li>
+    <li class="ae"><b>AE4 · Covers R9.</b> Both credential files exist → two stacked labeled rows.</li>
+    <li class="ae"><b>AE5 · Covers R2, R3.</b> Snapshot with <code>primary.window_minutes=300</code> (37%) and <code>secondary.window_minutes=10080</code> (62%) → the bar shows the 5h window, colored by the 62% weekly, with a "wk 62%" hint. A snapshot with <code>secondary=null</code> → single 5h line, no error.</li>
+  </ul>
+
+  <h3 id="scope">Scope Boundaries</h3>
+  <div class="callout scope-out">
+    <div class="lbl">Outside this feature</div>
+    <ul class="clean">
+      <li><b>ChatGPT web-chat usage.</b> No local data source exists for it. "Codex usage" here means the Codex CLI's plan quota — which <em>is</em> the ChatGPT-plan quota — not the web chat.</li>
+      <li><b>Per-chat / per-token cost metrics.</b> A different feature (the rollout <code>token_count</code> also carries token totals, but ambient per-chat cost is out of scope here).</li>
+      <li><b>Pi usage.</b> The third agent exposes no rate-limit data; not in this pass.</li>
+      <li><b>Live probe calls.</b> Forcing a throwaway API call just to read fresh rate-limit headers — rejected (costs tokens, hacky, no clean endpoint).</li>
+    </ul>
+  </div>
+  <div class="callout defer">
+    <div class="lbl">Deferred for later</div>
+    <ul class="clean">
+      <li>A separate per-provider toggle, if hiding one row turns out to be wanted.</li>
+      <li>macOS credential/rollout path differences — the row hides silently if the files are absent (matches R7); a platform-specific reader is follow-up work.</li>
+    </ul>
+  </div>
+
+  <h3 id="assumptions">Dependencies &amp; Assumptions</h3>
+  <div class="callout assume">
+    <div class="lbl">Verified this session</div>
+    <ul class="clean">
+      <li><span class="verified">✓</span> Codex CLI writes <code>rate_limits</code> into session rollout <code>.jsonl</code> files (live rollout inspected).</li>
+      <li><span class="verified">✓</span> <code>used_percent</code> is on a 0–100 scale (values up to 62.0 observed) — no fraction conversion needed, unlike the Claude <code>used_credits</code>-cents case.</li>
+      <li><span class="verified">✓</span> Two windows exist: <code>window_minutes</code> <code>300</code> (5h) and <code>10080</code> (weekly). <code>resets_at</code> is a unix epoch in <b>seconds</b> (Claude used ISO strings — parse accordingly).</li>
+      <li><span class="verified">✓</span> <code>~/.codex/auth.json</code> present with <code>auth_mode: "chatgpt"</code> and <code>tokens.access_token</code>; no API key needed for the file-read path.</li>
+    </ul>
+  </div>
+  <div class="callout assume">
+    <div class="lbl">Assumptions to confirm in planning</div>
+    <ul class="clean">
+      <li>The rate-limit snapshot is account-global and identical across concurrent sessions, so the newest rollout file is the freshest source. Plausible but not proven across all Codex versions.</li>
+      <li>The newest rollout always contains at least one <code>rate_limits</code> block; if a just-started session has none yet, the reader falls back to the next-newest (see Outstanding Questions).</li>
+    </ul>
+  </div>
+
+  <h3 id="questions">Outstanding Questions</h3>
+  <h4>Resolve before planning</h4>
+  <p>None — both product forks (UI shape, staleness handling) are resolved above.</p>
+  <h4>Deferred to planning</h4>
+  <ul class="clean">
+    <li><b>Architecture.</b> Extend the existing <code>UsageService</code> to also read Codex, or add a sibling reader — and generalize the <code>UsageData</code> / <code>usage:update</code> payload to carry a provider identity plus a generic window list.</li>
+    <li><b>Refresh mechanism.</b> Reuse the focus-aware 60s/300s poll cadence for the file read, or watch <code>~/.codex/sessions</code> via the existing <code>FileWatcherService</code>. Lean poll-cadence for v1.</li>
+    <li><b>Rollout selection edge case.</b> Whether to read only the single newest file or scan the few newest to skip an aborted session that has no <code>rate_limits</code> event yet.</li>
+  </ul>
+
+  <h3 id="sources">Sources</h3>
+  <ul class="clean">
+    <li>Live verification this session: <code>~/.codex/sessions/2026/07/20/rollout-*.jsonl</code> — <code>token_count</code> event <code>rate_limits</code> block (<code>primary</code>/<code>secondary</code>, <code>credits</code>, <code>plan_type: "plus"</code>).</li>
+    <li><code>~/.codex/auth.json</code> — <code>auth_mode: chatgpt</code>, <code>tokens.access_token</code>, no API key.</li>
+    <li><a href="electron/main/services/UsageService.ts">electron/main/services/UsageService.ts</a> — the Claude poller to mirror (lifecycle, transient vs definitive failure, emit-on-change).</li>
+    <li><a href="src/components/Sidebar/UsageIndicator.tsx">src/components/Sidebar/UsageIndicator.tsx</a> and <a href="src/utils/usageFormat.ts">src/utils/usageFormat.ts</a> — the bar, popover, and formatting to extend.</li>
+    <li><a href="shared/agents.ts">shared/agents.ts</a>, <a href="electron/main/services/agents.ts">electron/main/services/agents.ts</a> — Codex is already a first-class agent in Command.</li>
+    <li><a href="docs/plans/2026-06-11-001-feat-claude-usage-indicator-plan.md">docs/plans/2026-06-11-001-feat-claude-usage-indicator-plan.md</a> — the predecessor Claude usage-indicator plan.</li>
+  </ul>
+
+</section>
+
+<footer class="composition-signal">
+  Composed 2026-07-20 by ce-brainstorm from in-session dialogue + live inspection of <code>~/.codex</code>. Requirements-only unified plan; <code>ce-plan</code> enriches this same file in place with implementation units.
+</footer>
+
+</div>
+</body>
+</html>
