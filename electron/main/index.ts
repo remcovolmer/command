@@ -447,14 +447,17 @@ async function createWindow() {
       .catch((err) => automationLog.error('Worktree GC failed:', err))
   })
 
-  // Pause/resume GitHub and usage polling on focus/blur
+  // Pause/resume GitHub and usage polling on focus/blur, and drive the notch
+  // strip's foreground-gated visibility from the same signal.
   win.on('blur', () => {
     githubService?.pauseAllPolling()
     usageService?.pause()
+    notchService?.setMainForeground(false)
   })
   win.on('focus', () => {
     githubService?.resumeAllPolling()
     usageService?.resume()
+    notchService?.setMainForeground(true)
   })
 
   // Make all links open with the browser, not with the application

@@ -1,4 +1,8 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, screen } from 'electron'
+import { shouldShowStrip, computeStripBounds } from './notchVisibility'
+
+const STRIP_WIDTH = 380
+const STRIP_HEIGHT = 140
 
 /**
  * Paths the strip window needs to load the renderer. Mirrors the resolution
@@ -17,13 +21,19 @@ export interface NotchServiceConfig {
  * the same preload and renderer bundle as the main window, selecting the strip
  * view via a `#strip` hash route (see src/main.tsx).
  *
- * U1 scope: window lifecycle only (create hidden, show/hide, destroy).
- * Foreground-driven visibility (U2), the session feed (U3), pop policy (U4),
- * and click routing (U6) build on this shell.
+ * Visibility is foreground-driven (U2): the strip appears only while the main
+ * window is backgrounded, the notch is enabled, and there is content to show.
+ * The session feed (U3), pop policy (U4), and click routing (U6) build on this.
  */
 export class NotchService {
   private strip: BrowserWindow | null = null
   private destroyed = false
+
+  // Visibility inputs — see notchVisibility.shouldShowStrip. The app starts
+  // with the main window focused; enabled defaults on; content arrives in U3.
+  private mainForeground = true
+  private enabled = true
+  private hasContent = false
 
   constructor(
     private readonly mainWindow: BrowserWindow,
@@ -38,8 +48,8 @@ export class NotchService {
     if (this.strip && !this.strip.isDestroyed()) return this.strip
 
     const strip = new BrowserWindow({
-      width: 380,
-      height: 140,
+      width: STRIP_WIDTH,
+      height: STRIP_HEIGHT,
       show: false,
       frame: false,
       resizable: false,
@@ -76,26 +86,52 @@ export class NotchService {
     return strip
   }
 
-  /**
-   * Show the strip without stealing focus from the foreground window. U2
-   * replaces the caller with foreground-driven logic; kept public so the
-   * lifecycle is exercisable in isolation.
-   */
-  show(): void {
-    if (this.destroyed) return
-    const strip = this.ensureStrip()
-    if (!strip.isVisible()) strip.showInactive()
+  /** Called from the main window's focus/blur handlers. */
+  setMainForeground(foreground: boolean): void {
+    this.mainForeground = foreground
+    this.updateVisibility()
   }
 
-  hide(): void {
-    if (this.strip && !this.strip.isDestroyed() && this.strip.isVisible()) {
+  /** Notch enable/disable — wired to the sidebar toggle and hide button (U8). */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled
+    this.updateVisibility()
+  }
+
+  /** Whether any sessions are currently surfaced — driven by the feed (U3/U4). */
+  setHasContent(hasContent: boolean): void {
+    this.hasContent = hasContent
+    this.updateVisibility()
+  }
+
+  /** True when the main window is the focused window. */
+  isMainForeground(): boolean {
+    return !this.mainWindow.isDestroyed() && this.mainWindow.isFocused()
+  }
+
+  private updateVisibility(): void {
+    if (this.destroyed) return
+    const show = shouldShowStrip({
+      mainForeground: this.mainForeground,
+      enabled: this.enabled,
+      hasContent: this.hasContent,
+    })
+    if (show) {
+      const strip = this.ensureStrip()
+      this.reposition(strip)
+      if (!strip.isVisible()) strip.showInactive()
+    } else if (this.strip && !this.strip.isDestroyed() && this.strip.isVisible()) {
       this.strip.hide()
     }
   }
 
-  /** True when the main window is the focused window. Used by U2. */
-  isMainForeground(): boolean {
-    return !this.mainWindow.isDestroyed() && this.mainWindow.isFocused()
+  /** Place the strip top-center on the display under the cursor. */
+  private reposition(strip: BrowserWindow): void {
+    const point = screen.getCursorScreenPoint()
+    const display = screen.getDisplayNearestPoint(point)
+    strip.setBounds(
+      computeStripBounds(display.workArea, { width: STRIP_WIDTH, height: STRIP_HEIGHT }),
+    )
   }
 
   destroy(): void {
