@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import { shouldShowStrip, computeStripBounds } from './notchVisibility'
+import { computeSurfaced, activeSurfacedIds, type SurfacedMap } from './notchPopPolicy'
 import type { NotchPayload, NotchSession } from '../../../shared/ipc-types'
 
 const STRIP_WIDTH = 380
@@ -36,6 +37,9 @@ export class NotchService {
   private enabled = true
   private hasContent = false
   private sessions: NotchSession[] = []
+  private surfaced: SurfacedMap = new Map()
+  private surfacedIds: string[] = []
+  private flashTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(
     private readonly mainWindow: BrowserWindow,
@@ -93,19 +97,51 @@ export class NotchService {
   }
 
   /**
-   * Receive the latest cross-project session snapshot from the main renderer,
-   * relay it to the strip, and update visibility. Pop policy (U4) later refines
-   * `hasContent` to a "surfaced" subset; for now any agent session is content.
+   * Receive the latest cross-project session snapshot from the main renderer
+   * and run the pop policy: done flashes briefly, attention/stopped persists,
+   * busy does not surface. The surfaced set drives visibility.
    */
   setSessions(payload: NotchPayload): void {
     this.sessions = payload.sessions
+    this.recomputeSurfaced()
+  }
+
+  private recomputeSurfaced(): void {
+    const now = Date.now()
+    const { entries, nextDeadline } = computeSurfaced(this.surfaced, this.sessions, now)
+    this.surfaced = entries
+    this.surfacedIds = activeSurfacedIds(entries, now)
     this.pushToStrip()
-    this.setHasContent(this.sessions.length > 0)
+    this.setHasContent(this.surfacedIds.length > 0)
+    this.scheduleFlashExpiry(nextDeadline, now)
+  }
+
+  /**
+   * Re-evaluate when the earliest done flash expires, so the strip hides on
+   * time even without a new feed update.
+   */
+  private scheduleFlashExpiry(nextDeadline: number | null, now: number): void {
+    if (this.flashTimer) {
+      clearTimeout(this.flashTimer)
+      this.flashTimer = null
+    }
+    if (nextDeadline !== null) {
+      this.flashTimer = setTimeout(
+        () => {
+          this.flashTimer = null
+          this.recomputeSurfaced()
+        },
+        Math.max(0, nextDeadline - now) + 10,
+      )
+    }
   }
 
   private pushToStrip(): void {
     if (this.strip && !this.strip.isDestroyed()) {
-      this.strip.webContents.send('notch:state', { sessions: this.sessions })
+      this.strip.webContents.send('notch:state', {
+        sessions: this.sessions,
+        surfacedIds: this.surfacedIds,
+      })
     }
   }
 
@@ -159,6 +195,10 @@ export class NotchService {
 
   destroy(): void {
     this.destroyed = true
+    if (this.flashTimer) {
+      clearTimeout(this.flashTimer)
+      this.flashTimer = null
+    }
     if (this.strip && !this.strip.isDestroyed()) {
       this.strip.destroy()
     }

@@ -101,9 +101,12 @@ export interface NotchSession {
 }
 
 // Snapshot of all agent sessions pushed from the main renderer to the strip
-// window (via main, which relays on the `notch:state` channel).
+// window (via main, which relays on the `notch:state` channel). `surfacedIds`
+// is set only on the main->strip relay: the ids the pop policy is currently
+// surfacing (attention/stopped, or a done flash), for emphasis in the strip.
 export interface NotchPayload {
   sessions: NotchSession[]
+  surfacedIds?: string[]
 }
 
 /** Session metadata extracted from Claude Code JSONL transcripts. */
