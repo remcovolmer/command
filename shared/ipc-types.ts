@@ -90,6 +90,22 @@ export interface TerminalSession {
   origin?: 'automation' // set when spawned by an automation launch (drives the spawn cue)
 }
 
+// One agent session as surfaced in the notch strip (cross-project overview).
+export interface NotchSession {
+  id: string
+  projectId: string
+  projectName: string
+  title: string
+  agentType: AgentType
+  state: TerminalState
+}
+
+// Snapshot of all agent sessions pushed from the main renderer to the strip
+// window (via main, which relays on the `notch:state` channel).
+export interface NotchPayload {
+  sessions: NotchSession[]
+}
+
 /** Session metadata extracted from Claude Code JSONL transcripts. */
 export interface SessionIndexEntry {
   sessionId: string

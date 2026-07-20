@@ -22,7 +22,7 @@ import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
-import type { AgentType, TerminalType } from '../../shared/ipc-types'
+import type { AgentType, TerminalType, NotchPayload } from '../../shared/ipc-types'
 import { isAgentType } from '../../shared/agents'
 import { isHookCapableAgent } from './services/agents'
 import { GitService } from './services/GitService'
@@ -485,6 +485,18 @@ async function createWindow() {
     }
   })
 }
+
+// Notch strip: receive the cross-project session snapshot from the main
+// renderer and relay it to the strip window.
+ipcMain.on('notch:update', (_event, payload: unknown) => {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as { sessions?: unknown }).sessions)
+  ) {
+    notchService?.setSessions(payload as NotchPayload)
+  }
+})
 
 // IPC Handlers for Terminal operations
 ipcMain.handle(

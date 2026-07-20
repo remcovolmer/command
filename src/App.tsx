@@ -6,6 +6,7 @@ import { ShortcutsOverlay } from './components/Settings/ShortcutsOverlay'
 import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
+import { useNotchFeed } from './hooks/useNotchFeed'
 import { fileWatcherEvents } from './utils/fileWatcherEvents'
 import { useThemeResolver } from './hooks/useThemeResolver'
 import { dismissTopmostToast } from './utils/toastRegistry'
@@ -25,6 +26,9 @@ function App() {
   const closeEditorTab = useProjectStore((s) => s.closeEditorTab)
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
+
+  // Feed the notch strip window with the cross-project agent-session snapshot.
+  useNotchFeed()
 
   // Refocus the active terminal's xterm textarea (e.g. after closing dialogs)
   const refocusActiveTerminal = useCallback(() => {

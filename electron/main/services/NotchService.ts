@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import { shouldShowStrip, computeStripBounds } from './notchVisibility'
+import type { NotchPayload, NotchSession } from '../../../shared/ipc-types'
 
 const STRIP_WIDTH = 380
 const STRIP_HEIGHT = 140
@@ -34,6 +35,7 @@ export class NotchService {
   private mainForeground = true
   private enabled = true
   private hasContent = false
+  private sessions: NotchSession[] = []
 
   constructor(
     private readonly mainWindow: BrowserWindow,
@@ -82,8 +84,29 @@ export class NotchService {
       this.strip = null
     })
 
+    // A freshly-created strip may be shown before its renderer is ready; push
+    // the current snapshot once it can receive it.
+    strip.webContents.once('did-finish-load', () => this.pushToStrip())
+
     this.strip = strip
     return strip
+  }
+
+  /**
+   * Receive the latest cross-project session snapshot from the main renderer,
+   * relay it to the strip, and update visibility. Pop policy (U4) later refines
+   * `hasContent` to a "surfaced" subset; for now any agent session is content.
+   */
+  setSessions(payload: NotchPayload): void {
+    this.sessions = payload.sessions
+    this.pushToStrip()
+    this.setHasContent(this.sessions.length > 0)
+  }
+
+  private pushToStrip(): void {
+    if (this.strip && !this.strip.isDestroyed()) {
+      this.strip.webContents.send('notch:state', { sessions: this.sessions })
+    }
   }
 
   /** Called from the main window's focus/blur handlers. */

@@ -15,6 +15,8 @@ export type {
   TerminalType,
   Unsubscribe,
   TerminalSession,
+  NotchSession,
+  NotchPayload,
   SessionIndexEntry,
   FileSystemEntry,
   GitFileChange,
@@ -56,6 +58,7 @@ import type {
   TerminalType,
   Unsubscribe,
   TerminalSession,
+  NotchPayload,
   SessionIndexEntry,
   FileSystemEntry,
   GitStatus,
@@ -270,6 +273,13 @@ export interface ElectronAPI {
     onSummaryChange: (callback: (id: string, summary: string) => void) => Unsubscribe
     onGeneratedTitleChange: (callback: (id: string, title: string) => void) => Unsubscribe
     onSpawnFailed: (callback: (event: SpawnFailedEvent) => void) => Unsubscribe
+  }
+  notch: {
+    pushUpdate: (payload: NotchPayload) => void
+    focusSession: (terminalId: string) => void
+    setEnabled: (enabled: boolean) => void
+    onState: (callback: (payload: NotchPayload) => void) => Unsubscribe
+    onActivateTerminal: (callback: (terminalId: string) => void) => Unsubscribe
   }
   editor: {
     onOpenFile: (
