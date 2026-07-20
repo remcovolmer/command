@@ -27,6 +27,7 @@ export type {
   GitBranchListItem,
   PRCheckStatus,
   PRStatus,
+  UsageProvider,
   UsageWindow,
   UsageData,
   TaskItem,

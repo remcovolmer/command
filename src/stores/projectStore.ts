@@ -10,6 +10,7 @@ import type {
   TerminalType,
   PRStatus,
   UsageData,
+  UsageProvider,
   EditorTab,
   DiffTab,
   WorkingTreeDiffTab,
@@ -113,8 +114,9 @@ interface ProjectStore {
   prStatus: Record<string, PRStatus> // key (worktreeId or projectId) -> PRStatus
   ghAvailable: { installed: boolean; authenticated: boolean } | null
 
-  // Plan-usage indicator (data not persisted; toggle is)
-  usageData: UsageData | null
+  // Plan-usage indicator (data not persisted; toggle is). Keyed by provider so
+  // the footer can show a row per provider (Claude, Codex).
+  usageData: Partial<Record<UsageProvider, UsageData>>
   setUsageData: (data: UsageData) => void
   showUsageIndicator: boolean
   toggleUsageIndicator: () => void
@@ -405,7 +407,7 @@ export const useProjectStore = create<ProjectStore>()(
       ghAvailable: null,
 
       // Plan-usage indicator
-      usageData: null,
+      usageData: {},
       showUsageIndicator: true,
 
       // Tasks state
@@ -1375,7 +1377,9 @@ export const useProjectStore = create<ProjectStore>()(
 
       setGhAvailable: (available) => set({ ghAvailable: available }),
 
-      setUsageData: (data) => set({ usageData: data }),
+      // Merge by provider so a Claude update never clobbers Codex data (or vice versa).
+      setUsageData: (data) =>
+        set((s) => ({ usageData: { ...s.usageData, [data.provider]: data } })),
 
       // Single owner of the toggle side effect: Settings UI and the hotkey
       // both call this action, so main-process start/stop cannot diverge.

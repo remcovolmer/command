@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { usageLevel, formatResetTime, formatCredits } from '../src/utils/usageFormat'
+import { usageLevel, formatResetTime, formatCredits, windowLabel } from '../src/utils/usageFormat'
 
 describe('usageLevel', () => {
   test('maps thresholds: <70 normal, 70-89 warning, >=90 danger', () => {
@@ -9,6 +9,17 @@ describe('usageLevel', () => {
     expect(usageLevel(89)).toBe('warning')
     expect(usageLevel(90)).toBe('danger')
     expect(usageLevel(100)).toBe('danger')
+  })
+})
+
+describe('windowLabel', () => {
+  test('prefers the window label when present (Codex)', () => {
+    expect(windowLabel({ utilization: 1, resetsAt: '', label: 'wk' }, '5h')).toBe('wk')
+  })
+
+  test('falls back to the per-slot default when no label (Claude)', () => {
+    expect(windowLabel({ utilization: 45, resetsAt: '2026-06-11T17:50:00+00:00' }, '5h')).toBe('5h')
+    expect(windowLabel({ utilization: 6, resetsAt: '2026-06-16T11:00:00+00:00' }, 'wk')).toBe('wk')
   })
 })
 
