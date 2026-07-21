@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getElectronAPI } from '../../utils/electron'
-import { STATE_DOT_COLORS, STATE_TEXT_COLORS } from '../../utils/terminalState'
-import type { AgentType, NotchSession, TerminalState } from '../../types'
-
-const AGENT_LABEL: Record<AgentType, string> = {
-  claude: 'C',
-  codex: 'Cx',
-  pi: 'π',
-}
+import { STATE_TEXT_COLORS } from '../../utils/terminalState'
+import { AgentBadge } from '../AgentBadge'
+import type { NotchSession, TerminalState } from '../../types'
 
 const STATE_LABEL: Record<TerminalState, string> = {
   busy: 'bezig',
@@ -75,15 +70,21 @@ export function NotchStrip() {
 
   const surfaced = useMemo(() => new Set(surfacedIds), [surfacedIds])
   const groups = useMemo(() => groupByProject(sessions), [sessions])
-  const attentionCount = sessions.filter((s) => surfaced.has(s.id) && s.state !== 'done').length
-  const doneCount = sessions.filter((s) => surfaced.has(s.id) && s.state === 'done').length
+  const surfacedSessions = sessions.filter((s) => surfaced.has(s.id))
+  const isAttention = (state: TerminalState) =>
+    state === 'permission' || state === 'question' || state === 'stopped'
+  const attentionCount = surfacedSessions.filter((s) => isAttention(s.state)).length
+  const doneCount = surfacedSessions.filter((s) => s.state === 'done').length
+  const busyCount = surfacedSessions.filter((s) => s.state === 'busy').length
 
   const summary =
     attentionCount > 0
       ? `${attentionCount} ${attentionCount === 1 ? 'vraagt' : 'vragen'} om je aandacht`
       : doneCount > 0
         ? `${doneCount} klaar`
-        : `${sessions.length} ${sessions.length === 1 ? 'sessie' : 'sessies'}`
+        : busyCount > 0
+          ? `${busyCount} bezig`
+          : `${sessions.length} ${sessions.length === 1 ? 'sessie' : 'sessies'}`
 
   return (
     <div
@@ -119,10 +120,7 @@ export function NotchStrip() {
                   data-surfaced={surfaced.has(s.id) ? 'true' : undefined}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent"
                 >
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT_COLORS[s.state]}`} />
-                  <span className="shrink-0 rounded bg-sidebar-accent px-1 text-[10px] font-semibold text-muted-foreground">
-                    {AGENT_LABEL[s.agentType]}
-                  </span>
+                  <AgentBadge type={s.agentType} state={s.state} />
                   <span className="flex-1 truncate">{s.title}</span>
                   <span className={`shrink-0 text-[10px] ${STATE_TEXT_COLORS[s.state]}`}>
                     {STATE_LABEL[s.state]}
@@ -134,16 +132,10 @@ export function NotchStrip() {
         </div>
       ) : (
         <div className="flex items-center gap-2 px-3 py-2 text-xs">
-          <div className="flex items-center gap-1">
-            {sessions
-              .filter((s) => surfaced.has(s.id))
-              .slice(0, 6)
-              .map((s) => (
-                <span
-                  key={s.id}
-                  className={`h-2 w-2 rounded-full ${STATE_DOT_COLORS[s.state]}`}
-                />
-              ))}
+          <div className="flex items-center gap-1.5">
+            {surfacedSessions.slice(0, 6).map((s) => (
+              <AgentBadge key={s.id} type={s.agentType} state={s.state} />
+            ))}
           </div>
           <span data-testid="notch-count" className="text-muted-foreground">
             {summary}

@@ -10,21 +10,19 @@ export interface SurfacedEntry {
 }
 export type SurfacedMap = Map<string, SurfacedEntry>
 
-/** States that hold the strip open until addressed (never auto-dismiss). */
-function isPersistent(state: TerminalState): boolean {
-  return state === 'permission' || state === 'question' || state === 'stopped'
-}
-
 /**
  * Pure pop-policy step. Given the previous surfaced map, the current session
  * snapshot, and the clock, decide which sessions are surfaced:
  *
- * - permission/question/stopped -> surfaced persistently (deadline null)
  * - done -> surfaced with a flash deadline; an existing deadline is preserved
  *   so a still-done session does not re-flash on every feed tick, and an
  *   expired flash is retained (so it stays dismissed until the session leaves
  *   'done')
- * - busy -> not surfaced (a working agent does not pop the strip)
+ * - everything else (busy / permission / question / stopped) -> surfaced
+ *   persistently (deadline null) while the session stays in that state
+ *
+ * Every live agent session therefore keeps the strip present while Command is
+ * backgrounded (the live overview); only a finished session flashes and clears.
  *
  * Returns the next map (carried as `prev` into the following call) and the
  * earliest future flash deadline, so the caller can schedule a re-evaluation
@@ -40,9 +38,7 @@ export function computeSurfaced(
   let nextDeadline: number | null = null
 
   for (const s of sessions) {
-    if (isPersistent(s.state)) {
-      entries.set(s.id, { state: s.state, deadline: null })
-    } else if (s.state === 'done') {
+    if (s.state === 'done') {
       const prevEntry = prev.get(s.id)
       const deadline =
         prevEntry && prevEntry.state === 'done' && prevEntry.deadline !== null
@@ -52,8 +48,10 @@ export function computeSurfaced(
       if (now < deadline && (nextDeadline === null || deadline < nextDeadline)) {
         nextDeadline = deadline
       }
+    } else {
+      // busy / permission / question / stopped: shown while in that state.
+      entries.set(s.id, { state: s.state, deadline: null })
     }
-    // busy and any non-agent state: not tracked
   }
 
   return { entries, nextDeadline }

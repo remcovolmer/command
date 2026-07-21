@@ -17,10 +17,10 @@ describe('computeSurfaced', () => {
     }
   })
 
-  test('busy never surfaces', () => {
+  test('busy surfaces persistently (the live overview)', () => {
     const { entries } = computeSurfaced(new Map(), [session('a', 'busy')], 1000, FLASH)
-    expect(entries.has('a')).toBe(false)
-    expect(activeSurfacedIds(entries, 1000)).toEqual([])
+    expect(entries.get('a')).toEqual({ state: 'busy', deadline: null })
+    expect(activeSurfacedIds(entries, 1_000_000)).toEqual(['a'])
   })
 
   test('done surfaces briefly then auto-dismisses', () => {
@@ -48,7 +48,7 @@ describe('computeSurfaced', () => {
   test('a fresh finish flashes again after the session went busy in between', () => {
     const done1 = computeSurfaced(new Map(), [session('a', 'done')], 1000, FLASH)
     const busy = computeSurfaced(done1.entries, [session('a', 'busy')], 2000, FLASH)
-    expect(busy.entries.has('a')).toBe(false)
+    expect(busy.entries.get('a')).toEqual({ state: 'busy', deadline: null })
     const done2 = computeSurfaced(busy.entries, [session('a', 'done')], 3000, FLASH)
     expect(done2.entries.get('a')?.deadline).toBe(3000 + FLASH)
   })
@@ -56,6 +56,6 @@ describe('computeSurfaced', () => {
   test('surfaces multiple concurrent sessions', () => {
     const sessions = [session('a', 'permission'), session('b', 'done'), session('c', 'busy')]
     const { entries } = computeSurfaced(new Map(), sessions, 1000, FLASH)
-    expect(new Set(activeSurfacedIds(entries, 1000))).toEqual(new Set(['a', 'b']))
+    expect(new Set(activeSurfacedIds(entries, 1000))).toEqual(new Set(['a', 'b', 'c']))
   })
 })
