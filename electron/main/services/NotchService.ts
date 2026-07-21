@@ -1,6 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import { shouldShowStrip, computeStripBounds } from './notchVisibility'
-import { computeSurfaced, activeSurfacedIds, type SurfacedMap } from './notchPopPolicy'
+import { computeSurfacedIds } from './notchPopPolicy'
 import type { NotchPayload, NotchSession } from '../../../shared/ipc-types'
 
 const DEFAULT_WIDTH = 380
@@ -45,9 +45,10 @@ export class NotchService {
   // (including wherever the user dragged it) across hide/show.
   private placed = false
   private sessions: NotchSession[] = []
-  private surfaced: SurfacedMap = new Map()
   private surfacedIds: string[] = []
-  private flashTimer: ReturnType<typeof setTimeout> | null = null
+  // Finished (done) sessions the user has already seen — Command was focused
+  // while they were done. A seen finish stays cleared until it finishes anew.
+  private acknowledgedDone = new Set<string>()
 
   // Window size, driven by the strip's reported content size (setContentSize).
   private contentWidth = DEFAULT_WIDTH
@@ -114,6 +115,21 @@ export class NotchService {
   /** Called from the main window's focus/blur (and hide/show) handlers. */
   setMainForeground(foreground: boolean): void {
     this.mainForeground = foreground
+    if (foreground) {
+      // Focusing Command "sees" any finished session, so it won't reappear on
+      // the next background until it finishes again.
+      let acknowledged = false
+      for (const s of this.sessions) {
+        if (s.state === 'done' && !this.acknowledgedDone.has(s.id)) {
+          this.acknowledgedDone.add(s.id)
+          acknowledged = true
+        }
+      }
+      if (acknowledged) {
+        this.recomputeSurfaced()
+        return
+      }
+    }
     this.updateVisibility()
   }
 
@@ -162,42 +178,23 @@ export class NotchService {
 
   /**
    * Receive the latest cross-project session snapshot from the main renderer
-   * and run the pop policy: done flashes briefly, attention/stopped persists,
-   * busy does not surface. The surfaced set drives visibility.
+   * and re-run the pop policy. Every live session surfaces (the live overview);
+   * a finished session stays until Command is next focused, then clears.
    */
   setSessions(payload: NotchPayload): void {
     this.sessions = payload.sessions
+    // A session that is no longer 'done' can flash again next time it finishes.
+    const doneIds = new Set(this.sessions.filter((s) => s.state === 'done').map((s) => s.id))
+    for (const id of this.acknowledgedDone) {
+      if (!doneIds.has(id)) this.acknowledgedDone.delete(id)
+    }
     this.recomputeSurfaced()
   }
 
   private recomputeSurfaced(): void {
-    const now = Date.now()
-    const { entries, nextDeadline } = computeSurfaced(this.surfaced, this.sessions, now)
-    this.surfaced = entries
-    this.surfacedIds = activeSurfacedIds(entries, now)
+    this.surfacedIds = [...computeSurfacedIds(this.sessions, this.acknowledgedDone)]
     this.pushToStrip()
     this.setHasContent(this.surfacedIds.length > 0)
-    this.scheduleFlashExpiry(nextDeadline, now)
-  }
-
-  /**
-   * Re-evaluate when the earliest done flash expires, so the strip hides on
-   * time even without a new feed update.
-   */
-  private scheduleFlashExpiry(nextDeadline: number | null, now: number): void {
-    if (this.flashTimer) {
-      clearTimeout(this.flashTimer)
-      this.flashTimer = null
-    }
-    if (nextDeadline !== null) {
-      this.flashTimer = setTimeout(
-        () => {
-          this.flashTimer = null
-          this.recomputeSurfaced()
-        },
-        Math.max(0, nextDeadline - now) + 10,
-      )
-    }
   }
 
   private pushToStrip(): void {
@@ -243,10 +240,6 @@ export class NotchService {
 
   destroy(): void {
     this.destroyed = true
-    if (this.flashTimer) {
-      clearTimeout(this.flashTimer)
-      this.flashTimer = null
-    }
     if (this.strip && !this.strip.isDestroyed()) {
       this.strip.destroy()
     }
