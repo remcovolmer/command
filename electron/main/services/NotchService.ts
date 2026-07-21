@@ -78,6 +78,7 @@ export class NotchService {
       fullscreenable: false,
       skipTaskbar: true,
       focusable: true,
+      closable: false, // dismiss is the ✕ (setEnabled false); prevent Alt+F4 orphaning the window
       transparent: true,
       backgroundColor: '#00000000',
       webPreferences: {
@@ -102,6 +103,9 @@ export class NotchService {
 
     strip.on('closed', () => {
       this.strip = null
+      // A recreated strip must re-place itself top-center rather than reappear
+      // at the OS default position.
+      this.placed = false
     })
 
     // A freshly-created strip may be shown before its renderer is ready; push
@@ -155,12 +159,18 @@ export class NotchService {
     this.contentWidth = Math.min(Math.max(Math.round(width), MIN_WIDTH), MAX_WIDTH)
     this.contentHeight = Math.max(Math.round(height), MIN_HEIGHT)
     const strip = this.strip
-    if (strip && !strip.isDestroyed()) {
-      // Resize in place — keep the current (possibly user-dragged) position
-      // rather than re-centering.
-      const b = strip.getBounds()
-      strip.setBounds({ x: b.x, y: b.y, width: this.contentWidth, height: this.contentHeight })
-    }
+    if (!strip || strip.isDestroyed()) return
+    // Resize in place — keep the current (possibly user-dragged) position,
+    // clamped so the window stays fully within the display it sits on.
+    const b = strip.getBounds()
+    const { workArea } = screen.getDisplayNearestPoint({ x: b.x, y: b.y })
+    const w = Math.min(this.contentWidth, workArea.width)
+    const h = Math.min(this.contentHeight, workArea.height)
+    const x = Math.max(workArea.x, Math.min(b.x, workArea.x + workArea.width - w))
+    const y = Math.max(workArea.y, Math.min(b.y, workArea.y + workArea.height - h))
+    // Skip no-op setBounds so a 1px DPI oscillation can't churn the window.
+    if (b.x === x && b.y === y && b.width === w && b.height === h) return
+    strip.setBounds({ x, y, width: w, height: h })
   }
 
   /**
@@ -216,9 +226,10 @@ export class NotchService {
     if (show) {
       const strip = this.ensureStrip()
       if (!strip.isVisible()) {
-        // Place top-center once; afterwards keep the window's position so a
-        // user-dragged strip doesn't snap back on the next show.
-        if (!this.placed) {
+        // Place top-center on first show, or whenever the window has drifted
+        // fully off every display (e.g. a monitor was unplugged); otherwise
+        // keep the user's position.
+        if (!this.placed || !this.isOnScreen(strip)) {
           this.reposition(strip)
           this.placed = true
         }
@@ -236,6 +247,15 @@ export class NotchService {
     strip.setBounds(
       computeStripBounds(display.workArea, { width: this.contentWidth, height: this.contentHeight }),
     )
+  }
+
+  /** True when the strip overlaps at least one display's work area. */
+  private isOnScreen(strip: BrowserWindow): boolean {
+    const b = strip.getBounds()
+    return screen.getAllDisplays().some((d) => {
+      const w = d.workArea
+      return b.x < w.x + w.width && b.x + b.width > w.x && b.y < w.y + w.height && b.y + b.height > w.y
+    })
   }
 
   destroy(): void {

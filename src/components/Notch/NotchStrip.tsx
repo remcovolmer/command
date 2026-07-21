@@ -12,7 +12,9 @@ const STATE_LABEL: Record<TerminalState, string> = {
   stopped: 'gestopt',
 }
 
-const isAttention = (state: TerminalState): boolean =>
+// Distinct from terminalState.isAttentionState (permission|question): the notch
+// deliberately treats a stopped/crashed agent as needing attention too.
+const needsAttention = (state: TerminalState): boolean =>
   state === 'permission' || state === 'question' || state === 'stopped'
 
 // Delay before collapsing on mouse-leave. Gives hover hysteresis so the strip
@@ -53,6 +55,7 @@ export function NotchStrip() {
   const api = useMemo(() => getElectronAPI(), [])
   const rootRef = useRef<HTMLDivElement>(null)
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSize = useRef({ w: 0, h: 0 })
   const [sessions, setSessions] = useState<NotchSession[]>([])
   const [surfacedIds, setSurfacedIds] = useState<string[]>([])
   const [expanded, setExpanded] = useState(false)
@@ -69,7 +72,13 @@ export function NotchStrip() {
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
-    const report = () => api.notch.resize(el.offsetWidth, el.offsetHeight)
+    const report = () => {
+      const w = el.offsetWidth
+      const h = el.offsetHeight
+      if (w === lastSize.current.w && h === lastSize.current.h) return // skip redundant IPC/resize
+      lastSize.current = { w, h }
+      api.notch.resize(w, h)
+    }
     report()
     const observer = new ResizeObserver(report)
     observer.observe(el)
@@ -89,7 +98,7 @@ export function NotchStrip() {
     [sessions, surfaced],
   )
   const groups = useMemo(() => groupByProject(surfacedSessions), [surfacedSessions])
-  const attentionCount = surfacedSessions.filter((s) => isAttention(s.state)).length
+  const attentionCount = surfacedSessions.filter((s) => needsAttention(s.state)).length
   const doneCount = surfacedSessions.filter((s) => s.state === 'done').length
   const busyCount = surfacedSessions.filter((s) => s.state === 'busy').length
 
@@ -111,7 +120,10 @@ export function NotchStrip() {
   }
   const closeSoon = () => {
     if (collapseTimer.current) clearTimeout(collapseTimer.current)
-    collapseTimer.current = setTimeout(() => setExpanded(false), COLLAPSE_DELAY_MS)
+    collapseTimer.current = setTimeout(() => {
+      collapseTimer.current = null
+      setExpanded(false)
+    }, COLLAPSE_DELAY_MS)
   }
 
   return (
@@ -120,6 +132,8 @@ export function NotchStrip() {
       data-testid="notch-strip"
       onMouseEnter={openNow}
       onMouseLeave={closeSoon}
+      onFocus={openNow}
+      onBlur={closeSoon}
       className="notch-strip w-full overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg"
     >
       {/* Header — always visible, stable hover target. */}
@@ -134,6 +148,11 @@ export function NotchStrip() {
           {surfacedSessions.slice(0, 6).map((s) => (
             <AgentBadge key={s.id} type={s.agentType} state={s.state} />
           ))}
+          {surfacedSessions.length > 6 && (
+            <span className="text-[10px] text-muted-foreground">
+              +{surfacedSessions.length - 6}
+            </span>
+          )}
         </div>
         <span data-testid="notch-count" className="flex-1 truncate text-muted-foreground">
           {summary}
@@ -148,8 +167,10 @@ export function NotchStrip() {
         </button>
       </div>
 
-      {/* Session list — animates open/closed via grid-template-rows. */}
+      {/* Session list — animates open/closed via grid-template-rows. Hidden from
+          the a11y tree and tab order when collapsed (rows below are tabIndex -1). */}
       <div
+        aria-hidden={!expanded}
         className={`grid transition-[grid-template-rows] duration-200 ease-out ${
           expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
@@ -165,6 +186,7 @@ export function NotchStrip() {
                   <button
                     key={s.id}
                     type="button"
+                    tabIndex={expanded ? 0 : -1}
                     onClick={() => api.notch.focusSession(s.id)}
                     className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent [-webkit-app-region:no-drag]"
                   >
