@@ -41,6 +41,9 @@ export class NotchService {
   private mainForeground = true
   private enabled = true
   private hasContent = false
+  // Top-center placement happens once; after that the window keeps its position
+  // (including wherever the user dragged it) across hide/show.
+  private placed = false
   private sessions: NotchSession[] = []
   private surfaced: SurfacedMap = new Map()
   private surfacedIds: string[] = []
@@ -68,12 +71,12 @@ export class NotchService {
       show: false,
       frame: false,
       resizable: false,
-      movable: false,
+      movable: true,
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
       skipTaskbar: true,
-      focusable: false,
+      focusable: true,
       transparent: true,
       backgroundColor: '#00000000',
       webPreferences: {
@@ -135,8 +138,12 @@ export class NotchService {
     if (!Number.isFinite(width) || !Number.isFinite(height)) return
     this.contentWidth = Math.min(Math.max(Math.round(width), MIN_WIDTH), MAX_WIDTH)
     this.contentHeight = Math.max(Math.round(height), MIN_HEIGHT)
-    if (this.strip && !this.strip.isDestroyed() && this.strip.isVisible()) {
-      this.reposition(this.strip)
+    const strip = this.strip
+    if (strip && !strip.isDestroyed()) {
+      // Resize in place — keep the current (possibly user-dragged) position
+      // rather than re-centering.
+      const b = strip.getBounds()
+      strip.setBounds({ x: b.x, y: b.y, width: this.contentWidth, height: this.contentHeight })
     }
   }
 
@@ -211,10 +218,13 @@ export class NotchService {
     })
     if (show) {
       const strip = this.ensureStrip()
-      // Reposition only on the hidden->visible transition so a visible strip
-      // doesn't teleport to another monitor on every feed update.
       if (!strip.isVisible()) {
-        this.reposition(strip)
+        // Place top-center once; afterwards keep the window's position so a
+        // user-dragged strip doesn't snap back on the next show.
+        if (!this.placed) {
+          this.reposition(strip)
+          this.placed = true
+        }
         strip.showInactive()
       }
     } else if (this.strip && !this.strip.isDestroyed() && this.strip.isVisible()) {

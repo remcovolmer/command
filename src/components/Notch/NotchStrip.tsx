@@ -97,12 +97,14 @@ export function NotchStrip() {
       {expanded ? (
         <div className="max-h-[420px] overflow-y-auto p-2 text-xs">
           <div className="mb-1 flex items-center justify-between px-1">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Notch</span>
+            <span className="cursor-move select-none text-[10px] uppercase tracking-wide text-muted-foreground [-webkit-app-region:drag]">
+              ⋮⋮ Notch
+            </span>
             <button
               type="button"
               aria-label="Verberg notch"
               onClick={() => api.notch.setEnabled(false)}
-              className="rounded px-1 leading-none text-muted-foreground hover:text-foreground"
+              className="rounded px-1 leading-none text-muted-foreground hover:text-foreground [-webkit-app-region:no-drag]"
             >
               ✕
             </button>
@@ -118,7 +120,7 @@ export function NotchStrip() {
                   type="button"
                   onClick={() => api.notch.focusSession(s.id)}
                   data-surfaced={surfaced.has(s.id) ? 'true' : undefined}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent [-webkit-app-region:no-drag]"
                 >
                   <AgentBadge type={s.agentType} state={s.state} />
                   <span className="flex-1 truncate">{s.title}</span>
@@ -132,14 +134,28 @@ export function NotchStrip() {
         </div>
       ) : (
         <div className="flex items-center gap-2 px-3 py-2 text-xs">
+          <span
+            aria-hidden="true"
+            className="cursor-move select-none text-muted-foreground [-webkit-app-region:drag]"
+          >
+            ⋮⋮
+          </span>
           <div className="flex items-center gap-1.5">
             {surfacedSessions.slice(0, 6).map((s) => (
               <AgentBadge key={s.id} type={s.agentType} state={s.state} />
             ))}
           </div>
-          <span data-testid="notch-count" className="text-muted-foreground">
+          <span data-testid="notch-count" className="flex-1 text-muted-foreground">
             {summary}
           </span>
+          <button
+            type="button"
+            aria-label="Verberg notch"
+            onClick={() => api.notch.setEnabled(false)}
+            className="rounded px-1 leading-none text-muted-foreground hover:text-foreground [-webkit-app-region:no-drag]"
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>
