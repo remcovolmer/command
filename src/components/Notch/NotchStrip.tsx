@@ -12,6 +12,13 @@ const STATE_LABEL: Record<TerminalState, string> = {
   stopped: 'gestopt',
 }
 
+const isAttention = (state: TerminalState): boolean =>
+  state === 'permission' || state === 'question' || state === 'stopped'
+
+// Delay before collapsing on mouse-leave. Gives hover hysteresis so the strip
+// doesn't flicker when the pointer skims the drag handle or the window resizes.
+const COLLAPSE_DELAY_MS = 220
+
 interface ProjectGroup {
   projectId: string
   projectName: string
@@ -37,15 +44,15 @@ function groupByProject(sessions: NotchSession[]): ProjectGroup[] {
 
 /**
  * The notch strip renderer view, mounted in the dedicated strip window
- * (see src/main.tsx `#strip` branch). Collapsed it shows surfaced state dots
- * plus a summary; on hover it expands to the session list grouped by project.
- * Clicking a row returns to that session (U6); the hide button turns the notch
- * off (U8). Window visibility itself is driven by the main process, and the
- * window is sized to this component's reported content.
+ * (see src/main.tsx `#strip` branch). An always-visible header (drag handle,
+ * surfaced state, dismiss) sits above a session list that expands on hover.
+ * Clicking a row returns to that session; the ✕ turns the notch off. Window
+ * visibility and size are driven by the main process.
  */
 export function NotchStrip() {
   const api = useMemo(() => getElectronAPI(), [])
   const rootRef = useRef<HTMLDivElement>(null)
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sessions, setSessions] = useState<NotchSession[]>([])
   const [surfacedIds, setSurfacedIds] = useState<string[]>([])
   const [expanded, setExpanded] = useState(false)
@@ -57,7 +64,8 @@ export function NotchStrip() {
     })
   }, [api])
 
-  // Report the rendered content size so the main process fits the window to it.
+  // Report the rendered content size so the main process fits the window to it
+  // (and follows the expand/collapse animation).
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
@@ -68,11 +76,19 @@ export function NotchStrip() {
     return () => observer.disconnect()
   }, [api])
 
+  useEffect(
+    () => () => {
+      if (collapseTimer.current) clearTimeout(collapseTimer.current)
+    },
+    [],
+  )
+
   const surfaced = useMemo(() => new Set(surfacedIds), [surfacedIds])
-  const groups = useMemo(() => groupByProject(sessions), [sessions])
-  const surfacedSessions = sessions.filter((s) => surfaced.has(s.id))
-  const isAttention = (state: TerminalState) =>
-    state === 'permission' || state === 'question' || state === 'stopped'
+  const surfacedSessions = useMemo(
+    () => sessions.filter((s) => surfaced.has(s.id)),
+    [sessions, surfaced],
+  )
+  const groups = useMemo(() => groupByProject(surfacedSessions), [surfacedSessions])
   const attentionCount = surfacedSessions.filter((s) => isAttention(s.state)).length
   const doneCount = surfacedSessions.filter((s) => s.state === 'done').length
   const busyCount = surfacedSessions.filter((s) => s.state === 'busy').length
@@ -86,78 +102,84 @@ export function NotchStrip() {
           ? `${busyCount} bezig`
           : `${sessions.length} ${sessions.length === 1 ? 'sessie' : 'sessies'}`
 
+  const openNow = () => {
+    if (collapseTimer.current) {
+      clearTimeout(collapseTimer.current)
+      collapseTimer.current = null
+    }
+    setExpanded(true)
+  }
+  const closeSoon = () => {
+    if (collapseTimer.current) clearTimeout(collapseTimer.current)
+    collapseTimer.current = setTimeout(() => setExpanded(false), COLLAPSE_DELAY_MS)
+  }
+
   return (
     <div
       ref={rootRef}
       data-testid="notch-strip"
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
       className="notch-strip w-full overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg"
     >
-      {expanded ? (
-        <div className="max-h-[420px] overflow-y-auto p-2 text-xs">
-          <div className="mb-1 flex items-center justify-between px-1">
-            <span className="cursor-move select-none text-[10px] uppercase tracking-wide text-muted-foreground [-webkit-app-region:drag]">
-              ⋮⋮ Notch
-            </span>
-            <button
-              type="button"
-              aria-label="Verberg notch"
-              onClick={() => api.notch.setEnabled(false)}
-              className="rounded px-1 leading-none text-muted-foreground hover:text-foreground [-webkit-app-region:no-drag]"
-            >
-              ✕
-            </button>
-          </div>
-          {groups.map((group) => (
-            <div key={group.projectId} className="mb-1.5">
-              <div className="px-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                {group.projectName}
-              </div>
-              {group.sessions.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => api.notch.focusSession(s.id)}
-                  data-surfaced={surfaced.has(s.id) ? 'true' : undefined}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent [-webkit-app-region:no-drag]"
-                >
-                  <AgentBadge type={s.agentType} state={s.state} />
-                  <span className="flex-1 truncate">{s.title}</span>
-                  <span className={`shrink-0 text-[10px] ${STATE_TEXT_COLORS[s.state]}`}>
-                    {STATE_LABEL[s.state]}
-                  </span>
-                </button>
-              ))}
-            </div>
+      {/* Header — always visible, stable hover target. */}
+      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+        <span
+          aria-hidden="true"
+          className="cursor-move select-none text-muted-foreground [-webkit-app-region:drag]"
+        >
+          ⋮⋮
+        </span>
+        <div className="flex items-center gap-1.5">
+          {surfacedSessions.slice(0, 6).map((s) => (
+            <AgentBadge key={s.id} type={s.agentType} state={s.state} />
           ))}
         </div>
-      ) : (
-        <div className="flex items-center gap-2 px-3 py-2 text-xs">
-          <span
-            aria-hidden="true"
-            className="cursor-move select-none text-muted-foreground [-webkit-app-region:drag]"
-          >
-            ⋮⋮
-          </span>
-          <div className="flex items-center gap-1.5">
-            {surfacedSessions.slice(0, 6).map((s) => (
-              <AgentBadge key={s.id} type={s.agentType} state={s.state} />
+        <span data-testid="notch-count" className="flex-1 truncate text-muted-foreground">
+          {summary}
+        </span>
+        <button
+          type="button"
+          aria-label="Verberg notch"
+          onClick={() => api.notch.setEnabled(false)}
+          className="rounded px-1 leading-none text-muted-foreground hover:text-foreground [-webkit-app-region:no-drag]"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Session list — animates open/closed via grid-template-rows. */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+          expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="max-h-[420px] overflow-y-auto px-2 pb-2 text-xs">
+            {groups.map((group) => (
+              <div key={group.projectId} className="mb-1.5">
+                <div className="px-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {group.projectName}
+                </div>
+                {group.sessions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => api.notch.focusSession(s.id)}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent [-webkit-app-region:no-drag]"
+                  >
+                    <AgentBadge type={s.agentType} state={s.state} />
+                    <span className="flex-1 truncate">{s.title}</span>
+                    <span className={`shrink-0 text-[10px] ${STATE_TEXT_COLORS[s.state]}`}>
+                      {STATE_LABEL[s.state]}
+                    </span>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
-          <span data-testid="notch-count" className="flex-1 text-muted-foreground">
-            {summary}
-          </span>
-          <button
-            type="button"
-            aria-label="Verberg notch"
-            onClick={() => api.notch.setEnabled(false)}
-            className="rounded px-1 leading-none text-muted-foreground hover:text-foreground [-webkit-app-region:no-drag]"
-          >
-            ✕
-          </button>
         </div>
-      )}
+      </div>
     </div>
   )
 }
