@@ -344,13 +344,13 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   return (
     <>
-      <div className="mt-0.5 border-l border-primary/30 ml-6">
+      <div className="mt-0.5 border-l border-primary/30 ml-3">
       {/* Row 1: Branch info + hover actions */}
       <div
         onClick={handleRowClick}
         onContextMenu={handleContextMenu}
         className={`
-          group relative flex items-center gap-2 px-3 py-1.5 cursor-pointer
+          group relative flex items-center gap-2 px-2 py-1.5 cursor-pointer
           transition-colors duration-150 rounded-t-md
           ${attentionRowBg(isAttention, isActive)}
           ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
@@ -423,7 +423,7 @@ export const WorktreeItem = memo(function WorktreeItem({
       {hasPR && (
         <div
           className={`
-            flex items-center gap-1.5 pl-9 pr-3 py-1 text-muted-foreground
+            flex items-center gap-1.5 pl-7 pr-3 py-1 text-muted-foreground
             ${isActive ? 'bg-[var(--sidebar-highlight)] rounded-b-md' : ''}
             ${prStatus.stale ? 'opacity-60' : ''}
           `}

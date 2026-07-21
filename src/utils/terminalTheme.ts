@@ -1,4 +1,4 @@
-import type { ITheme } from '@xterm/xterm'
+import type { ITheme, ITerminalOptions } from '@xterm/xterm'
 
 // Helper to get computed CSS variable value as hex
 function getCssVar(name: string): string {
@@ -63,6 +63,16 @@ export function buildTerminalTheme(appTheme?: string): ITheme {
   cachedThemeKey = key
 
   return cachedTheme
+}
+
+/** Keep TUI colors readable when terminal applications use a dark-only palette. */
+export function buildTerminalThemeOptions(
+  appTheme?: string
+): Pick<ITerminalOptions, 'theme' | 'minimumContrastRatio'> {
+  return {
+    theme: buildTerminalTheme(appTheme),
+    minimumContrastRatio: 4.5,
+  }
 }
 
 /** Invalidate theme cache (call on theme change) */

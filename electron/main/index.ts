@@ -39,6 +39,7 @@ import { installAgentHooks } from './services/HookInstaller'
 import { UpdateService } from './services/UpdateService'
 import { GitHubService, type GitEvent, VALID_GIT_EVENTS } from './services/GitHubService'
 import { UsageService } from './services/UsageService'
+import { CodexUsageService } from './services/CodexUsageService'
 import { TaskService } from './services/TaskService'
 import { FileWatcherService } from './services/FileWatcherService'
 import { AutomationService } from './services/AutomationService'
@@ -257,6 +258,7 @@ let hookWatcher: ClaudeHookWatcher | null = null
 let updateService: UpdateService | null = null
 let githubService: GitHubService | null = null
 let usageService: UsageService | null = null
+let codexUsageService: CodexUsageService | null = null
 let taskService: TaskService | null = null
 let fileWatcherService: FileWatcherService | null = null
 let automationService: AutomationService | null = null
@@ -445,6 +447,8 @@ async function createWindow() {
   githubService.setWindow(win)
   usageService = new UsageService()
   usageService.setWindow(win)
+  codexUsageService = new CodexUsageService()
+  codexUsageService.setWindow(win)
   // Resolve CLI directory: packaged apps use resourcesPath, dev uses compiled output
   const cliDir = app.isPackaged
     ? path.join(process.resourcesPath, 'cli')
@@ -504,11 +508,13 @@ async function createWindow() {
   win.on('blur', () => {
     githubService?.pauseAllPolling()
     usageService?.pause()
+    codexUsageService?.pause()
     notchService?.setMainForeground(false)
   })
   win.on('focus', () => {
     githubService?.resumeAllPolling()
     usageService?.resume()
+    codexUsageService?.resume()
     notchService?.setMainForeground(true)
   })
   // hide() (close-to-tray) does not reliably emit blur on Windows, so drive the
@@ -1369,12 +1375,14 @@ ipcMain.handle('github:stop-polling', async (_event, key: string) => {
   githubService!.stopPolling(key)
 })
 
-// IPC Handler for plan-usage polling
+// IPC Handler for plan-usage polling. One toggle drives both providers; each
+// service self-gates (Codex pushes nothing without ~/.codex/auth.json).
 ipcMain.handle('usage:set-enabled', async (_event, enabled: boolean) => {
   if (typeof enabled !== 'boolean') {
     throw new Error('Invalid enabled flag')
   }
   usageService?.setEnabled(enabled)
+  codexUsageService?.setEnabled(enabled)
 })
 
 // IPC Handlers for Worktree operations
@@ -1772,6 +1780,7 @@ ipcMain.handle('update:install', async () => {
   hookWatcher?.destroy()
   githubService?.destroy()
   usageService?.destroy()
+  codexUsageService?.destroy()
   await fileWatcherService?.stopAll().catch(() => {})
   await automationService?.destroy().catch(() => {})
 
@@ -2071,6 +2080,7 @@ app.on('before-quit', () => {
   hookWatcher?.destroy()
   githubService?.destroy()
   usageService?.destroy()
+  codexUsageService?.destroy()
   notchService?.destroy()
   tray?.destroy()
   terminalManager?.destroy()

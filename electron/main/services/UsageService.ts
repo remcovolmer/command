@@ -23,7 +23,7 @@ const POLL_INTERVAL = 60_000
 const BLUR_POLL_INTERVAL = 300_000
 const FETCH_TIMEOUT = 10_000
 
-const UNAVAILABLE: UsageData = { status: 'unavailable' }
+const UNAVAILABLE: UsageData = { provider: 'claude', status: 'unavailable' }
 
 function getCredentialsPath(): string {
   return join(homedir(), '.claude', '.credentials.json')
@@ -73,7 +73,7 @@ export function mapUsageResponse(body: unknown): UsageData | null {
   const sevenDay = mapWindow(b.seven_day)
   if (!fiveHour && !sevenDay) return null
 
-  const data: UsageData = { status: 'ok' }
+  const data: UsageData = { provider: 'claude', status: 'ok' }
   if (fiveHour) data.fiveHour = fiveHour
   if (sevenDay) data.sevenDay = sevenDay
   const sonnet = mapWindow(b.seven_day_sonnet)

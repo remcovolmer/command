@@ -89,7 +89,8 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | `SessionIndexService.ts` | Reads Claude Code's `sessions-index.json` per project, caches summaries, pushes to renderer |
 | `TaskService.ts` | Scans project files for TODO/FIXME markers |
 | `UpdateService.ts` | Auto-updates via electron-updater |
-| `UsageService.ts` | Polls Anthropic's OAuth usage endpoint every 60s (5min blurred), classifies failures, pushes plan-usage data via `usage:update` |
+| `UsageService.ts` | Polls Anthropic's OAuth usage endpoint every 60s (5min blurred), classifies failures, pushes Claude plan-usage via `usage:update` (`provider: 'claude'`) |
+| `CodexUsageService.ts` | Reads the newest `~/.codex/sessions` rollout for its last `rate_limits` snapshot (local file, no network/token; presence-checks `~/.codex/auth.json` only), pushes Codex plan-usage via `usage:update` (`provider: 'codex'`). Same focus-aware cadence and enable toggle as `UsageService` |
 
 ### Claude State Detection (Hook System)
 

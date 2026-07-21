@@ -91,6 +91,7 @@ describe('mapUsageResponse', () => {
   test('maps a full response including optional blocks', () => {
     const data = mapUsageResponse(fullBody())
     expect(data).toEqual({
+      provider: 'claude',
       status: 'ok',
       fiveHour: { utilization: 45.0, resetsAt: '2026-06-11T17:50:00+00:00' },
       sevenDay: { utilization: 6.0, resetsAt: '2026-06-16T11:00:00+00:00' },
@@ -204,13 +205,19 @@ describe('UsageService.pollOnce', () => {
     await service.pollOnce()
     await service.pollOnce()
     expect(send).toHaveBeenCalledTimes(1)
-    expect(send).toHaveBeenCalledWith('usage:update', { status: 'unavailable' })
+    expect(send).toHaveBeenCalledWith('usage:update', {
+      provider: 'claude',
+      status: 'unavailable',
+    })
   })
 
   test('malformed credentials emit unavailable without throwing', async () => {
     readFileStub = async () => '{broken'
     await service.pollOnce()
-    expect(send).toHaveBeenCalledWith('usage:update', { status: 'unavailable' })
+    expect(send).toHaveBeenCalledWith('usage:update', {
+      provider: 'claude',
+      status: 'unavailable',
+    })
   })
 
   test('401 with expired token is transient, recovers on next 200', async () => {
@@ -228,7 +235,10 @@ describe('UsageService.pollOnce', () => {
   test('401 with valid token emits unavailable', async () => {
     fetchMock.mockResolvedValue(errResponse(401))
     await service.pollOnce()
-    expect(send).toHaveBeenCalledWith('usage:update', { status: 'unavailable' })
+    expect(send).toHaveBeenCalledWith('usage:update', {
+      provider: 'claude',
+      status: 'unavailable',
+    })
   })
 
   test('transient failures keep last-good data (no emit)', async () => {
@@ -248,7 +258,10 @@ describe('UsageService.pollOnce', () => {
   test('200 with unusable body emits unavailable', async () => {
     fetchMock.mockResolvedValue(okResponse({ something: 'else' }))
     await service.pollOnce()
-    expect(send).toHaveBeenCalledWith('usage:update', { status: 'unavailable' })
+    expect(send).toHaveBeenCalledWith('usage:update', {
+      provider: 'claude',
+      status: 'unavailable',
+    })
   })
 
   test('200 with malformed JSON (SyntaxError) emits unavailable', async () => {
@@ -260,7 +273,10 @@ describe('UsageService.pollOnce', () => {
       },
     })
     await service.pollOnce()
-    expect(send).toHaveBeenCalledWith('usage:update', { status: 'unavailable' })
+    expect(send).toHaveBeenCalledWith('usage:update', {
+      provider: 'claude',
+      status: 'unavailable',
+    })
   })
 
   test('connection drop during body read is transient, keeps last-good', async () => {

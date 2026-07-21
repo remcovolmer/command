@@ -853,7 +853,7 @@ describe('projectStore active terminal & content', () => {
 describe('projectStore usage indicator', () => {
   beforeEach(() => {
     usageSetEnabledMock.mockClear()
-    useProjectStore.setState({ showUsageIndicator: true, usageData: null })
+    useProjectStore.setState({ showUsageIndicator: true, usageData: {} })
   })
 
   test('toggleUsageIndicator flips the flag and notifies main with the new value', () => {
@@ -869,18 +869,34 @@ describe('projectStore usage indicator', () => {
     expect(usageSetEnabledMock).toHaveBeenLastCalledWith(true)
   })
 
-  test('setUsageData stores the pushed payload', () => {
+  test('setUsageData stores the pushed payload keyed by provider', () => {
     useProjectStore.getState().setUsageData({
+      provider: 'claude',
       status: 'ok',
       fiveHour: { utilization: 45, resetsAt: '2026-06-11T17:50:00+00:00' },
     })
 
-    expect(useProjectStore.getState().usageData?.status).toBe('ok')
-    expect(useProjectStore.getState().usageData?.fiveHour?.utilization).toBe(45)
+    expect(useProjectStore.getState().usageData.claude?.status).toBe('ok')
+    expect(useProjectStore.getState().usageData.claude?.fiveHour?.utilization).toBe(45)
 
-    useProjectStore.getState().setUsageData({ status: 'unavailable' })
+    useProjectStore.getState().setUsageData({ provider: 'claude', status: 'unavailable' })
 
-    expect(useProjectStore.getState().usageData).toEqual({ status: 'unavailable' })
+    expect(useProjectStore.getState().usageData.claude).toEqual({
+      provider: 'claude',
+      status: 'unavailable',
+    })
+  })
+
+  test('setUsageData for one provider does not clobber the other', () => {
+    useProjectStore.getState().setUsageData({ provider: 'claude', status: 'ok' })
+    useProjectStore.getState().setUsageData({
+      provider: 'codex',
+      status: 'ok',
+      sevenDay: { utilization: 62, resetsAt: '2026-07-27T00:00:00.000Z', label: 'wk' },
+    })
+
+    expect(useProjectStore.getState().usageData.claude?.status).toBe('ok')
+    expect(useProjectStore.getState().usageData.codex?.sevenDay?.label).toBe('wk')
   })
 })
 

@@ -433,7 +433,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <>
           {/* Direct Chats (not in worktree) */}
           {directTerminals.length > 0 && (
-            <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/30">
+            <ul className="ml-3 mt-1 space-y-0.5 border-l border-border/30">
               {directTerminals.map((terminal) => (
                 <TerminalListItem
                   key={terminal.id}
@@ -463,7 +463,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                   <button
                     onClick={() => toggleInactiveWorktrees(project.id)}
                     aria-expanded={showInactiveWorktrees}
-                    className="ml-6 flex items-center gap-1 pl-3 pr-3 py-1 w-full text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    className="ml-3 flex items-center gap-1 pl-2 pr-3 py-1 w-full text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
                   >
                     <ChevronRight
                       aria-hidden="true"
@@ -483,7 +483,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
 
           {/* Empty state for active project (code projects show when no terminals/worktrees, workspace/project when no terminals) */}
           {showEmptyState && (
-            <div className="ml-6 pl-3 py-2 border-l border-border/30">
+            <div className="ml-3 pl-2 py-2 border-l border-border/30">
               <button
                 onClick={() => onCreateTerminal(project.id)}
                 className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"

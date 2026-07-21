@@ -233,13 +233,20 @@ export interface PRStatus {
   stale?: boolean
 }
 
-// Plan-usage types (pushed by UsageService via usage:update)
+// Plan-usage types (pushed by UsageService / CodexUsageService via usage:update)
+export type UsageProvider = 'claude' | 'codex'
+
 export interface UsageWindow {
   utilization: number
   resetsAt: string
+  /** Display label derived from the window size (e.g. "5h", "wk"). Codex sets
+   *  this from `window_minutes`; Claude leaves it undefined and the component
+   *  falls back to its fixed per-field labels. */
+  label?: string
 }
 
 export interface UsageData {
+  provider: UsageProvider
   status: 'ok' | 'unavailable'
   fiveHour?: UsageWindow
   sevenDay?: UsageWindow
@@ -247,6 +254,13 @@ export interface UsageData {
   extraUsage?: {
     usedCredits: number
     currency: string
+  }
+  /** Codex plan tier (e.g. "plus", "pro"); undefined for Claude. */
+  planType?: string
+  /** Codex credits block; `balance` is a string as reported by the CLI. */
+  credits?: {
+    hasCredits: boolean
+    balance: string
   }
 }
 

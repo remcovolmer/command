@@ -1,3 +1,5 @@
+import type { UsageWindow } from '../types'
+
 export type UsageLevel = 'normal' | 'warning' | 'danger'
 
 /** Threshold mapping for the indicator color: ≥90 danger, ≥70 warning. */
@@ -5,6 +7,15 @@ export function usageLevel(utilization: number): UsageLevel {
   if (utilization >= 90) return 'danger'
   if (utilization >= 70) return 'warning'
   return 'normal'
+}
+
+/**
+ * Display label for a usage window. Codex sets `label` from `window_minutes`
+ * (e.g. "5h", "wk"); Claude leaves it undefined, so callers pass the fixed
+ * per-field fallback ("5h" for the five-hour slot, "wk" for the weekly slot).
+ */
+export function windowLabel(window: UsageWindow, fallback: string): string {
+  return window.label ?? fallback
 }
 
 /**
