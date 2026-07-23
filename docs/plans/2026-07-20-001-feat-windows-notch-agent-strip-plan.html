@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows Agent-Status Notch - Plan</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --surface:#ffffff; --surface2:#f0f2f6; --line:#e2e6ee;
+    --ink:#1a1f2b; --dim:#5a6474; --dimmer:#8a94a6;
+    --accent:#3a63d6; --accent-soft:#eaf0ff; --accent-text:#274bb5;
+    --busy:#8b95a7; --perm:#c9820f; --perm-soft:#fdf3e0; --perm-text:#8a5a06;
+    --done:#1f9e56; --done-soft:#e6f6ec; --done-text:#15703c;
+    --stopped:#d1443b; --info-soft:#eef1f6;
+    --radius:12px;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0d0f14; --surface:#161a22; --surface2:#1c212b; --line:#2a3140;
+      --ink:#e8ecf3; --dim:#9aa4b6; --dimmer:#6b7488;
+      --accent:#6d92ff; --accent-soft:#1a2540; --accent-text:#a9c0ff;
+      --busy:#8b95a7; --perm:#f0a63a; --perm-soft:#3a2c12; --perm-text:#f3c682;
+      --done:#43c46a; --done-soft:#123020; --done-text:#7fe3a2;
+      --stopped:#e0524a; --info-soft:#1b212c;
+    }
+  }
+  :root[data-theme="dark"]{
+      --bg:#0d0f14; --surface:#161a22; --surface2:#1c212b; --line:#2a3140;
+      --ink:#e8ecf3; --dim:#9aa4b6; --dimmer:#6b7488;
+      --accent:#6d92ff; --accent-soft:#1a2540; --accent-text:#a9c0ff;
+      --perm:#f0a63a; --perm-soft:#3a2c12; --perm-text:#f3c682;
+      --done:#43c46a; --done-soft:#123020; --done-text:#7fe3a2;
+      --stopped:#e0524a; --info-soft:#1b212c;
+  }
+  :root[data-theme="light"]{
+      --bg:#f7f8fa; --surface:#ffffff; --surface2:#f0f2f6; --line:#e2e6ee;
+      --ink:#1a1f2b; --dim:#5a6474; --dimmer:#8a94a6;
+      --accent:#3a63d6; --accent-soft:#eaf0ff; --accent-text:#274bb5;
+      --perm:#c9820f; --perm-soft:#fdf3e0; --perm-text:#8a5a06;
+      --done:#1f9e56; --done-soft:#e6f6ec; --done-text:#15703c;
+      --stopped:#d1443b; --info-soft:#eef1f6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;font-size:15.5px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin-inline:auto;padding:44px 24px 80px}
+  h1{font-size:29px;line-height:1.2;margin:0 0 6px;letter-spacing:-.02em;font-weight:700}
+  h2{font-size:21px;margin:44px 0 14px;letter-spacing:-.01em;font-weight:680;
+    padding-bottom:7px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:26px 0 8px;font-weight:670;color:var(--ink)}
+  p{margin:0 0 13px;max-width:72ch}
+  section p, section li{max-width:72ch}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface2);
+    padding:1px 5px;border-radius:5px;border:1px solid var(--line)}
+  strong{color:inherit;font-weight:660}
+  .eyebrow{font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--dimmer);font-weight:700;margin:0 0 3px}
+
+  /* metadata header */
+  .meta{display:flex;flex-wrap:wrap;gap:7px 8px;margin:16px 0 6px}
+  .chip{font-size:11.5px;font-family:var(--mono);padding:3px 9px;border-radius:20px;
+    background:var(--surface2);border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+  .chip b{color:var(--ink);font-weight:600}
+  .chip.k{background:var(--accent-soft);border-color:transparent;color:var(--accent-text)}
+  nav.toc{margin:18px 0 6px;display:flex;flex-wrap:wrap;gap:6px 10px;font-size:13.5px}
+  nav.toc a{padding:4px 11px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}
+
+  /* capsule */
+  .capsule{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:6px 20px 12px;margin:14px 0 4px}
+  .capsule dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 18px;margin:0}
+  .capsule dt{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dimmer);
+    font-weight:700;padding-top:11px}
+  .capsule dd{margin:0;padding-top:9px}
+
+  section{scroll-margin-top:18px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:15px 18px;margin:12px 0}
+  .kd{display:flex;gap:13px}
+  .kd .id{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent-text);
+    background:var(--accent-soft);border-radius:7px;padding:2px 8px;height:max-content;white-space:nowrap}
+  .kd .body{flex:1}
+  .kd .body b{display:block;margin-bottom:2px}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-size:14.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dimmer);font-weight:700}
+  td .rid,td .aid,td .fid{font-family:var(--mono);font-weight:700;color:var(--accent-text);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  .grp{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
+    font-weight:700;margin:20px 0 2px}
+
+  ul.flows,ul.ae{list-style:none;padding:0;margin:6px 0}
+  ul.flows li,ul.ae li{background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:12px 15px;margin:9px 0}
+  .fid,.aeid{font-family:var(--mono);font-weight:700;color:var(--accent-text);margin-right:6px}
+  .lead{font-weight:660;color:var(--dim);font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+
+  .callouts{display:grid;gap:10px;margin:8px 0}
+  .co{border-radius:10px;padding:12px 15px;border:1px solid var(--line)}
+  .co .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:3px}
+  .co.scope{background:var(--info-soft)}
+  .co.defer{background:var(--perm-soft)} .co.defer .lbl{color:var(--perm-text)}
+  .co.out{background:var(--info-soft)} .co.out .lbl{color:var(--dimmer)}
+  .co.resolve{background:var(--accent-soft)} .co.resolve .lbl{color:var(--accent-text)}
+
+  figure{margin:16px 0;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px 16px 10px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{font-size:12.5px;color:var(--dim);margin-top:9px;font-style:italic}
+  .wf-note{font-size:12px;color:var(--perm-text);background:var(--perm-soft);
+    border-radius:8px;padding:8px 12px;margin-top:10px;font-style:normal}
+
+  footer.composition-signal{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--dimmer);font-family:var(--mono)}
+  .scr{overflow-x:auto}
+
+  /* planning contract + implementation units */
+  .preserve{display:inline-block;font-size:12.5px;background:var(--done-soft);color:var(--done-text);
+    border-radius:8px;padding:7px 13px;margin:4px 0 16px}
+  article.unit{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 18px;margin:14px 0}
+  article.unit>h4{font-size:15.5px;margin:0 0 10px;font-weight:670;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  article.unit>h4 .uid{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent-text);
+    background:var(--accent-soft);border-radius:7px;padding:2px 8px}
+  dl.strip{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0;font-size:14px}
+  dl.strip dt{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dimmer);
+    font-weight:700;padding-top:2px}
+  dl.strip dd{margin:0}
+  dl.strip dd code{font-size:.84em}
+  .exec{font-size:13px;background:var(--perm-soft);color:var(--perm-text);border-radius:8px;
+    padding:8px 12px;margin:11px 0 2px}
+  .exec b{color:inherit;font-weight:700}
+  details.more{margin-top:11px;border-top:1px solid var(--line);padding-top:9px}
+  details.more>summary{cursor:pointer;font-size:12px;font-weight:660;color:var(--accent-text);
+    letter-spacing:.03em;list-style:none}
+  details.more>summary::-webkit-details-marker{display:none}
+  details.more>summary::before{content:"\25B8  ";color:var(--dimmer)}
+  details.more[open]>summary::before{content:"\25BE  "}
+  details.more .inner{padding:10px 2px 2px}
+  details.more h5{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dimmer);
+    font-weight:700;margin:13px 0 4px}
+  details.more h5:first-child{margin-top:2px}
+  details.more ul{margin:4px 0;padding-left:20px;font-size:14px}
+  details.more li{margin:4px 0}
+  ul.dod{list-style:none;padding:0;margin:10px 0}
+  ul.dod li{padding:8px 0 8px 28px;border-bottom:1px solid var(--line);position:relative}
+  ul.dod li:last-child{border-bottom:0}
+  ul.dod li::before{content:"\2610";position:absolute;left:2px;top:6px;color:var(--dimmer);font-size:15px}
+  .seq{font-family:var(--mono);font-size:13px;background:var(--surface2);border:1px solid var(--line);
+    border-radius:8px;padding:10px 14px;margin:10px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Implementation-ready unified plan</p>
+  <h1>Windows Agent-Status Notch — Plan</h1>
+
+  <div class="meta">
+    <span class="chip"><b>type</b>&nbsp;feat</span>
+    <span class="chip"><b>date</b>&nbsp;<time datetime="2026-07-20">2026-07-20</time></span>
+    <span class="chip"><b>topic</b>&nbsp;windows-notch-agent-strip</span>
+    <span class="chip k"><b>artifact_contract</b>&nbsp;ce-unified-plan/v1</span>
+    <span class="chip k"><b>artifact_readiness</b>&nbsp;implementation-ready</span>
+    <span class="chip k"><b>product_contract_source</b>&nbsp;ce-brainstorm</span>
+    <span class="chip"><b>execution</b>&nbsp;code</span>
+  </div>
+
+  <nav class="toc">
+    <a href="#goal-capsule">Goal Capsule</a>
+    <a href="#product-contract">Product Contract</a>
+    <a href="#planning-contract">Planning Contract</a>
+    <a href="#implementation-units">Implementation Units</a>
+    <a href="#verification-contract">Verification</a>
+    <a href="#definition-of-done">Definition of Done</a>
+    <a href="#appendix">Sources</a>
+  </nav>
+
+  <section id="goal-capsule">
+    <h2>Goal Capsule</h2>
+    <div class="capsule">
+      <dl>
+        <dt>Objective</dt>
+        <dd>Geef Command een Windows-native, altijd-beschikbaar oppervlak dat agent-staat over álle projecten toont en je terugtrekt naar de juiste sessie zodra een agent klaar is of je nodig heeft — zónder dat Command op de voorgrond hoeft te staan.</dd>
+        <dt>Product authority</dt>
+        <dd>Remco Volmer (owner, Command).</dd>
+        <dt>Open blockers</dt>
+        <dd>Geen. Scope is bevestigd in dialoog; resterende vragen zijn uitgesteld naar planning.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section id="product-contract">
+    <h2>Product Contract</h2>
+
+    <h3 id="summary">Summary</h3>
+    <p>Een tray-residente Command krijgt een always-on-top "notch"-strip die verschijnt zodra Command niet op de voorgrond staat en elke agent-sessie over alle projecten toont. De strip flitst kort bij een afronding, houdt een blijvende melding vast als een sessie een vraag of goedkeuring nodig heeft, en brengt je met één klik terug in precies die sessie. Eén toggle onderaan de sidebar zet de notch volledig uit voor presentaties.</p>
+
+    <h3 id="problem-frame">Problem Frame</h3>
+    <p>Command draait al meerdere agents (Claude, Codex, pi) over projecten heen in één cockpit, en detecteert al per sessie de staat (<code>busy</code>/<code>permission</code>/<code>question</code>/<code>done</code>) via het hook-systeem. Maar zodra je wegschakelt naar een andere app, is die staat onzichtbaar: een agent die klaar is of vastloopt op een goedkeuring blijft ongemerkt tot je toevallig terug-alt-tabt.</p>
+    <p>De kosten zijn tweeledig: <strong>dode tijd</strong> (agents wachten stil op goedkeuring terwijl jij iets anders doet) en <strong>context-switch-belasting</strong> (zoeken wélk project en welke sessie je aandacht vraagt). De Mac-notch-demo die dit aanzwengelde lost het op met een oppervlak dat buiten het app-venster leeft. Windows heeft geen notch, dus het equivalent moet als een apart oppervlak gebouwd worden.</p>
+
+    <h3 id="key-decisions">Key Decisions</h3>
+
+    <div class="card kd"><span class="id">KD1</span><div class="body">
+      <b>Minimalistische always-on-top strip die op aanvraag uitklapt.</b>
+      Collapsed toont de strip staat-stipjes plus een teller; hover of een binnenkomend event klapt hem uit naar de sessielijst. Gekozen boven een permanente balk (kost altijd schermruimte) en boven pure OS-toasts (geen live overzicht).
+    </div></div>
+
+    <div class="card kd"><span class="id">KD2</span><div class="body">
+      <b>De strip is gekoppeld aan de voorgrond-staat van Command.</b>
+      Hij verschijnt alleen als Command niet het actieve venster is en verdwijnt zodra Command focus krijgt — ín Command heb je immers de volle UI. Dit is meteen het ruis-mechanisme: geen strip terwijl je werkt.
+    </div></div>
+
+    <div class="card kd"><span class="id">KD3</span><div class="body">
+      <b>Asymmetrische aandacht per staat.</b>
+      Een afronding flitst kort en verdwijnt vanzelf; een vraag, goedkeuring of gestopte/gecrashte agent (<code>stopped</code>) blijft staan tot je 'm afhandelt. Afrondingen zijn informatief; de rest vraagt actie of mag niet stil verdwijnen.
+    </div></div>
+
+    <div class="card kd"><span class="id">KD4</span><div class="body">
+      <b>Sluiten-naar-tray; Command wordt tray-resident.</b>
+      De sluitknop verbergt het venster en houdt het proces draaiend zodat de strip blijft leven; afsluiten gaat expliciet via het tray-menu. Vereist om de strip beschikbaar te houden nadat je het venster "sluit".
+    </div></div>
+
+    <div class="card kd"><span class="id">KD5</span><div class="body">
+      <b>Hergebruik bestaande staat-signalen; geen nieuwe detectie.</b>
+      De strip consumeert de bestaande staten en de al aanwezige platte, project-overstijgende sessielijst. Het voegt een oppervlak toe, geen nieuw staat-model.
+    </div></div>
+
+    <h3 id="actors">Actors</h3>
+    <div class="scr"><table>
+      <thead><tr><th>ID</th><th>Actor</th><th>Rol</th></tr></thead>
+      <tbody>
+        <tr><td class="aid">A1</td><td>Gebruiker</td><td>Werkt in andere apps terwijl agents draaien; wil alleen teruggetrokken worden wanneer nodig.</td></tr>
+        <tr><td class="aid">A2</td><td>Agent-sessies</td><td>Claude &amp; Codex (hook-based, volledige staat incl. permission/question); pi.dev (hookless, alleen busy/done).</td></tr>
+        <tr><td class="aid">A3</td><td>Command hoofdvenster</td><td>Voorgrond/achtergrond-staat stuurt de zichtbaarheid van de strip; doelwit van "terug naar sessie".</td></tr>
+        <tr><td class="aid">A4</td><td>Notch-strip</td><td>Always-on-top oppervlak; toont geaggregeerde staat; routeert klikken naar sessies.</td></tr>
+        <tr><td class="aid">A5</td><td>Systeembalk (tray)</td><td>Persistente aanwezigheid; herstel van het venster en expliciet afsluiten.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 id="wireframe">Vorm — collapsed &amp; uitgeklapt</h3>
+    <figure>
+      <svg viewBox="0 0 820 300" role="img" aria-label="Wireframe van de collapsed en uitgeklapte strip">
+        <!-- collapsed -->
+        <text x="20" y="26" font-family="sans-serif" font-size="13" font-weight="700" fill="currentColor">Collapsed (idle op de achtergrond)</text>
+        <rect x="20" y="40" width="200" height="34" rx="9" fill="none" stroke="currentColor" stroke-opacity=".45"/>
+        <circle cx="46" cy="57" r="5" fill="#c9820f"/>
+        <circle cx="64" cy="57" r="5" fill="#8b95a7"/>
+        <circle cx="82" cy="57" r="5" fill="#1f9e56"/>
+        <text x="104" y="61" font-family="sans-serif" font-size="12" fill="currentColor" fill-opacity=".7">1 vraagt om je aandacht</text>
+
+        <!-- expanded -->
+        <text x="20" y="112" font-family="sans-serif" font-size="13" font-weight="700" fill="currentColor">Uitgeklapt (hover of binnenkomend event)</text>
+        <rect x="20" y="126" width="440" height="150" rx="11" fill="none" stroke="currentColor" stroke-opacity=".45"/>
+        <text x="447" y="146" text-anchor="end" font-family="sans-serif" font-size="9" fill="currentColor" fill-opacity=".5">verberg</text>
+        <text x="452" y="146" text-anchor="start" font-family="sans-serif" font-size="12" fill="currentColor" fill-opacity=".65">✕</text>
+        <text x="36" y="148" font-family="sans-serif" font-size="10.5" fill="currentColor" fill-opacity=".55" letter-spacing="1">PROJECT · AGENT-RUNTIME</text>
+        <circle cx="42" cy="170" r="5" fill="#c9820f"/>
+        <rect x="56" y="164" width="22" height="13" rx="3" fill="currentColor" fill-opacity=".14"/>
+        <text x="60" y="174" font-family="monospace" font-size="9" fill="currentColor" fill-opacity=".7">C</text>
+        <text x="88" y="174" font-family="sans-serif" font-size="12" font-weight="600" fill="currentColor">Trace agent events</text>
+        <text x="300" y="174" font-family="sans-serif" font-size="11" fill="#c9820f">goedkeuring nodig</text>
+        <text x="36" y="206" font-family="sans-serif" font-size="10.5" fill="currentColor" fill-opacity=".55" letter-spacing="1">PROJECT · COMMAND</text>
+        <circle cx="42" cy="228" r="5" fill="#1f9e56"/>
+        <rect x="56" y="222" width="22" height="13" rx="3" fill="currentColor" fill-opacity=".14"/>
+        <text x="59" y="232" font-family="monospace" font-size="9" fill="currentColor" fill-opacity=".7">Cx</text>
+        <text x="88" y="232" font-family="sans-serif" font-size="12" font-weight="600" fill="currentColor">npm test — klaar</text>
+        <text x="322" y="232" font-family="sans-serif" font-size="11" fill="#1f9e56">klaar ✓</text>
+        <circle cx="42" cy="258" r="5" fill="#8b95a7"/>
+        <rect x="56" y="252" width="22" height="13" rx="3" fill="currentColor" fill-opacity=".14"/>
+        <text x="60" y="262" font-family="monospace" font-size="9" fill="currentColor" fill-opacity=".7">C</text>
+        <text x="88" y="262" font-family="sans-serif" font-size="12" font-weight="600" fill="currentColor">feat-notch · bezig…</text>
+
+        <!-- click callout -->
+        <line x1="470" y1="185" x2="520" y2="185" stroke="currentColor" stroke-opacity=".4" stroke-dasharray="3 3"/>
+        <text x="528" y="170" font-family="sans-serif" font-size="12" font-weight="700" fill="currentColor">Klik op een rij →</text>
+        <text x="528" y="189" font-family="sans-serif" font-size="11.5" fill="currentColor" fill-opacity=".75">Command naar voorgrond,</text>
+        <text x="528" y="206" font-family="sans-serif" font-size="11.5" fill="currentColor" fill-opacity=".75">exact dat project + terminal actief</text>
+      </svg>
+      <div class="wf-note">Directioneel — illustreert de bedoelde vorm. Exacte kleuren, spacing, copy en componentkeuzes zijn placeholders voor review, geen requirements.</div>
+    </figure>
+
+    <h3 id="key-flows">Key Flows</h3>
+    <ul class="flows">
+      <li><span class="fid">F1</span> <span class="lead">Weg → sessie klaar.</span> <strong>Trigger:</strong> een sessie gaat naar <code>done</code> terwijl Command niet op de voorgrond staat. De strip verschijnt (indien verborgen), toont die sessie kort als klaar, en verdwijnt na het dismiss-interval vanzelf. <em>Dekt R6.</em></li>
+      <li><span class="fid">F2</span> <span class="lead">Weg → sessie heeft je nodig.</span> <strong>Trigger:</strong> een sessie gaat naar <code>permission</code>, <code>question</code> of <code>stopped</code> terwijl Command niet op de voorgrond staat. De strip verschijnt en houdt een blijvende melding voor die sessie tot ze is afgehandeld of weggeklikt. <em>Dekt R7.</em></li>
+      <li><span class="fid">F3</span> <span class="lead">Klik → terug naar sessie.</span> <strong>Trigger:</strong> gebruiker klikt een sessie in de strip. Het hoofdvenster wordt naar voren gehaald en gefocust, het juiste project + terminal wordt geactiveerd, en de strip verdwijnt (Command is nu voorgrond). <em>Dekt R9, R10, R5.</em></li>
+      <li><span class="fid">F4</span> <span class="lead">Sluiten → tray.</span> <strong>Trigger:</strong> gebruiker klikt de sluitknop. Het venster verbergt, Command draait door in de tray, de strip blijft werken. Afsluiten via het tray-menu. <em>Dekt R11, R12, R13.</em></li>
+      <li><span class="fid">F5</span> <span class="lead">Focus → verbergen.</span> <strong>Trigger:</strong> Command wordt het voorgrond-venster. De strip verbergt. <em>Dekt R5.</em></li>
+      <li><span class="fid">F6</span> <span class="lead">Presentatie-modus.</span> <strong>Trigger:</strong> gebruiker zet de sidebar-toggle uit óf klikt de verberg-knop op de strip. De notch gaat uit en de strip verschijnt niet meer tot de toggle weer aan gaat; staat-veranderingen zijn dan alleen in-app zichtbaar bij terugkeer. <em>Dekt R15, R16.</em></li>
+    </ul>
+
+    <h3 id="pop-policy">Pop-beleid (staat → gedrag)</h3>
+    <figure>
+      <svg viewBox="0 0 820 250" role="img" aria-label="Beslislogica: verandert de zichtbaarheid en het gedrag van de strip">
+        <!-- start -->
+        <ellipse cx="90" cy="60" rx="70" ry="26" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="90" y="57" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">Staat-event</text>
+        <text x="90" y="72" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">van een sessie</text>
+        <!-- decision 1: foreground? -->
+        <path d="M300 60 L370 30 L440 60 L370 90 Z" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="370" y="57" text-anchor="middle" font-family="sans-serif" font-size="11" fill="currentColor">Command op</text>
+        <text x="370" y="71" text-anchor="middle" font-family="sans-serif" font-size="11" fill="currentColor">voorgrond?</text>
+        <line x1="160" y1="60" x2="298" y2="60" stroke="currentColor" stroke-opacity=".45"/>
+        <!-- yes -> main UI only -->
+        <rect x="560" y="20" width="230" height="42" rx="8" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="675" y="38" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">Geen strip — alleen de</text>
+        <text x="675" y="53" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">bestaande in-app indicator</text>
+        <line x1="440" y1="52" x2="558" y2="41" stroke="currentColor" stroke-opacity=".45"/>
+        <text x="470" y="34" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#1f9e56">ja</text>
+        <!-- no -> decision 2 -->
+        <path d="M300 150 L370 120 L440 150 L370 180 Z" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="370" y="152" text-anchor="middle" font-family="sans-serif" font-size="11" fill="currentColor">welke staat?</text>
+        <text x="370" y="166" text-anchor="middle" font-family="sans-serif" font-size="9" fill="currentColor" fill-opacity=".65">(perm/question: Claude/Codex)</text>
+        <line x1="370" y1="90" x2="370" y2="118" stroke="currentColor" stroke-opacity=".45"/>
+        <text x="378" y="108" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#c9820f">nee</text>
+        <!-- done -> brief flash -->
+        <rect x="560" y="108" width="230" height="42" rx="8" fill="none" stroke="#1f9e56" stroke-opacity=".7"/>
+        <text x="675" y="126" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">Strip toont sessie kort,</text>
+        <text x="675" y="141" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">dismisst vanzelf</text>
+        <line x1="440" y1="143" x2="558" y2="130" stroke="currentColor" stroke-opacity=".45"/>
+        <text x="462" y="126" font-family="monospace" font-size="10.5" font-weight="700" fill="#1f9e56">done</text>
+        <!-- permission/question -> persistent -->
+        <rect x="560" y="182" width="230" height="42" rx="8" fill="none" stroke="#c9820f" stroke-opacity=".7"/>
+        <text x="675" y="200" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">Strip houdt blijvende melding</text>
+        <text x="675" y="215" text-anchor="middle" font-family="sans-serif" font-size="11.5" fill="currentColor">tot afgehandeld/weggeklikt</text>
+        <line x1="440" y1="158" x2="558" y2="200" stroke="currentColor" stroke-opacity=".45"/>
+        <text x="446" y="192" font-family="monospace" font-size="10" font-weight="700" fill="#c9820f">perm / question / stopped</text>
+      </svg>
+      <figcaption>De strip bestaat alleen in de "nee"-tak: terwijl Command op de voorgrond staat verandert er niets aan het huidige in-app gedrag.</figcaption>
+    </figure>
+
+    <section id="product-requirements">
+    <h3>Requirements</h3>
+
+    <p class="grp">Oppervlak &amp; presentatie</p>
+    <div class="scr"><table>
+      <tbody>
+        <tr><td class="rid">R1</td><td>De strip is een always-on-top oppervlak, minimaal in collapsed vorm (staat-stipjes plus een teller van sessies die aandacht vragen).</td></tr>
+        <tr><td class="rid">R2</td><td>De strip aggregeert sessies over alle projecten én worktrees, niet alleen het actieve project.</td></tr>
+        <tr><td class="rid">R3</td><td>Hover op de collapsed strip klapt hem uit tot een lijst van sessies, gegroepeerd per project, met per rij de agent, de sessie/chat-naam en de huidige staat.</td></tr>
+        <tr><td class="rid">R4</td><td>De strip verschijnt op de actieve monitor van de gebruiker.</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="grp">Aandacht &amp; pop-beleid</p>
+    <div class="scr"><table>
+      <tbody>
+        <tr><td class="rid">R5</td><td>De strip is alleen zichtbaar terwijl Command niet het voorgrond-venster is; hij verbergt zodra Command focus krijgt.</td></tr>
+        <tr><td class="rid">R6</td><td>Wanneer een sessie <code>done</code> wordt terwijl Command op de achtergrond staat, toont de strip die sessie kort en dismisst hem daarna vanzelf.</td></tr>
+        <tr><td class="rid">R7</td><td>Wanneer een sessie <code>permission</code>, <code>question</code> of <code>stopped</code> wordt terwijl Command op de achtergrond staat, toont de strip een blijvende melding voor die sessie die blijft tot ze is afgehandeld of weggeklikt.</td></tr>
+        <tr><td class="rid">R8</td><td>De strip onderbreekt de gebruiker nooit terwijl Command op de voorgrond staat; staat-veranderingen tonen zich dan in de hoofd-UI zoals nu.</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="grp">Terug naar de sessie</p>
+    <div class="scr"><table>
+      <tbody>
+        <tr><td class="rid">R9</td><td>Een klik op een sessie in de strip haalt het Command-hoofdvenster naar voren en geeft het focus.</td></tr>
+        <tr><td class="rid">R10</td><td>Diezelfde klik activeert het exacte project en de terminal van die sessie, zodat de gebruiker er direct in belandt.</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="grp">Levenscyclus &amp; tray</p>
+    <div class="scr"><table>
+      <tbody>
+        <tr><td class="rid">R11</td><td>De sluitknop van het hoofdvenster verbergt het en houdt Command draaiend, zodat de strip beschikbaar blijft.</td></tr>
+        <tr><td class="rid">R12</td><td>Command toont een tray-aanwezigheid zolang het draait, van waaruit de gebruiker het venster kan herstellen en expliciet kan afsluiten.</td></tr>
+        <tr><td class="rid">R13</td><td>Expliciet afsluiten beëindigt de strip en de tray-aanwezigheid samen.</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="grp">Agent-dekking</p>
+    <div class="scr"><table>
+      <tbody>
+        <tr><td class="rid">R14</td><td>Het gedrag volgt de staten die elke agent rapporteert: Claude en Codex ondersteunen afronding, de permission/question-melding én de stopped-melding; pi.dev is hookless en rapporteert alleen busy/done, dus daarvan triggert alleen de afronding.</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="grp">Aan/uit-besturing (presentatie-modus)</p>
+    <div class="scr"><table>
+      <tbody>
+        <tr><td class="rid">R15</td><td>Onderaan de sidebar staat een toggle die de notch in zijn geheel aan- of uitzet. Staat de toggle uit, dan verschijnt de strip nooit, ongeacht de sessie-staat (bijv. tijdens een presentatie). Standaard staat de notch aan.</td></tr>
+        <tr><td class="rid">R16</td><td>De strip heeft een eigen verberg-knop die de notch uitzet — dezelfde staat als de sidebar-toggle op "uit". Weer aanzetten gaat via de sidebar-toggle; de aan/uit-staat is één gedeelde instelling die beide plekken tonen en besturen.</td></tr>
+      </tbody>
+    </table></div>
+    </section>
+
+    <h3 id="acceptance-examples">Acceptance Examples</h3>
+    <ul class="ae">
+      <li><span class="aeid">AE1</span> <strong>Dekt R5, R8.</strong> Command staat op de voorgrond en een sessie wordt klaar → de strip verschijnt niet; de verandering toont zich alleen in de hoofd-UI. Schakelt de gebruiker daarna naar een andere app → de strip verschijnt met de actuele staat.</li>
+      <li><span class="aeid">AE2</span> <strong>Dekt R6.</strong> Command staat op de achtergrond en een Claude-sessie wordt klaar → de strip toont die sessie als klaar en haalt hem na het dismiss-interval automatisch weg; keek de gebruiker niet, dan is de afronding niet bewaard in de strip (wel nog zichtbaar in Command bij terugkeer).</li>
+      <li><span class="aeid">AE3</span> <strong>Dekt R7.</strong> Command staat op de achtergrond en een Codex-sessie raakt een permission-prompt → de strip toont een blijvende melding die staat tot de gebruiker de sessie opent of wegklikt; hij dismisst niet vanzelf.</li>
+      <li><span class="aeid">AE4</span> <strong>Dekt R9, R10, R5.</strong> De gebruiker klikt een meldende sessie in de strip → Command komt naar de voorgrond met exact dat project + terminal actief; omdat Command nu voorgrond is, verbergt de strip.</li>
+      <li><span class="aeid">AE5</span> <strong>Dekt R14.</strong> Een pi.dev-sessie draait terwijl Command op de achtergrond staat → hij kan een afronding-flits triggeren maar nooit een permission/question-melding.</li>
+      <li><span class="aeid">AE6</span> <strong>Dekt R15, R16.</strong> De notch-toggle staat uit (of de gebruiker klikte verberg) en een sessie heeft goedkeuring nodig terwijl Command op de achtergrond staat → de strip verschijnt niet; de melding is pas zichtbaar bij terugkeer in Command. Presentatie-modus onderdrukt de strip volledig.</li>
+    </ul>
+
+    <h3 id="scope-boundaries">Scope Boundaries</h3>
+    <div class="callouts">
+      <div class="co out"><div class="lbl">Buiten dit product</div>Windows-only; geen Mac-notch-integratie. Geen goedkeuring/vraag-detectie voor pi.dev (zou een pi-hook vereisen) — pi blijft busy/done. Geen herwerking van de bestaande in-app attention-indicator; die blijft zoals hij is. Geen rijke telemetrie in de strip (usage-%, verstreken tijd à la de bron-tweet) — staat, identiteit en één-klik-terug zijn het geheel.</div>
+      <div class="co defer"><div class="lbl">Uitgesteld (later, niet v1)</div>Configureerbare pop-regels per agent of per project — v1 hanteert één beleid voor alles.</div>
+    </div>
+
+    <h3 id="dependencies-assumptions">Dependencies &amp; Assumptions</h3>
+    <ul>
+      <li>Bouwt voort op de bestaande hook-based staat-signalen (<code>busy</code>/<code>permission</code>/<code>question</code>/<code>done</code>/<code>stopped</code>) als bron van waarheid.</li>
+      <li>Gebruikt de al aanwezige platte, project-overstijgende sessielijst (per sessie o.a. project, worktree, staat, titel, type) als databron voor de aggregatie.</li>
+      <li><strong>Nieuwe capaciteit nodig, nu niet aanwezig:</strong> een frameless always-on-top venster; een main-proces-feed van geaggregeerde staat naar dat venster (nu aggregeert alleen de renderer); een route om het OS-venster naar voren te halen + te focussen én een specifieke terminal te activeren (bestaat nu niet cross-process); en tray + sluiten-naar-tray. Zie Sources voor de geverifieerde huidige situatie.</li>
+    </ul>
+
+    <h3 id="outstanding-questions">Outstanding Questions</h3>
+    <div class="callouts">
+      <div class="co defer"><div class="lbl">Uitgesteld naar planning</div>
+        <strong>OQ1.</strong> Auto-dismiss-interval voor afrondingen, en of gelijktijdige afrondingen stapelen of in een rij komen in de strip.<br>
+        <strong>OQ2.</strong> Exacte collapsed→uitgeklapt-interactie: hover-vertraging, klik-om-vast-te-pinnen, of een binnenkomende melding automatisch uitklapt.<br>
+        <strong>OQ3.</strong> Multi-monitor-randgevallen: gedrag als de monitor-configuratie tijdens een sessie verandert (R4 zet de basis: actieve monitor).
+      </div>
+    </div>
+
+  </section>
+
+  <section id="planning-contract">
+    <h2>Planning Contract</h2>
+    <span class="preserve">Product Contract onveranderd — verrijking voegt alleen de Planning Contract, Implementation Units, Verification Contract en Definition of Done toe.</span>
+
+    <h3 id="key-technical-decisions">Key Technical Decisions</h3>
+
+    <div class="card kd"><span class="id">KTD1</span><div class="body">
+      <b>Tweede venster via een <code>#strip</code> hash-route, geen aparte HTML-entry.</b>
+      De strip is een tweede frameless <code>BrowserWindow</code> (<code>alwaysOnTop</code>, <code>skipTaskbar</code>, <code>frame:false</code>) die dezelfde preload en renderer-bundle laadt; <code>src/main.tsx</code> vertakt op <code>location.hash === '#strip'</code> en rendert <code>&lt;NotchStrip/&gt;</code> in plaats van <code>&lt;App/&gt;</code>. Kleinste wijziging t.o.v. een tweede Vite-entry, en hergebruikt de bestaande preload plus de persisted store. Mirror: de <code>createWindow()</code>-opties in <code>electron/main/index.ts</code>.
+    </div></div>
+
+    <div class="card kd"><span class="id">KTD2</span><div class="body">
+      <b>De hoofd-renderer blijft de aggregator; main relayt alleen.</b>
+      De verborgen hoofd-renderer blijft draaien (een verborgen <code>BrowserWindow</code> behoudt zijn webContents) en berekent de sessielijst met de bestaande <code>getProjectRollupState</code> + <code>terminalState</code>-helpers over de bestaande <code>terminals</code>-record — er komt géén tweede aggregatie in het main-proces. De renderer pusht die payload naar main; <code>NotchService</code> relayt naar de strip. Sluit aan op het principe "spiegel het bestaande patroon, geen asymmetrie".
+    </div></div>
+
+    <div class="card kd"><span class="id">KTD3</span><div class="body">
+      <b>Pop-beleid en venster-zichtbaarheid leven in een nieuwe <code>NotchService</code> (main); de strip-renderer is display-only.</b>
+      NotchService bezit het strip-venster, volgt <code>focus</code>/<code>blur</code> van het hoofdvenster, past het pop-beleid toe (done → dismiss-timer; permission/question/stopped → persistent) en positioneert de strip op de actieve monitor. De strip rendert alleen wat main stuurt en stuurt terug: een klik (<code>notch:focus</code>) en verbergen.
+    </div></div>
+
+    <div class="card kd"><span class="id">KTD4</span><div class="body">
+      <b>Sluiten-naar-tray hergebruikt het bestaande quit/cleanup-pad.</b>
+      De <code>X</code> doet <code>preventDefault</code> + <code>win.hide()</code> en slaat de bestaande "actieve sessies"-bevestigingsdialoog over (verbergen is geen afsluiten); alleen een expliciete tray-Quit zet een <code>quitting</code>-vlag en roept <code>app.quit()</code>, zodat <code>before-quit</code> de sessie-persistentie en service-teardown nog draait. <code>window-all-closed</code> mag de app niet meer afsluiten zolang de tray leeft.
+    </div></div>
+
+    <div class="card kd"><span class="id">KTD5</span><div class="body">
+      <b>Notch-aan/uit is één persisted boolean, end-to-end gespiegeld op <code>showUsageIndicator</code>.</b>
+      <code>notchEnabled</code> (default <code>true</code>) in de store met dezelfde toggle-actie en <code>partialize</code>-entry; een sidebar-footer-icoonknop (gespiegeld op de thema/settings-knoppen) en een <code>ui.toggleNotch</code>-hotkey besturen 'm, en de verberg-knop op de strip zet dezelfde vlag. Geen nieuwe UI-state.
+    </div></div>
+
+    <h3 id="htd">High-Level Technical Design</h3>
+    <figure>
+      <svg viewBox="0 0 820 270" role="img" aria-label="Data-flow tussen hoofd-renderer, NotchService en strip-venster">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="currentColor" fill-opacity=".55"/>
+          </marker>
+        </defs>
+        <!-- boxes -->
+        <rect x="30" y="46" width="200" height="72" rx="10" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="130" y="76" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="700" fill="currentColor">Hoofd-renderer</text>
+        <text x="130" y="94" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="currentColor" fill-opacity=".7">store + rollup-helpers</text>
+        <rect x="310" y="46" width="200" height="72" rx="10" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="410" y="72" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="700" fill="currentColor">NotchService (main)</text>
+        <text x="410" y="90" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="currentColor" fill-opacity=".7">focus/blur · pop-timers</text>
+        <text x="410" y="105" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="currentColor" fill-opacity=".7">venster + tray</text>
+        <rect x="590" y="46" width="200" height="72" rx="10" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="690" y="76" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="700" fill="currentColor">Strip-venster</text>
+        <text x="690" y="94" text-anchor="middle" font-family="sans-serif" font-size="10.5" fill="currentColor" fill-opacity=".7">display-only</text>
+        <!-- forward arrows (top, y=64) -->
+        <line x1="232" y1="64" x2="306" y2="64" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ah)"/>
+        <text x="269" y="56" text-anchor="middle" font-family="monospace" font-size="9.5" fill="currentColor" fill-opacity=".8">notch:update</text>
+        <line x1="512" y1="64" x2="586" y2="64" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ah)"/>
+        <text x="549" y="56" text-anchor="middle" font-family="monospace" font-size="9.5" fill="currentColor" fill-opacity=".8">notch:state</text>
+        <!-- return arrows (bottom, y=100) -->
+        <line x1="586" y1="100" x2="512" y2="100" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ah)"/>
+        <text x="549" y="114" text-anchor="middle" font-family="monospace" font-size="9.5" fill="currentColor" fill-opacity=".8">notch:focus</text>
+        <line x1="306" y1="100" x2="232" y2="100" stroke="currentColor" stroke-opacity=".55" marker-end="url(#ah)"/>
+        <text x="269" y="114" text-anchor="middle" font-family="monospace" font-size="9" fill="currentColor" fill-opacity=".8">activate-terminal</text>
+        <!-- tray -->
+        <rect x="310" y="176" width="200" height="44" rx="10" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="410" y="203" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="700" fill="currentColor">Systeembalk (tray)</text>
+        <line x1="410" y1="176" x2="410" y2="120" stroke="currentColor" stroke-opacity=".5" marker-end="url(#ah)"/>
+        <text x="420" y="152" font-family="sans-serif" font-size="10" fill="currentColor" fill-opacity=".7">herstel / afsluiten</text>
+      </svg>
+      <figcaption>Heen: de renderer pusht de sessielijst (<code>notch:update</code>), NotchService pusht render-state (<code>notch:state</code>). Terug: klik in de strip (<code>notch:focus</code>) → main raist het venster en activeert de terminal (<code>notch:activate-terminal</code> → <code>setActiveTerminal</code>). De tray herstelt of sluit af.</figcaption>
+    </figure>
+
+    <h3 id="assumptions">Assumptions</h3>
+    <ul>
+      <li>De verborgen hoofd-renderer blijft draaien terwijl het venster verborgen is (Electron <code>hide()</code> vernietigt de webContents niet), zodat de sessie-feed blijft pushen — te bevestigen bij de eerste smoke-test.</li>
+      <li>Windows-only build; het tray-icoon hergebruikt <code>build/icon.ico</code> (het enige asset dat electron-builder nu naar resources kopieert). Een dedicated tray-PNG vereist een extra <code>extraResources</code>-entry.</li>
+      <li>pi.dev blijft busy/done (hookless); er komt geen pi-hook in scope.</li>
+    </ul>
+
+    <h3 id="sequencing">Sequencing</h3>
+    <div class="seq">U1 → U2 → U3 → { U4, U5 } → U6&nbsp;&nbsp;·&nbsp;&nbsp;U7 en U8 kunnen parallel na U2</div>
+  </section>
+
+  <section id="implementation-units">
+    <h2>Implementation Units</h2>
+
+    <article class="unit" id="u1">
+      <h4><span class="uid">U1.</span> Strip-venster + hash-geroute renderer-entry</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Een tweede frameless always-on-top venster dat via <code>#strip</code> een aparte, lichte renderer-view laadt.</dd>
+        <dt>Requirements</dt><dd>R1 (deels), R4 (positionering in U2)</dd>
+        <dt>Dependencies</dt><dd>—</dd>
+        <dt>Files</dt><dd><code>electron/main/services/NotchService.ts</code> (nieuw), <code>electron/main/index.ts</code>, <code>src/main.tsx</code>, <code>src/components/Notch/NotchStrip.tsx</code> (skeleton), <code>src/components/Notch/NotchStrip.test.tsx</code></dd>
+      </dl>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p>Mirror de <code>createWindow()</code>-opties, maar met <code>frame:false</code>, <code>alwaysOnTop:true</code>, <code>skipTaskbar:true</code>, <code>resizable:false</code>. Laad <code>${VITE_DEV_SERVER_URL}#strip</code> (dev) / <code>loadFile(indexHtml,{hash:'strip'})</code> (prod), dezelfde preload. In <code>src/main.tsx</code>: <code>location.hash === '#strip' ? &lt;NotchStrip/&gt; : &lt;App/&gt;</code>. Venster start verborgen.</p>
+        <h5>Patterns to follow</h5>
+        <ul><li><code>electron/main/index.ts</code> — <code>createWindow()</code> opties + dev/prod-load</li><li><code>src/main.tsx</code> — bestaande render-entry</li></ul>
+        <h5>Test scenarios</h5>
+        <ul><li><code>NotchStrip</code>-skeleton rendert onder de <code>#strip</code>-branch (component-test).</li><li>Venster wordt verborgen aangemaakt (geen flits bij opstart).</li></ul>
+        <h5>Verification</h5>
+        <p>Dev-run toont een leeg strip-venster wanneer geforceerd getoond; de hoofd-app rendert ongewijzigd zonder hash.</p>
+      </div></details>
+    </article>
+
+    <article class="unit" id="u2">
+      <h4><span class="uid">U2.</span> NotchService: lifecycle + voorgrond-gestuurde zichtbaarheid</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>De strip verschijnt alleen als het hoofdvenster niet gefocust is, op de actieve monitor; verbergt bij focus.</dd>
+        <dt>Requirements</dt><dd>R4, R5, R8</dd>
+        <dt>Dependencies</dt><dd>U1</dd>
+        <dt>Files</dt><dd><code>electron/main/services/NotchService.ts</code>, <code>electron/main/index.ts</code>, <code>electron/main/services/NotchService.test.ts</code></dd>
+      </dl>
+      <div class="exec"><b>Execution note:</b> extraheer de zichtbaarheids-beslissing als pure functie zodat ze los te testen valt (spiegel het bestaande <code>test/</code>-patroon).</div>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p>Abonneer op <code>win.on('blur')</code>/<code>win.on('focus')</code>. Bij blur: toon de strip (als <code>notchEnabled</code> en er iets te tonen is). Bij focus: verberg. Positie: <code>screen.getDisplayNearestPoint(screen.getCursorScreenPoint())</code> → top-center van de <code>workArea</code> van die display. NotchService bezit <code>show()/hide()/reposition()</code>.</p>
+        <h5>Patterns to follow</h5>
+        <ul><li><code>electron/main/index.ts</code> — venster-event-handlers en <code>second-instance</code> restore</li><li>Electron <code>screen</code>-module voor de actieve display</li></ul>
+        <h5>Test scenarios</h5>
+        <ul><li>Zichtbaarheids-reducer <code>(isForeground, enabled, hasContent) → shouldShow</code>: alle combinaties.</li><li>Reposition-math klemt de strip binnen de <code>workArea</code> (top-center).</li></ul>
+        <h5>Verification</h5>
+        <p>Alt-tab weg van Command → strip verschijnt; terug naar Command → strip verdwijnt. Dekt AE1.</p>
+      </div></details>
+    </article>
+
+    <article class="unit" id="u3">
+      <h4><span class="uid">U3.</span> Sessie-feed over projecten heen → strip</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>De hoofd-renderer berekent de sessielijst en pusht 'm; NotchService relayt render-state naar de strip.</dd>
+        <dt>Requirements</dt><dd>R1, R2, R3</dd>
+        <dt>Dependencies</dt><dd>U1, U2</dd>
+        <dt>Files</dt><dd><code>shared/ipc-types.ts</code>, <code>electron/preload/index.ts</code>, <code>src/types/index.ts</code>, <code>src/hooks/useNotchFeed.ts</code> (nieuw), <code>src/App.tsx</code>, <code>electron/main/services/NotchService.ts</code>, <code>electron/main/index.ts</code>, <code>src/utils/notchFeed.test.ts</code></dd>
+      </dl>
+      <div class="exec"><b>Execution note:</b> bouw de payload-derivatie als pure functie met unit-tests (spiegel <code>test/projectStore.ts</code>) vóór de IPC-bedrading.</div>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p>Leid <code>NotchSession[]</code> af uit <code>Object.values(terminals)</code>, gefilterd op <code>isVisibleState</code>, verrijkt met projectnaam + agent-type en gegroepeerd per project via <code>getProjectRollupState</code>. Push op elke relevante store-verandering (<code>notch:update</code>); main relayt via <code>notch:state</code>. Voeg het gedeelde <code>NotchSession</code>/<code>NotchPayload</code>-type toe aan <code>shared/ipc-types.ts</code>, de kanalen aan de preload-whitelist + <code>electronAPI.notch</code>-namespace, en de types aan <code>ElectronAPI</code>. Géén tweede aggregatie in main (KTD2).</p>
+        <h5>Patterns to follow</h5>
+        <ul><li><code>src/utils/projectRollup.ts</code> / <code>src/utils/terminalState.ts</code> — bestaande aggregatie + kleur-tokens</li><li><code>electron/preload/index.ts</code> — <code>onStateChange</code>-listener + <code>ALLOWED_LISTENER_CHANNELS</code></li><li><code>electron/main/index.ts</code> — <code>project:update</code>-handler als IPC-vorm</li></ul>
+        <h5>Test scenarios</h5>
+        <ul><li>Derivatie (terminals-record + projecten → <code>NotchSession[]</code>): happy path met meerdere projecten/staten.</li><li>Lege lijst → lege payload; <code>normal</code>-terminals worden uitgefilterd.</li><li>Worktree-sessies worden meegenomen (R2).</li></ul>
+        <h5>Verification</h5>
+        <p>De strip toont live de sessies over projecten en worktrees heen.</p>
+      </div></details>
+    </article>
+
+    <article class="unit" id="u4">
+      <h4><span class="uid">U4.</span> Pop-beleid (flits vs. blijvend)</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>done → kort tonen + auto-dismiss; permission/question/stopped → blijvend tot afgehandeld of weggeklikt.</dd>
+        <dt>Requirements</dt><dd>R6, R7, R14</dd>
+        <dt>Dependencies</dt><dd>U3</dd>
+        <dt>Files</dt><dd><code>electron/main/services/NotchService.ts</code>, <code>electron/main/services/notchPopPolicy.test.ts</code></dd>
+      </dl>
+      <div class="exec"><b>Execution note:</b> implementeer het pop-beleid als pure reducer met de klok als parameter (injecteerbaar) — test-first.</div>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p>NotchService diff't opeenvolgende payloads. Transitie naar <code>done</code> → markeer de sessie "surfaced" met een dismiss-timer (interval = OQ1, voorlopige default ~6&nbsp;s). <code>permission</code>/<code>question</code>/<code>stopped</code> → "surfaced" persistent tot de staat wegvalt of de gebruiker dismisst. Alleen surfacen wanneer het hoofdvenster niet gefocust is. pi levert nooit permission/question, dus daarvan komt alleen de done-flits (R14 volgt uit de gerapporteerde staten).</p>
+        <h5>Test scenarios</h5>
+        <ul><li>Reducer <code>(prevSurfaced, payload, now) → { surfaced, timers }</code>: done verdwijnt na het interval.</li><li>permission/question/stopped blijft; verdwijnt pas als de staat wegvalt of bij dismiss.</li><li>done gevolgd door permission op dezelfde sessie wordt blijvend.</li><li>Meerdere gelijktijdige afrondingen (OQ1: stapelen/rij).</li></ul>
+        <h5>Verification</h5>
+        <p>Manuele smoke van F1/F2 en AE2/AE3.</p>
+      </div></details>
+    </article>
+
+    <article class="unit" id="u5">
+      <h4><span class="uid">U5.</span> Strip-renderer UI (collapsed, hover-expand, verberg, klik)</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>De visuele strip: collapsed (stipjes + teller), hover → uitgeklapte lijst, verberg-knop, klikbare rijen.</dd>
+        <dt>Requirements</dt><dd>R1, R3, R16 (verberg-knop)</dd>
+        <dt>Dependencies</dt><dd>U3</dd>
+        <dt>Files</dt><dd><code>src/components/Notch/NotchStrip.tsx</code>, <code>src/components/Notch/NotchStrip.test.tsx</code></dd>
+      </dl>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p>Consumeer <code>notch:state</code>. Collapsed: staat-stipjes (kleuren uit <code>STATE_DOT_COLORS</code>) + teller van aandacht-sessies. Hover (of een persistente melding) → expand naar een lijst gegroepeerd per project (rij: agent-chip, titel, staat). Klik op een rij → <code>electronAPI.notch.focusSession(id)</code>. Verberg-✕ → <code>electronAPI.notch.setEnabled(false)</code>. Herbruik de kleur-tokens uit <code>terminalState</code>.</p>
+        <h5>Patterns to follow</h5>
+        <ul><li><code>src/utils/terminalState.ts</code> — <code>STATE_DOT_COLORS</code>/<code>STATE_TEXT_COLORS</code></li><li>Bestaande sidebar rollup-dot-rendering</li></ul>
+        <h5>Test scenarios</h5>
+        <ul><li>Rendert sessies uit <code>notch:state</code>; collapsed toont de juiste aandacht-teller.</li><li>Klik op een rij roept <code>focusSession</code> met de juiste id.</li><li>Verberg-✕ roept <code>setEnabled(false)</code>.</li><li>Hover togglet tussen collapsed en uitgeklapt.</li></ul>
+        <h5>Verification</h5>
+        <p>Visuele smoke tegen de wireframe in het Product Contract.</p>
+      </div></details>
+    </article>
+
+    <article class="unit" id="u6">
+      <h4><span class="uid">U6.</span> Terug-naar-sessie (raise + activate)</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Een klik in de strip haalt Command naar voren en activeert exact die terminal.</dd>
+        <dt>Requirements</dt><dd>R9, R10</dd>
+        <dt>Dependencies</dt><dd>U2, U5</dd>
+        <dt>Files</dt><dd><code>electron/main/services/NotchService.ts</code>, <code>electron/main/index.ts</code>, <code>electron/preload/index.ts</code>, <code>src/types/index.ts</code>, <code>src/App.tsx</code></dd>
+      </dl>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p><code>notch:focus</code>(terminalId, UUID-gevalideerd) → <code>win.show(); win.focus()</code> en <code>win.webContents.send('notch:activate-terminal', id)</code>. <code>src/App.tsx</code> luistert en roept <code>setActiveTerminal(id)</code> (die schakelt project en activeert de terminal). De focus-event verbergt vervolgens de strip (U2).</p>
+        <h5>Patterns to follow</h5>
+        <ul><li><code>electron/main/index.ts</code> — <code>second-instance</code> restore (<code>win.show/focus</code>)</li><li><code>src/stores/projectStore.ts</code> — <code>setActiveTerminal</code></li><li><code>electron/preload/index.ts</code> — listener/send-paar</li></ul>
+        <h5>Test scenarios</h5>
+        <ul><li><code>Covers AE4.</code> De handler negeert een ongeldige (niet-UUID) id.</li><li>De App.tsx-listener roept <code>setActiveTerminal</code> met de juiste id.</li><li>Na focus is de strip verborgen (integratie/smoke).</li></ul>
+        <h5>Verification</h5>
+        <p>Klik brengt je in het juiste project + terminal; de strip is daarna weg. Dekt F3.</p>
+      </div></details>
+    </article>
+
+    <article class="unit" id="u7">
+      <h4><span class="uid">U7.</span> Tray + sluiten-naar-tray + expliciet afsluiten</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Systeembalk-icoon; X verbergt naar tray; app blijft draaien; tray-Quit sluit netjes af.</dd>
+        <dt>Requirements</dt><dd>R11, R12, R13</dd>
+        <dt>Dependencies</dt><dd>U2</dd>
+        <dt>Files</dt><dd><code>electron/main/index.ts</code>, <code>electron-builder.json</code> (alleen als een tray-PNG als resource nodig is; anders <code>build/icon.ico</code>)</dd>
+      </dl>
+      <div class="exec"><b>Execution note:</b> verifieer met een install/runtime-smoke en let op de reconciliatie met de bestaande <code>app:close-request</code>-dialoog — die mag bij een gewone X niet meer vuren.</div>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p><code>new Tray(icon)</code> met een context-menu (Herstel, Afsluiten). Wijzig <code>win.on('close')</code>: als niet <code>quitting</code> → <code>e.preventDefault(); win.hide()</code> (sla de "actieve sessies"-dialoog over — verbergen ≠ afsluiten). Guard <code>window-all-closed</code> zodat het niet <code>app.quit()</code> zolang de tray leeft. Tray-Afsluiten → <code>quitting=true; app.quit()</code> → <code>before-quit</code> draait de bestaande cleanup + sessie-persistentie. Tray-Herstel → <code>win.show()/focus()</code>.</p>
+        <h5>Patterns to follow</h5>
+        <ul><li><code>electron/main/index.ts</code> — close-handler, <code>app:confirm-close</code>, <code>before-quit</code>, <code>window-all-closed</code>, venster-icoon-resolutie</li></ul>
+        <h5>Test scenarios</h5>
+        <ul><li>Close-beslissing als kleine pure helper: <code>quitting</code> → afsluiten, anders verbergen.</li><li>Smoke: X verbergt en de app draait door; tray-Herstel toont; tray-Afsluiten beëindigt met sessie-persistentie.</li><li>Regressie: de bestaande close-confirm-dialoog vuurt niet meer bij X.</li></ul>
+        <h5>Verification</h5>
+        <p>Dekt F4 + tray-herstel + een schone afsluit.</p>
+      </div></details>
+    </article>
+
+    <article class="unit" id="u8">
+      <h4><span class="uid">U8.</span> Notch aan/uit-toggle + hotkey</h4>
+      <dl class="strip">
+        <dt>Goal</dt><dd>Persisted aan/uit; sidebar-footer-knop; hotkey; de strip-verberg-knop deelt dezelfde vlag.</dd>
+        <dt>Requirements</dt><dd>R15, R16</dd>
+        <dt>Dependencies</dt><dd>U2 (en U5 voor de verberg-knop)</dd>
+        <dt>Files</dt><dd><code>src/stores/projectStore.ts</code>, <code>src/components/Sidebar/Sidebar.tsx</code>, <code>src/types/hotkeys.ts</code>, <code>src/utils/hotkeys.ts</code>, <code>src/App.tsx</code>, <code>electron/preload/index.ts</code>, <code>src/types/index.ts</code>, <code>electron/main/services/NotchService.ts</code>, <code>CLAUDE.md</code> (shortcuts-tabel), <code>test/projectStore.test.ts</code></dd>
+      </dl>
+      <details class="more"><summary>Approach, patronen, tests</summary><div class="inner">
+        <h5>Approach</h5>
+        <p>Spiegel <code>showUsageIndicator</code> exact: interface-veld + default <code>true</code> + toggle-actie + <code>partialize</code>-entry. Sidebar-footer icoonknop gespiegeld op de thema/settings-knoppen. <code>ui.toggleNotch</code>-hotkey met een vrije binding (let op: <code>Ctrl+Shift+N</code> is bezet door "Create worktree" — kies een vrije combinatie) en documenteer 'm in de Keyboard Shortcuts-tabel (projectconventie). <code>src/App.tsx</code> pusht <code>notchEnabled</code> naar main (<code>notch:set-enabled</code>) bij verandering; NotchService onderdrukt de strip als disabled. De verberg-✕ (U5) zet dezelfde vlag op uit.</p>
+        <h5>Patterns to follow</h5>
+        <ul><li><code>src/stores/projectStore.ts</code> — <code>showUsageIndicator</code> end-to-end (default, toggle, partialize)</li><li><code>src/components/Settings/GeneralSection.tsx</code> — <code>role="switch"</code>-toggle</li><li><code>src/components/Sidebar/Sidebar.tsx</code> — footer-icoonknoppen</li><li><code>src/utils/hotkeys.ts</code> / <code>src/types/hotkeys.ts</code> / <code>src/App.tsx</code> — hotkey-registratie</li></ul>
+        <h5>Test scenarios</h5>
+        <ul><li><code>Covers AE6.</code> Toggle op uit → derivatie/relay onderdrukt de strip.</li><li>De vlag persisteert over een reload (partialize).</li><li>De hotkey roept de toggle-actie.</li><li>De verberg-knop zet de vlag op uit (gedeelde staat met de sidebar-toggle).</li></ul>
+        <h5>Verification</h5>
+        <p>Dekt F6; toggle, hotkey en verberg-knop delen één staat en blijven na herstart.</p>
+      </div></details>
+    </article>
+  </section>
+
+  <section id="verification-contract">
+    <h2>Verification Contract</h2>
+    <ul>
+      <li><code>npm test</code> (Vitest) — nieuwe unit-tests groen: payload-derivatie (U3), zichtbaarheids-reducer (U2), pop-policy-reducer (U4), strip-component (U5), close-beslissing (U7), <code>notchEnabled</code>-persist (U8). Spiegel de bestaande <code>test/</code>-suites (<code>TerminalPool</code>, <code>projectStore</code>).</li>
+      <li><code>npm run build</code> (tsc strict + vite + electron-builder) slaagt zonder TS-fouten; <strong>geen <code>any</code></strong> (projectconventie).</li>
+      <li>ESLint schoon (<code>eslint</code> + <code>@typescript-eslint</code>) — projectconventie; de PostToolUse lint-fix-hook leunt hierop.</li>
+      <li>Manuele smoke (dev-run) van F1–F6 en AE1–AE6, met nadruk op de multi-window- en tray-flows die buiten Vitest vallen. Optioneel een Playwright-electron E2E voor strip-verschijnen + klik-naar-sessie.</li>
+      <li><code>npm run rebuild</code> is niet nodig — geen wijziging aan native modules (node-pty).</li>
+    </ul>
+  </section>
+
+  <section id="definition-of-done">
+    <h2>Definition of Done</h2>
+    <ul class="dod">
+      <li>Alle acht units geïmplementeerd; elk unit's test scenarios groen.</li>
+      <li><code>npm test</code> groen, <code>npm run build</code> slaagt, ESLint schoon, geen <code>any</code>.</li>
+      <li>Manuele smoke van F1–F6 en AE1–AE6 op Windows geverifieerd.</li>
+      <li>Notch-toggle, verberg-knop en hotkey delen één persisted staat en blijven na herstart.</li>
+      <li>Sluiten-naar-tray: X verbergt, de app draait door, tray-Afsluiten sluit netjes af met sessie-persistentie; de bestaande close-confirm-dialoog is niet geregresseerd.</li>
+      <li>De Keyboard Shortcuts-tabel in <code>CLAUDE.md</code> is bijgewerkt met de notch-hotkey.</li>
+      <li>Dode of experimentele code uit niet-gelukte pogingen is verwijderd.</li>
+    </ul>
+  </section>
+
+  <section id="appendix">
+    <h2>Sources &amp; Research</h2>
+    <p>Geverifieerd tegen de codebase tijdens grounding — dit is de huidige situatie waar de nieuwe capaciteit op aansluit.</p>
+    <ul>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/index.ts">electron/main/index.ts</a> — één <code>BrowserWindow</code> (:322), Windows native frame (:333); venster wordt alleen naar voren gehaald op <code>second-instance</code>/<code>activate</code> (:1939/:1946), niets raist het op agent-events.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/CommandServer.ts">electron/main/services/CommandServer.ts</a> — <code>ccli notify</code> vuurt een native <code>Notification</code> (:635, fire-and-forget, geen klik/routing); <code>ccli open</code> → <code>editor:open</code> (:399) haalt het OS-venster níet naar voren.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/shared/ipc-types.ts">shared/ipc-types.ts</a> — <code>terminal:state</code> = <code>(channel, terminalId, state)</code>, staat ∈ <code>busy|permission|question|done|stopped</code> (:62).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/utils/projectRollup.ts">src/utils/projectRollup.ts</a> &amp; <a href="https://github.com/remcovolmer/command/blob/main/src/utils/terminalState.ts">src/utils/terminalState.ts</a> — cross-project staat-rollup bestaat renderer-side; geen main-proces-aggregaat.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/src/stores/projectStore.ts">src/stores/projectStore.ts</a> — <code>setActiveTerminal(id)</code> wisselt automatisch van project (:1773–1791); renderer-only, niet blootgesteld via IPC. Houdt ook de platte <code>terminals</code>-record over alle projecten.</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/TerminalManager.ts">electron/main/services/TerminalManager.ts</a> — pi.dev busy/done-heuristiek uit PTY-output (:121, hookless).</li>
+      <li><a href="https://github.com/remcovolmer/command/blob/main/electron/main/services/agents.ts">electron/main/services/agents.ts</a> — <code>hasHook</code>-vlag scheidt hook-based van heuristische agents.</li>
+      <li><strong>Geen <code>Tray</code></strong> aanwezig in de codebase (geverifieerde afwezigheid).</li>
+    </ul>
+    <p>Vormschets die de dialoog begeleidde: <a href="https://github.com/remcovolmer/command/blob/main/docs/brainstorm/2026-07-20-notch-surface-options.html"><code>docs/brainstorm/2026-07-20-notch-surface-options.html</code></a>.</p>
+  </section>
+
+  <footer class="composition-signal">
+    Composed 2026-07-20 by ce-brainstorm; enriched to implementation-ready 2026-07-20 by ce-plan (bron-tweet: Edward Luo, Mac-notch multi-agent monitor).
+  </footer>
+
+</div>
+</body>
+</html>

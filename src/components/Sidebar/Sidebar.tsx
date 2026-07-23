@@ -10,6 +10,8 @@ import {
   AlertCircle,
   Settings,
   Zap,
+  Bell,
+  BellOff,
 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '../../stores/projectStore'
@@ -37,6 +39,8 @@ export function Sidebar() {
   const activeTerminalId = useProjectStore((s) => s.activeTerminalId)
   const theme = useProjectStore((s) => s.theme)
   const toggleTheme = useProjectStore((s) => s.toggleTheme)
+  const notchEnabled = useProjectStore((s) => s.notchEnabled)
+  const toggleNotchEnabled = useProjectStore((s) => s.toggleNotchEnabled)
   const setSettingsDialogOpen = useProjectStore((s) => s.setSettingsDialogOpen)
   const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
   const profiles = useProjectStore((s) => s.profiles)
@@ -554,6 +558,13 @@ export function Sidebar() {
                 ) : (
                   <Monitor className="w-4 h-4" />
                 )}
+              </button>
+              <button
+                onClick={toggleNotchEnabled}
+                className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+                title={`Notch: ${notchEnabled ? 'aan' : 'uit'} (${formatBinding(hotkeyConfig['ui.toggleNotch'])})`}
+              >
+                {notchEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
               </button>
               <button
                 onClick={() => setSettingsDialogOpen(true)}

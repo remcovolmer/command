@@ -22,6 +22,7 @@ import type {
   TerminalSession,
   TerminalState,
   TerminalType,
+  NotchPayload,
   UncaughtErrorEvent,
   Unsubscribe,
   UsageData,
@@ -58,6 +59,9 @@ const ALLOWED_LISTENER_CHANNELS = [
   'github:pr-status-update',
   'github:pr-status-stale',
   'usage:update',
+  'notch:state',
+  'notch:activate-terminal',
+  'notch:enabled',
   'fs:watch:changes',
   'fs:watch:error',
   'automation:run-started',
@@ -71,6 +75,30 @@ const ALLOWED_LISTENER_CHANNELS = [
 
 // Expose secure API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Notch strip: cross-project agent-status surface (second window)
+  notch: {
+    pushUpdate: (payload: NotchPayload): void => ipcRenderer.send('notch:update', payload),
+    focusSession: (terminalId: string): void => ipcRenderer.send('notch:focus', terminalId),
+    setEnabled: (enabled: boolean): void => ipcRenderer.send('notch:set-enabled', enabled),
+    resize: (width: number, height: number): void =>
+      ipcRenderer.send('notch:resize', width, height),
+    onState: (callback: (payload: NotchPayload) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: NotchPayload) => callback(payload)
+      ipcRenderer.on('notch:state', handler)
+      return () => ipcRenderer.removeListener('notch:state', handler)
+    },
+    onActivateTerminal: (callback: (terminalId: string) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, terminalId: string) => callback(terminalId)
+      ipcRenderer.on('notch:activate-terminal', handler)
+      return () => ipcRenderer.removeListener('notch:activate-terminal', handler)
+    },
+    onEnabled: (callback: (enabled: boolean) => void): Unsubscribe => {
+      const handler = (_event: Electron.IpcRendererEvent, enabled: boolean) => callback(enabled)
+      ipcRenderer.on('notch:enabled', handler)
+      return () => ipcRenderer.removeListener('notch:enabled', handler)
+    },
+  },
+
   // Terminal operations
   terminal: {
     create: (
