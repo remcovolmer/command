@@ -4,19 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-```bash
-npm install          # Install dependencies
-npm run dev          # Run in development mode (Vite dev server + Electron)
-npm run build        # Build for production (TypeScript + Vite + electron-builder)
-npm run test         # Run Vitest tests
-npm run test -- path/to/test.ts  # Run a single test file
-npm run rebuild      # Rebuild native modules (node-pty)
-npm run release:patch  # Bump patch version, push with tags
-npm run release:minor  # Bump minor version, push with tags
-npm run release:major  # Bump major version, push with tags
-```
-
-Tests require a pre-build step (`npm run pretest` runs automatically). E2E tests use Playwright's Electron API. Unit tests exist for `TerminalPool` and `projectStore` in `test/`.
+Scripts live in `package.json` (`npm run dev`, `build`, `test`, `lint`, `rebuild`, `release:{patch,minor,major}`). Non-obvious bits worth knowing: tests auto-run a pre-build step (`npm run pretest`); E2E tests use Playwright's Electron API; native modules (node-pty) must be rebuilt with `npm run rebuild` after a Node/Electron bump. Unit tests for `TerminalPool` and `projectStore` live in `test/`.
 
 ## Workflow Guidelines
 
@@ -136,7 +124,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 - Tailwind CSS for styling (all colors via CSS variables for runtime theming)
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
-- **Hotkey Requirement**: Core features and primary workflows should include keyboard shortcuts — peripheral or in-surface tools (e.g. panel-local controls) don't require one. When adding a shortcut: define it in `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG) and the `HotkeyAction` union in `src/types/hotkeys.ts`, register the handler in `src/App.tsx`, and document it in the Keyboard Shortcuts table below.
+- **Hotkey Requirement**: Core features and primary workflows should include keyboard shortcuts — peripheral or in-surface tools (e.g. panel-local controls) don't require one. When adding a shortcut: define it in `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG) and the `HotkeyAction` union in `src/types/hotkeys.ts`, register the handler in `src/App.tsx`. Press `Ctrl + /` in-app afterwards to verify the binding and check for conflicts.
 
 ## Windows Development
 
@@ -154,87 +142,4 @@ Always use complete absolute Windows paths with drive letters and backslashes fo
 
 ## Keyboard Shortcuts
 
-All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to view all shortcuts. The hotkey system supports recording custom bindings, conflict detection, and per-action enable/disable.
-
-### Navigation
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + ↑` | Previous project |
-| `Ctrl + ↓` | Next project |
-| `Ctrl + ←` | Previous terminal |
-| `Ctrl + →` | Next terminal |
-| `Ctrl + 1` | Focus sidebar |
-| `Ctrl + 2` | Focus terminal |
-| `Ctrl + 3` | Focus file explorer |
-| `Ctrl + Shift + O` | Show project overview |
-| `Ctrl + Shift + A` | Show automations overview |
-
-### Terminal
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + T` | New terminal |
-| `Ctrl + W` | Close terminal |
-| `Ctrl + \` | Toggle shell drawer |
-| `Alt + 1-9` | Go to terminal 1-9 |
-
-### File Explorer
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + B` | Toggle file explorer |
-| `Ctrl + Shift + E` | Switch to files tab |
-| `Ctrl + Shift + G` | Switch to git tab |
-| `Ctrl + Shift + K` | Switch to tasks tab |
-| `Ctrl + Alt + N` | New file |
-| `Ctrl + Alt + Shift + N` | New folder |
-| `F2` | Rename selected |
-| `Delete` | Delete selected |
-| `Ctrl + Shift + C` | Copy file path |
-
-### Editor
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + Shift + W` | Close editor tab |
-| `Ctrl + Tab` | Next editor tab |
-| `Ctrl + Shift + Tab` | Previous editor tab |
-| `Ctrl + S` | Save file |
-| `Ctrl + Shift + B` | Open browser tab |
-
-### Browser
-Shortcuts fire while the built-in browser (webview) has focus, via a main-process `before-input-event` interceptor; they also fire from the app chrome when a browser tab is active. All new browser controls otherwise live behind the toolbar's `⋯` overflow menu.
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + =` | Browser: zoom in |
-| `Ctrl + -` | Browser: zoom out |
-| `Ctrl + 0` | Browser: reset zoom |
-| `Ctrl + F` | Browser: find in page |
-| `Ctrl + Shift + R` | Browser: hard reload (bypass cache) |
-
-### Worktree
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + Shift + N` | Create worktree |
-
-### Sidebar
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + Shift + I` | Toggle inactive projects section |
-| `Ctrl + Shift + P` | Toggle collapse active project |
-| `Ctrl + Alt + P` | Pin or unpin the active project |
-| `Ctrl + Shift + J` | Show/hide inactive worktrees (active project) |
-| `F2` | Rename the active project (when sidebar focused) |
-| `Ctrl + Shift + Y` | Toggle active project type (Project/Code) |
-
-### UI & Settings
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + ,` | Open settings |
-| `Ctrl + Shift + T` | Toggle theme |
-| `Ctrl + /` | Show shortcuts |
-| `Ctrl + Shift + M` | Cycle Claude mode |
-| `Ctrl + Shift + U` | Toggle usage indicator |
-
-### Dialogs
-| Shortcut | Action |
-|----------|--------|
-| `Escape` | Dismiss topmost toast (if any), otherwise close dialog |
-| `Enter` | Confirm dialog |
+All shortcuts are configurable via Settings (`Ctrl + ,`); press `Ctrl + /` in-app to view the full, current list (with recording, conflict detection, and per-action enable/disable). The bindings are defined in `src/utils/hotkeys.ts` (`DEFAULT_HOTKEY_CONFIG`) with action names in `src/types/hotkeys.ts` — that source is authoritative, so no table is duplicated here. Add new shortcuts per the Hotkey Requirement under Code Conventions above.
