@@ -404,6 +404,13 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
     category: 'ui',
     enabled: true,
   },
+  'ui.toggleNotch': {
+    key: 'd',
+    modifiers: ['ctrl', 'shift'],
+    description: 'Toggle notch',
+    category: 'ui',
+    enabled: true,
+  },
 
   // Dialogs
   'dialog.close': {

@@ -232,6 +232,7 @@ Shortcuts fire while the built-in browser (webview) has focus, via a main-proces
 | `Ctrl + /` | Show shortcuts |
 | `Ctrl + Shift + M` | Cycle Claude mode |
 | `Ctrl + Shift + U` | Toggle usage indicator |
+| `Ctrl + Shift + D` | Toggle notch |
 
 ### Dialogs
 | Shortcut | Action |

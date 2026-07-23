@@ -10,6 +10,7 @@ import {
   clipboard,
   nativeImage,
   session,
+  Tray,
 } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -22,7 +23,13 @@ import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
-import type { AgentType, TerminalType } from '../../shared/ipc-types'
+import type {
+  AgentType,
+  TerminalType,
+  TerminalState,
+  NotchPayload,
+  NotchSession,
+} from '../../shared/ipc-types'
 import { isAgentType } from '../../shared/agents'
 import { isHookCapableAgent } from './services/agents'
 import { GitService } from './services/GitService'
@@ -46,6 +53,7 @@ import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
 import { CommandServer } from './services/CommandServer'
 import { SkillInstaller } from './services/SkillInstaller'
+import { NotchService } from './services/NotchService'
 import { randomUUID } from 'node:crypto'
 
 // Prevent EPIPE errors on console.log from crashing the app
@@ -237,6 +245,11 @@ if (process.env.NODE_ENV !== 'test' && !app.requestSingleInstanceLock()) {
 }
 
 let win: BrowserWindow | null = null
+let notchService: NotchService | null = null
+let tray: Tray | null = null
+// Set once an explicit quit is requested (tray → Afsluiten, or before-quit).
+// Until then, closing the main window hides it to the tray instead of quitting.
+let isQuitting = false
 let terminalManager: TerminalManager | null = null
 let projectPersistence: ProjectPersistence | null = null
 let gitService: GitService | null = null
@@ -318,6 +331,43 @@ async function restoreSessions(): Promise<void> {
 const preload = path.join(__dirname, '../preload/index.cjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
+function createTray() {
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'build', 'icon.ico')
+    : path.join(process.env.APP_ROOT, 'build', 'icon.ico')
+  tray = new Tray(iconPath)
+  tray.setToolTip('Command')
+
+  const showWindow = () => {
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  }
+
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Command tonen', click: showWindow },
+      { type: 'separator' },
+      {
+        label: 'Afsluiten',
+        click: () => {
+          // Confirm before killing running agents (reuses the close dialog);
+          // otherwise quit straight away — before-quit persists sessions.
+          if (terminalManager?.hasActiveTerminals()) {
+            showWindow()
+            win?.webContents.send('app:close-request')
+          } else {
+            isQuitting = true
+            app.quit()
+          }
+        },
+      },
+    ]),
+  )
+  tray.on('double-click', showWindow)
+}
+
 async function createWindow() {
   Menu.setApplicationMenu(null)
 
@@ -341,6 +391,19 @@ async function createWindow() {
       webviewTag: true, // Enables the built-in browser (<webview>); guests are hardened below
     },
   })
+
+  // Notch strip: a second frameless always-on-top window reusing this window's
+  // preload + renderer bundle via the `#strip` hash route. Foreground-driven
+  // visibility and the session feed are wired in later units.
+  notchService?.destroy()
+  notchService = new NotchService(win, {
+    preload,
+    indexHtml,
+    devServerUrl: VITE_DEV_SERVER_URL,
+  })
+
+  // Tray keeps Command resident so the notch survives closing the window.
+  if (!tray) createTray()
 
   // Install hooks for every hook-capable agent (Claude, Codex) for state detection
   installAgentHooks()
@@ -440,17 +503,25 @@ async function createWindow() {
       .catch((err) => automationLog.error('Worktree GC failed:', err))
   })
 
-  // Pause/resume GitHub and usage polling on focus/blur
+  // Pause/resume GitHub and usage polling on focus/blur, and drive the notch
+  // strip's foreground-gated visibility from the same signal.
   win.on('blur', () => {
     githubService?.pauseAllPolling()
     usageService?.pause()
     codexUsageService?.pause()
+    notchService?.setMainForeground(false)
   })
   win.on('focus', () => {
     githubService?.resumeAllPolling()
     usageService?.resume()
     codexUsageService?.resume()
+    notchService?.setMainForeground(true)
   })
+  // hide() (close-to-tray) does not reliably emit blur on Windows, so drive the
+  // notch's foreground state from hide/show too — otherwise the strip would
+  // stay suppressed exactly when Command is minimized to the tray.
+  win.on('hide', () => notchService?.setMainForeground(false))
+  win.on('show', () => notchService?.setMainForeground(win?.isFocused() ?? false))
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -469,14 +540,89 @@ async function createWindow() {
     return { action: 'deny' }
   })
 
-  // Handle close request
+  // Close-to-tray: the X hides the window and keeps Command running so the
+  // notch stays alive. Only an explicit quit (tray → Afsluiten, or any
+  // app.quit() path, which sets isQuitting in before-quit) closes the window.
   win.on('close', (e) => {
-    if (terminalManager?.hasActiveTerminals()) {
+    if (!isQuitting) {
       e.preventDefault()
-      win?.webContents.send('app:close-request')
+      win?.hide()
+      notchService?.setMainForeground(false)
     }
   })
 }
+
+// Notch strip: receive the cross-project session snapshot from the main
+// renderer and relay it to the strip. Validate each element (same rigor as the
+// terminal:* handlers) rather than trusting the payload shape — the strip
+// consumes id/state/agentType directly.
+const VALID_NOTCH_STATES = new Set<TerminalState>([
+  'busy',
+  'permission',
+  'question',
+  'done',
+  'stopped',
+])
+
+function isValidNotchSession(value: unknown): value is NotchSession {
+  if (!value || typeof value !== 'object') return false
+  const s = value as Record<string, unknown>
+  return (
+    typeof s.id === 'string' &&
+    isValidUUID(s.id) &&
+    typeof s.projectId === 'string' &&
+    typeof s.projectName === 'string' &&
+    typeof s.title === 'string' &&
+    isAgentType(s.agentType) &&
+    typeof s.state === 'string' &&
+    VALID_NOTCH_STATES.has(s.state as TerminalState)
+  )
+}
+
+function sanitizeNotchPayload(payload: unknown): NotchPayload | null {
+  if (!payload || typeof payload !== 'object') return null
+  const raw = (payload as { sessions?: unknown }).sessions
+  if (!Array.isArray(raw)) return null
+  const sessions: NotchSession[] = raw.filter(isValidNotchSession).map((s) => ({
+    id: s.id,
+    projectId: s.projectId,
+    projectName: s.projectName,
+    title: s.title,
+    agentType: s.agentType,
+    state: s.state,
+  }))
+  return { sessions }
+}
+
+ipcMain.on('notch:update', (_event, payload: unknown) => {
+  const clean = sanitizeNotchPayload(payload)
+  if (clean) notchService?.setSessions(clean)
+})
+
+// Notch strip click: raise the main window and activate the clicked session.
+ipcMain.on('notch:focus', (_event, terminalId: unknown) => {
+  if (typeof terminalId === 'string' && isValidUUID(terminalId)) {
+    notchService?.focusSession(terminalId)
+  }
+})
+
+// Notch enable/disable. Echo a strip-originated change (e.g. the hide button)
+// back to the main renderer so its store + sidebar toggle stay in sync.
+ipcMain.on('notch:set-enabled', (event, enabled: unknown) => {
+  if (typeof enabled !== 'boolean') return
+  notchService?.setEnabled(enabled)
+  if (win && event.sender !== win.webContents) {
+    win.webContents.send('notch:enabled', enabled)
+  }
+})
+
+// Notch strip reports its rendered content size so the window fits it exactly
+// (the expanded session list would otherwise clip against a fixed height).
+ipcMain.on('notch:resize', (_event, width: unknown, height: unknown) => {
+  if (typeof width === 'number' && typeof height === 'number') {
+    notchService?.setContentSize(width, height)
+  }
+})
 
 // IPC Handlers for Terminal operations
 ipcMain.handle(
@@ -1877,6 +2023,10 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  // A real quit is underway — let the main window's close handler proceed
+  // instead of hiding to tray.
+  isQuitting = true
+
   // Skip cleanup and session persistence during update — services already
   // destroyed in update:install handler, sessions will be restored after restart
   if (updateService?.isUpdateInProgress) return
@@ -1931,6 +2081,8 @@ app.on('before-quit', () => {
   githubService?.destroy()
   usageService?.destroy()
   codexUsageService?.destroy()
+  notchService?.destroy()
+  tray?.destroy()
   terminalManager?.destroy()
 })
 

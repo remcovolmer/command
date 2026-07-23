@@ -6,6 +6,7 @@ import { ShortcutsOverlay } from './components/Settings/ShortcutsOverlay'
 import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
+import { useNotchFeed } from './hooks/useNotchFeed'
 import { fileWatcherEvents } from './utils/fileWatcherEvents'
 import { useThemeResolver } from './hooks/useThemeResolver'
 import { dismissTopmostToast } from './utils/toastRegistry'
@@ -25,6 +26,9 @@ function App() {
   const closeEditorTab = useProjectStore((s) => s.closeEditorTab)
   const hasActiveTerminals = Object.keys(terminals).length > 0
   const api = useMemo(() => getElectronAPI(), [])
+
+  // Feed the notch strip window with the cross-project agent-session snapshot.
+  useNotchFeed()
 
   // Refocus the active terminal's xterm textarea (e.g. after closing dialogs)
   const refocusActiveTerminal = useCallback(() => {
@@ -51,6 +55,20 @@ function App() {
       }
     })
     return unsubscribe
+  }, [api])
+
+  // Return to a session when clicked in the notch strip.
+  useEffect(() => {
+    return api.notch.onActivateTerminal((terminalId) => {
+      useProjectStore.getState().setActiveTerminal(terminalId)
+    })
+  }, [api])
+
+  // Sync the notch toggle when the strip's hide button turns it off.
+  useEffect(() => {
+    return api.notch.onEnabled((enabled) => {
+      useProjectStore.getState().setNotchEnabled(enabled)
+    })
   }, [api])
 
   // Helper to get visual order of projects (pinned → active → inactive)
@@ -450,6 +468,9 @@ function App() {
     },
     'ui.toggleUsageIndicator': () => {
       useProjectStore.getState().toggleUsageIndicator()
+    },
+    'ui.toggleNotch': () => {
+      useProjectStore.getState().toggleNotchEnabled()
     },
 
     // Browser shortcuts, app-chrome-focus path — registered ONLY when a browser

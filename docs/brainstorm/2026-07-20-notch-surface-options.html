@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notch voor Windows — vormvarianten</title>
+<style>
+  :root{
+    --bg:#0d0f14; --panel:#161a22; --panel2:#1e2430; --line:#2a3240;
+    --ink:#e8ecf3; --dim:#8b95a7; --dimmer:#5c6577;
+    --busy:#8b95a7; --perm:#f0a63a; --done:#43c46a; --stopped:#e0524a;
+    --accent:#5b8cff;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
+    padding:28px 26px 60px;line-height:1.45}
+  h1{font-size:22px;margin:0 0 4px;font-weight:650;letter-spacing:-.01em}
+  .sub{color:var(--dim);font-size:13.5px;margin:0 0 4px;max-width:900px}
+  .judge{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0 24px;font-size:12.5px}
+  .judge div{color:var(--dim)}
+  .judge b{color:var(--ink);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;max-width:1180px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px 16px 14px;display:flex;flex-direction:column}
+  .card h2{font-size:15px;margin:0 0 2px;font-weight:640}
+  .card h2 .k{display:inline-flex;width:22px;height:22px;border-radius:6px;
+    background:var(--accent);color:#fff;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;margin-right:9px;vertical-align:middle}
+  .card .desc{color:var(--dim);font-size:12.5px;margin:0 0 12px;min-height:34px}
+
+  /* mock windows desktop */
+  .desk{position:relative;aspect-ratio:16/10;border-radius:9px;overflow:hidden;
+    background:linear-gradient(150deg,#1c2f5a 0%,#274b8a 42%,#3f7bd6 100%);
+    border:1px solid #000}
+  .win{position:absolute;background:rgba(20,24,33,.92);border:1px solid rgba(255,255,255,.09);
+    border-radius:7px;backdrop-filter:blur(2px)}
+  .win .bar{height:9px;border-bottom:1px solid rgba(255,255,255,.06);
+    display:flex;gap:3px;align-items:center;padding:0 5px}
+  .win .bar i{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.3)}
+  .taskbar{position:absolute;left:0;right:0;bottom:0;height:26px;
+    background:rgba(10,12,16,.82);backdrop-filter:blur(6px);
+    border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;
+    justify-content:center;gap:8px}
+  .taskbar .ico{width:13px;height:13px;border-radius:3px;background:rgba(255,255,255,.16)}
+  .taskbar .ico.cmd{background:var(--accent)}
+  .tray{position:absolute;right:7px;bottom:0;height:26px;display:flex;align-items:center;gap:6px}
+  .tray .t{width:10px;height:10px;border-radius:2px;background:rgba(255,255,255,.22);position:relative}
+  .badge{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;
+    background:var(--perm);border:1.5px solid #0a0c10}
+
+  /* the surface itself (shared pill styling) */
+  .surface{position:absolute;background:rgba(14,16,22,.97);
+    border:1px solid rgba(255,255,255,.11);border-radius:9px;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);overflow:hidden}
+  .srow{display:flex;align-items:center;gap:6px;padding:5px 8px;
+    border-bottom:1px solid rgba(255,255,255,.05);font-size:9.5px;white-space:nowrap}
+  .srow:last-child{border-bottom:0}
+  .dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+  .dot.busy{background:var(--busy)} .dot.perm{background:var(--perm);box-shadow:0 0 6px var(--perm)}
+  .dot.done{background:var(--done)}
+  .chip{font-size:7.5px;font-weight:700;padding:1px 3px;border-radius:3px;
+    background:rgba(255,255,255,.1);color:var(--dim);flex:0 0 auto}
+  .proj{color:var(--ink);font-weight:600;flex:0 0 auto}
+  .act{color:var(--dimmer);overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;min-width:0}
+  .hd{font-size:8px;color:var(--dimmer);padding:4px 8px;letter-spacing:.04em;text-transform:uppercase;
+    border-bottom:1px solid rgba(255,255,255,.06)}
+
+  /* toast */
+  .toast{position:absolute;right:6px;bottom:32px;width:47%;background:rgba(20,24,33,.98);
+    border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:6px 8px;
+    box-shadow:0 8px 22px rgba(0,0,0,.5)}
+  .toast .tt{font-size:9px;font-weight:700;display:flex;align-items:center;gap:5px}
+  .toast .tb{font-size:8.5px;color:var(--dim);margin-top:2px}
+  .toast .ta{margin-top:5px;display:flex;gap:5px}
+  .toast .ta span{font-size:8px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.1);color:var(--ink)}
+  .toast .ta span.pri{background:var(--accent)}
+
+  /* peek tab */
+  .peektab{position:absolute;top:0;left:50%;transform:translateX(-50%);
+    background:rgba(14,16,22,.97);border:1px solid rgba(255,255,255,.11);border-top:0;
+    border-radius:0 0 8px 8px;padding:2px 12px;font-size:8px;color:var(--dim);
+    display:flex;align-items:center;gap:5px}
+
+  .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .tag{font-size:10.5px;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+  .tag b{color:var(--ink);font-weight:600}
+  .tag.good{border-color:rgba(67,196,106,.4);color:#8fe3a8}
+  .tag.warn{border-color:rgba(240,166,58,.4);color:#f2c07a}
+  .caption{font-size:11.5px;color:var(--dimmer);font-style:italic;margin-top:9px}
+  .note{max-width:1180px;margin:26px auto 0;color:var(--dimmer);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+  <h1>Notch voor Windows — 4 vormen voor het altijd-aanwezige oppervlak</h1>
+  <p class="sub">Ruwe richtingsschetsen. Elk scherm toont <b>waar</b> het oppervlak zit en hoe het eruitziet als een agent net gepopt is (goedkeuring nodig).</p>
+  <div class="judge">
+    <div><b>Beoordeel:</b> plaatsing · hoe opdringerig · past het bij hoe jij werkt</div>
+    <div><b>Negeer:</b> exacte kleuren, fonts, pixel-uitlijning, iconen</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- A: Tray + flyout -->
+    <div class="card">
+      <h2><span class="k">A</span>Tray-icoon + rijke flyout</h2>
+      <p class="desc">Icoon in de systeembalk (rechtsonder) met kleur-badge voor de scherpste staat. Klik → paneel met alle sessies. Toast bij events.</p>
+      <div class="desk">
+        <div class="win" style="left:8%;top:12%;width:40%;height:46%"><div class="bar"><i></i><i></i></div></div>
+        <div class="win" style="left:34%;top:30%;width:44%;height:50%"><div class="bar"><i></i><i></i></div></div>
+        <div class="taskbar"><div class="ico"></div><div class="ico cmd"></div><div class="ico"></div></div>
+        <div class="tray"><div class="t" style="background:var(--perm)"><div class="badge"></div></div></div>
+        <!-- flyout above tray -->
+        <div class="surface" style="right:4%;bottom:30px;width:56%">
+          <div class="hd">4 sessies · 1 wacht op jou</div>
+          <div class="srow"><span class="dot perm"></span><span class="chip">C</span><span class="proj">agent-runtime</span><span class="act">Approve edit App.tsx?</span></div>
+          <div class="srow"><span class="dot done"></span><span class="chip">Cx</span><span class="proj">command</span><span class="act">npm test — done</span></div>
+          <div class="srow"><span class="dot busy"></span><span class="chip">C</span><span class="proj">feat-notch</span><span class="act">Tracing events…</span></div>
+        </div>
+      </div>
+      <p class="caption">Nul schermruimte tot je klikt. Voelt het meest "Windows".</p>
+      <div class="tags">
+        <span class="tag good">Footprint <b>nul</b></span>
+        <span class="tag warn">Altijd zichtbaar <b>nee</b></span>
+        <span class="tag good">Native <b>hoog</b></span>
+        <span class="tag good">Bouwkosten <b>laag</b></span>
+      </div>
+    </div>
+
+    <!-- B: Always-on-top bar -->
+    <div class="card">
+      <h2><span class="k">B</span>Always-on-top mini-balk</h2>
+      <p class="desc">Smalle strip bovenaan-midden, altijd boven alles. Toont sessie-pillen live. Zwelt op bij een event. Dichtst bij de Mac-notch.</p>
+      <div class="desk">
+        <div class="win" style="left:10%;top:26%;width:44%;height:48%"><div class="bar"><i></i><i></i></div></div>
+        <div class="win" style="left:44%;top:38%;width:44%;height:46%"><div class="bar"><i></i><i></i></div></div>
+        <div class="taskbar"><div class="ico"></div><div class="ico cmd"></div><div class="ico"></div></div>
+        <!-- bar top center, always visible -->
+        <div class="surface" style="left:50%;top:6px;transform:translateX(-50%);width:70%">
+          <div class="srow"><span class="dot perm"></span><span class="chip">C</span><span class="proj">agent-runtime</span><span class="act">Approve edit?</span><span class="dot busy"></span><span class="chip">C</span><span class="proj">feat-notch</span><span class="dot done"></span><span class="chip">Cx</span><span class="proj">command</span></div>
+        </div>
+      </div>
+      <p class="caption">Altijd in beeld. Kost een reepje bovenaan; kan boven fullscreen apps hangen.</p>
+      <div class="tags">
+        <span class="tag warn">Footprint <b>reepje</b></span>
+        <span class="tag good">Altijd zichtbaar <b>ja</b></span>
+        <span class="tag">Native <b>midden</b></span>
+        <span class="tag warn">Bouwkosten <b>midden</b></span>
+      </div>
+    </div>
+
+    <!-- C: Auto-hide peek -->
+    <div class="card">
+      <h2><span class="k">C</span>Auto-hide "peek"-balk</h2>
+      <p class="desc">Verborgen buiten beeld aan de bovenrand. Glijdt naar beneden bij een event of hover, verdwijnt weer. De echte notch-truc zonder permanente voetafdruk.</p>
+      <div class="desk">
+        <div class="win" style="left:12%;top:24%;width:46%;height:50%"><div class="bar"><i></i><i></i></div></div>
+        <div class="win" style="left:40%;top:34%;width:46%;height:48%"><div class="bar"><i></i><i></i></div></div>
+        <div class="taskbar"><div class="ico"></div><div class="ico cmd"></div><div class="ico"></div></div>
+        <!-- small peek tab visible when hidden -->
+        <div class="peektab">▾ <span class="dot perm"></span> 1</div>
+        <!-- popped-down surface -->
+        <div class="surface" style="left:50%;top:0;transform:translateX(-50%);width:60%">
+          <div class="srow"><span class="dot perm"></span><span class="chip">C</span><span class="proj">agent-runtime</span><span class="act">Approve edit App.tsx?</span></div>
+          <div class="srow"><span class="dot done"></span><span class="chip">Cx</span><span class="proj">command</span><span class="act">npm test — done</span></div>
+        </div>
+      </div>
+      <p class="caption">Onzichtbaar 99% van de tijd; verschijnt precies wanneer iets jou nodig heeft.</p>
+      <div class="tags">
+        <span class="tag good">Footprint <b>~nul</b></span>
+        <span class="tag good">Altijd zichtbaar <b>op trigger</b></span>
+        <span class="tag">Native <b>midden</b></span>
+        <span class="tag warn">Bouwkosten <b>midden+</b></span>
+      </div>
+    </div>
+
+    <!-- D: Smart toasts + tray badge -->
+    <div class="card">
+      <h2><span class="k">D</span>Slimme toasts + tray-badge</h2>
+      <p class="desc">Leunt volledig op Windows-toasts (bestaan al!) maar maakt ze slim: klik → naar die sessie. Tray-icoon voor de lijst. Minste nieuwe UI, snelst te shippen.</p>
+      <div class="desk">
+        <div class="win" style="left:9%;top:16%;width:42%;height:52%"><div class="bar"><i></i><i></i></div></div>
+        <div class="win" style="left:38%;top:30%;width:46%;height:50%"><div class="bar"><i></i><i></i></div></div>
+        <div class="taskbar"><div class="ico"></div><div class="ico cmd"></div><div class="ico"></div></div>
+        <div class="tray"><div class="t" style="background:var(--perm)"><div class="badge"></div></div></div>
+        <!-- toast bottom right -->
+        <div class="toast">
+          <div class="tt"><span class="dot perm"></span> agent-runtime · Claude</div>
+          <div class="tb">Wacht op goedkeuring — Approve edit App.tsx?</div>
+          <div class="ta"><span class="pri">Open sessie</span><span>Later</span></div>
+        </div>
+      </div>
+      <p class="caption">Vertrouwd Windows-gedrag; maar toasts zijn vluchtig, geen live overzicht.</p>
+      <div class="tags">
+        <span class="tag good">Footprint <b>nul</b></span>
+        <span class="tag warn">Altijd zichtbaar <b>nee</b></span>
+        <span class="tag good">Native <b>zeer hoog</b></span>
+        <span class="tag good">Bouwkosten <b>laagst</b></span>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="note">Deze vier sluiten elkaar niet uit — D (slimme toasts) is de bodem die onder A/B/C sowieso nodig is voor het "pop als het venster geminimaliseerd is"-deel.</p>
+</body>
+</html>
