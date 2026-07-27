@@ -16,7 +16,7 @@
     {
       "from": "electron/main/cli",
       "to": "cli",
-      "filter": ["*.cjs", "*.cmd"]
+      "filter": ["*.cjs", "*.cmd", "ccli"]
     },
     {
       "from": "electron/main/templates",

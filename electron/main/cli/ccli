@@ -1,0 +1,6 @@
+#!/bin/sh
+# POSIX shim so a bare `ccli` resolves in Git Bash / MSYS shells, which
+# (unlike PowerShell's PATHEXT) do NOT auto-append .cmd to a bare command
+# name. Mirrors ccli.cmd. Without this, agents shelling out via Git Bash
+# see "ccli not on PATH" and fall back to native file opening.
+exec node "$(dirname "$0")/ccli.cjs" "$@"

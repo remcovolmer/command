@@ -1,10 +1,14 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest'
 import http from 'node:http'
 import path from 'node:path'
+import fs from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 // Import the CJS module internals
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
+const here = path.dirname(fileURLToPath(import.meta.url))
 const ccli = require('../electron/main/cli/ccli.cjs') as {
   parseArgs: (argv: string[]) => { positional: string[]; flags: Record<string, string | boolean> }
   buildRoute: (
@@ -487,6 +491,43 @@ describe('ccli', () => {
     test('project create resolves relative path', () => {
       const route = ccli.buildRoute(['project', 'create', './my-proj'], { name: 'Test' })
       expect(path.isAbsolute(route.body!.path as string)).toBe(true)
+    })
+  })
+
+  // --- packaging shim (regression) ---
+  //
+  // Git Bash / MSYS shells do NOT auto-append .cmd to a bare command name the
+  // way PowerShell's PATHEXT does, so without an extension-less POSIX shim a
+  // bare `ccli` resolves only in PowerShell. Agents that shell out via Git
+  // Bash then see "ccli not on PATH" and fall back to native file opening.
+  // These guards keep the shim present, executable, and packaged.
+  describe('packaging shim', () => {
+    const repoRoot = path.resolve(here, '..')
+    const shimPath = path.join(repoRoot, 'electron', 'main', 'cli', 'ccli')
+
+    test('extension-less POSIX shim exists and delegates to ccli.cjs', () => {
+      expect(fs.existsSync(shimPath)).toBe(true)
+      const body = fs.readFileSync(shimPath, 'utf8')
+      expect(body.startsWith('#!/bin/sh')).toBe(true)
+      expect(body).toMatch(/exec node .*ccli\.cjs/)
+    })
+
+    test('shim is tracked as executable (git mode 100755)', () => {
+      const out = execFileSync('git', ['ls-files', '-s', 'electron/main/cli/ccli'], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      })
+      // format: "<mode> <sha> <stage>\t<path>"
+      expect(out.split(/\s+/)[0]).toBe('100755')
+    })
+
+    test('electron-builder ships the shim alongside .cjs and .cmd', () => {
+      const builder = JSON.parse(
+        fs.readFileSync(path.join(repoRoot, 'electron-builder.json'), 'utf8')
+      ) as { extraResources: Array<{ from: string; filter?: string[] }> }
+      const cliEntry = builder.extraResources.find((r) => r.from === 'electron/main/cli')
+      expect(cliEntry).toBeDefined()
+      expect(cliEntry!.filter).toContain('ccli')
     })
   })
 })
