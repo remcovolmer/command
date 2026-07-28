@@ -216,7 +216,7 @@ All shortcuts are configurable via Settings (`Ctrl + ,`). Press `Ctrl + /` to vi
 | `Ctrl + ,` | Open settings |
 | `Ctrl + Shift + T` | Toggle theme |
 | `Ctrl + /` | Show shortcuts |
-| `Ctrl + Shift + M` | Cycle Codex mode |
+| `Ctrl + Shift + M` | Cycle Agent mode |
 
 ### Dialogs
 | Shortcut | Action |

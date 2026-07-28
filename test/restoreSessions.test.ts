@@ -187,10 +187,16 @@ describe('restoreSessions handler', () => {
         type: 'project',
         createdAt: 0,
         sortOrder: 0,
+        settings: { claudeMode: 'full-auto' as const },
       },
     ]
     const createTerminal = vi.fn(
-      (_opts: { cwd: string; type?: string; resumeSessionId?: string }) => 'cx-terminal'
+      (_opts: {
+        cwd: string
+        type?: string
+        resumeSessionId?: string
+        claudeMode?: 'chat' | 'auto' | 'full-auto'
+      }) => 'cx-terminal'
     )
     const projectPersistence = {
       getSessions: vi.fn(() => sessions),
@@ -219,6 +225,7 @@ describe('restoreSessions handler', () => {
     expect(createTerminal.mock.calls[0][0]).toMatchObject({
       type: 'codex',
       resumeSessionId: 'codexuuid1',
+      claudeMode: 'full-auto',
     })
     expect(preAssociateSession).toHaveBeenCalledWith('codexuuid1', 'cx-terminal')
     const restored = send.mock.calls.filter((c) => c[0] === 'session:restored')

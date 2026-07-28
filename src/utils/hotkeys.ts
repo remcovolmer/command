@@ -393,7 +393,7 @@ export const DEFAULT_HOTKEY_CONFIG: HotkeyConfig = {
   'ui.cycleClaudeMode': {
     key: 'm',
     modifiers: ['ctrl', 'shift'],
-    description: 'Cycle Claude mode',
+    description: 'Cycle Agent mode',
     category: 'ui',
     enabled: true,
   },
@@ -627,8 +627,9 @@ export function parseKeyEvent(
  *   which dereferences DEFAULT_HOTKEY_CONFIG[action].key and throws on
  *   `undefined`, white-screening the whole Settings dialog.
  *
- * Called from onRehydrateStorage in projectStore.ts. Existing user
- * customizations for actions that still exist are left untouched.
+ * Called from onRehydrateStorage in projectStore.ts. Existing user-editable
+ * binding fields are left untouched; static descriptions follow the current
+ * application copy.
  */
 export function mergeMissingHotkeyDefaults(config: HotkeyConfig): HotkeyConfig {
   let changed = false
@@ -637,6 +638,12 @@ export function mergeMissingHotkeyDefaults(config: HotkeyConfig): HotkeyConfig {
   for (const action of Object.keys(DEFAULT_HOTKEY_CONFIG) as HotkeyAction[]) {
     if (!merged[action]) {
       merged[action] = DEFAULT_HOTKEY_CONFIG[action]
+      changed = true
+    } else if (merged[action].description !== DEFAULT_HOTKEY_CONFIG[action].description) {
+      merged[action] = {
+        ...merged[action],
+        description: DEFAULT_HOTKEY_CONFIG[action].description,
+      }
       changed = true
     }
   }

@@ -21,7 +21,7 @@ export interface AgentSpawnSpec {
    * Empty array = this agent has no id-based resume.
    */
   buildResumeArgs(sessionId: string): string[]
-  /** Permission/mode flags. Only claude maps ClaudeMode today; others no-op. */
+  /** Provider-specific permission/mode flags derived from the shared project mode. */
   buildModeArgs(mode?: ClaudeMode): string[]
   /**
    * True when the agent reports lifecycle state via a hook that writes into the
@@ -48,7 +48,8 @@ export const AGENT_SPAWN: Record<AgentType, AgentSpawnSpec> = {
     // <UUID>` continues a prior session (verified against codex CLI v-current).
     binary: 'codex',
     buildResumeArgs: (sessionId) => [`resume "${sessionId}"`],
-    buildModeArgs: () => [],
+    buildModeArgs: (mode) =>
+      mode === 'full-auto' ? ['--dangerously-bypass-approvals-and-sandbox'] : [],
     hasHook: true,
   },
   pi: {

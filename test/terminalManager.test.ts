@@ -143,16 +143,35 @@ describe('TerminalManager CLI flag construction', () => {
     expect(command).toContain('--enable-auto-mode')
   })
 
-  test('codex terminal → launches interactive "codex\\r" (no claude flags)', () => {
-    manager.createTerminal({ cwd: '/test', type: 'codex' })
+  test('codex Chat → launches interactive "codex\\r" without permission flags', () => {
+    manager.createTerminal({ cwd: '/test', type: 'codex', claudeMode: 'chat' })
     flushTimers()
     expect(mockWrite).toHaveBeenCalledWith('codex\r')
   })
 
-  test('codex resume → "codex resume \\"id\\"\\r" subcommand form', () => {
-    manager.createTerminal({ cwd: '/test', type: 'codex', resumeSessionId: 'uuid-1' })
+  test('codex Auto → keeps the default interactive command', () => {
+    manager.createTerminal({ cwd: '/test', type: 'codex', claudeMode: 'auto' })
     flushTimers()
-    expect(mockWrite).toHaveBeenCalledWith('codex resume "uuid-1"\r')
+    expect(mockWrite).toHaveBeenCalledWith('codex\r')
+  })
+
+  test('codex Full Auto → writes exactly one approvals-and-sandbox bypass flag', () => {
+    manager.createTerminal({ cwd: '/test', type: 'codex', claudeMode: 'full-auto' })
+    flushTimers()
+    expect(mockWrite).toHaveBeenCalledWith('codex --dangerously-bypass-approvals-and-sandbox\r')
+  })
+
+  test('codex Full Auto resume → keeps resume args before exactly one bypass flag', () => {
+    manager.createTerminal({
+      cwd: '/test',
+      type: 'codex',
+      resumeSessionId: 'uuid-1',
+      claudeMode: 'full-auto',
+    })
+    flushTimers()
+    expect(mockWrite).toHaveBeenCalledWith(
+      'codex resume "uuid-1" --dangerously-bypass-approvals-and-sandbox\r'
+    )
   })
 
   test('pi terminal → launches "pi\\r"', () => {

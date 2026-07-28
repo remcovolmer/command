@@ -21,6 +21,14 @@ describe('DEFAULT_HOTKEY_CONFIG', () => {
     expect([...binding.modifiers].sort()).toEqual(['ctrl', 'shift'])
     expect(binding.enabled).toBe(true)
   })
+
+  test('ui.cycleClaudeMode keeps its compatible id and Ctrl+Shift+M binding', () => {
+    const binding = DEFAULT_HOTKEY_CONFIG['ui.cycleClaudeMode']
+    expect(binding.key).toBe('m')
+    expect([...binding.modifiers].sort()).toEqual(['ctrl', 'shift'])
+    expect(binding.description).toBe('Cycle Agent mode')
+    expect(binding.enabled).toBe(true)
+  })
 })
 
 describe('mergeMissingHotkeyDefaults', () => {
@@ -76,6 +84,30 @@ describe('mergeMissingHotkeyDefaults', () => {
     const merged = mergeMissingHotkeyDefaults(customized)
     expect(merged['ui.openSettings'].key).toBe('p')
     expect([...merged['ui.openSettings'].modifiers].sort()).toEqual(['alt', 'ctrl'])
+  })
+
+  test('refreshes a persisted mode description without changing custom binding fields', () => {
+    const customized = {
+      ...DEFAULT_HOTKEY_CONFIG,
+      'ui.cycleClaudeMode': {
+        ...DEFAULT_HOTKEY_CONFIG['ui.cycleClaudeMode'],
+        key: 'm',
+        modifiers: ['ctrl', 'alt'],
+        description: 'Cycle Claude mode',
+        enabled: false,
+      },
+    } as HotkeyConfig
+
+    const merged = mergeMissingHotkeyDefaults(customized)
+    const binding = merged['ui.cycleClaudeMode']
+
+    expect(binding).toEqual({
+      ...customized['ui.cycleClaudeMode'],
+      description: 'Cycle Agent mode',
+    })
+    expect(binding.key).toBe('m')
+    expect(binding.modifiers).toEqual(['ctrl', 'alt'])
+    expect(binding.enabled).toBe(false)
   })
 
   test('returns the same reference when nothing changes', () => {

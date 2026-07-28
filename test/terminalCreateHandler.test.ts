@@ -10,7 +10,11 @@ const VALID_PROJECT_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 
 function makeDeps(
   overrides: Partial<{
-    createTerminal: (opts: { cwd: string }) => string
+    createTerminal: (opts: {
+      cwd: string
+      type?: string
+      claudeMode?: 'chat' | 'auto' | 'full-auto'
+    }) => string
     getProjects: () => Array<{
       id: string
       path: string
@@ -136,6 +140,29 @@ describe('terminal:create IPC handler body', () => {
       expect(result).toBe('tid')
       expect(createTerminal.mock.calls[0][0]).toMatchObject({ type })
     }
+  })
+
+  test('forwards the parent project Full Auto mode for a fresh codex terminal', async () => {
+    const createTerminal = vi.fn(() => 'tid')
+    const { deps } = makeDeps({
+      createTerminal,
+      getProjects: () => [
+        {
+          id: VALID_PROJECT_ID,
+          path: '/p',
+          settings: { claudeMode: 'full-auto' },
+        },
+      ],
+    })
+
+    await handleTerminalCreate(deps, { projectId: VALID_PROJECT_ID, type: 'codex' })
+
+    expect(createTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'codex',
+        claudeMode: 'full-auto',
+      })
+    )
   })
 
   test('rejects an unknown terminal type', async () => {

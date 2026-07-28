@@ -299,16 +299,16 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 </select>
               </div>
 
-              {/* Claude Mode selector (applies to Claude chats) */}
+              {/* Agent Mode selector (provider-specific behavior) */}
               <div className="mt-3">
-                <label className="text-sm font-medium text-foreground">Claude Mode</label>
+                <label className="text-sm font-medium text-foreground">Agent Mode</label>
                 <p className="text-xs text-muted-foreground mt-1 mb-2">
                   {currentMode === 'chat' &&
-                    'Normal mode — Claude asks for permission before every action.'}
+                    'Normal mode — Claude and Codex use their default approval behavior.'}
                   {currentMode === 'auto' &&
-                    'Auto mode — Claude auto-accepts safe actions, asks for risky ones.'}
+                    'Auto mode — Claude auto-accepts safe actions; Codex keeps its default behavior.'}
                   {currentMode === 'full-auto' &&
-                    'Full auto — Claude executes all actions without permission prompts.'}
+                    'Full auto — Claude skips permission prompts; Codex runs without approvals or its internal sandbox.'}
                 </p>
                 <div className="flex items-center gap-1">
                   {modeOptions.map((option) => (
@@ -385,14 +385,19 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                       Enable Full Auto Mode?
                     </h3>
                     <p className="text-xs text-muted-foreground mt-2">
-                      This will run Claude Code with{' '}
+                      This runs Claude Code with{' '}
                       <code className="text-[11px] px-1 py-0.5 bg-muted rounded">
                         --dangerously-skip-permissions
+                      </code>{' '}
+                      and Codex with{' '}
+                      <code className="text-[11px] px-1 py-0.5 bg-muted rounded">
+                        --dangerously-bypass-approvals-and-sandbox
                       </code>
-                      , allowing it to execute any command without approval prompts.
+                      . Claude skips permission prompts; Codex bypasses approvals and its internal
+                      sandbox.
                     </p>
                     <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                      Only enable this in isolated or sandboxed environments.
+                      Only enable this in an externally sandboxed environment.
                     </p>
                   </>
                 ) : (
@@ -404,7 +409,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                         --enable-auto-mode
                       </code>
                       . Claude will auto-accept safe actions (file edits, reads) but still ask
-                      permission for risky operations.
+                      permission for risky operations. Codex keeps its default approval and sandbox
+                      behavior.
                     </p>
                   </>
                 )}
