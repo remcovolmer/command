@@ -36,14 +36,33 @@ describe('agent registry', () => {
     expect(buildAgentCommand('claude', { resumeSessionId: 'x', claudeMode: 'auto' })).toBe(
       'claude --resume "x" --enable-auto-mode'
     )
+    expect(buildAgentCommand('claude', { resumeSessionId: 'x', claudeMode: 'full-auto' })).toBe(
+      'claude --resume "x" --dangerously-skip-permissions'
+    )
   })
 
-  test('codex resumes via subcommand; pi via --session; mode flags are claude-only', () => {
+  test('codex maps only Full Auto to its approvals-and-sandbox bypass', () => {
     expect(buildAgentCommand('codex', {})).toBe('codex')
+    expect(buildAgentCommand('codex', { claudeMode: 'chat' })).toBe('codex')
+    expect(buildAgentCommand('codex', { claudeMode: 'auto' })).toBe('codex')
+    expect(buildAgentCommand('codex', { claudeMode: 'full-auto' })).toBe(
+      'codex --dangerously-bypass-approvals-and-sandbox'
+    )
     expect(buildAgentCommand('codex', { resumeSessionId: 'uuid-1' })).toBe('codex resume "uuid-1"')
-    expect(buildAgentCommand('codex', { claudeMode: 'full-auto' })).toBe('codex')
+    expect(
+      buildAgentCommand('codex', {
+        resumeSessionId: 'uuid-1',
+        claudeMode: 'full-auto',
+      })
+    ).toBe('codex resume "uuid-1" --dangerously-bypass-approvals-and-sandbox')
+  })
+
+  test('pi resumes via --session and ignores every mode value', () => {
     expect(buildAgentCommand('pi', {})).toBe('pi')
     expect(buildAgentCommand('pi', { resumeSessionId: 's1' })).toBe('pi --session "s1"')
+    expect(buildAgentCommand('pi', { claudeMode: 'chat' })).toBe('pi')
+    expect(buildAgentCommand('pi', { claudeMode: 'auto' })).toBe('pi')
+    expect(buildAgentCommand('pi', { claudeMode: 'full-auto' })).toBe('pi')
   })
 
   test('only claude and codex report state via a hook', () => {
