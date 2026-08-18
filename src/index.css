@@ -178,15 +178,25 @@ body {
   background: color-mix(in oklch, var(--primary) 40%, transparent);
 }
 
-/* Terminal container styling */
+/* Terminal container styling.
+
+   The 8px gutter MUST live on .xterm, not on this container. FitAddon derives
+   the available space from getComputedStyle(parentElement).height minus the
+   padding of the .xterm element itself. Tailwind's preflight sets
+   box-sizing: border-box, so the parent's computed height INCLUDES its own
+   padding — padding here is therefore never subtracted, fit() over-estimates
+   the space by 16px and proposes up to one row and two cols too many, and the
+   bottom row/right column render outside the visible area (clipped in half).
+   xterm reads the padding off .xterm for mouse coords too (getCoords), so the
+   gutter belongs there. */
 .terminal-container {
   height: 100%;
-  padding: 8px;
   background: var(--sidebar);
 }
 
 .terminal-container .xterm {
   height: 100%;
+  padding: 8px;
 }
 
 .terminal-container .xterm-viewport {
