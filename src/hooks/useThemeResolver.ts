@@ -28,6 +28,17 @@ export function useThemeResolver() {
       }
       const prev = useProjectStore.getState().resolvedTheme
       setResolvedTheme(resolved)
+      // Every apply, not only on change: the store's initial resolvedTheme
+      // already equals the OS theme, so a user who never toggles would
+      // otherwise never persist it (cold-start backgroundColor stays wrong and
+      // the Windows overlay buttons keep the fallback colors). The .dark class
+      // is applied above, so these resolve the real --canvas / --fg-muted.
+      api.app
+        .setTitleBarOverlay?.(resolved, {
+          color: getCssVar('--canvas'),
+          symbolColor: getCssVar('--fg-muted'),
+        })
+        ?.catch((e: unknown) => console.warn('Failed to set titlebar overlay:', e))
       if (resolved !== prev) {
         if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current)
         syncTimeoutRef.current = setTimeout(() => {
@@ -38,15 +49,6 @@ export function useThemeResolver() {
         // Repaints the Windows titlebar overlay buttons and persists the theme
         // for the next cold-start backgroundColor. Optional-chained on the
         // method itself so older preloads or a test double lacking it don't throw.
-        // The .dark class is already applied above, so these resolve the real
-        // --canvas / --fg-muted tokens; main persists them for the cold-start
-        // backgroundColor so the first paint matches the app exactly.
-        api.app
-          .setTitleBarOverlay?.(resolved, {
-            color: getCssVar('--canvas'),
-            symbolColor: getCssVar('--fg-muted'),
-          })
-          ?.catch((e: unknown) => console.warn('Failed to set titlebar overlay:', e))
       }
     }
 

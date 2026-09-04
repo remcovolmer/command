@@ -77,7 +77,15 @@ export function DiscardConfirmDialog({ gitPath, onComplete }: DiscardConfirmDial
   }
 
   return (
-    <Dialog open onClose={clearDiscardingFiles} title={title} icon={AlertTriangle} size="sm">
+    <Dialog
+      open
+      // Backdrop/X must not dismiss while git is rewriting files — same
+      // invariant as the disabled Cancel button and the Escape guard above.
+      onClose={loading ? () => undefined : clearDiscardingFiles}
+      title={title}
+      icon={AlertTriangle}
+      size="sm"
+    >
       <p className="text-[13px] text-fg-muted mb-4">{description}</p>
 
       {error && <p className="text-[13px] text-danger mb-4">{error}</p>}

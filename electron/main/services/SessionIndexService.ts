@@ -170,7 +170,9 @@ async function parseSessionJsonl(
               // "[!p]" or "[<a]".
               .replace(/\x1b\[[?<>!]?[\d;]*[a-zA-Z~]|\[<[\d;]+[Mm]/g, '')
               .trim()
-              .slice(0, 200)
+            // Clean before capping: slicing first can cut a closing tag off a
+            // caveat block, after which the markup can no longer be recognised.
+            firstPrompt = cleanSessionTitle(firstPrompt, 200)
             if (!gitBranch) gitBranch = obj.gitBranch || ''
           }
 
@@ -237,8 +239,8 @@ async function parseSessionJsonl(
       // compaction preambles) here so every consumer — sidebar summary, notch,
       // breadcrumb, overview — sees human text. Generous cap: display sites
       // truncate further themselves.
-      summary: cleanSessionTitle(compactSummary || firstPrompt, 400),
-      firstPrompt: cleanSessionTitle(firstPrompt, 400),
+      summary: cleanSessionTitle(compactSummary, 400) || firstPrompt,
+      firstPrompt,
       messageCount: userMessageCount,
       gitBranch,
       modified: modified || new Date().toISOString(),
