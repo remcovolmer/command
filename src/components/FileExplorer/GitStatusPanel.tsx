@@ -101,7 +101,7 @@ export function GitStatusPanel({
 
             {/* Status Indicator */}
             {gitStatus.isClean ? (
-              <div className="flex items-center gap-2 px-3 py-2 text-sm text-green-600 dark:text-green-400">
+              <div className="flex items-center gap-2 px-3 py-2 text-sm text-success">
                 <Check className="w-4 h-4" />
                 <span>Working tree clean</span>
               </div>
@@ -177,7 +177,7 @@ export function GitStatusPanel({
             )}
 
             {gitStatus.error && (
-              <div className="px-3 py-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+              <div className="px-3 py-2 text-sm text-danger flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 <span className="truncate">{gitStatus.error}</span>
               </div>
@@ -303,7 +303,7 @@ function BranchSection({
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             ) : (
               <ArrowDown
-                className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
+                className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-warning' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
               />
             )}
           </button>
@@ -321,7 +321,7 @@ function BranchSection({
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             ) : (
               <ArrowUp
-                className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
+                className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-success' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
               />
             )}
           </button>
@@ -369,9 +369,9 @@ function FileChangeSection({
   const closeWorkingTreeDiffTabs = useProjectStore((s) => s.closeWorkingTreeDiffTabs)
 
   const colorClass = {
-    success: 'text-green-600 dark:text-green-400',
-    warning: 'text-yellow-600 dark:text-yellow-400',
-    error: 'text-red-600 dark:text-red-400',
+    success: 'text-success',
+    warning: 'text-warning',
+    error: 'text-danger',
     muted: 'text-muted-foreground',
   }[variant]
 
@@ -500,9 +500,9 @@ function FileChangeItem({
   }[file.status]
 
   const colorClass = {
-    success: 'text-green-600 dark:text-green-400',
-    warning: 'text-yellow-600 dark:text-yellow-400',
-    error: 'text-red-600 dark:text-red-400',
+    success: 'text-success',
+    warning: 'text-warning',
+    error: 'text-danger',
     muted: 'text-muted-foreground',
   }[variant]
 

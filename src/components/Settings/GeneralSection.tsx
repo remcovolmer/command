@@ -123,9 +123,9 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
       case 'chat':
         return 'bg-primary text-primary-foreground'
       case 'auto':
-        return 'bg-blue-500 text-white'
+        return 'bg-info text-white'
       case 'full-auto':
-        return 'bg-yellow-500 text-black'
+        return 'bg-warning text-fg-strong'
     }
   }
 
@@ -269,7 +269,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 {/* Vertex AI indicator */}
                 {hasVertexConfig && (
                   <span
-                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-500/10 text-blue-500 shrink-0"
+                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-info/10 text-info shrink-0"
                     title="Vertex AI configured via .claude/settings.local.json"
                   >
                     <Coins className="w-3 h-3" />
@@ -374,9 +374,9 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
           <div className="relative bg-background rounded-lg border border-border p-6 max-w-md shadow-xl">
             <div className="flex items-start gap-3">
               {confirmDialog.mode === 'full-auto' ? (
-                <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-warning mt-0.5 shrink-0" />
               ) : (
-                <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                <Info className="w-5 h-5 text-info mt-0.5 shrink-0" />
               )}
               <div>
                 {confirmDialog.mode === 'full-auto' ? (
@@ -396,7 +396,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                       . Claude skips permission prompts; Codex bypasses approvals and its internal
                       sandbox.
                     </p>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                    <p className="text-xs text-warning mt-2">
                       Only enable this in an externally sandboxed environment.
                     </p>
                   </>
@@ -427,8 +427,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 onClick={confirmMode}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   confirmDialog.mode === 'full-auto'
-                    ? 'bg-yellow-500 text-black hover:bg-yellow-400'
-                    : 'bg-blue-500 text-white hover:bg-blue-400'
+                    ? 'bg-warning text-fg-strong hover:bg-warning/90'
+                    : 'bg-info text-white hover:bg-info/90'
                 }`}
               >
                 Enable

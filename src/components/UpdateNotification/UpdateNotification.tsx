@@ -83,9 +83,9 @@ export function UpdateNotification() {
   // Error state
   if (state === 'error') {
     return (
-      <div className="fixed bottom-4 right-4 bg-red-900/90 text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
+      <div className="fixed bottom-4 right-4 bg-danger text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
         <div className="flex items-start gap-3">
-          <div className="text-red-400">
+          <div className="text-white/85">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -97,9 +97,9 @@ export function UpdateNotification() {
           </div>
           <div className="flex-1">
             <p className="font-medium">Update failed</p>
-            <p className="text-sm text-red-200 mt-1">{error}</p>
+            <p className="text-sm text-white/80 mt-1">{error}</p>
           </div>
-          <button onClick={handleDismiss} className="text-red-300 hover:text-white">
+          <button onClick={handleDismiss} className="text-white/70 hover:text-white">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -117,9 +117,9 @@ export function UpdateNotification() {
   // Update available state
   if (state === 'available' && updateInfo) {
     return (
-      <div className="fixed bottom-4 right-4 bg-blue-900/90 text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
+      <div className="fixed bottom-4 right-4 bg-info text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
         <div className="flex items-start gap-3">
-          <div className="text-blue-400">
+          <div className="text-white/85">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -131,19 +131,19 @@ export function UpdateNotification() {
           </div>
           <div className="flex-1">
             <p className="font-medium">Update available</p>
-            <p className="text-sm text-blue-200 mt-1">
+            <p className="text-sm text-white/80 mt-1">
               Version {updateInfo.version} is ready to download
             </p>
             <div className="flex gap-2 mt-3">
               <button
                 onClick={handleDownload}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
+                className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
               >
                 Download
               </button>
               <button
                 onClick={handleDismiss}
-                className="px-3 py-1.5 bg-blue-800 hover:bg-blue-700 rounded text-sm font-medium transition-colors"
+                className="px-3 py-1.5 bg-black/20 hover:bg-black/30 rounded text-sm font-medium transition-colors"
               >
                 Later
               </button>
@@ -160,9 +160,9 @@ export function UpdateNotification() {
     const speed = (progress.bytesPerSecond / 1024 / 1024).toFixed(1)
 
     return (
-      <div className="fixed bottom-4 right-4 bg-blue-900/90 text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
+      <div className="fixed bottom-4 right-4 bg-info text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
         <div className="flex items-start gap-3">
-          <div className="text-blue-400 animate-pulse">
+          <div className="text-white/85 animate-pulse">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -174,13 +174,13 @@ export function UpdateNotification() {
           </div>
           <div className="flex-1">
             <p className="font-medium">Downloading update...</p>
-            <div className="mt-2 w-full bg-blue-800 rounded-full h-2">
+            <div className="mt-2 w-full bg-black/20 rounded-full h-2">
               <div
-                className="bg-blue-400 h-2 rounded-full transition-all duration-300"
+                className="bg-white h-2 rounded-full transition-all duration-300"
                 style={{ width: `${percent}%` }}
               />
             </div>
-            <p className="text-xs text-blue-300 mt-1">
+            <p className="text-xs text-white/80 mt-1">
               {percent}% - {speed} MB/s
             </p>
           </div>
@@ -192,9 +192,9 @@ export function UpdateNotification() {
   // Downloaded state
   if (state === 'downloaded') {
     return (
-      <div className="fixed bottom-4 right-4 bg-green-900/90 text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
+      <div className="fixed bottom-4 right-4 bg-success text-white p-4 rounded-lg shadow-lg max-w-sm z-50">
         <div className="flex items-start gap-3">
-          <div className="text-green-400">
+          <div className="text-white/85">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -206,17 +206,17 @@ export function UpdateNotification() {
           </div>
           <div className="flex-1">
             <p className="font-medium">Update ready</p>
-            <p className="text-sm text-green-200 mt-1">Restart to install the update</p>
+            <p className="text-sm text-white/80 mt-1">Restart to install the update</p>
             <div className="flex gap-2 mt-3">
               <button
                 onClick={handleInstall}
-                className="px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded text-sm font-medium transition-colors"
+                className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
               >
                 Restart now
               </button>
               <button
                 onClick={handleDismiss}
-                className="px-3 py-1.5 bg-green-800 hover:bg-green-700 rounded text-sm font-medium transition-colors"
+                className="px-3 py-1.5 bg-black/20 hover:bg-black/30 rounded text-sm font-medium transition-colors"
               >
                 Later
               </button>

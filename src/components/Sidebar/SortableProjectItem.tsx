@@ -380,7 +380,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         {/* Indicators */}
         {hasVertexConfig && (
           <span title="Vertex AI configured via .claude/settings.local.json">
-            <Coins className="w-3 h-3 shrink-0 text-blue-400" />
+            <Coins className="w-3 h-3 shrink-0 text-info" />
           </span>
         )}
         {hasMismatch && (
@@ -391,7 +391,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                 : 'Selected profile is missing or has no environment variables'
             }
           >
-            <AlertTriangle className="w-3 h-3 shrink-0 text-yellow-500" />
+            <AlertTriangle className="w-3 h-3 shrink-0 text-warning" />
           </span>
         )}
 

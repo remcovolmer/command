@@ -30,6 +30,6 @@ describe('terminal gutter padding', () => {
   })
 
   test('.terminal-container .xterm carries the gutter padding', () => {
-    expect(ruleBody('.terminal-container .xterm')).toMatch(/padding:\s*8px/)
+    expect(ruleBody('.terminal-container .xterm')).toMatch(/padding:\s*12px/)
   })
 })

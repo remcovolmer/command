@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react'
 import type { DiffTab } from '../../types'
 import { getElectronAPI } from '../../utils/electron'
 import { useProjectStore } from '../../stores/projectStore'
+import { defineCommandMonacoTheme } from './EditorContainer'
 
 interface DiffEditorViewProps {
   tab: DiffTab
@@ -13,6 +14,9 @@ interface DiffEditorViewProps {
 export function DiffEditorView({ tab, isActive }: DiffEditorViewProps) {
   const api = useMemo(() => getElectronAPI(), [])
   const resolvedTheme = useProjectStore((s) => s.resolvedTheme)
+  // Registered (or re-registered) before the DiffEditor below reads its
+  // theme prop, so command-light/command-dark are always defined by then.
+  defineCommandMonacoTheme(resolvedTheme)
   const [original, setOriginal] = useState<string | null>(null)
   const [modified, setModified] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -81,7 +85,7 @@ export function DiffEditorView({ tab, isActive }: DiffEditorViewProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full bg-background text-sm text-red-500">
+      <div className="flex items-center justify-center h-full bg-background text-sm text-danger">
         {error}
       </div>
     )
@@ -102,7 +106,7 @@ export function DiffEditorView({ tab, isActive }: DiffEditorViewProps) {
         original={original ?? ''}
         modified={modified ?? ''}
         language={getLanguageFromPath(tab.filePath)}
-        theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
+        theme={resolvedTheme === 'dark' ? 'command-dark' : 'command-light'}
         options={{
           readOnly: true,
           renderSideBySide: true,

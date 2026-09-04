@@ -141,10 +141,10 @@ export function SpawnErrorToast() {
           <div
             key={toast.id}
             role="status"
-            className="bg-red-900/90 text-white p-4 rounded-lg shadow-lg max-w-sm"
+            className="bg-danger text-white p-4 rounded-lg shadow-lg max-w-sm"
           >
             <div className="flex items-start gap-3">
-              <div className="text-red-400 mt-0.5">
+              <div className="text-white/85 mt-0.5">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -156,11 +156,11 @@ export function SpawnErrorToast() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium">{title}</p>
-                <p className="text-sm text-red-200 mt-1 break-all">{body}</p>
+                <p className="text-sm text-white/80 mt-1 break-all">{body}</p>
                 {toast.code === 'SPAWN_FAILED' && (
                   <button
                     onClick={openLog}
-                    className="mt-3 px-3 py-1.5 bg-red-800 hover:bg-red-700 rounded text-sm font-medium transition-colors"
+                    className="mt-3 px-3 py-1.5 bg-black/20 hover:bg-black/30 rounded text-sm font-medium transition-colors"
                   >
                     Open crash.log
                   </button>
@@ -168,7 +168,7 @@ export function SpawnErrorToast() {
               </div>
               <button
                 onClick={() => dismiss(toast.id)}
-                className="text-red-300 hover:text-white"
+                className="text-white/70 hover:text-white"
                 aria-label="Dismiss"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -148,13 +148,13 @@ function RunResultContent({ text }: { text: string }) {
 function statusIcon(status: AutomationRun['status']) {
   switch (status) {
     case 'running':
-      return <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+      return <Loader2 className="w-3.5 h-3.5 text-info animate-spin" />
     case 'completed':
-      return <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+      return <CheckCircle2 className="w-3.5 h-3.5 text-success" />
     case 'failed':
-      return <XCircle className="w-3.5 h-3.5 text-red-400" />
+      return <XCircle className="w-3.5 h-3.5 text-danger" />
     case 'timeout':
-      return <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
+      return <AlertTriangle className="w-3.5 h-3.5 text-warning" />
     case 'cancelled':
       return <Square className="w-3.5 h-3.5 text-muted-foreground" />
   }
@@ -367,7 +367,7 @@ export function AutomationsOverview() {
                         {triggerLabel(a.trigger)}
                       </td>
                       <td className="px-2 py-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-400/10 text-green-500 text-[10px]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-[10px]">
                           {a.defaultTarget === 'worktree' ? (
                             <GitBranch className="w-3 h-3" />
                           ) : (
@@ -506,7 +506,7 @@ export function AutomationsOverview() {
                         </div>
                       )}
                       {run.error && (
-                        <div className="text-xs text-red-400 bg-red-400/10 rounded px-2 py-1">
+                        <div className="text-xs text-danger bg-danger/10 rounded px-2 py-1">
                           {run.error}
                         </div>
                       )}

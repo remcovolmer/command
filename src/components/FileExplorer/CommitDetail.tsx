@@ -81,7 +81,7 @@ export function CommitDetail({ commit, gitPath, detailCache }: CommitDetailProps
 
       {/* Merge indicator */}
       {detail.isMerge && (
-        <div className="text-xs text-purple-500 mb-2">
+        <div className="text-xs text-fg-muted mb-2">
           Merge commit ({detail.parentHashes.length} parents)
         </div>
       )}
@@ -113,10 +113,10 @@ export function CommitDetail({ commit, gitPath, detailCache }: CommitDetailProps
               </span>
               <span className="flex-shrink-0 font-mono">
                 {file.additions > 0 && (
-                  <span className="text-green-600 dark:text-green-400">+{file.additions}</span>
+                  <span className="text-success">+{file.additions}</span>
                 )}
                 {file.deletions > 0 && (
-                  <span className="text-red-600 dark:text-red-400 ml-1">-{file.deletions}</span>
+                  <span className="text-danger ml-1">-{file.deletions}</span>
                 )}
               </span>
             </button>
@@ -132,19 +132,19 @@ function FileStatusIcon({ status }: { status: GitCommitFile['status'] }) {
   switch (status) {
     case 'added':
       return (
-        <FilePlus {...props} className={`${props.className} text-green-600 dark:text-green-400`} />
+        <FilePlus {...props} className={`${props.className} text-success`} />
       )
     case 'deleted':
-      return <FileX {...props} className={`${props.className} text-red-600 dark:text-red-400`} />
+      return <FileX {...props} className={`${props.className} text-danger`} />
     case 'renamed':
       return (
-        <ArrowRight {...props} className={`${props.className} text-blue-600 dark:text-blue-400`} />
+        <ArrowRight {...props} className={`${props.className} text-info`} />
       )
     default:
       return (
         <FileEdit
           {...props}
-          className={`${props.className} text-yellow-600 dark:text-yellow-400`}
+          className={`${props.className} text-warning`}
         />
       )
   }

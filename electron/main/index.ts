@@ -380,7 +380,7 @@ async function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    backgroundColor: '#1a1b26',
+    backgroundColor: '#2b2825',
     titleBarStyle: 'hiddenInset',
     frame: process.platform === 'darwin' ? false : true,
     webPreferences: {

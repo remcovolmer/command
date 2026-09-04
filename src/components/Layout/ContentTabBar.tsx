@@ -60,15 +60,15 @@ export function ContentTabBar({ tabs, activeContentId, onSelect, onClose }: Cont
             `}
           >
             {tab.type === 'browser' ? (
-              <Globe className="w-3.5 h-3.5 flex-shrink-0 text-purple-400" />
+              <Globe className="w-3.5 h-3.5 flex-shrink-0 text-fg-muted" />
             ) : tab.type === 'diff' || tab.type === 'working-tree-diff' ? (
-              <GitCompare className="w-3.5 h-3.5 flex-shrink-0 text-blue-400" />
+              <GitCompare className="w-3.5 h-3.5 flex-shrink-0 text-info" />
             ) : (
               <FileText className="w-3.5 h-3.5 flex-shrink-0" />
             )}
             <span className="text-xs font-medium whitespace-nowrap">{tabLabel(tab)}</span>
             {tab.type === 'editor' && tab.isDirty && (
-              <Circle className="w-2 h-2 flex-shrink-0 fill-current text-orange-400" />
+              <Circle className="w-2 h-2 flex-shrink-0 fill-current text-warning" />
             )}
             <button
               onClick={(e) => {

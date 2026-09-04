@@ -148,298 +148,331 @@ export function useXtermInstance({
     isDisposedRef.current = false
     isReadyRef.current = false
 
-    // Resolve project/worktree base path up front — shared by linkHandler (OSC 8
-    // hyperlinks below) and the FileLinkProvider (plain-text paths, registered
-    // after terminal.open). Empty for sidecar/normal terminals without a project.
-    const store = useProjectStore.getState()
-    const termSession = store.terminals[id]
-    const worktree = termSession?.worktreeId ? store.worktrees[termSession.worktreeId] : null
-    const project = store.projects.find((p) => p.id === projectId)
-    const contextPath = projectId ? worktree?.path || project?.path || '' : ''
+    let cancelled = false
 
-    const terminal = new XTerm({
-      cursorBlink: true,
-      cursorStyle: 'block',
-      fontSize,
-      fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace",
-      lineHeight: 1.0,
-      scrollback,
-      ...buildTerminalThemeOptions(resolvedTheme),
-      allowProposedApi: true,
-      letterSpacing: 0,
-      customGlyphs: true,
-      // OSC 8 hyperlink handler for chat terminals. Claude Code wraps every
-      // markdown link in OSC 8 with a bare relative path as URI; xterm's default
-      // filters non-HTTP protocols, so allowNonHttpProtocols is required. The
-      // classifier in osc8LinkRouter is the single security chokepoint.
-      linkHandler: contextPath
-        ? {
-            allowNonHttpProtocols: true,
-            activate: (_event, text) => {
-              const decision = classifyOsc8Uri(text, contextPath)
-              if (decision.kind === 'external') {
-                api.shell.openExternal(decision.url).catch(console.error)
-                return
-              }
-              if (decision.kind === 'editor' || decision.kind === 'browser') {
-                const openInBrowser = decision.kind === 'browser'
-                const fileName = decision.fileName
-                api.fs
-                  .stat(decision.resolved)
-                  .then((stat) => {
-                    if (stat.exists && stat.isFile) {
-                      if (openInBrowser) {
-                        store.openFileInBrowser(stat.resolved, fileName, projectId)
-                      } else {
-                        store.openEditorTab(stat.resolved, fileName, projectId)
-                      }
-                    }
-                  })
-                  .catch(() => {
-                    /* silent — fs:stat never throws but defense in depth */
-                  })
-                return
-              }
-              // decision.kind === 'ignore' — silent no-op (wrong extension, traversal,
-              // unsupported scheme, oversized URI, etc.)
-            },
-          }
-        : undefined,
-    })
-
-    const fitAddon = new FitAddon()
-    terminal.loadAddon(fitAddon)
-    terminal.loadAddon(
-      new WebLinksAddon((_event: MouseEvent, uri: string) => {
-        api.shell.openExternal(uri).catch(console.error)
-      })
-    )
-
-    // Unicode 11 addon for better wide character and emoji support
-    const unicodeAddon = new Unicode11Addon()
-    terminal.loadAddon(unicodeAddon)
-
-    // Serialize addon for LRU pool eviction
-    const serializeAddon = new SerializeAddon()
-    terminal.loadAddon(serializeAddon)
-    serializeAddonRef.current = serializeAddon
-
-    terminal.open(containerRef.current)
-
-    // WebGL renderer for sharper block character and glyph rendering
-    let webglAddon: WebglAddon | null = null
-    try {
-      webglAddon = new WebglAddon()
-      webglAddon.onContextLoss(() => {
-        webglAddon?.dispose()
-        webglAddon = null
-      })
-      terminal.loadAddon(webglAddon)
-    } catch {
-      // WebGL not available, fall back to default canvas renderer
-      webglAddon = null
-    }
-
-    // Restore serialized buffer if this terminal was previously evicted
-    const wasEvicted = terminalPool.isEvicted(id)
-    if (wasEvicted) {
-      const savedBuffer = terminalPool.getBuffer(id)
-      if (savedBuffer) {
-        terminal.write(savedBuffer)
-      }
-      terminalPool.clearBuffer(id)
-      terminalPool.markRestored(id)
-    }
-
-    // Register pool callbacks for LRU eviction
-    terminalPool.registerCallbacks(
-      id,
-      () => {
-        // Serializer: serialize the current scrollback buffer
+    const init = async () => {
+      // xterm measures cell width at open(); if the bundled Plex Mono face
+      // is still loading, that measurement uses the fallback stack and the
+      // grid stays wrong until the next resize. Wait for it up front (guard
+      // document.fonts for jsdom/tests, where it's undefined).
+      if (typeof document !== 'undefined' && document.fonts) {
         try {
-          return serializeAddonRef.current?.serialize() ?? null
+          await document.fonts.load("14px 'IBM Plex Mono'")
         } catch {
-          return null
+          // Loading can reject in constrained environments — the fallback
+          // stack (JetBrains Mono, Cascadia Code, Consolas) still renders,
+          // so proceed regardless.
         }
-      },
-      () => {
-        // Cleanup: destroy the xterm instance
-        cleanupRef.current?.()
-        cleanupRef.current = null
       }
-    )
-    terminalPool.touch(id)
 
-    // Activate Unicode 11 for correct character width calculations
-    terminal.unicode.activeVersion = '11'
+      // The component may have unmounted or gone inactive while we waited.
+      if (cancelled || !containerRef.current) {
+        hasInitializedRef.current = false
+        return
+      }
 
-    // Register file link provider for plain-text clickable file paths (Ctrl+click).
-    // OSC 8 hyperlinks are handled separately by linkHandler above.
-    if (projectId && contextPath) {
-      terminal.registerLinkProvider(
-        createFileLinkProvider(terminal, contextPath, api, (filePath, fileName) => {
-          // HTML paths open in the built-in browser, consistent with OSC 8 links.
-          if (isHtmlFile(fileName)) {
-            store.openFileInBrowser(filePath, fileName, projectId)
-          } else {
-            store.openEditorTab(filePath, fileName, projectId)
-          }
+      // Resolve project/worktree base path up front — shared by linkHandler (OSC 8
+      // hyperlinks below) and the FileLinkProvider (plain-text paths, registered
+      // after terminal.open). Empty for sidecar/normal terminals without a project.
+      const store = useProjectStore.getState()
+      const termSession = store.terminals[id]
+      const worktree = termSession?.worktreeId ? store.worktrees[termSession.worktreeId] : null
+      const project = store.projects.find((p) => p.id === projectId)
+      const contextPath = projectId ? worktree?.path || project?.path || '' : ''
+
+      const terminal = new XTerm({
+        cursorBlink: true,
+        cursorStyle: 'block',
+        fontSize,
+        fontFamily: "'IBM Plex Mono', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
+        lineHeight: 1.15,
+        scrollback,
+        ...buildTerminalThemeOptions(resolvedTheme),
+        allowProposedApi: true,
+        letterSpacing: 0,
+        customGlyphs: true,
+        // OSC 8 hyperlink handler for chat terminals. Claude Code wraps every
+        // markdown link in OSC 8 with a bare relative path as URI; xterm's default
+        // filters non-HTTP protocols, so allowNonHttpProtocols is required. The
+        // classifier in osc8LinkRouter is the single security chokepoint.
+        linkHandler: contextPath
+          ? {
+              allowNonHttpProtocols: true,
+              activate: (_event, text) => {
+                const decision = classifyOsc8Uri(text, contextPath)
+                if (decision.kind === 'external') {
+                  api.shell.openExternal(decision.url).catch(console.error)
+                  return
+                }
+                if (decision.kind === 'editor' || decision.kind === 'browser') {
+                  const openInBrowser = decision.kind === 'browser'
+                  const fileName = decision.fileName
+                  api.fs
+                    .stat(decision.resolved)
+                    .then((stat) => {
+                      if (stat.exists && stat.isFile) {
+                        if (openInBrowser) {
+                          store.openFileInBrowser(stat.resolved, fileName, projectId)
+                        } else {
+                          store.openEditorTab(stat.resolved, fileName, projectId)
+                        }
+                      }
+                    })
+                    .catch(() => {
+                      /* silent — fs:stat never throws but defense in depth */
+                    })
+                  return
+                }
+                // decision.kind === 'ignore' — silent no-op (wrong extension, traversal,
+                // unsupported scheme, oversized URI, etc.)
+              },
+            }
+          : undefined,
+      })
+
+      const fitAddon = new FitAddon()
+      terminal.loadAddon(fitAddon)
+      terminal.loadAddon(
+        new WebLinksAddon((_event: MouseEvent, uri: string) => {
+          api.shell.openExternal(uri).catch(console.error)
         })
       )
-    }
 
-    terminalRef.current = terminal
-    fitAddonRef.current = fitAddon
+      // Unicode 11 addon for better wide character and emoji support
+      const unicodeAddon = new Unicode11Addon()
+      terminal.loadAddon(unicodeAddon)
 
-    // Recover spaces that a Windows IME/text-suggestion layer eats: those
-    // keydowns arrive as keyCode 229 and xterm drops them by design (only
-    // textarea diffs are forwarded, and the layer inserts no space). The
-    // watchdog injects the space when no space data follows the keydown.
-    const spaceWatchdog = createSpaceKeyWatchdog({
-      writeSpace: () => {
-        if (!isDisposedRef.current) {
-          api.terminal.write(id, ' ')
-        }
-      },
-    })
+      // Serialize addon for LRU pool eviction
+      const serializeAddon = new SerializeAddon()
+      terminal.loadAddon(serializeAddon)
+      serializeAddonRef.current = serializeAddon
 
-    // Handle Ctrl+C (copy when selected, otherwise send SIGINT) and Ctrl+V (paste)
-    terminal.attachCustomKeyEventHandler((event) => {
-      spaceWatchdog.handleKeyEvent(event)
+      terminal.open(containerRef.current)
 
-      if (event.type !== 'keydown') return true
-
-      if (event.ctrlKey && event.key === 'c') {
-        const selection = terminal.getSelection()
-        if (selection) {
-          // Electron-native clipboard: navigator.clipboard is unavailable in the
-          // packaged file:// renderer, so copy silently no-ops there.
-          api.clipboard.writeText(selection)
-          return false
-        }
-        return true
+      // WebGL renderer for sharper block character and glyph rendering
+      let webglAddon: WebglAddon | null = null
+      try {
+        webglAddon = new WebglAddon()
+        webglAddon.onContextLoss(() => {
+          webglAddon?.dispose()
+          webglAddon = null
+        })
+        terminal.loadAddon(webglAddon)
+      } catch {
+        // WebGL not available, fall back to default canvas renderer
+        webglAddon = null
       }
 
-      if (event.ctrlKey && event.key === 'v') {
-        event.preventDefault()
-        api.clipboard
-          .readText()
-          .then((text) => {
-            if (text && !isDisposedRef.current) {
-              api.terminal.write(id, text)
+      // Restore serialized buffer if this terminal was previously evicted
+      const wasEvicted = terminalPool.isEvicted(id)
+      if (wasEvicted) {
+        const savedBuffer = terminalPool.getBuffer(id)
+        if (savedBuffer) {
+          terminal.write(savedBuffer)
+        }
+        terminalPool.clearBuffer(id)
+        terminalPool.markRestored(id)
+      }
+
+      // Register pool callbacks for LRU eviction
+      terminalPool.registerCallbacks(
+        id,
+        () => {
+          // Serializer: serialize the current scrollback buffer
+          try {
+            return serializeAddonRef.current?.serialize() ?? null
+          } catch {
+            return null
+          }
+        },
+        () => {
+          // Cleanup: destroy the xterm instance
+          cleanupRef.current?.()
+          cleanupRef.current = null
+        }
+      )
+      terminalPool.touch(id)
+
+      // Activate Unicode 11 for correct character width calculations
+      terminal.unicode.activeVersion = '11'
+
+      // Register file link provider for plain-text clickable file paths (Ctrl+click).
+      // OSC 8 hyperlinks are handled separately by linkHandler above.
+      if (projectId && contextPath) {
+        terminal.registerLinkProvider(
+          createFileLinkProvider(terminal, contextPath, api, (filePath, fileName) => {
+            // HTML paths open in the built-in browser, consistent with OSC 8 links.
+            if (isHtmlFile(fileName)) {
+              store.openFileInBrowser(filePath, fileName, projectId)
+            } else {
+              store.openEditorTab(filePath, fileName, projectId)
             }
           })
-          .catch(() => {})
-        return false
+        )
       }
 
-      return true
-    })
+      terminalRef.current = terminal
+      fitAddonRef.current = fitAddon
 
-    // Honor OSC 52 clipboard writes. Claude Code implements copy-on-select and
-    // /copy by emitting OSC 52; xterm has no built-in handler and drops it, so
-    // those copies never reach the clipboard. Route writes through the same
-    // Electron-native clipboard the Ctrl+C path uses. Reads are refused inside
-    // the handler (clipboard-exfiltration vector).
-    const osc52 = createOsc52ClipboardHandler({
-      writeText: (text) => api.clipboard.writeText(text),
-    })
-    const osc52Disposable = terminal.parser.registerOscHandler(52, (data) => {
-      osc52.handle(data)
-      return true
-    })
+      // Recover spaces that a Windows IME/text-suggestion layer eats: those
+      // keydowns arrive as keyCode 229 and xterm drops them by design (only
+      // textarea diffs are forwarded, and the layer inserts no space). The
+      // watchdog injects the space when no space data follows the keydown.
+      const spaceWatchdog = createSpaceKeyWatchdog({
+        writeSpace: () => {
+          if (!isDisposedRef.current) {
+            api.terminal.write(id, ' ')
+          }
+        },
+      })
 
-    const readyTimer = setTimeout(() => {
-      if (!isDisposedRef.current) {
-        isReadyRef.current = true
-        safeFit()
-      }
-    }, READY_DELAY_MS)
+      // Handle Ctrl+C (copy when selected, otherwise send SIGINT) and Ctrl+V (paste)
+      terminal.attachCustomKeyEventHandler((event) => {
+        spaceWatchdog.handleKeyEvent(event)
 
-    terminal.onData((data) => {
-      spaceWatchdog.handleData(data)
-      api.terminal.write(id, data)
-    })
+        if (event.type !== 'keydown') return true
 
-    terminal.onResize(({ cols, rows }) => {
-      api.terminal.resize(id, cols, rows)
-    })
-
-    // Subscribe to terminal events via centralized manager
-    terminalEvents.subscribe(
-      id,
-      (data) => {
-        if (terminalRef.current && !isDisposedRef.current) {
-          terminalRef.current.write(data)
+        if (event.ctrlKey && event.key === 'c') {
+          const selection = terminal.getSelection()
+          if (selection) {
+            // Electron-native clipboard: navigator.clipboard is unavailable in the
+            // packaged file:// renderer, so copy silently no-ops there.
+            api.clipboard.writeText(selection)
+            return false
+          }
+          return true
         }
-      },
-      (state) => {
-        updateTerminalState(id, state)
-      },
-      onExit ? () => onExit() : undefined,
-      onTitle ??
-        ((title) => {
-          updateTerminalTitle(id, title)
-        })
-    )
 
-    // Flush main-process buffer after subscribing to events (ensures flushed data is captured)
-    if (wasEvicted) {
-      api.terminal.restore(id)
+        if (event.ctrlKey && event.key === 'v') {
+          event.preventDefault()
+          api.clipboard
+            .readText()
+            .then((text) => {
+              if (text && !isDisposedRef.current) {
+                api.terminal.write(id, text)
+              }
+            })
+            .catch(() => {})
+          return false
+        }
+
+        return true
+      })
+
+      // Honor OSC 52 clipboard writes. Claude Code implements copy-on-select and
+      // /copy by emitting OSC 52; xterm has no built-in handler and drops it, so
+      // those copies never reach the clipboard. Route writes through the same
+      // Electron-native clipboard the Ctrl+C path uses. Reads are refused inside
+      // the handler (clipboard-exfiltration vector).
+      const osc52 = createOsc52ClipboardHandler({
+        writeText: (text) => api.clipboard.writeText(text),
+      })
+      const osc52Disposable = terminal.parser.registerOscHandler(52, (data) => {
+        osc52.handle(data)
+        return true
+      })
+
+      const readyTimer = setTimeout(() => {
+        if (!isDisposedRef.current) {
+          isReadyRef.current = true
+          safeFit()
+        }
+      }, READY_DELAY_MS)
+
+      terminal.onData((data) => {
+        spaceWatchdog.handleData(data)
+        api.terminal.write(id, data)
+      })
+
+      terminal.onResize(({ cols, rows }) => {
+        api.terminal.resize(id, cols, rows)
+      })
+
+      // Subscribe to terminal events via centralized manager
+      terminalEvents.subscribe(
+        id,
+        (data) => {
+          if (terminalRef.current && !isDisposedRef.current) {
+            terminalRef.current.write(data)
+          }
+        },
+        (state) => {
+          updateTerminalState(id, state)
+        },
+        onExit ? () => onExit() : undefined,
+        onTitle ??
+          ((title) => {
+            updateTerminalTitle(id, title)
+          })
+      )
+
+      // Flush main-process buffer after subscribing to events (ensures flushed data is captured)
+      if (wasEvicted) {
+        api.terminal.restore(id)
+      }
+
+      const resizeObserver = new ResizeObserver(() => {
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current)
+        }
+        resizeTimeoutRef.current = setTimeout(() => {
+          safeFit()
+        }, RESIZE_DEBOUNCE_MS)
+      })
+      resizeObserver.observe(containerRef.current)
+
+      // Watch for xterm initial DOM setup (viewport initialization)
+      const mutationObserver = new MutationObserver(() => {
+        if (!containerRef.current) return
+        const viewport = containerRef.current.querySelector('.xterm-viewport')
+        if (viewport && viewport.clientWidth > 0 && viewport.clientHeight > 0) {
+          mutationObserver.disconnect()
+          safeFit()
+        }
+      })
+      mutationObserver.observe(containerRef.current, {
+        childList: true,
+        subtree: false,
+      })
+
+      cleanupRef.current = () => {
+        isDisposedRef.current = true
+        isReadyRef.current = false
+        hasInitializedRef.current = false
+        clearTimeout(readyTimer)
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current)
+        }
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current)
+        }
+        resizeObserver.disconnect()
+        mutationObserver.disconnect()
+        spaceWatchdog.dispose()
+        osc52Disposable.dispose()
+        terminalEvents.unsubscribe(id)
+        terminalPool.unregisterCallbacks(id)
+        // Dispose WebGL addon before terminal to avoid _isDisposed race
+        try {
+          webglAddon?.dispose()
+        } catch {
+          /* already disposed */
+        }
+        webglAddon = null
+        terminal.dispose()
+        terminalRef.current = null
+        fitAddonRef.current = null
+        serializeAddonRef.current = null
+      }
     }
 
-    const resizeObserver = new ResizeObserver(() => {
-      if (resizeTimeoutRef.current) {
-        clearTimeout(resizeTimeoutRef.current)
-      }
-      resizeTimeoutRef.current = setTimeout(() => {
-        safeFit()
-      }, RESIZE_DEBOUNCE_MS)
-    })
-    resizeObserver.observe(containerRef.current)
+    init()
 
-    // Watch for xterm initial DOM setup (viewport initialization)
-    const mutationObserver = new MutationObserver(() => {
-      if (!containerRef.current) return
-      const viewport = containerRef.current.querySelector('.xterm-viewport')
-      if (viewport && viewport.clientWidth > 0 && viewport.clientHeight > 0) {
-        mutationObserver.disconnect()
-        safeFit()
-      }
-    })
-    mutationObserver.observe(containerRef.current, {
-      childList: true,
-      subtree: false,
-    })
-
-    cleanupRef.current = () => {
-      isDisposedRef.current = true
-      isReadyRef.current = false
-      hasInitializedRef.current = false
-      clearTimeout(readyTimer)
-      if (resizeTimeoutRef.current) {
-        clearTimeout(resizeTimeoutRef.current)
-      }
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current)
-      }
-      resizeObserver.disconnect()
-      mutationObserver.disconnect()
-      spaceWatchdog.dispose()
-      osc52Disposable.dispose()
-      terminalEvents.unsubscribe(id)
-      terminalPool.unregisterCallbacks(id)
-      // Dispose WebGL addon before terminal to avoid _isDisposed race
-      try {
-        webglAddon?.dispose()
-      } catch {
-        /* already disposed */
-      }
-      webglAddon = null
-      terminal.dispose()
-      terminalRef.current = null
-      fitAddonRef.current = null
-      serializeAddonRef.current = null
+    // If the effect re-runs (isActive flips) or the component unmounts while
+    // init() is still awaiting the font, mark it cancelled so it bails out
+    // instead of creating a terminal nobody wants anymore.
+    return () => {
+      cancelled = true
     }
     // Intentionally excludes: projectId, onExit, onTitle, fontSize, scrollback.
     // This effect initializes once per terminal (guarded by hasInitializedRef).

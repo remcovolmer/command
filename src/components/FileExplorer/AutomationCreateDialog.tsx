@@ -334,7 +334,7 @@ export function AutomationCreateDialog({
                   'Variables: {{pr.number}}, {{pr.title}}, {{pr.branch}}, {{pr.url}}, {{pr.mergeable}}, {{pr.state}}'
                 }
               </p>
-              <p className="text-xs text-yellow-500 mt-1">
+              <p className="text-xs text-warning mt-1">
                 {
                   'Note: PR metadata (title, branch) is user-controlled. Use caution on public repos.'
                 }
@@ -389,7 +389,7 @@ export function AutomationCreateDialog({
           </div>
 
           {error && (
-            <div className="text-xs text-red-400 bg-red-400/10 rounded px-2 py-1.5">{error}</div>
+            <div className="text-xs text-danger bg-danger/10 rounded px-2 py-1.5">{error}</div>
           )}
         </div>
 

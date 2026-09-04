@@ -7,6 +7,12 @@ export default {
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
+        canvas: 'var(--canvas)',
+        panel: 'var(--panel)',
+        screen: 'var(--screen)',
+        raised: 'var(--raised)',
+        selected: 'var(--selected)',
+        'border-strong': 'var(--border-strong)',
         card: {
           DEFAULT: 'var(--card)',
           foreground: 'var(--card-foreground)',
@@ -17,6 +23,8 @@ export default {
         },
         primary: {
           DEFAULT: 'var(--primary)',
+          hover: 'var(--primary-hover)',
+          soft: 'var(--primary-soft)',
           foreground: 'var(--primary-foreground)',
         },
         secondary: {
@@ -35,8 +43,22 @@ export default {
           DEFAULT: 'var(--destructive)',
           foreground: 'var(--destructive-foreground)',
         },
+        fg: {
+          strong: 'var(--fg-strong)',
+          DEFAULT: 'var(--fg)',
+          muted: 'var(--fg-muted)',
+          faint: 'var(--fg-faint)',
+        },
+        info: 'var(--info)',
+        success: 'var(--success)',
         warning: 'var(--warning)',
         danger: 'var(--danger)',
+        status: {
+          attention: 'var(--status-attention)',
+          done: 'var(--status-done)',
+          busy: 'var(--status-busy)',
+          stopped: 'var(--status-stopped)',
+        },
         border: 'var(--border)',
         input: 'var(--input)',
         ring: 'var(--ring)',
@@ -56,9 +78,11 @@ export default {
         mono: ['var(--font-mono)'],
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        sm: '4px',
+        DEFAULT: 'var(--radius)',
+        md: 'var(--radius)',
+        lg: '8px',
+        xl: '12px',
       },
       animation: {
         'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',

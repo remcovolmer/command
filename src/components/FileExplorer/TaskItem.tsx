@@ -82,7 +82,7 @@ export function TaskItem({
         title={task.completed ? 'Mark as open' : 'Mark as complete'}
       >
         {task.completed ? (
-          <CheckSquare className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+          <CheckSquare className="w-3.5 h-3.5 text-success" />
         ) : (
           <Square className="w-3.5 h-3.5 text-muted-foreground hover:text-sidebar-foreground" />
         )}
@@ -118,9 +118,9 @@ export function TaskItem({
             <span
               className={`inline-flex items-center gap-0.5 text-[10px] px-1 py-0 rounded ${
                 task.isOverdue
-                  ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                  ? 'bg-danger/15 text-danger'
                   : task.isDueToday
-                    ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+                    ? 'bg-warning/15 text-warning'
                     : 'bg-muted text-muted-foreground'
               }`}
             >
@@ -158,7 +158,7 @@ export function TaskItem({
         className="mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
         title="Delete task"
       >
-        <X className="w-3 h-3 text-muted-foreground hover:text-red-500" />
+        <X className="w-3 h-3 text-muted-foreground hover:text-danger" />
       </button>
     </div>
   )

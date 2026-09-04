@@ -517,11 +517,11 @@ export function Sidebar() {
                 disabled={updateStatus === 'checking'}
                 className={`p-1.5 rounded-lg transition-colors ${
                   updateStatus === 'available'
-                    ? 'bg-green-500/20 text-green-500'
+                    ? 'bg-success/20 text-success'
                     : updateStatus === 'up-to-date'
-                      ? 'text-green-500'
+                      ? 'text-success'
                       : updateStatus === 'error'
-                        ? 'text-red-500'
+                        ? 'text-danger'
                         : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
                 } disabled:opacity-50`}
                 title={

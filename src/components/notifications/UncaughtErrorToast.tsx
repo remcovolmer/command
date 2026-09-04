@@ -111,10 +111,10 @@ export function UncaughtErrorToast() {
         <div
           key={toast.id}
           role="status"
-          className="bg-amber-900/90 text-white p-4 rounded-lg shadow-lg max-w-sm"
+          className="bg-warning text-white p-4 rounded-lg shadow-lg max-w-sm"
         >
           <div className="flex items-start gap-3">
-            <div className="text-amber-300 mt-0.5">
+            <div className="text-white/85 mt-0.5">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -126,17 +126,17 @@ export function UncaughtErrorToast() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium">An internal error occurred</p>
-              <p className="text-sm text-amber-200 mt-1 break-all">{toast.message}</p>
+              <p className="text-sm text-white/80 mt-1 break-all">{toast.message}</p>
               <button
                 onClick={openLog}
-                className="mt-3 px-3 py-1.5 bg-amber-800 hover:bg-amber-700 rounded text-sm font-medium transition-colors"
+                className="mt-3 px-3 py-1.5 bg-black/20 hover:bg-black/30 rounded text-sm font-medium transition-colors"
               >
                 Open crash.log
               </button>
             </div>
             <button
               onClick={() => dismiss(toast.id)}
-              className="text-amber-300 hover:text-white"
+              className="text-white/70 hover:text-white"
               aria-label="Dismiss"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

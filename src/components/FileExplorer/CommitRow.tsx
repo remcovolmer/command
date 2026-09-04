@@ -66,7 +66,7 @@ export function CommitRow({
           )}
           {isMerge && (
             <span title="Merge commit">
-              <GitMerge className="w-3 h-3 text-purple-500" />
+              <GitMerge className="w-3 h-3 text-fg-muted" />
             </span>
           )}
         </div>
