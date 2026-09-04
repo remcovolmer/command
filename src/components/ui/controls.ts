@@ -19,7 +19,7 @@ export const btnIcon =
   'inline-flex items-center justify-center w-7 h-7 rounded-md text-fg-muted hover:bg-raised hover:text-fg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed'
 
 export const btnDanger =
-  'inline-flex items-center gap-2 h-8 px-3 rounded-md bg-danger text-white text-[13px] font-medium hover:opacity-90 active:scale-[0.97] transition-[opacity,transform] duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100'
+  'inline-flex items-center gap-2 h-8 px-3 rounded-md bg-danger text-destructive-foreground text-[13px] font-medium hover:opacity-90 active:scale-[0.97] transition-[opacity,transform] duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100'
 
 export const input =
   'h-8 px-2.5 rounded-md bg-screen border border-border text-[13px] text-fg placeholder:text-fg-faint focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25'

@@ -6,6 +6,7 @@ import { homedir } from 'os'
 import { type BrowserWindow } from 'electron'
 import { createLogger } from './Logger'
 import type { SessionIndexEntry } from '../../../shared/ipc-types'
+import { cleanSessionTitle } from '../../../shared/sessionTitle'
 
 export type { SessionIndexEntry }
 
@@ -232,8 +233,12 @@ async function parseSessionJsonl(
     const sessionId = filePath.replace(/^.*[\\/]/, '').replace('.jsonl', '')
     return {
       sessionId,
-      summary: compactSummary || firstPrompt,
-      firstPrompt,
+      // Strip Claude Code's system markup (caveat blocks, slash-command tags,
+      // compaction preambles) here so every consumer — sidebar summary, notch,
+      // breadcrumb, overview — sees human text. Generous cap: display sites
+      // truncate further themselves.
+      summary: cleanSessionTitle(compactSummary || firstPrompt, 400),
+      firstPrompt: cleanSessionTitle(firstPrompt, 400),
       messageCount: userMessageCount,
       gitBranch,
       modified: modified || new Date().toISOString(),
@@ -460,8 +465,8 @@ export class SessionIndexService {
     for (const [sessionId, cacheEntry] of Object.entries(this.summaryCache)) {
       const entry = this.cache.get(sessionId)
       if (entry && cacheEntry.title && cacheEntry.summary) {
-        entry.generatedTitle = cacheEntry.title
-        entry.generatedSummary = cacheEntry.summary
+        entry.generatedTitle = cleanSessionTitle(cacheEntry.title, 400)
+        entry.generatedSummary = cleanSessionTitle(cacheEntry.summary, 400)
       }
     }
   }

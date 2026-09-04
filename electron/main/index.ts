@@ -23,7 +23,13 @@ import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
-import { readUiStateSync, writeUiState, TITLEBAR_COLORS } from './services/uiState'
+import {
+  readUiStateSync,
+  writeUiState,
+  isTitlebarColors,
+  resolveTitlebarColors,
+  TITLEBAR_COLORS,
+} from './services/uiState'
 import type {
   AgentType,
   TerminalType,
@@ -364,7 +370,7 @@ function createTray() {
           }
         },
       },
-    ]),
+    ])
   )
   tray.on('double-click', showWindow)
 }
@@ -375,8 +381,7 @@ async function createWindow() {
   // Read synchronously (before the window exists) so the initial
   // backgroundColor / titleBarOverlay match the last-used theme on the very
   // first paint — no flash of the wrong theme while the renderer boots.
-  const { resolvedTheme } = readUiStateSync()
-  const titlebarColors = TITLEBAR_COLORS[resolvedTheme]
+  const titlebarColors = resolveTitlebarColors(readUiStateSync())
 
   win = new BrowserWindow({
     title: 'Command',
@@ -1779,16 +1784,19 @@ ipcMain.handle('app:sync-claude-theme', async (_event, theme: 'light' | 'dark') 
   }
 })
 
-// Persist the resolved theme and, on Windows, repaint the titlebar overlay
-// buttons to match. Called from useThemeResolver after every theme change.
-ipcMain.handle('app:set-titlebar-overlay', async (_event, theme: unknown) => {
+// Persist the resolved theme plus the token-derived titlebar colors the
+// renderer resolved from CSS, and on Windows repaint the overlay buttons to
+// match. Called from useThemeResolver after every theme change; the persisted
+// colors also seed the next cold start's backgroundColor.
+ipcMain.handle('app:set-titlebar-overlay', async (_event, theme: unknown, colors: unknown) => {
   if (theme !== 'light' && theme !== 'dark') {
     throw new Error('Invalid theme')
   }
-  writeUiState({ resolvedTheme: theme })
+  const titlebar = isTitlebarColors(colors) ? colors : TITLEBAR_COLORS[theme]
+  writeUiState({ resolvedTheme: theme, titlebar })
   if (process.platform === 'win32' && win && !win.isDestroyed()) {
     try {
-      win.setTitleBarOverlay(TITLEBAR_COLORS[theme])
+      win.setTitleBarOverlay(titlebar)
     } catch (e) {
       // setTitleBarOverlay is a no-op/unsupported outside titleBarStyle:'hidden'
       // windows — never let a platform quirk crash the main process.
@@ -1922,9 +1930,7 @@ ipcMain.handle(
       automationService?.recordForegroundLaunch(automationId, {
         terminalId: opts.terminalId as string,
         worktreeBranch:
-          typeof opts.worktreeBranch === 'string'
-            ? opts.worktreeBranch.slice(0, 200)
-            : undefined,
+          typeof opts.worktreeBranch === 'string' ? opts.worktreeBranch.slice(0, 200) : undefined,
       }) ?? null
     )
   }

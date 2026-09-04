@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useProjectStore } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
+import { getCssVar } from '../utils/terminalTheme'
 
 /**
  * Resolves the active theme (light/dark) from the user's theme preference,
@@ -37,8 +38,14 @@ export function useThemeResolver() {
         // Repaints the Windows titlebar overlay buttons and persists the theme
         // for the next cold-start backgroundColor. Optional-chained on the
         // method itself so older preloads or a test double lacking it don't throw.
+        // The .dark class is already applied above, so these resolve the real
+        // --canvas / --fg-muted tokens; main persists them for the cold-start
+        // backgroundColor so the first paint matches the app exactly.
         api.app
-          .setTitleBarOverlay?.(resolved)
+          .setTitleBarOverlay?.(resolved, {
+            color: getCssVar('--canvas'),
+            symbolColor: getCssVar('--fg-muted'),
+          })
           ?.catch((e: unknown) => console.warn('Failed to set titlebar overlay:', e))
       }
     }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import clsx from 'clsx'
 import { btnIcon } from './controls'
@@ -38,13 +38,17 @@ export function Dialog({
   children,
   bodyClassName,
 }: DialogProps) {
+  const titleId = useId()
   if (!open) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-scrim backdrop-blur-[2px]" onClick={onClose} />
 
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={clsx(
           'relative w-full bg-popover rounded-xl border border-border shadow-[0_1px_2px_oklch(0_0_0/.06),0_12px_40px_-12px_oklch(0_0_0/.35)] flex flex-col max-h-[85vh]',
           'dialog-in',
@@ -53,7 +57,10 @@ export function Dialog({
       >
         <div className="flex items-center gap-2 h-12 px-5 border-b border-border shrink-0">
           {Icon && <Icon className="w-4 h-4 text-primary shrink-0" />}
-          <h2 className="text-[15px] font-semibold text-fg-strong truncate flex-1 min-w-0">
+          <h2
+            id={titleId}
+            className="text-[15px] font-semibold text-fg-strong truncate flex-1 min-w-0"
+          >
             {title}
           </h2>
           <button onClick={onClose} className={btnIcon} aria-label="Close">

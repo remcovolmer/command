@@ -88,7 +88,7 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onCancel} />
+      <div className="absolute inset-0 bg-scrim backdrop-blur-[2px]" onClick={onCancel} />
 
       {/* Dialog */}
       <div className="relative bg-popover rounded-xl shadow-[0_1px_2px_oklch(0_0_0/.06),0_12px_40px_-12px_oklch(0_0_0/.35)] border border-border p-6 min-w-[400px] dialog-in">

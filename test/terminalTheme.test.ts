@@ -28,16 +28,20 @@ describe('terminal theme options', () => {
     expect(options.theme?.cursor).toBe('#b56032')
   })
 
-  test('picks the dark ANSI palette when the app theme is dark', () => {
+  test('reads the ANSI palette from the --ansi-* tokens (camelCase key → kebab var)', () => {
+    document.documentElement.style.setProperty('--ansi-red', '#e06c6c')
+    document.documentElement.style.setProperty('--ansi-bright-magenta', '#c7a0da')
     const options = buildTerminalThemeOptions('dark')
 
     expect(options.theme?.red).toBe('#e06c6c')
+    expect(options.theme?.brightMagenta).toBe('#c7a0da')
   })
 
-  test('picks the light ANSI palette when the app theme is light', () => {
+  test('omits ANSI slots whose token is undefined so xterm keeps its default', () => {
+    document.documentElement.style.removeProperty('--ansi-red')
     const options = buildTerminalThemeOptions('light')
 
-    expect(options.theme?.red).toBe('#b83f36')
+    expect(options.theme?.red).toBeUndefined()
   })
 })
 

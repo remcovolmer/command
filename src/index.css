@@ -43,6 +43,20 @@
   --warning: var(--status-attention);
   --danger: var(--status-stopped);
   --terminal-selection: color-mix(in oklch, var(--primary) 22%, var(--screen));
+  --scrim: oklch(0 0 0 / 0.35);
+  /* Terminal ANSI palette (xterm reads these via getCssVar) */
+  --ansi-red: #b83f36;
+  --ansi-green: #4e7d2a;
+  --ansi-yellow: #9a6a10;
+  --ansi-blue: #2f5fb3;
+  --ansi-magenta: #8748a8;
+  --ansi-cyan: #217a82;
+  --ansi-bright-red: #be4e46;
+  --ansi-bright-green: #5c873b;
+  --ansi-bright-yellow: #a27623;
+  --ansi-bright-blue: #406cb9;
+  --ansi-bright-magenta: #9157af;
+  --ansi-bright-cyan: #33858c;
 
   --font-sans: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
@@ -109,6 +123,20 @@
   --warning: var(--status-attention);
   --danger: var(--status-stopped);
   --terminal-selection: color-mix(in oklch, var(--primary) 22%, var(--screen));
+  --scrim: oklch(0 0 0 / 0.5);
+  /* Terminal ANSI palette (xterm reads these via getCssVar) */
+  --ansi-red: #e06c6c;
+  --ansi-green: #97c37a;
+  --ansi-yellow: #e2b96a;
+  --ansi-blue: #7fa8e0;
+  --ansi-magenta: #c39ad8;
+  --ansi-cyan: #7ccfd0;
+  --ansi-bright-red: #e27575;
+  --ansi-bright-green: #9dc782;
+  --ansi-bright-yellow: #e4bd73;
+  --ansi-bright-blue: #87ade2;
+  --ansi-bright-magenta: #c7a0da;
+  --ansi-bright-cyan: #84d2d3;
 
   --background: var(--screen);
   --foreground: var(--fg);

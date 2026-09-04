@@ -21,7 +21,13 @@ vi.mock('node:fs', () => ({
   default: fsMock,
 }))
 
-import { readUiStateSync, writeUiState, TITLEBAR_COLORS } from '../electron/main/services/uiState'
+import {
+  readUiStateSync,
+  writeUiState,
+  isTitlebarColors,
+  resolveTitlebarColors,
+  TITLEBAR_COLORS,
+} from '../electron/main/services/uiState'
 
 describe('uiState', () => {
   beforeEach(() => {
@@ -97,6 +103,32 @@ describe('uiState', () => {
       expect(TITLEBAR_COLORS.light.symbolColor).toMatch(/^#/)
       expect(TITLEBAR_COLORS.dark.color).toMatch(/^#/)
       expect(TITLEBAR_COLORS.dark.symbolColor).toMatch(/^#/)
+    })
+  })
+
+  describe('titlebar colors', () => {
+    test('round-trips renderer-resolved colors and prefers them over the fallback', () => {
+      const titlebar = { color: '#f1efe9', symbolColor: '#4a4540' }
+      fsMock.readFileSync.mockReturnValue(JSON.stringify({ resolvedTheme: 'light', titlebar }))
+      const state = readUiStateSync()
+      expect(state.titlebar).toEqual(titlebar)
+      expect(resolveTitlebarColors(state)).toEqual(titlebar)
+    })
+
+    test('drops malformed stored colors and falls back to the theme constants', () => {
+      fsMock.readFileSync.mockReturnValue(
+        JSON.stringify({ resolvedTheme: 'dark', titlebar: { color: 'red', symbolColor: '#fff' } })
+      )
+      const state = readUiStateSync()
+      expect(state.titlebar).toBeUndefined()
+      expect(resolveTitlebarColors(state)).toEqual(TITLEBAR_COLORS.dark)
+    })
+
+    test('isTitlebarColors accepts 6-digit hex only', () => {
+      expect(isTitlebarColors({ color: '#ABCDEF', symbolColor: '#123456' })).toBe(true)
+      expect(isTitlebarColors({ color: '#abc', symbolColor: '#123456' })).toBe(false)
+      expect(isTitlebarColors({ color: 'oklch(0.5 0 0)', symbolColor: '#123456' })).toBe(false)
+      expect(isTitlebarColors(null)).toBe(false)
     })
   })
 })

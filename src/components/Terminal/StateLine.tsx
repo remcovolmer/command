@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { TerminalState } from '../../types'
+import { STATE_DOT_COLORS, isAttentionState } from '../../utils/terminalState'
 
 // Busy needs a gradient sweep (background + background-size + animation) that
 // isn't expressible as a static Tailwind utility, so it's applied as inline
@@ -18,19 +19,13 @@ const BUSY_STYLE: CSSProperties = {
  * intentionally excluded (returns ''); its look comes from BUSY_STYLE above.
  */
 export function stateLineClass(state: TerminalState | null): string {
-  switch (state) {
-    case 'busy':
-      return ''
-    case 'permission':
-    case 'question':
-      return 'bg-status-attention attention-pulse'
-    case 'done':
-      return 'bg-status-done'
-    case 'stopped':
-      return 'bg-status-stopped'
-    default:
-      return 'bg-transparent'
-  }
+  if (state === null) return 'bg-transparent'
+  if (state === 'busy') return ''
+  // Same color map and attention grouping as the sidebar dots/rail, so the
+  // line can never disagree with the badge about the same chat's status.
+  return isAttentionState(state)
+    ? `${STATE_DOT_COLORS[state]} attention-pulse`
+    : STATE_DOT_COLORS[state]
 }
 
 interface StateLineProps {

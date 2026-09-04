@@ -10,6 +10,9 @@ import type { ITheme, ITerminalOptions } from '@xterm/xterm'
  */
 export function getCssVar(name: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  // Undefined token: return '' so callers can omit the slot instead of
+  // painting whatever the temp element's default color resolves to.
+  if (!value) return ''
   // If it's already hex, return it
   if (value.startsWith('#')) return value
   // If it's oklch, color-mix or any other CSS color syntax, resolve it via a
@@ -24,9 +27,7 @@ export function getCssVar(name: string): string {
   // Matches "rgb(r, g, b)", "rgba(r, g, b, a)" and the space-separated
   // "rgb(r g b / a)" syntax — comma or whitespace between channels, with an
   // optional "/ alpha" suffix that we ignore (xterm themes take opaque hex).
-  const match = computed.match(
-    /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+[\d.]+)?\s*\)/
-  )
+  const match = computed.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+[\d.]+)?\s*\)/)
   if (match) {
     const r = parseInt(match[1], 10).toString(16).padStart(2, '0')
     const g = parseInt(match[2], 10).toString(16).padStart(2, '0')
@@ -36,40 +37,34 @@ export function getCssVar(name: string): string {
   return value
 }
 
-// Two explicit ANSI palettes (warm-toned, one per app theme) replacing the
-// former Tokyo Night pastels that shifted hue arbitrarily once
-// minimumContrastRatio remapped them for light backgrounds. Bright variants
-// are the same hue lightened toward white in sRGB (light: +8%, dark: +6%) —
-// computed once and hard-coded rather than derived at runtime, since these
-// are fixed design values, not theme-dependent.
-const ANSI_LIGHT = {
-  red: '#b83f36',
-  green: '#4e7d2a',
-  yellow: '#9a6a10',
-  blue: '#2f5fb3',
-  magenta: '#8748a8',
-  cyan: '#217a82',
-  brightRed: '#be4e46',
-  brightGreen: '#5c873b',
-  brightYellow: '#a27623',
-  brightBlue: '#406cb9',
-  brightMagenta: '#9157af',
-  brightCyan: '#33858c',
-}
+// The 16-color ANSI palette lives in src/index.css as --ansi-* tokens (one
+// set per theme, next to the other surface tokens) so a token tweak or a third
+// theme reaches the terminal too. Names are the xterm ITheme keys.
+const ANSI_KEYS = [
+  'red',
+  'green',
+  'yellow',
+  'blue',
+  'magenta',
+  'cyan',
+  'brightRed',
+  'brightGreen',
+  'brightYellow',
+  'brightBlue',
+  'brightMagenta',
+  'brightCyan',
+] as const
+type AnsiKey = (typeof ANSI_KEYS)[number]
 
-const ANSI_DARK = {
-  red: '#e06c6c',
-  green: '#97c37a',
-  yellow: '#e2b96a',
-  blue: '#7fa8e0',
-  magenta: '#c39ad8',
-  cyan: '#7ccfd0',
-  brightRed: '#e27575',
-  brightGreen: '#9dc782',
-  brightYellow: '#e4bd73',
-  brightBlue: '#87ade2',
-  brightMagenta: '#c7a0da',
-  brightCyan: '#84d2d3',
+const toCssVar = (key: AnsiKey) => `--ansi-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`
+
+function readAnsiPalette(): Partial<Record<AnsiKey, string>> {
+  const out: Partial<Record<AnsiKey, string>> = {}
+  for (const key of ANSI_KEYS) {
+    const value = getCssVar(toCssVar(key))
+    if (value) out[key] = value
+  }
+  return out
 }
 
 let cachedTheme: ITheme | null = null
@@ -80,7 +75,7 @@ export function buildTerminalTheme(appTheme?: string): ITheme {
   const key = appTheme ?? 'default'
   if (cachedTheme && cachedThemeKey === key) return cachedTheme
 
-  const ansi = appTheme === 'dark' ? ANSI_DARK : ANSI_LIGHT
+  const ansi = readAnsiPalette()
 
   const bg = getCssVar('--screen')
   const fg = getCssVar('--fg')

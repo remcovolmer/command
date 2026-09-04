@@ -6,6 +6,7 @@ import { FileExplorer } from '../FileExplorer/FileExplorer'
 import { ActivityRail } from './ActivityRail'
 import { ShellDrawer } from './ShellDrawer'
 import { TitleBar } from './TitleBar'
+import { hasCustomTitleBar } from '../../utils/platform'
 import { UpdateNotification } from '../UpdateNotification'
 import { SpawnErrorToast } from '../notifications/SpawnErrorToast'
 import { UncaughtErrorToast } from '../notifications/UncaughtErrorToast'
@@ -45,7 +46,7 @@ export function MainLayout() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-canvas">
-      <TitleBar />
+      {hasCustomTitleBar() && <TitleBar />}
       <UpdateNotification />
       <SpawnErrorToast />
       <UncaughtErrorToast />

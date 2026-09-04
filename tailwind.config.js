@@ -60,6 +60,7 @@ export default {
           stopped: 'var(--status-stopped)',
         },
         border: 'var(--border)',
+        scrim: 'var(--scrim)',
         input: 'var(--input)',
         ring: 'var(--ring)',
         sidebar: {

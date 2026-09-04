@@ -18,7 +18,14 @@ loader.config({ monaco })
  * useThemeResolver) so the newly active surface colors get picked up.
  * monaco.editor.defineTheme is safe to call repeatedly with the same name.
  */
+let definedFor: 'light' | 'dark' | null = null
+
 export function defineCommandMonacoTheme(resolvedTheme: 'light' | 'dark') {
+  // Called from editor render bodies (so the theme name exists before Monaco
+  // reads the prop); the token reads force style recalcs, so only redo the
+  // work when the theme actually changed since the last definition.
+  if (definedFor === resolvedTheme) return
+  definedFor = resolvedTheme
   const name = resolvedTheme === 'dark' ? 'command-dark' : 'command-light'
   const base = resolvedTheme === 'dark' ? 'vs-dark' : 'vs'
   const borderStrong = getCssVar('--border-strong')
