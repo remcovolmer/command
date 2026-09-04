@@ -63,6 +63,14 @@ export function useXtermInstance({
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasInitializedRef = useRef(false)
   const cleanupRef = useRef<(() => void) | null>(null)
+  // Latest isActive + mount state, read by the async init() after the font
+  // await so it decides on current facts rather than on the closure that
+  // started it (see the race note in the init effect).
+  const isActiveRef = useRef(isActive)
+  const unmountedRef = useRef(false)
+  useEffect(() => {
+    isActiveRef.current = isActive
+  }, [isActive])
 
   const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
   const updateTerminalTitle = useProjectStore((s) => s.updateTerminalTitle)
@@ -148,16 +156,16 @@ export function useXtermInstance({
     isDisposedRef.current = false
     isReadyRef.current = false
 
-    let cancelled = false
-
     const init = async () => {
       // xterm measures cell width at open(); if the bundled Plex Mono face
       // is still loading, that measurement uses the fallback stack and the
       // grid stays wrong until the next resize. Wait for it up front (guard
-      // document.fonts for jsdom/tests, where it's undefined).
-      if (typeof document !== 'undefined' && document.fonts) {
+      // document.fonts for jsdom/tests, where it's undefined). Once the face
+      // is resident, check() is true and we stay synchronous.
+      const fontSpec = "14px 'IBM Plex Mono'"
+      if (typeof document !== 'undefined' && document.fonts && !document.fonts.check(fontSpec)) {
         try {
-          await document.fonts.load("14px 'IBM Plex Mono'")
+          await document.fonts.load(fontSpec)
         } catch {
           // Loading can reject in constrained environments — the fallback
           // stack (JetBrains Mono, Cascadia Code, Consolas) still renders,
@@ -165,8 +173,12 @@ export function useXtermInstance({
         }
       }
 
-      // The component may have unmounted or gone inactive while we waited.
-      if (cancelled || !containerRef.current) {
+      // Decide on the *current* state, not the closure's. While we awaited,
+      // isActive may have flipped off and on again; the re-run effect bailed
+      // on hasInitializedRef, so this init is the only one that will ever run
+      // for that sequence and must still create the terminal when the tab is
+      // active now. Only a real unmount / inactive-now aborts.
+      if (unmountedRef.current || !containerRef.current || !isActiveRef.current) {
         hasInitializedRef.current = false
         return
       }
@@ -466,14 +478,7 @@ export function useXtermInstance({
       }
     }
 
-    init()
-
-    // If the effect re-runs (isActive flips) or the component unmounts while
-    // init() is still awaiting the font, mark it cancelled so it bails out
-    // instead of creating a terminal nobody wants anymore.
-    return () => {
-      cancelled = true
-    }
+    void init()
     // Intentionally excludes: projectId, onExit, onTitle, fontSize, scrollback.
     // This effect initializes once per terminal (guarded by hasInitializedRef).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -482,6 +487,7 @@ export function useXtermInstance({
   // Cleanup on unmount only (terminal closed or component removed)
   useEffect(() => {
     return () => {
+      unmountedRef.current = true
       cleanupRef.current?.()
       cleanupRef.current = null
       // Only remove from pool if terminal is actually closing (not just remounting).
