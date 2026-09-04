@@ -25,6 +25,7 @@ import { CommitHistory } from './CommitHistory'
 import { CommitForm } from './CommitForm'
 import { BranchDropdown } from './BranchDropdown'
 import { DiscardConfirmDialog } from './DiscardConfirmDialog'
+import { btnIcon } from '../ui/controls'
 
 interface GitStatusPanelProps {
   project: Project
@@ -82,10 +83,10 @@ export function GitStatusPanel({
     <div className="h-full flex flex-col">
       {!gitStatus ? (
         <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          <Loader2 className="w-4 h-4 animate-spin text-fg-muted" />
         </div>
       ) : !gitStatus.isGitRepo ? (
-        <div className="px-3 py-2 text-sm text-muted-foreground">Not a git repository</div>
+        <div className="px-3 py-2 text-[13px] text-fg-muted">Not a git repository</div>
       ) : (
         <>
           {/* Top section: branch info + working tree status (collapsible, scrollable) */}
@@ -101,8 +102,8 @@ export function GitStatusPanel({
 
             {/* Status Indicator */}
             {gitStatus.isClean ? (
-              <div className="flex items-center gap-2 px-3 py-2 text-sm text-success">
-                <Check className="w-4 h-4" />
+              <div className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-success">
+                <Check className="w-4 h-4" strokeWidth={1.5} />
                 <span>Working tree clean</span>
               </div>
             ) : (
@@ -177,20 +178,18 @@ export function GitStatusPanel({
             )}
 
             {gitStatus.error && (
-              <div className="px-3 py-2 text-sm text-danger flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
+              <div className="px-3 py-2 text-[12.5px] text-danger flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" strokeWidth={1.5} />
                 <span className="truncate">{gitStatus.error}</span>
               </div>
             )}
           </div>
 
           {/* Commit History section - fills remaining space */}
-          <div className="flex-1 min-h-0 flex flex-col border-t border-border/50">
+          <div className="flex-1 min-h-0 flex flex-col border-t border-border">
             <div className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0">
-              <History className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Commits
-              </span>
+              <History className="w-3.5 h-3.5 text-fg-muted" strokeWidth={1.5} />
+              <span className="eyebrow">Commits</span>
             </div>
             <div className="flex-1 min-h-0">
               <CommitHistory gitPath={effectiveGitPath} contextId={contextKey} />
@@ -259,12 +258,12 @@ function BranchSection({
   return (
     <div className="px-3 py-2">
       <div className="flex items-center gap-2">
-        <GitBranch className="w-4 h-4 text-primary" />
+        <GitBranch className="w-4 h-4 text-primary" strokeWidth={1.5} />
         <button
           ref={branchNameRef}
           onClick={() => setShowDropdown(!showDropdown)}
           disabled={loading !== null}
-          className="text-sm text-sidebar-foreground font-medium truncate flex-1 text-left hover:text-primary transition-colors cursor-pointer"
+          className="text-[13px] text-fg font-medium truncate flex-1 text-left hover:text-primary transition-colors cursor-pointer"
           title="Click to switch branches"
         >
           {loading === 'switch' ? (
@@ -280,19 +279,19 @@ function BranchSection({
           <button
             onClick={() => handleGitAction('fetch')}
             disabled={loading !== null}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
+            className={btnIcon}
             title="Fetch"
           >
             {loading === 'fetch' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <Download className="w-3.5 h-3.5 text-muted-foreground hover:text-sidebar-foreground" />
+              <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
             )}
           </button>
           <button
             onClick={() => handleGitAction('pull')}
             disabled={loading !== null || !branch.upstream}
-            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={btnIcon}
             title={
               !branch.upstream
                 ? 'No upstream branch configured'
@@ -300,17 +299,18 @@ function BranchSection({
             }
           >
             {loading === 'pull' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <ArrowDown
-                className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-warning' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
+                className={`w-3.5 h-3.5 ${branch.behind > 0 ? 'text-warning' : ''}`}
+                strokeWidth={1.5}
               />
             )}
           </button>
           <button
             onClick={() => handleGitAction('push')}
             disabled={loading !== null || !branch.upstream || branch.ahead === 0}
-            className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={btnIcon}
             title={
               !branch.upstream
                 ? 'No upstream branch configured'
@@ -318,10 +318,11 @@ function BranchSection({
             }
           >
             {loading === 'push' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <ArrowUp
-                className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-success' : 'text-muted-foreground hover:text-sidebar-foreground'}`}
+                className={`w-3.5 h-3.5 ${branch.ahead > 0 ? 'text-success' : ''}`}
+                strokeWidth={1.5}
               />
             )}
           </button>
@@ -372,7 +373,7 @@ function FileChangeSection({
     success: 'text-success',
     warning: 'text-warning',
     error: 'text-danger',
-    muted: 'text-muted-foreground',
+    muted: 'text-fg-muted',
   }[variant]
 
   const handleStageAll = useCallback(
@@ -407,46 +408,38 @@ function FileChangeSection({
   )
 
   return (
-    <div className="border-t border-border/50">
+    <div className="border-t border-border">
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-sidebar-accent transition-colors group"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-raised transition-colors group"
       >
         {expanded ? (
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          <ChevronDown className="w-4 h-4 text-fg-faint" strokeWidth={1.5} />
         ) : (
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <ChevronRight className="w-4 h-4 text-fg-faint" strokeWidth={1.5} />
         )}
-        <span className={`text-sm font-medium ${colorClass}`}>{title}</span>
-        <span className="text-xs text-muted-foreground">{files.length}</span>
+        <span className={`eyebrow ${colorClass}`}>{title}</span>
+        <span className="font-mono text-[11px] text-fg-muted tnum">{files.length}</span>
         <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {sectionType === 'staged' && (
-            <button
-              onClick={handleUnstageAll}
-              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title="Unstage All"
-            >
-              <Minus className="w-3.5 h-3.5 text-muted-foreground" />
+            <button onClick={handleUnstageAll} className={btnIcon} title="Unstage All">
+              <Minus className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
           )}
           {(sectionType === 'modified' || sectionType === 'untracked') && (
-            <button
-              onClick={handleStageAll}
-              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title="Stage All"
-            >
-              <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+            <button onClick={handleStageAll} className={btnIcon} title="Stage All">
+              <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
           )}
           {(sectionType === 'modified' || sectionType === 'untracked') && (
             <button
               onClick={handleDiscardAll}
-              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
+              className={btnIcon}
               title={
                 sectionType === 'untracked' ? 'Delete All Untracked Files' : 'Discard All Changes'
               }
             >
-              <X className="w-3.5 h-3.5 text-muted-foreground" />
+              <X className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
           )}
         </div>
@@ -503,7 +496,7 @@ function FileChangeItem({
     success: 'text-success',
     warning: 'text-warning',
     error: 'text-danger',
-    muted: 'text-muted-foreground',
+    muted: 'text-fg-muted',
   }[variant]
 
   const fileName = file.path.split(/[/\\]/).pop() || file.path
@@ -553,65 +546,41 @@ function FileChangeItem({
 
   return (
     <div
-      className="flex items-center gap-2 px-3 py-1 ml-4 text-sm hover:bg-sidebar-accent rounded transition-colors min-w-0 group cursor-pointer"
+      className="flex items-center gap-2 h-7 px-3 ml-4 text-[12.5px] hover:bg-raised rounded-md transition-colors min-w-0 group cursor-pointer"
       title={file.path}
       onClick={handleClick}
     >
-      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} />
-      <span className="text-sidebar-foreground truncate min-w-0 flex-1">{fileName}</span>
+      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${colorClass}`} strokeWidth={1.5} />
+      <span className="text-fg truncate min-w-0 flex-1">{fileName}</span>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
         {sectionType === 'staged' && (
-          <button
-            onClick={handleUnstage}
-            className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-            title="Unstage"
-          >
-            <Minus className="w-3 h-3 text-muted-foreground" />
+          <button onClick={handleUnstage} className={btnIcon} title="Unstage">
+            <Minus className="w-3 h-3" strokeWidth={1.5} />
           </button>
         )}
         {sectionType === 'modified' && (
           <>
-            <button
-              onClick={handleStage}
-              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title="Stage"
-            >
-              <Plus className="w-3 h-3 text-muted-foreground" />
+            <button onClick={handleStage} className={btnIcon} title="Stage">
+              <Plus className="w-3 h-3" strokeWidth={1.5} />
             </button>
-            <button
-              onClick={handleDiscard}
-              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title="Discard Changes"
-            >
-              <X className="w-3 h-3 text-muted-foreground" />
+            <button onClick={handleDiscard} className={btnIcon} title="Discard Changes">
+              <X className="w-3 h-3" strokeWidth={1.5} />
             </button>
           </>
         )}
         {sectionType === 'untracked' && (
           <>
-            <button
-              onClick={handleStage}
-              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title="Stage"
-            >
-              <Plus className="w-3 h-3 text-muted-foreground" />
+            <button onClick={handleStage} className={btnIcon} title="Stage">
+              <Plus className="w-3 h-3" strokeWidth={1.5} />
             </button>
-            <button
-              onClick={handleDiscard}
-              className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-              title="Delete File"
-            >
-              <X className="w-3 h-3 text-muted-foreground" />
+            <button onClick={handleDiscard} className={btnIcon} title="Delete File">
+              <X className="w-3 h-3" strokeWidth={1.5} />
             </button>
           </>
         )}
         {sectionType === 'conflicted' && (
-          <button
-            onClick={handleStage}
-            className="p-0.5 rounded hover:bg-muted/80 transition-colors"
-            title="Mark as Resolved"
-          >
-            <CheckCircle className="w-3 h-3 text-muted-foreground" />
+          <button onClick={handleStage} className={btnIcon} title="Mark as Resolved">
+            <CheckCircle className="w-3 h-3" strokeWidth={1.5} />
           </button>
         )}
       </div>

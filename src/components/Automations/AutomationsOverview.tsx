@@ -22,6 +22,15 @@ import { getElectronAPI } from '../../utils/electron'
 import { useProjectStore } from '../../stores/projectStore'
 import { useLaunchAutomation } from '../../hooks/useLaunchAutomation'
 import { AutomationCreateDialog } from '../FileExplorer/AutomationCreateDialog'
+import clsx from 'clsx'
+import {
+  btnPrimary,
+  btnIcon,
+  segmentGroup,
+  segment,
+  segmentActive,
+  segmentInactive,
+} from '../ui/controls'
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -74,7 +83,7 @@ function renderInline(text: string): ReactNode[] {
       )
     } else if (match[2]) {
       parts.push(
-        <strong key={match.index} className="text-foreground font-semibold">
+        <strong key={match.index} className="text-fg font-semibold">
           {match[3]}
         </strong>
       )
@@ -82,7 +91,7 @@ function renderInline(text: string): ReactNode[] {
       parts.push(
         <code
           key={match.index}
-          className="bg-muted/60 px-1 py-0.5 rounded text-[10px] font-mono text-foreground"
+          className="bg-raised px-1 py-0.5 rounded text-[10px] font-mono text-fg"
         >
           {match[5]}
         </code>
@@ -113,7 +122,7 @@ function RunResultContent({ text }: { text: string }) {
       elements.push(
         <pre
           key={`code-${i}`}
-          className="bg-muted/60 rounded px-2 py-1.5 overflow-x-auto font-mono text-[10px] text-foreground whitespace-pre"
+          className="bg-raised rounded px-2 py-1.5 overflow-x-auto font-mono text-[10px] text-fg whitespace-pre"
         >
           {codeLines.join('\n')}
         </pre>
@@ -127,7 +136,7 @@ function RunResultContent({ text }: { text: string }) {
     if (/^[-•]\s/.test(stripped)) {
       elements.push(
         <div key={i} className="flex gap-1.5 pl-1">
-          <span className="text-muted-foreground/60 shrink-0">{'•'}</span>
+          <span className="text-fg-faint shrink-0">{'•'}</span>
           <span>{renderInline(stripped.replace(/^[-•]\s+/, ''))}</span>
         </div>
       )
@@ -138,9 +147,9 @@ function RunResultContent({ text }: { text: string }) {
     i++
   }
   return (
-    <div className="text-xs text-muted-foreground space-y-1">
+    <div className="text-xs text-fg-muted space-y-1">
       {elements}
-      {text.length > 2000 && <div className="text-muted-foreground/50">...truncated</div>}
+      {text.length > 2000 && <div className="text-fg-faint">...truncated</div>}
     </div>
   )
 }
@@ -156,7 +165,7 @@ function statusIcon(status: AutomationRun['status']) {
     case 'timeout':
       return <AlertTriangle className="w-3.5 h-3.5 text-warning" />
     case 'cancelled':
-      return <Square className="w-3.5 h-3.5 text-muted-foreground" />
+      return <Square className="w-3.5 h-3.5 text-fg-muted" />
   }
 }
 
@@ -281,39 +290,42 @@ export function AutomationsOverview() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-background text-muted-foreground">
+      <div className="h-full flex items-center justify-center bg-screen text-fg-muted">
         <Loader2 className="w-5 h-5 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col bg-background text-sm">
+    <div className="h-full flex flex-col bg-screen text-[13px]">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
-        <Zap className="w-5 h-5 text-primary" />
-        <h1 className="text-lg font-semibold text-foreground">Automations</h1>
-        <span className="text-xs text-muted-foreground">
+      <div className="flex items-center gap-2.5 h-12 px-5 border-b border-border bg-canvas shrink-0">
+        <Zap className="w-4 h-4 text-primary" strokeWidth={1.5} />
+        <h1 className="text-[15px] font-semibold text-fg-strong">Automations</h1>
+        <span className="font-mono text-[11.5px] text-fg-muted tnum">
           {automations.length} template{automations.length === 1 ? '' : 's'}
         </span>
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={() => setTab('automations')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium ${tab === 'automations' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            Templates
-          </button>
-          <button
-            onClick={() => setTab('runs')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium ${tab === 'runs' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            Run history
-          </button>
-          <button
-            onClick={openCreate}
-            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="w-3.5 h-3.5" /> New
+        <div className="ml-auto flex items-center gap-3">
+          <div className={segmentGroup} role="tablist">
+            <button
+              role="tab"
+              aria-selected={tab === 'automations'}
+              onClick={() => setTab('automations')}
+              className={clsx(segment, tab === 'automations' ? segmentActive : segmentInactive)}
+            >
+              Templates
+            </button>
+            <button
+              role="tab"
+              aria-selected={tab === 'runs'}
+              onClick={() => setTab('runs')}
+              className={clsx(segment, tab === 'runs' ? segmentActive : segmentInactive)}
+            >
+              Run history
+            </button>
+          </div>
+          <button onClick={openCreate} className={`${btnPrimary} h-7 px-2.5 text-[12.5px]`}>
+            <Plus className="w-3.5 h-3.5" strokeWidth={1.5} /> New
           </button>
         </div>
       </div>
@@ -321,8 +333,8 @@ export function AutomationsOverview() {
       {tab === 'automations' ? (
         <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
           {automations.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <Zap className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <div className="text-center py-16 text-fg-muted">
+              <Zap className="w-8 h-8 mx-auto mb-3 text-fg-faint" strokeWidth={1.5} />
               <p className="mb-2">No automations yet.</p>
               <button onClick={openCreate} className="text-primary hover:underline">
                 Create your first automation
@@ -331,43 +343,41 @@ export function AutomationsOverview() {
           ) : (
             <table className="w-full border-collapse">
               <thead>
-                <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <th className="text-left font-medium px-2 py-2 w-10"></th>
-                  <th className="text-left font-medium px-2 py-2">Name</th>
-                  <th className="text-left font-medium px-2 py-2">Project</th>
-                  <th className="text-left font-medium px-2 py-2">Trigger</th>
-                  <th className="text-left font-medium px-2 py-2">Target</th>
-                  <th className="text-left font-medium px-2 py-2">Last run</th>
-                  <th className="text-right font-medium px-2 py-2">Actions</th>
+                <tr>
+                  <th className="eyebrow text-left px-2 py-2 w-10"></th>
+                  <th className="eyebrow text-left px-2 py-2">Name</th>
+                  <th className="eyebrow text-left px-2 py-2">Project</th>
+                  <th className="eyebrow text-left px-2 py-2">Trigger</th>
+                  <th className="eyebrow text-left px-2 py-2">Target</th>
+                  <th className="eyebrow text-left px-2 py-2">Last run</th>
+                  <th className="eyebrow text-right px-2 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {automations.map((a) => {
                   const lastRun = runs.find((r) => r.automationId === a.id)
                   return (
-                    <tr key={a.id} className="border-t border-border/60 hover:bg-muted/20 group">
+                    <tr key={a.id} className="border-t border-border hover:bg-raised/60 group">
                       <td className="px-2 py-2">
                         <button
                           onClick={() => handleToggle(a.id)}
                           title={a.enabled ? 'Enabled' : 'Disabled'}
-                          className={`w-8 h-[18px] rounded-full relative transition-colors ${a.enabled ? 'bg-primary' : 'bg-muted-foreground/40'}`}
+                          className={`w-8 h-[18px] rounded-full relative transition-colors ${a.enabled ? 'bg-primary' : 'bg-border-strong'}`}
                         >
                           <span
                             className={`absolute top-[2px] w-3.5 h-3.5 rounded-full bg-white transition-all ${a.enabled ? 'right-[2px]' : 'left-[2px]'}`}
                           />
                         </button>
                       </td>
-                      <td className="px-2 py-2 font-medium text-foreground">{a.name}</td>
-                      <td className="px-2 py-2 text-muted-foreground">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-xs">
+                      <td className="px-2 py-2 font-medium text-fg-strong">{a.name}</td>
+                      <td className="px-2 py-2 text-fg-muted">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-raised text-[12px] text-fg">
                           {projectName(a.projectId)}
                         </span>
                       </td>
-                      <td className="px-2 py-2 text-muted-foreground text-xs">
-                        {triggerLabel(a.trigger)}
-                      </td>
+                      <td className="px-2 py-2 text-fg-muted text-xs">{triggerLabel(a.trigger)}</td>
                       <td className="px-2 py-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-[10px]">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-success/10 text-success font-mono text-[10.5px]">
                           {a.defaultTarget === 'worktree' ? (
                             <GitBranch className="w-3 h-3" />
                           ) : (
@@ -376,7 +386,7 @@ export function AutomationsOverview() {
                           {a.defaultTarget}
                         </span>
                       </td>
-                      <td className="px-2 py-2 text-xs text-muted-foreground">
+                      <td className="px-2 py-2 font-mono text-[11px] text-fg-muted tnum">
                         {lastRun ? (
                           <span className="inline-flex items-center gap-1.5">
                             {statusIcon(lastRun.status)}
@@ -392,31 +402,29 @@ export function AutomationsOverview() {
                           <div className="relative inline-flex items-stretch">
                             <button
                               onClick={() => handleLaunch(a)}
-                              className="inline-flex items-center gap-1 h-6 pl-2.5 pr-2 rounded-l-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                              className="inline-flex items-center gap-1 h-6 pl-2.5 pr-2 rounded-l-md text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover"
                               title={`Launch in ${a.defaultTarget}`}
                             >
                               <Play className="w-3 h-3" /> Launch
                             </button>
                             <button
-                              onClick={() =>
-                                setLaunchMenuId((cur) => (cur === a.id ? null : a.id))
-                              }
-                              className="inline-flex items-center justify-center h-6 w-6 rounded-r-md bg-primary text-primary-foreground hover:bg-primary/90 border-l border-primary-foreground/25"
+                              onClick={() => setLaunchMenuId((cur) => (cur === a.id ? null : a.id))}
+                              className="inline-flex items-center justify-center h-6 w-6 rounded-r-md bg-primary text-primary-foreground hover:bg-primary-hover border-l border-primary-foreground/25"
                               title="Choose launch target"
                             >
                               <ChevronDown className="w-3 h-3" />
                             </button>
                             {launchMenuId === a.id && (
-                              <div className="absolute right-0 top-full mt-1 z-10 w-44 bg-popover border border-border rounded-md shadow-lg py-1">
+                              <div className="absolute right-0 top-full mt-1 z-10 w-44 bg-popover border border-border rounded-lg shadow-[0_8px_30px_-10px_oklch(0_0_0/.35)] py-1">
                                 <button
                                   onClick={() => handleLaunch(a, 'chat')}
-                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted/50 flex items-center gap-2"
+                                  className="w-full text-left h-7 px-3 text-[12.5px] hover:bg-raised flex items-center gap-2"
                                 >
                                   <MessageSquare className="w-3 h-3" /> Launch in chat
                                 </button>
                                 <button
                                   onClick={() => handleLaunch(a, 'worktree')}
-                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted/50 flex items-center gap-2"
+                                  className="w-full text-left h-7 px-3 text-[12.5px] hover:bg-raised flex items-center gap-2"
                                 >
                                   <GitBranch className="w-3 h-3" /> Launch in worktree
                                 </button>
@@ -425,21 +433,21 @@ export function AutomationsOverview() {
                           </div>
                           <button
                             onClick={() => handleHeadless(a.id)}
-                            className="p-1 rounded hover:bg-muted/60 text-muted-foreground"
+                            className={btnIcon}
                             title="Run headless now"
                           >
                             <Zap className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => openEdit(a)}
-                            className="p-1 rounded hover:bg-muted/60 text-muted-foreground opacity-0 group-hover:opacity-100"
+                            className={`${btnIcon} opacity-0 group-hover:opacity-100`}
                             title="Edit"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDelete(a.id)}
-                            className="p-1 rounded hover:bg-muted/60 text-muted-foreground opacity-0 group-hover:opacity-100"
+                            className={`${btnIcon} opacity-0 group-hover:opacity-100`}
                             title="Delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -456,35 +464,37 @@ export function AutomationsOverview() {
       ) : (
         <div className="flex-1 min-h-0 overflow-auto px-6 py-3">
           {runs.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">No runs yet</div>
+            <div className="text-center py-16 text-fg-muted">No runs yet</div>
           ) : (
             <div className="max-w-3xl mx-auto">
               {runs.map((run) => (
-                <div key={run.id} className="border-b border-border/50">
+                <div key={run.id} className="border-b border-border">
                   <div
                     onClick={() => handleToggleRun(run)}
-                    className="w-full text-left px-2 py-2 hover:bg-muted/20 flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-2 h-9 hover:bg-raised/60 flex items-center gap-2 cursor-pointer"
                   >
                     {expandedRunId === run.id ? (
-                      <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
+                      <ChevronDown className="w-3 h-3 shrink-0 text-fg-muted" />
                     ) : (
-                      <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground" />
+                      <ChevronRight className="w-3 h-3 shrink-0 text-fg-muted" />
                     )}
                     {statusIcon(run.status)}
-                    <span className="text-xs font-medium">{automationName(run.automationId)}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                    <span className="text-[12.5px] font-medium text-fg-strong">
+                      {automationName(run.automationId)}
+                    </span>
+                    <span className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-raised text-fg-muted">
                       {run.mode}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[11.5px] text-fg-muted">
                       {projectName(run.projectId)}
                     </span>
-                    <span className="ml-auto text-xs text-muted-foreground">
+                    <span className="ml-auto font-mono text-[11px] text-fg-muted tnum">
                       {formatRelativeTime(run.startedAt)}
                     </span>
                   </div>
                   {expandedRunId === run.id && (
-                    <div className="px-6 py-2 bg-muted/10 space-y-1.5">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="px-6 py-3 bg-canvas space-y-1.5">
+                      <div className="flex items-center gap-2 font-mono text-[11px] text-fg-muted tnum">
                         <Clock className="w-3 h-3" />
                         <span>{run.durationMs ? formatDuration(run.durationMs) : '—'}</span>
                         {run.exitCode !== undefined && <span>Exit: {run.exitCode}</span>}
@@ -499,7 +509,7 @@ export function AutomationsOverview() {
                               <MessageSquare className="w-3 h-3" /> Open chat
                             </button>
                           ) : (
-                            <span className="text-muted-foreground">
+                            <span className="text-fg-muted">
                               Session ended (launched interactively)
                             </span>
                           )}
@@ -511,14 +521,13 @@ export function AutomationsOverview() {
                         </div>
                       )}
                       {run.result && (
-                        <div className="bg-background/60 rounded px-2 py-1.5 max-h-60 overflow-auto">
+                        <div className="bg-panel border border-border rounded-md px-3 py-2 max-h-60 overflow-auto">
                           <RunResultContent text={run.result} />
                         </div>
                       )}
                       {run.worktreeBranch && (
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          Branch:{' '}
-                          <span className="font-mono text-foreground">{run.worktreeBranch}</span>
+                        <div className="text-xs text-fg-muted flex items-center gap-1.5">
+                          Branch: <span className="font-mono text-fg">{run.worktreeBranch}</span>
                           {run.prUrl && (
                             <button
                               onClick={() => window.electronAPI.shell.openExternal(run.prUrl!)}

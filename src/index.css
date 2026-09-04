@@ -359,9 +359,14 @@ body {
   }
 }
 
+.dialog-in {
+  animation: dialog-in 120ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .state-line,
-  .attention-pulse {
+  .attention-pulse,
+  .dialog-in {
     animation: none;
   }
 }

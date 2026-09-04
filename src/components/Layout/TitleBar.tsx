@@ -24,9 +24,11 @@ export function TitleBar() {
     ? activeTerminal.generatedTitle || activeTerminal.title
     : undefined
 
-  const segments = [project?.name, worktree?.name, chatTitle].filter(
-    (s): s is string => Boolean(s)
-  )
+  // A chat is usually titled after its worktree until the agent names it, so
+  // drop a segment that merely repeats the one before it.
+  const segments = [project?.name, worktree?.name, chatTitle]
+    .filter((s): s is string => Boolean(s))
+    .filter((s, i, arr) => i === 0 || s !== arr[i - 1])
 
   const mac = useMemo(() => isMac(), [])
 

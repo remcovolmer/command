@@ -253,7 +253,7 @@ export function SortableProjectList({
             <button
               onClick={toggleInactiveSectionCollapsed}
               aria-expanded={!inactiveSectionCollapsed}
-              className="flex items-center gap-1 w-full text-left hover:text-fg-muted transition-colors"
+              className="eyebrow flex items-center gap-1 w-full text-left hover:text-fg-muted transition-colors"
             >
               <ChevronRight
                 aria-hidden="true"

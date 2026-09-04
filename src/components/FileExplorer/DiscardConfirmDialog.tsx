@@ -1,6 +1,9 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
+import { Dialog } from '../ui/Dialog'
+import { btnSecondary, btnDanger } from '../ui/controls'
 
 interface DiscardConfirmDialogProps {
   gitPath: string
@@ -74,31 +77,24 @@ export function DiscardConfirmDialog({ gitPath, onComplete }: DiscardConfirmDial
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-4 shadow-xl">
-        <h3 className="text-base font-semibold text-card-foreground mb-2">{title}</h3>
-        <p className="text-sm text-muted-foreground mb-4">{description}</p>
+    <Dialog open onClose={clearDiscardingFiles} title={title} icon={AlertTriangle} size="sm">
+      <p className="text-[13px] text-fg-muted mb-4">{description}</p>
 
-        {error && <p className="text-sm text-danger mb-4">{error}</p>}
+      {error && <p className="text-[13px] text-danger mb-4">{error}</p>}
 
-        <div className="flex items-center justify-end gap-2">
-          <button
-            ref={cancelRef}
-            onClick={clearDiscardingFiles}
-            disabled={loading}
-            className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={loading}
-            className="px-3 py-1.5 text-sm rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Working…' : isUntracked ? 'Delete' : 'Discard'}
-          </button>
-        </div>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          ref={cancelRef}
+          onClick={clearDiscardingFiles}
+          disabled={loading}
+          className={btnSecondary}
+        >
+          Cancel
+        </button>
+        <button onClick={handleConfirm} disabled={loading} className={btnDanger}>
+          {loading ? 'Working…' : isUntracked ? 'Delete' : 'Discard'}
+        </button>
       </div>
-    </div>
+    </Dialog>
   )
 }

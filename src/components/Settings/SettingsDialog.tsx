@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
-import { X, Keyboard, Settings, User } from 'lucide-react'
+import { Keyboard, Settings, User } from 'lucide-react'
+import clsx from 'clsx'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import { HotkeySection } from './HotkeySection'
 import { GeneralSection } from './GeneralSection'
 import { AccountsSection } from './AccountsSection'
 import { useProjectStore } from '../../stores/projectStore'
+import { Dialog } from '../ui/Dialog'
+import { segmentGroup, segment, segmentActive, segmentInactive } from '../ui/controls'
 
 interface SettingsDialogProps {
   isOpen: boolean
@@ -12,6 +15,12 @@ interface SettingsDialogProps {
 }
 
 type SettingsTab = 'shortcuts' | 'general' | 'accounts'
+
+const TABS: { id: SettingsTab; label: string; icon: typeof Keyboard }[] = [
+  { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: Keyboard },
+  { id: 'general', label: 'General', icon: Settings },
+  { id: 'accounts', label: 'Accounts', icon: User },
+]
 
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const settingsInitialTab = useProjectStore((s) => s.settingsInitialTab)
@@ -28,70 +37,28 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   // Close on Escape — disabled when a nested dialog (e.g. confirmation) is open
   useDialogHotkeys(onClose, undefined, { enabled: isOpen && !hasNestedDialog })
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-
-      {/* Dialog */}
-      <div className="relative w-full max-w-3xl max-h-[85vh] bg-sidebar rounded-xl shadow-2xl border border-border flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-sidebar-accent/30">
-          <div className="flex items-center gap-2">
-            <Settings className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Settings</h2>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-border/30 px-5">
+    <Dialog open={isOpen} onClose={onClose} title="Settings" icon={Settings} size="lg">
+      <div className={clsx(segmentGroup, 'mb-4')}>
+        {TABS.map(({ id, label, icon: Icon }) => (
           <button
-            onClick={() => setActiveTab('shortcuts')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === 'shortcuts'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={clsx(
+              segment,
+              'inline-flex items-center gap-1.5',
+              activeTab === id ? segmentActive : segmentInactive
+            )}
           >
-            <Keyboard className="w-4 h-4" />
-            Keyboard Shortcuts
+            <Icon className="w-3.5 h-3.5" />
+            {label}
           </button>
-          <button
-            onClick={() => setActiveTab('general')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === 'general'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            General
-          </button>
-          <button
-            onClick={() => setActiveTab('accounts')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === 'accounts'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            Accounts
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {activeTab === 'shortcuts' && <HotkeySection />}
-          {activeTab === 'general' && <GeneralSection onNestedDialogChange={setHasNestedDialog} />}
-          {activeTab === 'accounts' && <AccountsSection />}
-        </div>
+        ))}
       </div>
-    </div>
+
+      {activeTab === 'shortcuts' && <HotkeySection />}
+      {activeTab === 'general' && <GeneralSection onNestedDialogChange={setHasNestedDialog} />}
+      {activeTab === 'accounts' && <AccountsSection />}
+    </Dialog>
   )
 }

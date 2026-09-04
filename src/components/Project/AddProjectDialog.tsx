@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
-import { X, Code, FolderOpen, Loader2 } from 'lucide-react'
+import { Code, FolderOpen, Loader2 } from 'lucide-react'
+import clsx from 'clsx'
 import { getElectronAPI } from '../../utils/electron'
 import type { Project, ProjectType } from '../../types'
+import { Dialog } from '../ui/Dialog'
+import { btnPrimary, btnSecondary } from '../ui/controls'
 
 const PROJECT_TYPE_OPTIONS = [
   { type: 'project' as const, icon: FolderOpen, label: 'Project', description: 'Files + Claude' },
@@ -68,103 +71,86 @@ export function AddProjectDialog({ isOpen, onClose, onCreated }: AddProjectDialo
     onClose()
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={handleClose} />
-
-      {/* Dialog */}
-      <div className="relative w-full max-w-md bg-sidebar rounded-xl shadow-2xl border border-border">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-sidebar-accent/30">
-          <div className="flex items-center gap-2">
-            <FolderOpen className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Add Project</h2>
-          </div>
-          <button
-            onClick={handleClose}
-            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="px-5 py-4 space-y-4">
-          {/* Project Type Selection */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Project Type</label>
-            <div className="flex gap-2">
-              {PROJECT_TYPE_OPTIONS.map(({ type, icon: Icon, label, description }) => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className={`flex-1 flex flex-col items-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
-                    selectedType === type
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-muted-foreground'
-                  }`}
-                >
-                  <Icon
-                    className={`w-6 h-6 ${selectedType === type ? 'text-primary' : 'text-muted-foreground'}`}
-                  />
-                  <div className="text-center">
-                    <p
-                      className={`text-xs font-medium ${selectedType === type ? 'text-foreground' : 'text-muted-foreground'}`}
-                    >
-                      {label}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Folder Selection */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Folder</label>
-            <button
-              onClick={handleSelectFolder}
-              className="w-full px-4 py-3 rounded-lg border border-border bg-background text-left hover:bg-muted/50 transition-colors"
-            >
-              {selectedPath ? (
-                <span className="text-sm text-foreground truncate block">{selectedPath}</span>
-              ) : (
-                <span className="text-sm text-muted-foreground">Click to select folder...</span>
-              )}
-            </button>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-border/30">
-          <button
-            onClick={handleClose}
-            disabled={creating}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          >
+    <Dialog
+      open={isOpen}
+      onClose={handleClose}
+      title="Add Project"
+      icon={FolderOpen}
+      size="sm"
+      footer={
+        <>
+          <button onClick={handleClose} disabled={creating} className={btnSecondary}>
             Cancel
           </button>
           <button
             onClick={handleCreate}
             disabled={creating || !selectedPath}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={btnPrimary}
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             Add Project
           </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Project Type Selection */}
+        <div>
+          <label className="block text-[13px] font-medium text-fg mb-2">Project Type</label>
+          <div className="flex gap-2">
+            {PROJECT_TYPE_OPTIONS.map(({ type, icon: Icon, label, description }) => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={clsx(
+                  'flex-1 flex flex-col items-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors',
+                  selectedType === type
+                    ? 'border-primary bg-primary-soft'
+                    : 'border-border hover:border-border-strong'
+                )}
+              >
+                <Icon
+                  className={clsx('w-6 h-6', selectedType === type ? 'text-primary' : 'text-fg-muted')}
+                />
+                <div className="text-center">
+                  <p
+                    className={clsx(
+                      'text-[12px] font-medium',
+                      selectedType === type ? 'text-fg-strong' : 'text-fg-muted'
+                    )}
+                  >
+                    {label}
+                  </p>
+                  <p className="text-[10px] text-fg-muted mt-0.5">{description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Folder Selection */}
+        <div>
+          <label className="block text-[13px] font-medium text-fg mb-2">Folder</label>
+          <button
+            onClick={handleSelectFolder}
+            className="w-full px-4 py-3 rounded-md border border-border bg-screen text-left hover:bg-raised transition-colors"
+          >
+            {selectedPath ? (
+              <span className="text-[13px] text-fg truncate block">{selectedPath}</span>
+            ) : (
+              <span className="text-[13px] text-fg-muted">Click to select folder...</span>
+            )}
+          </button>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="px-3 py-2 rounded-md bg-danger/10 border border-danger/20">
+            <p className="text-[12.5px] text-danger">{error}</p>
+          </div>
+        )}
       </div>
-    </div>
+    </Dialog>
   )
 }

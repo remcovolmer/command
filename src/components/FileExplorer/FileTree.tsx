@@ -9,6 +9,7 @@ import { ContextMenu, type ContextMenuEntry } from '../Sidebar/ContextMenu'
 import { isEditableFile, isHtmlFile } from '../../utils/editorLanguages'
 import { getFileIcon, getFolderIcon } from './fileIcons'
 import { getParentPath } from '../../utils/paths'
+import { input as inputClass } from '../ui/controls'
 
 const EMPTY_EXPANDED: Record<string, true> = {}
 
@@ -231,21 +232,18 @@ export function FileTree({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        <Loader2 className="w-5 h-5 animate-spin text-fg-muted" />
       </div>
     )
   }
 
   if (error) {
-    return <div className="px-3 py-4 text-sm text-destructive">{error}</div>
+    return <div className="px-3 py-4 text-[13px] text-danger">{error}</div>
   }
 
   if (!rootEntries || rootEntries.length === 0) {
     return (
-      <div
-        className="px-3 py-4 text-sm text-muted-foreground"
-        onContextMenu={handleRootContextMenu}
-      >
+      <div className="px-3 py-4 text-[13px] text-fg-muted" onContextMenu={handleRootContextMenu}>
         {rootEntries ? 'Empty directory' : 'Loading...'}
       </div>
     )
@@ -372,9 +370,9 @@ function RootCreateEntry({
             else handleSubmit()
           }}
           placeholder={type === 'file' ? 'filename' : 'folder name'}
-          className="w-full bg-input border border-border rounded px-1 py-0 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+          className={`${inputClass} w-full h-6 text-[12px] px-1`}
         />
-        {error && <div className="text-xs text-destructive mt-0.5">{error}</div>}
+        {error && <div className="text-[11px] text-danger mt-0.5">{error}</div>}
       </div>
     </div>
   )

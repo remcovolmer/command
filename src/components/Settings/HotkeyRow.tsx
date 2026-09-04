@@ -1,9 +1,11 @@
 import { memo, useState } from 'react'
 import { RotateCcw, ToggleLeft, ToggleRight } from 'lucide-react'
+import clsx from 'clsx'
 import { useProjectStore } from '../../stores/projectStore'
 import { formatBinding, DEFAULT_HOTKEY_CONFIG, findConflicts } from '../../utils/hotkeys'
 import type { HotkeyAction, HotkeyBinding } from '../../types/hotkeys'
 import { HotkeyRecorder } from './HotkeyRecorder'
+import { btnIcon, kbd } from '../ui/controls'
 
 interface HotkeyRowProps {
   action: HotkeyAction
@@ -63,12 +65,10 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
 
   return (
     <>
-      <div className="flex items-center gap-4 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
+      <div className="flex items-center gap-4 py-2 px-3 rounded-lg hover:bg-raised transition-colors">
         {/* Description */}
         <div className="flex-1 min-w-0">
-          <span
-            className={`text-sm ${binding.enabled ? 'text-foreground' : 'text-muted-foreground'}`}
-          >
+          <span className={clsx('text-[13px]', binding.enabled ? 'text-fg' : 'text-fg-muted')}>
             {binding.description}
           </span>
         </div>
@@ -76,11 +76,11 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
         {/* Shortcut Display / Edit Button */}
         <button
           onClick={() => setIsRecording(true)}
-          className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors ${
-            binding.enabled
-              ? 'bg-muted border-border text-foreground hover:border-primary'
-              : 'bg-muted/50 border-border/50 text-muted-foreground'
-          }`}
+          className={clsx(
+            kbd,
+            'transition-colors',
+            binding.enabled ? 'hover:border-primary' : 'opacity-50'
+          )}
           title="Click to change shortcut"
         >
           {formatBinding(binding)}
@@ -90,28 +90,25 @@ export const HotkeyRow = memo(function HotkeyRow({ action, binding }: HotkeyRowP
         <button
           onClick={handleReset}
           disabled={isDefault}
-          className={`p-1.5 rounded-lg transition-colors ${
-            isDefault
-              ? 'text-muted-foreground/30 cursor-not-allowed'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
+          className={clsx(btnIcon, isDefault && 'opacity-30 cursor-not-allowed')}
           title="Reset to default"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 h-3.5" />
         </button>
 
         {/* Enable/Disable Toggle */}
         <button
           onClick={handleToggleEnabled}
-          className={`p-1 rounded-lg transition-colors ${
-            binding.enabled ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-          }`}
+          className={clsx(
+            btnIcon,
+            binding.enabled ? 'text-primary hover:text-primary' : undefined
+          )}
           title={binding.enabled ? 'Disable shortcut' : 'Enable shortcut'}
         >
           {binding.enabled ? (
-            <ToggleRight className="w-6 h-6" />
+            <ToggleRight className="w-5 h-5" />
           ) : (
-            <ToggleLeft className="w-6 h-6" />
+            <ToggleLeft className="w-5 h-5" />
           )}
         </button>
       </div>

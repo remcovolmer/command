@@ -6,6 +6,7 @@ import { getElectronAPI } from '../../utils/electron'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { pathsMatch } from '../../utils/paths'
 import { TaskSection } from './TaskSection'
+import { btnPrimary } from '../ui/controls'
 
 interface TasksPanelProps {
   project: Project
@@ -184,7 +185,7 @@ export function TasksPanel({ project }: TasksPanelProps) {
   if (isLoading && !tasksData) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        <Loader2 className="w-4 h-4 animate-spin text-fg-muted" />
       </div>
     )
   }
@@ -193,12 +194,9 @@ export function TasksPanel({ project }: TasksPanelProps) {
   if (!tasksData || tasksData.files.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 px-4">
-        <ListTodo className="w-8 h-8 text-muted-foreground/40" />
-        <p className="text-sm text-muted-foreground text-center">No TASKS.md found</p>
-        <button
-          onClick={handleCreateFile}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
+        <ListTodo className="w-8 h-8 text-fg-faint" strokeWidth={1.5} />
+        <p className="text-[13px] text-fg-muted text-center">No TASKS.md found</p>
+        <button onClick={handleCreateFile} className={`${btnPrimary} h-7 px-2.5 text-[12.5px]`}>
           <Plus className="w-3.5 h-3.5" />
           Create TASKS.md
         </button>

@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { Zap, Loader2 } from 'lucide-react'
+import clsx from 'clsx'
 import { getElectronAPI } from '../../utils/electron'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import { useProjectStore } from '../../stores/projectStore'
 import type { Automation, AutomationTrigger, AutomationTarget, GitEvent } from '../../types'
+import { Dialog } from '../ui/Dialog'
+import { btnPrimary, btnSecondary, input, select, textarea } from '../ui/controls'
 
 interface AutomationCreateDialogProps {
   isOpen: boolean
@@ -12,6 +15,17 @@ interface AutomationCreateDialogProps {
 }
 
 type TriggerType = 'schedule' | 'claude-done' | 'git-event' | 'file-change'
+
+function segButton(active: boolean, disabled = false) {
+  return clsx(
+    'px-2 py-1.5 text-xs rounded border',
+    disabled
+      ? 'border-border text-fg-faint cursor-not-allowed'
+      : active
+        ? 'border-primary bg-primary-soft text-primary'
+        : 'border-border text-fg-muted hover:text-fg'
+  )
+}
 
 export function AutomationCreateDialog({
   isOpen,
@@ -158,259 +172,228 @@ export function AutomationCreateDialog({
 
   useDialogHotkeys(onClose, handleSave, { enabled: isOpen, canConfirm: canSubmit })
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-popover border border-border rounded-lg shadow-lg w-[480px] max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <h2 className="text-sm font-semibold">
-            {isEditing ? 'Edit Automation' : 'New Automation'}
-          </h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted/50">
-            <X className="w-4 h-4 text-muted-foreground" />
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      title={isEditing ? 'Edit Automation' : 'New Automation'}
+      icon={Zap}
+      size="md"
+      footer={
+        <>
+          <button onClick={onClose} className={btnSecondary}>
+            Cancel
           </button>
+          <button onClick={handleSave} disabled={!canSubmit} className={btnPrimary}>
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {isEditing ? 'Save' : 'Create'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Name */}
+        <div>
+          <label className="block text-xs font-medium text-fg-muted mb-1">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={100}
+            placeholder="e.g. Daily code review"
+            className={clsx(input, 'w-full')}
+            autoFocus
+          />
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4">
-          {/* Name */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={100}
-              placeholder="e.g. Daily code review"
-              className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
-              autoFocus
-            />
-          </div>
+        {/* Prompt */}
+        <div>
+          <label className="block text-xs font-medium text-fg-muted mb-1">Prompt</label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            maxLength={50000}
+            rows={4}
+            placeholder="What should Claude do?"
+            className={clsx(textarea, 'w-full resize-y font-mono')}
+          />
+        </div>
 
-          {/* Prompt */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              maxLength={50000}
-              rows={4}
-              placeholder="What should Claude do?"
-              className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
-            />
-          </div>
+        {/* Project (single) */}
+        <div>
+          <label className="block text-xs font-medium text-fg-muted mb-1">Project</label>
+          <select
+            value={projectId}
+            onChange={(e) => {
+              const id = e.target.value
+              setProjectId(id)
+              // Snap to chat when the chosen project has no Git repo.
+              if (projects.find((p) => p.id === id)?.type !== 'code') {
+                setDefaultTarget('chat')
+              }
+            }}
+            className={clsx(select, 'w-full')}
+          >
+            <option value="">Select a project...</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          {/* Project (single) */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Project</label>
-            <select
-              value={projectId}
-              onChange={(e) => {
-                const id = e.target.value
-                setProjectId(id)
-                // Snap to chat when the chosen project has no Git repo.
-                if (projects.find((p) => p.id === id)?.type !== 'code') {
-                  setDefaultTarget('chat')
-                }
-              }}
-              className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="">Select a project...</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Default launch target */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Default launch target
-            </label>
-            <div className="grid grid-cols-2 gap-1">
-              {(
-                [
-                  { value: 'worktree', label: 'New worktree' },
-                  { value: 'chat', label: 'Chat in project' },
-                ] as const
-              ).map((opt) => {
-                const disabled = opt.value === 'worktree' && !canUseWorktree
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => !disabled && setDefaultTarget(opt.value)}
-                    disabled={disabled}
-                    title={
-                      disabled ? 'Worktree launches need a Git (Code-type) project' : undefined
-                    }
-                    className={`px-2 py-1.5 text-xs rounded border ${
-                      disabled
-                        ? 'border-border text-muted-foreground/40 cursor-not-allowed'
-                        : defaultTarget === opt.value
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {canUseWorktree
-                ? 'Used when you launch this automation in the foreground; override per launch.'
-                : 'This project has no Git repo, so foreground launches run as a chat in the project.'}
-            </p>
-          </div>
-
-          {/* Trigger type */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Trigger</label>
-            <div className="grid grid-cols-2 gap-1">
-              {(
-                [
-                  { value: 'schedule', label: 'Schedule' },
-                  { value: 'claude-done', label: 'Claude Done' },
-                  { value: 'git-event', label: 'Git Event' },
-                  { value: 'file-change', label: 'File Change' },
-                ] as const
-              ).map((opt) => (
+        {/* Default launch target */}
+        <div>
+          <label className="block text-xs font-medium text-fg-muted mb-1">
+            Default launch target
+          </label>
+          <div className="grid grid-cols-2 gap-1">
+            {(
+              [
+                { value: 'worktree', label: 'New worktree' },
+                { value: 'chat', label: 'Chat in project' },
+              ] as const
+            ).map((opt) => {
+              const disabled = opt.value === 'worktree' && !canUseWorktree
+              return (
                 <button
                   key={opt.value}
-                  onClick={() => setTriggerType(opt.value)}
-                  className={`px-2 py-1.5 text-xs rounded border ${
-                    triggerType === opt.value
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:text-foreground'
-                  }`}
+                  onClick={() => !disabled && setDefaultTarget(opt.value)}
+                  disabled={disabled}
+                  title={disabled ? 'Worktree launches need a Git (Code-type) project' : undefined}
+                  className={segButton(defaultTarget === opt.value, disabled)}
                 >
                   {opt.label}
                 </button>
-              ))}
-            </div>
+              )
+            })}
           </div>
+          <p className="text-xs text-fg-muted mt-1">
+            {canUseWorktree
+              ? 'Used when you launch this automation in the foreground; override per launch.'
+              : 'This project has no Git repo, so foreground launches run as a chat in the project.'}
+          </p>
+        </div>
 
-          {/* Trigger-specific config */}
-          {triggerType === 'schedule' && (
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">
-                Cron Expression
-              </label>
-              <input
-                type="text"
-                value={cron}
-                onChange={(e) => setCron(e.target.value)}
-                placeholder="0 9 * * *"
-                className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring font-mono"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                e.g. "0 9 * * *" = every day at 9am, "*/30 * * * *" = every 30 minutes
-              </p>
-            </div>
-          )}
-
-          {triggerType === 'git-event' && (
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">
-                Event Type
-              </label>
-              <select
-                value={gitEvent}
-                onChange={(e) => setGitEvent(e.target.value as typeof gitEvent)}
-                className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+        {/* Trigger type */}
+        <div>
+          <label className="block text-xs font-medium text-fg-muted mb-1">Trigger</label>
+          <div className="grid grid-cols-2 gap-1">
+            {(
+              [
+                { value: 'schedule', label: 'Schedule' },
+                { value: 'claude-done', label: 'Claude Done' },
+                { value: 'git-event', label: 'Git Event' },
+                { value: 'file-change', label: 'File Change' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setTriggerType(opt.value)}
+                className={segButton(triggerType === opt.value)}
               >
-                <option value="pr-merged">PR Merged</option>
-                <option value="pr-opened">PR Opened</option>
-                <option value="checks-passed">Checks Passed</option>
-                <option value="merge-conflict">Merge Conflict</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {
-                  'Variables: {{pr.number}}, {{pr.title}}, {{pr.branch}}, {{pr.url}}, {{pr.mergeable}}, {{pr.state}}'
-                }
-              </p>
-              <p className="text-xs text-warning mt-1">
-                {
-                  'Note: PR metadata (title, branch) is user-controlled. Use caution on public repos.'
-                }
-              </p>
-            </div>
-          )}
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {triggerType === 'file-change' && (
-            <div className="space-y-2">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  File Patterns (one per line)
-                </label>
-                <textarea
-                  value={filePatterns}
-                  onChange={(e) => setFilePatterns(e.target.value)}
-                  rows={3}
-                  placeholder={'**/*.ts\nsrc/**/*.tsx'}
-                  className="w-full px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  Cooldown (seconds)
-                </label>
-                <input
-                  type="number"
-                  value={cooldownSeconds}
-                  onChange={(e) => setCooldownSeconds(Math.max(10, parseInt(e.target.value) || 60))}
-                  min={10}
-                  className="w-20 px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Timeout */}
+        {/* Trigger-specific config */}
+        {triggerType === 'schedule' && (
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Timeout (minutes)
+            <label className="block text-xs font-medium text-fg-muted mb-1">
+              Cron Expression
             </label>
             <input
-              type="number"
-              value={timeoutMinutes}
-              onChange={(e) =>
-                setTimeoutMinutes(Math.max(1, Math.min(120, parseInt(e.target.value) || 30)))
-              }
-              min={1}
-              max={120}
-              className="w-20 px-2 py-1.5 text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+              type="text"
+              value={cron}
+              onChange={(e) => setCron(e.target.value)}
+              placeholder="0 9 * * *"
+              className={clsx(input, 'w-full font-mono')}
             />
+            <p className="text-xs text-fg-muted mt-1">
+              e.g. "0 9 * * *" = every day at 9am, "*/30 * * * *" = every 30 minutes
+            </p>
           </div>
+        )}
 
-          {error && (
-            <div className="text-xs text-danger bg-danger/10 rounded px-2 py-1.5">{error}</div>
-          )}
+        {triggerType === 'git-event' && (
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1">Event Type</label>
+            <select
+              value={gitEvent}
+              onChange={(e) => setGitEvent(e.target.value as typeof gitEvent)}
+              className={clsx(select, 'w-full')}
+            >
+              <option value="pr-merged">PR Merged</option>
+              <option value="pr-opened">PR Opened</option>
+              <option value="checks-passed">Checks Passed</option>
+              <option value="merge-conflict">Merge Conflict</option>
+            </select>
+            <p className="text-xs text-fg-muted mt-1">
+              {
+                'Variables: {{pr.number}}, {{pr.title}}, {{pr.branch}}, {{pr.url}}, {{pr.mergeable}}, {{pr.state}}'
+              }
+            </p>
+            <p className="text-xs text-warning mt-1">
+              {
+                'Note: PR metadata (title, branch) is user-controlled. Use caution on public repos.'
+              }
+            </p>
+          </div>
+        )}
+
+        {triggerType === 'file-change' && (
+          <div className="space-y-2">
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1">
+                File Patterns (one per line)
+              </label>
+              <textarea
+                value={filePatterns}
+                onChange={(e) => setFilePatterns(e.target.value)}
+                rows={3}
+                placeholder={'**/*.ts\nsrc/**/*.tsx'}
+                className={clsx(textarea, 'w-full resize-y font-mono')}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1">
+                Cooldown (seconds)
+              </label>
+              <input
+                type="number"
+                value={cooldownSeconds}
+                onChange={(e) => setCooldownSeconds(Math.max(10, parseInt(e.target.value) || 60))}
+                min={10}
+                className={clsx(input, 'w-20')}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Timeout */}
+        <div>
+          <label className="block text-xs font-medium text-fg-muted mb-1">
+            Timeout (minutes)
+          </label>
+          <input
+            type="number"
+            value={timeoutMinutes}
+            onChange={(e) =>
+              setTimeoutMinutes(Math.max(1, Math.min(120, parseInt(e.target.value) || 30)))
+            }
+            min={1}
+            max={120}
+            className={clsx(input, 'w-20')}
+          />
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border shrink-0">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSubmit}
-            className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-          >
-            {saving && <Loader2 className="w-3 h-3 animate-spin" />}
-            {isEditing ? 'Save' : 'Create'}
-          </button>
-        </div>
+        {error && (
+          <div className="text-xs text-danger bg-danger/10 rounded px-2 py-1.5">{error}</div>
+        )}
       </div>
-    </div>
+    </Dialog>
   )
 }

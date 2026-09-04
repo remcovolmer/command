@@ -1,11 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
-import { RotateCw, ArrowRight, ArrowLeft, ChevronRight, Wrench, MessageSquare, Highlighter, X } from 'lucide-react'
+import {
+  RotateCw,
+  ArrowRight,
+  ArrowLeft,
+  ChevronRight,
+  Wrench,
+  MessageSquare,
+  Highlighter,
+  X,
+} from 'lucide-react'
 import { normalizeAddressBarInput } from '../../utils/browserUrls'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { normalizeFilePath } from '../../utils/paths'
 import { getElectronAPI } from '../../utils/electron'
 import { useProjectStore } from '../../stores/projectStore'
-import { execInGuest, captureGuest, setZoom, findInGuest, stopFind } from '../../utils/webviewControl'
+import {
+  execInGuest,
+  captureGuest,
+  setZoom,
+  findInGuest,
+  stopFind,
+} from '../../utils/webviewControl'
 import {
   clampZoom,
   zoomIn as computeZoomIn,
@@ -16,6 +31,7 @@ import {
 import { describeLoadError, isAbort } from '../../utils/browserLoadError'
 import { onBrowserShortcut, type BrowserShortcutAction } from '../../utils/browserShortcutBus'
 import { BrowserOverflowMenu } from './BrowserOverflowMenu'
+import { btnIcon, input as inputCls } from '../ui/controls'
 import { BrowserFindBar } from './BrowserFindBar'
 import { BrowserErrorState } from './BrowserErrorState'
 import {
@@ -86,7 +102,14 @@ function makeNonce(): string {
  * — at the user's own risk — external URLs (guests are hardened in the main
  * process; see webviewSecurity.ts). Replaces the former sandboxed iframe.
  */
-export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projectId }: BrowserTabProps) {
+export function BrowserTab({
+  url,
+  isActive,
+  onUrlChange,
+  tabId,
+  filePath,
+  projectId,
+}: BrowserTabProps) {
   const webviewRef = useRef<CommandWebviewElement>(null)
   // Flips true on the guest's dom-ready. Webview methods throw synchronously if
   // called before attach, so timer-driven calls (live-reload) must check this.
@@ -553,23 +576,22 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
     dispatchShortcutRef.current = dispatchShortcut
   })
 
-  const iconBtn =
-    'p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
-  const modeBtn = (active: boolean) => `${iconBtn} ${active ? 'text-primary bg-muted/60' : ''}`
+  const iconBtn = `${btnIcon} disabled:hover:bg-transparent disabled:hover:text-fg-muted`
+  const modeBtn = (active: boolean) => `${iconBtn} ${active ? 'text-primary bg-raised' : ''}`
 
   return (
     <div
-      className="absolute inset-0 flex flex-col bg-background"
+      className="absolute inset-0 flex flex-col bg-screen"
       style={{ visibility: isActive ? 'visible' : 'hidden' }}
     >
-      <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-border bg-sidebar-accent">
+      <div className="flex items-center gap-1 h-9 px-2 border-b border-border bg-canvas shrink-0">
         <button
           onClick={() => webviewRef.current?.goBack()}
           disabled={!canBack}
           title="Back"
           className={iconBtn}
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
+          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <button
           onClick={() => webviewRef.current?.goForward()}
@@ -577,14 +599,18 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
           title="Forward"
           className={iconBtn}
         >
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <button
           onClick={handleReloadOrStop}
           title={isLoading ? 'Stop' : 'Reload'}
           className={iconBtn}
         >
-          {isLoading ? <X className="w-3.5 h-3.5" /> : <RotateCw className="w-3.5 h-3.5" />}
+          {isLoading ? (
+            <X className="w-3.5 h-3.5" strokeWidth={1.5} />
+          ) : (
+            <RotateCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+          )}
         </button>
         <input
           value={input}
@@ -593,17 +619,17 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
             if (e.key === 'Enter') navigate()
           }}
           placeholder="localhost:5173 of pad naar een .html-bestand"
-          className="flex-1 px-2 py-1 text-xs rounded bg-background border border-border text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          className={`${inputCls} flex-1 min-w-0 h-7 font-mono text-[12px]`}
         />
         <button onClick={navigate} title="Go" className={iconBtn}>
-          <ChevronRight className="w-3.5 h-3.5" />
+          <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <button
           onClick={() => webviewRef.current?.openDevTools()}
           title="DevTools"
           className={iconBtn}
         >
-          <Wrench className="w-3.5 h-3.5" />
+          <Wrench className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <div className="w-px h-4 bg-border mx-0.5" />
         <button
@@ -611,14 +637,14 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
           title="Annotatie: hover + klik een element om te becommentariëren"
           className={modeBtn(mode === 'comment')}
         >
-          <MessageSquare className="w-3.5 h-3.5" />
+          <MessageSquare className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <button
           onClick={() => void switchMode('draw')}
           title="Annotatie: tekenen"
           className={modeBtn(mode === 'draw')}
         >
-          <Highlighter className="w-3.5 h-3.5" />
+          <Highlighter className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <div className="w-px h-4 bg-border mx-0.5" />
         <BrowserOverflowMenu
@@ -636,8 +662,8 @@ export function BrowserTab({ url, isActive, onUrlChange, tabId, filePath, projec
       {isLoading && <div className="h-0.5 bg-primary/60 animate-pulse" />}
 
       {status && (
-        <div className="flex items-center px-2 py-1.5 border-b border-border bg-sidebar-accent text-xs">
-          <span className="text-muted-foreground truncate">{status}</span>
+        <div className="flex items-center h-7 px-3 border-b border-border bg-canvas">
+          <span className="font-mono text-[11px] text-fg-muted truncate">{status}</span>
         </div>
       )}
 

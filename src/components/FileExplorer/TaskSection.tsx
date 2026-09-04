@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
+import clsx from 'clsx'
 import type { TaskSection as TaskSectionType, TaskItem as TaskItemType } from '../../types'
 import { TaskItem } from './TaskItem'
+import { input as inputCls } from '../ui/controls'
 
 interface TaskSectionProps {
   section: TaskSectionType
@@ -67,7 +69,7 @@ export function TaskSection({
 
   return (
     <div
-      className={`border-t border-border/50 ${dragOver ? 'bg-primary/5' : ''}`}
+      className={clsx('border-t border-border', dragOver && 'bg-primary-soft')}
       onDragOver={(e) => {
         e.preventDefault()
         setDragOver(true)
@@ -80,22 +82,23 @@ export function TaskSection({
         onDrop?.(e, section.name)
       }}
     >
-      {/* Section header */}
-      <div className="group/header flex items-center gap-1 px-2 py-1.5 hover:bg-sidebar-accent transition-colors">
+      {/* Section header — eyebrow with the open count, matching the git panel */}
+      <div className="group/header flex items-center gap-1 px-2 h-8 hover:bg-raised transition-colors">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 flex-1 min-w-0"
+          aria-expanded={expanded}
+          className="flex items-center gap-1 flex-1 min-w-0 text-left"
         >
-          {expanded ? (
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          )}
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {section.name}
-          </span>
-          <span className="text-[10px] text-muted-foreground/70 ml-auto">
-            {isDone ? section.tasks.length : openCount}
+          <ChevronRight
+            aria-hidden="true"
+            className={clsx(
+              'w-3 h-3 text-fg-faint flex-shrink-0 transition-transform duration-150',
+              expanded && 'rotate-90'
+            )}
+            strokeWidth={1.5}
+          />
+          <span className="eyebrow">
+            {section.name} · {isDone ? section.tasks.length : openCount}
           </span>
         </button>
         {!isDone && (
@@ -104,10 +107,10 @@ export function TaskSection({
               setExpanded(true)
               setAdding(true)
             }}
-            className="p-0.5 rounded hover:bg-muted/50 transition-colors opacity-0 group-hover/header:opacity-100"
+            className="w-6 h-6 inline-flex items-center justify-center rounded text-fg-muted hover:bg-raised hover:text-fg transition-colors opacity-0 group-hover/header:opacity-100"
             title="Add task"
           >
-            <Plus className="w-3 h-3 text-muted-foreground hover:text-sidebar-foreground" />
+            <Plus className="w-3 h-3" strokeWidth={1.5} />
           </button>
         )}
       </div>
@@ -124,14 +127,14 @@ export function TaskSection({
                 onChange={(e) => setNewText(e.target.value)}
                 onBlur={handleAddSave}
                 onKeyDown={handleAddKeyDown}
-                placeholder="New task..."
-                className="w-full bg-background border border-border rounded px-2 py-1 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                placeholder="New task…"
+                className={clsx(inputCls, 'w-full h-6 text-[12px] px-2')}
               />
             </div>
           )}
 
           {section.tasks.length === 0 && !adding && (
-            <div className="px-6 py-1 text-[10px] text-muted-foreground/50 italic">empty</div>
+            <div className="px-6 py-1 font-mono text-[10.5px] text-fg-faint">empty</div>
           )}
 
           {section.tasks.map((task) => (

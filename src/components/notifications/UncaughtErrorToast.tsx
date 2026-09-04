@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
+import { Toast } from '../ui/Toast'
+import { btnSecondary } from '../ui/controls'
 import { pushToastDismiss } from '../../utils/toastRegistry'
 import type { UncaughtErrorEvent } from '../../types'
 
@@ -108,48 +111,18 @@ export function UncaughtErrorToast() {
   return (
     <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 overflow-y-auto max-h-[60vh]">
       {toasts.map((toast) => (
-        <div
+        <Toast
           key={toast.id}
-          role="status"
-          className="bg-warning text-white p-4 rounded-lg shadow-lg max-w-sm"
+          tone="warning"
+          icon={AlertTriangle}
+          title="An internal error occurred"
+          onDismiss={() => dismiss(toast.id)}
         >
-          <div className="flex items-start gap-3">
-            <div className="text-white/85 mt-0.5">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-2.99l-6.93-12a2 2 0 00-3.48 0l-6.93 12A2 2 0 005.07 19z"
-                />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium">An internal error occurred</p>
-              <p className="text-sm text-white/80 mt-1 break-all">{toast.message}</p>
-              <button
-                onClick={openLog}
-                className="mt-3 px-3 py-1.5 bg-black/20 hover:bg-black/30 rounded text-sm font-medium transition-colors"
-              >
-                Open crash.log
-              </button>
-            </div>
-            <button
-              onClick={() => dismiss(toast.id)}
-              className="text-white/70 hover:text-white"
-              aria-label="Dismiss"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
+          <p className="text-[12.5px] text-fg-muted mt-0.5 break-all">{toast.message}</p>
+          <button onClick={openLog} className={`${btnSecondary} h-7 px-2.5 text-[12.5px] mt-3`}>
+            Open crash.log
+          </button>
+        </Toast>
       ))}
     </div>
   )

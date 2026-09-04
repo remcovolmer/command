@@ -12,9 +12,11 @@ import { TerminalViewport } from '../Terminal/TerminalViewport'
 import { SecondPanel } from './SecondPanel'
 import { ProjectOverview } from '../ProjectOverview'
 import { AutomationsOverview } from '../Automations/AutomationsOverview'
-import { TerminalIcon, Plus, Sparkles } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
+import { LogoIcon } from '../LogoIcon'
+import { DEFAULT_HOTKEY_CONFIG, formatBinding } from '../../utils/hotkeys'
+import { kbd } from '../ui/controls'
 
 export function TerminalArea() {
   const api = useMemo(() => getElectronAPI(), [])
@@ -29,6 +31,7 @@ export function TerminalArea() {
     activeContentTabId,
     projectOverviewVisible,
     automationsOverviewVisible,
+    hotkeyConfig,
     setActiveTerminal,
     removeTerminal,
     setActiveContentTab,
@@ -47,6 +50,7 @@ export function TerminalArea() {
       activeContentTabId: s.activeContentTabId,
       projectOverviewVisible: s.projectOverviewVisible,
       automationsOverviewVisible: s.automationsOverviewVisible,
+      hotkeyConfig: s.hotkeyConfig ?? DEFAULT_HOTKEY_CONFIG,
       setActiveTerminal: s.setActiveTerminal,
       removeTerminal: s.removeTerminal,
       setActiveContentTab: s.setActiveContentTab,
@@ -145,26 +149,29 @@ export function TerminalArea() {
 
   // No project selected - show welcome
   if (!activeProjectId || !activeProject) {
+    const newChatBinding = hotkeyConfig['terminal.new']
+    const shortcutsBinding = hotkeyConfig['ui.showShortcuts']
+
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-background">
+      <div className="flex flex-col items-center justify-center h-full bg-screen">
         <div className="text-center max-w-md mx-auto px-8">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-sm flex items-center justify-center">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-semibold text-foreground mb-3">Welcome to Command</h2>
-          <p className="text-muted-foreground mb-8">
-            Select a project from the sidebar to start managing your Claude Code terminals.
+          <LogoIcon className="w-10 h-10 text-primary mx-auto mb-4" />
+          <h2 className="text-[22px] font-semibold text-fg-strong mb-2">Command</h2>
+          <p className="text-[13px] text-fg-muted mb-6">
+            Kies links een project, of voeg er een toe.
           </p>
-          <div className="flex items-center justify-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
-              <TerminalIcon className="w-3.5 h-3.5" />
-              Multi-terminal support
+          <div className="flex flex-col items-center gap-1.5 font-mono text-[11.5px] text-fg-muted">
+            <div className="flex items-center gap-2">
+              <kbd className={kbd}>+</kbd>
+              <span>Add project</span>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
-              <Plus className="w-3.5 h-3.5" />
-              Up to {MAX_TERMINALS_PER_PROJECT} per project
+            <div className="flex items-center gap-2">
+              <kbd className={kbd}>{formatBinding(newChatBinding)}</kbd>
+              <span>New chat</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <kbd className={kbd}>{formatBinding(shortcutsBinding)}</kbd>
+              <span>Shortcuts</span>
             </div>
           </div>
         </div>

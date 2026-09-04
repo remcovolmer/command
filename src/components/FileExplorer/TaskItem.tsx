@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Square, CheckSquare, Calendar, X, GripVertical, Pencil } from 'lucide-react'
+import clsx from 'clsx'
 import type { TaskItem as TaskItemType } from '../../types'
+import { input as inputCls } from '../ui/controls'
 
 interface TaskItemProps {
   task: TaskItemType
@@ -11,6 +13,9 @@ interface TaskItemProps {
   draggable?: boolean
   onDragStart?: (e: React.DragEvent, task: TaskItemType) => void
 }
+
+const hoverIconBtn =
+  'mt-0.5 flex-shrink-0 w-5 h-5 inline-flex items-center justify-center rounded text-fg-muted opacity-0 group-hover:opacity-100 transition-opacity hover:bg-raised'
 
 export function TaskItem({
   task,
@@ -64,27 +69,31 @@ export function TaskItem({
 
   return (
     <div
-      className={`group flex items-start gap-1 px-2 py-1 text-sm hover:bg-sidebar-accent rounded transition-colors ${
-        task.completed ? 'opacity-60' : ''
-      }`}
+      className={clsx(
+        'group flex items-start gap-1 px-2 py-1 text-[12.5px] hover:bg-raised rounded-md transition-colors',
+        task.completed && 'opacity-60'
+      )}
       draggable={draggable}
       onDragStart={(e) => onDragStart?.(e, task)}
     >
       {/* Drag handle */}
       {draggable && (
-        <GripVertical className="w-3 h-3 mt-0.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 cursor-grab flex-shrink-0" />
+        <GripVertical
+          className="w-3 h-3 mt-1 text-fg-faint opacity-0 group-hover:opacity-100 cursor-grab flex-shrink-0"
+          strokeWidth={1.5}
+        />
       )}
 
       {/* Checkbox */}
       <button
         onClick={() => onToggle(task)}
-        className="mt-0.5 flex-shrink-0"
+        className="mt-0.5 flex-shrink-0 w-5 h-5 inline-flex items-center justify-center rounded hover:bg-raised"
         title={task.completed ? 'Mark as open' : 'Mark as complete'}
       >
         {task.completed ? (
-          <CheckSquare className="w-3.5 h-3.5 text-success" />
+          <CheckSquare className="w-3.5 h-3.5 text-success" strokeWidth={1.5} />
         ) : (
-          <Square className="w-3.5 h-3.5 text-muted-foreground hover:text-sidebar-foreground" />
+          <Square className="w-3.5 h-3.5 text-fg-muted" strokeWidth={1.5} />
         )}
       </button>
 
@@ -97,14 +106,16 @@ export function TaskItem({
             onChange={(e) => setEditText(e.target.value)}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
-            className="w-full bg-background border border-border rounded px-1 py-0 text-sm text-foreground outline-none focus:border-primary"
+            className={clsx(inputCls, 'w-full h-6 text-[12px] px-1.5')}
           />
         ) : (
           <span
             onClick={() => setExpanded(!expanded)}
-            className={`cursor-pointer block ${expanded ? 'whitespace-pre-wrap break-words' : 'truncate'} ${
-              task.completed ? 'line-through text-muted-foreground' : 'text-sidebar-foreground'
-            }`}
+            className={clsx(
+              'cursor-pointer block leading-5',
+              expanded ? 'whitespace-pre-wrap break-words' : 'truncate',
+              task.completed ? 'line-through text-fg-muted' : 'text-fg'
+            )}
             title={expanded ? undefined : displayText}
           >
             {displayText}
@@ -112,53 +123,44 @@ export function TaskItem({
         )}
 
         {/* Metadata row */}
-        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          {/* Due date */}
-          {task.dueDate && (
-            <span
-              className={`inline-flex items-center gap-0.5 text-[10px] px-1 py-0 rounded ${
-                task.isOverdue
-                  ? 'bg-danger/15 text-danger'
-                  : task.isDueToday
-                    ? 'bg-warning/15 text-warning'
-                    : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              <Calendar className="w-2.5 h-2.5" />
-              {task.dueDate.slice(5)} {/* Show MM-DD */}
-            </span>
-          )}
+        {(task.dueDate || task.personTags?.length || showSource) && (
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap font-mono text-[10.5px] tnum">
+            {task.dueDate && (
+              <span
+                className={clsx(
+                  'inline-flex items-center gap-0.5 px-1 rounded',
+                  task.isOverdue
+                    ? 'bg-danger/15 text-danger'
+                    : task.isDueToday
+                      ? 'bg-warning/15 text-warning'
+                      : 'bg-raised text-fg-muted'
+                )}
+              >
+                <Calendar className="w-2.5 h-2.5" strokeWidth={1.5} />
+                {task.dueDate.slice(5)} {/* Show MM-DD */}
+              </span>
+            )}
 
-          {/* Person tags */}
-          {task.personTags?.map((name) => (
-            <span key={name} className="text-[10px] px-1 py-0 rounded bg-primary/10 text-primary">
-              {name}
-            </span>
-          ))}
+            {task.personTags?.map((name) => (
+              <span key={name} className="px-1 rounded bg-primary-soft text-primary">
+                {name}
+              </span>
+            ))}
 
-          {/* Source file */}
-          {showSource && (
-            <span className="text-[10px] text-muted-foreground/60">{sourceLabel}</span>
-          )}
-        </div>
+            {showSource && <span className="text-fg-faint">{sourceLabel}</span>}
+          </div>
+        )}
       </div>
 
-      {/* Edit button */}
-      <button
-        onClick={handleStartEdit}
-        className="mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Edit task"
-      >
-        <Pencil className="w-3 h-3 text-muted-foreground hover:text-sidebar-foreground" />
+      <button onClick={handleStartEdit} className={hoverIconBtn} title="Edit task">
+        <Pencil className="w-3 h-3" strokeWidth={1.5} />
       </button>
-
-      {/* Delete button */}
       <button
         onClick={() => onDelete(task)}
-        className="mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        className={clsx(hoverIconBtn, 'hover:text-danger')}
         title="Delete task"
       >
-        <X className="w-3 h-3 text-muted-foreground hover:text-danger" />
+        <X className="w-3 h-3" strokeWidth={1.5} />
       </button>
     </div>
   )
