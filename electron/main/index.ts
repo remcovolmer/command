@@ -23,6 +23,7 @@ import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
+import { readUiStateSync, writeUiState, TITLEBAR_COLORS } from './services/uiState'
 import type {
   AgentType,
   TerminalType,
@@ -371,6 +372,12 @@ function createTray() {
 async function createWindow() {
   Menu.setApplicationMenu(null)
 
+  // Read synchronously (before the window exists) so the initial
+  // backgroundColor / titleBarOverlay match the last-used theme on the very
+  // first paint — no flash of the wrong theme while the renderer boots.
+  const { resolvedTheme } = readUiStateSync()
+  const titlebarColors = TITLEBAR_COLORS[resolvedTheme]
+
   win = new BrowserWindow({
     title: 'Command',
     icon: app.isPackaged
@@ -380,9 +387,23 @@ async function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    backgroundColor: '#2b2825',
-    titleBarStyle: 'hiddenInset',
-    frame: process.platform === 'darwin' ? false : true,
+    backgroundColor: titlebarColors.color,
+    // darwin: hiddenInset + frame:false (unchanged from before). win32: hidden
+    // + titleBarOverlay draws only the native window buttons, frame stays the
+    // default (true) — setting frame:false on Windows would also remove those
+    // buttons. linux: untouched, keeps its native frame.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, frame: false }
+      : process.platform === 'win32'
+        ? {
+            titleBarStyle: 'hidden' as const,
+            titleBarOverlay: {
+              color: titlebarColors.color,
+              symbolColor: titlebarColors.symbolColor,
+              height: 36,
+            },
+          }
+        : {}),
     webPreferences: {
       preload,
       contextIsolation: true,
@@ -1755,6 +1776,24 @@ ipcMain.handle('app:sync-claude-theme', async (_event, theme: 'light' | 'dark') 
     await fs.rename(tempPath, claudeConfigPath)
   } catch (e) {
     appLog.warn('Failed to sync Claude theme:', e)
+  }
+})
+
+// Persist the resolved theme and, on Windows, repaint the titlebar overlay
+// buttons to match. Called from useThemeResolver after every theme change.
+ipcMain.handle('app:set-titlebar-overlay', async (_event, theme: unknown) => {
+  if (theme !== 'light' && theme !== 'dark') {
+    throw new Error('Invalid theme')
+  }
+  writeUiState({ resolvedTheme: theme })
+  if (process.platform === 'win32' && win && !win.isDestroyed()) {
+    try {
+      win.setTitleBarOverlay(TITLEBAR_COLORS[theme])
+    } catch (e) {
+      // setTitleBarOverlay is a no-op/unsupported outside titleBarStyle:'hidden'
+      // windows — never let a platform quirk crash the main process.
+      appLog.warn('Failed to set titlebar overlay:', e)
+    }
   }
 })
 

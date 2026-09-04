@@ -399,6 +399,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),
 
+    setTitleBarOverlay: (theme: 'light' | 'dark'): Promise<void> =>
+      ipcRenderer.invoke('app:set-titlebar-overlay', theme),
+
     onUncaughtError: (callback: (event: UncaughtErrorEvent) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, payload: UncaughtErrorEvent) =>
         callback(payload)

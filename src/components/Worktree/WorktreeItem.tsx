@@ -344,16 +344,16 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   return (
     <>
-      <div className="mt-0.5 border-l border-primary/30 ml-3">
+      <div className="mt-0.5 border-l border-border ml-3">
       {/* Row 1: Branch info + hover actions */}
       <div
         onClick={handleRowClick}
         onContextMenu={handleContextMenu}
         className={`
-          group relative flex items-center gap-2 px-2 py-1.5 cursor-pointer
+          group relative flex items-center gap-2 h-7 px-2 cursor-pointer
           transition-colors duration-150 rounded-t-md
           ${attentionRowBg(isAttention, isActive)}
-          ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
+          ${isActive ? 'text-fg-strong' : 'text-fg-muted hover:text-fg'}
           ${!hasPR ? 'rounded-b-md' : ''}
         `}
       >
@@ -375,11 +375,11 @@ export const WorktreeItem = memo(function WorktreeItem({
           </span>
         )}
 
-        {/* Branch name — no branch icon. "Worktree" is carried subtly: the
-            rust-tinted left rail (border-primary/30) plus this monospace,
-            faintly rust-tinted name read as a branch without a loud glyph. */}
+        {/* Branch name — no branch icon and no rust tint (that's reserved for
+            things that mean "active"/"primary"); the neutral border-l on the
+            container plus this monospace name read as a branch. */}
         <span
-          className="flex-1 text-xs font-mono truncate text-[color-mix(in_oklch,var(--primary)_55%,var(--sidebar-foreground))]"
+          className={`flex-1 font-mono text-[12px] truncate ${isActive ? 'text-fg-strong' : 'text-fg'}`}
           title={worktree.branch}
         >
           {worktree.name}

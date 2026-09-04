@@ -7,6 +7,7 @@ import {
   getVisibleTerminals,
 } from '../../stores/projectStore'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
+import { StateLine } from '../Terminal/StateLine'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
 import { SecondPanel } from './SecondPanel'
 import { ProjectOverview } from '../ProjectOverview'
@@ -191,7 +192,7 @@ export function TerminalArea() {
     <PanelGroup direction="horizontal" autoSaveId="center-split">
       {/* Chat column — always visible; fills the width when nothing is open */}
       <Panel id="chat-col" order={1} defaultSize={55} minSize={25}>
-        <div className="h-full w-full flex flex-col bg-sidebar">
+        <div className="h-full w-full flex flex-col bg-screen">
           <TerminalTabBar
             terminals={projectTerminals}
             activeTerminalId={activeTerminalId}
@@ -200,6 +201,7 @@ export function TerminalArea() {
             onAdd={handleCreateTerminal}
             canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
           />
+          <StateLine state={activeTerminalId ? (terminals[activeTerminalId]?.state ?? null) : null} />
           <div className="flex-1 min-h-0">
             <TerminalViewport terminals={projectTerminals} activeTerminalId={activeTerminalId} />
           </div>

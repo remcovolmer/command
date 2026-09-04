@@ -19,13 +19,11 @@ export function AttentionRail() {
   )
 }
 
-/** Chip telling the user a permission/question row needs them. */
+/** Square mono chip telling the user a permission/question row needs them. */
 export function AttentionChip() {
   return (
-    <span
-      className={`${CHIP_BASE} flex-shrink-0 bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[var(--status-attention)]`}
-    >
-      wacht op jou
+    <span className="flex-shrink-0 font-mono text-[10px] font-medium tracking-[.04em] px-1.5 py-px rounded bg-[color-mix(in_oklch,var(--status-attention)_18%,transparent)] text-[color-mix(in_oklch,var(--status-attention)_65%,var(--fg-strong))]">
+      WACHT
     </span>
   )
 }
@@ -34,10 +32,10 @@ export function AttentionChip() {
 export function attentionRowBg(isAttention: boolean, isActive: boolean): string {
   if (isActive) {
     return isAttention
-      ? 'bg-[color-mix(in_oklch,var(--status-attention)_14%,var(--sidebar-highlight))]'
-      : 'bg-[var(--sidebar-highlight)]'
+      ? 'bg-[color-mix(in_oklch,var(--status-attention)_14%,var(--selected))]'
+      : 'bg-selected'
   }
   return isAttention
-    ? 'bg-[color-mix(in_oklch,var(--status-attention)_8%,transparent)]'
-    : 'hover:bg-muted/50'
+    ? 'bg-[color-mix(in_oklch,var(--status-attention)_10%,transparent)]'
+    : 'hover:bg-raised'
 }

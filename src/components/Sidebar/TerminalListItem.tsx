@@ -27,10 +27,10 @@ export const TerminalListItem = memo(function TerminalListItem({
 }: TerminalListItemProps) {
   const isAttention = isAttentionState(terminal.state)
   const defaultClassName = `
-    group flex items-center gap-2 px-2 py-1.5 cursor-pointer
-    transition-colors duration-150 rounded-md
+    group flex items-center gap-2 h-7 px-2 rounded-md text-[12.5px] cursor-pointer
+    transition-colors duration-150
     ${attentionRowBg(isAttention, isActive)}
-    ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
+    ${isActive ? 'text-fg-strong' : 'text-fg-muted hover:text-fg'}
   `
   const isClaude = terminal.type === 'claude'
   const showSummary = isClaude && isActive && Boolean(terminal.summary)
@@ -89,7 +89,7 @@ export const TerminalListItem = memo(function TerminalListItem({
             {terminal.generatedTitle || terminal.title}
           </span>
           {showSummary && (
-            <span className="text-[10px] text-muted-foreground truncate block leading-tight opacity-70">
+            <span className="text-[10.5px] text-fg-muted truncate block leading-tight opacity-70">
               {terminal.summary}
             </span>
           )}
@@ -99,7 +99,7 @@ export const TerminalListItem = memo(function TerminalListItem({
         {isAttention && <AttentionChip />}
         <button
           onClick={onClose}
-          className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity flex-shrink-0"
+          className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-opacity flex-shrink-0"
           title="Close Chat"
         >
           <X className="w-3 h-3" />

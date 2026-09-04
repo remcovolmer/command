@@ -81,15 +81,15 @@ export function ActivityRail() {
   return (
     <div
       data-activity-rail
-      className="flex flex-col items-center w-12 bg-sidebar border-l border-border py-2 gap-1 shrink-0"
+      className="flex flex-col items-center w-11 bg-canvas border-l border-border py-2 gap-1 shrink-0"
     >
       {/* Open browser tab — content action, sits above the panel icons */}
       <button
         onClick={handleOpenBrowser}
         title="Open browser tab"
-        className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50"
+        className="w-8 h-8 rounded-md flex items-center justify-center transition-colors text-fg-muted hover:text-fg hover:bg-raised"
       >
-        <Globe className="w-[18px] h-[18px]" />
+        <Globe className="w-[18px] h-[18px]" strokeWidth={1.5} />
       </button>
       <div className="w-5 h-px bg-border my-1" />
 
@@ -101,15 +101,13 @@ export function ActivityRail() {
             key={tab}
             onClick={() => handleClick(tab)}
             title={label}
-            className={`relative w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-              active
-                ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
-                : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
+            className={`relative w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
+              active ? 'bg-selected text-fg-strong' : 'text-fg-muted hover:text-fg hover:bg-raised'
             }`}
           >
-            <Icon className="w-[18px] h-[18px]" />
+            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
             {count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold leading-[15px] text-center">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground font-mono tnum text-[9px] font-semibold leading-[15px] text-center">
                 {count}
               </span>
             )}
@@ -121,15 +119,15 @@ export function ActivityRail() {
       <button
         onClick={toggleShellDrawer}
         title={hasShells ? `${shellCount} shell${shellCount === 1 ? '' : 's'}` : 'Open shell'}
-        className={`relative mt-auto w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+        className={`relative mt-auto w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
           hasShells && !shellCollapsed
-            ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
-            : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
+            ? 'bg-selected text-fg-strong'
+            : 'text-fg-muted hover:text-fg hover:bg-raised'
         }`}
       >
-        <TerminalSquare className="w-[18px] h-[18px]" />
+        <TerminalSquare className="w-[18px] h-[18px]" strokeWidth={1.5} />
         {hasShells && shellCollapsed && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold leading-[15px] text-center">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground font-mono tnum text-[9px] font-semibold leading-[15px] text-center">
             {shellCount}
           </span>
         )}

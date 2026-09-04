@@ -81,14 +81,14 @@ export function ProjectOverview({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-sidebar">
+      <div className="flex items-center justify-center h-full bg-screen">
         <div className="text-muted-foreground text-sm">Loading sessions...</div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full bg-sidebar">
+    <div className="flex flex-col h-full bg-screen">
       {/* Header */}
       <div className="px-6 pt-8 pb-4">
         <h2 className="text-xl font-semibold text-sidebar-foreground mb-1">{projectName}</h2>

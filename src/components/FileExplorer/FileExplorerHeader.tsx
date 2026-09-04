@@ -31,20 +31,18 @@ export function FileExplorerHeader({
   const gitRefreshing = activeTab === 'git' && isGitLoading
 
   return (
-    <div className="flex items-center justify-between px-2 py-1 bg-sidebar-accent border-b border-border shrink-0">
-      <div className="flex items-center gap-1.5 px-1 min-w-0 text-xs font-medium text-sidebar-foreground">
+    <div className="flex items-center justify-between px-2 py-1 bg-canvas border-b border-border shrink-0">
+      <div className="flex items-center gap-1.5 px-1 min-w-0 text-[12px] font-medium text-fg">
         <Icon className="w-3.5 h-3.5 shrink-0" />
         <span className="truncate">{title}</span>
       </div>
       <button
         onClick={onRefresh}
         disabled={gitRefreshing}
-        className="p-1 rounded hover:bg-muted/50 transition-colors shrink-0"
+        className="p-1 rounded hover:bg-raised transition-colors shrink-0"
         title="Refresh"
       >
-        <RefreshCw
-          className={`w-3.5 h-3.5 text-muted-foreground ${gitRefreshing ? 'animate-spin' : ''}`}
-        />
+        <RefreshCw className={`w-3.5 h-3.5 text-fg-muted ${gitRefreshing ? 'animate-spin' : ''}`} />
       </button>
     </div>
   )

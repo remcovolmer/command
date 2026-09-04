@@ -34,6 +34,12 @@ export function useThemeResolver() {
             .syncClaudeTheme(resolved)
             .catch((e: unknown) => console.warn('Failed to sync Claude theme:', e))
         }, 200)
+        // Repaints the Windows titlebar overlay buttons and persists the theme
+        // for the next cold-start backgroundColor. Optional-chained on the
+        // method itself so older preloads or a test double lacking it don't throw.
+        api.app
+          .setTitleBarOverlay?.(resolved)
+          ?.catch((e: unknown) => console.warn('Failed to set titlebar overlay:', e))
       }
     }
 
