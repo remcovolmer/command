@@ -1,54 +1,95 @@
 /** @type {import('tailwindcss').Config} */
+
+/**
+ * Token color with working opacity modifiers. The tokens are full oklch()
+ * colors in src/index.css, so Tailwind cannot splice an alpha channel into
+ * them; `bg-primary/25` would otherwise generate no CSS at all. With this
+ * helper the modifier becomes a color-mix toward transparent, which keeps a
+ * single source of truth for every color.
+ */
+const tok =
+  (name) =>
+  ({ opacityValue }) => {
+    // Without a modifier Tailwind passes `var(--tw-bg-opacity)` (a string),
+    // not a number — only a real fraction below 1 gets the color-mix.
+    const alpha = Number(opacityValue)
+    if (!Number.isFinite(alpha) || alpha >= 1) return `var(${name})`
+    return `color-mix(in oklch, var(${name}) ${alpha * 100}%, transparent)`
+  }
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
+        background: tok('--background'),
+        foreground: tok('--foreground'),
+        canvas: tok('--canvas'),
+        panel: tok('--panel'),
+        screen: tok('--screen'),
+        raised: tok('--raised'),
+        selected: tok('--selected'),
+        'border-strong': tok('--border-strong'),
         card: {
-          DEFAULT: 'var(--card)',
-          foreground: 'var(--card-foreground)',
+          DEFAULT: tok('--card'),
+          foreground: tok('--card-foreground'),
         },
         popover: {
-          DEFAULT: 'var(--popover)',
-          foreground: 'var(--popover-foreground)',
+          DEFAULT: tok('--popover'),
+          foreground: tok('--popover-foreground'),
         },
         primary: {
-          DEFAULT: 'var(--primary)',
-          foreground: 'var(--primary-foreground)',
+          DEFAULT: tok('--primary'),
+          hover: tok('--primary-hover'),
+          soft: tok('--primary-soft'),
+          foreground: tok('--primary-foreground'),
         },
         secondary: {
-          DEFAULT: 'var(--secondary)',
-          foreground: 'var(--secondary-foreground)',
+          DEFAULT: tok('--secondary'),
+          foreground: tok('--secondary-foreground'),
         },
         muted: {
-          DEFAULT: 'var(--muted)',
-          foreground: 'var(--muted-foreground)',
+          DEFAULT: tok('--muted'),
+          foreground: tok('--muted-foreground'),
         },
         accent: {
-          DEFAULT: 'var(--accent)',
-          foreground: 'var(--accent-foreground)',
+          DEFAULT: tok('--accent'),
+          foreground: tok('--accent-foreground'),
         },
         destructive: {
-          DEFAULT: 'var(--destructive)',
-          foreground: 'var(--destructive-foreground)',
+          DEFAULT: tok('--destructive'),
+          foreground: tok('--destructive-foreground'),
         },
-        warning: 'var(--warning)',
-        danger: 'var(--danger)',
-        border: 'var(--border)',
-        input: 'var(--input)',
-        ring: 'var(--ring)',
+        fg: {
+          strong: tok('--fg-strong'),
+          DEFAULT: tok('--fg'),
+          muted: tok('--fg-muted'),
+          faint: tok('--fg-faint'),
+        },
+        info: tok('--info'),
+        success: tok('--success'),
+        warning: tok('--warning'),
+        danger: tok('--danger'),
+        status: {
+          attention: tok('--status-attention'),
+          done: tok('--status-done'),
+          busy: tok('--status-busy'),
+          stopped: tok('--status-stopped'),
+        },
+        border: tok('--border'),
+        scrim: tok('--scrim'),
+        input: tok('--input'),
+        ring: tok('--ring'),
         sidebar: {
-          DEFAULT: 'var(--sidebar)',
-          foreground: 'var(--sidebar-foreground)',
-          primary: 'var(--sidebar-primary)',
-          'primary-foreground': 'var(--sidebar-primary-foreground)',
-          accent: 'var(--sidebar-accent)',
-          'accent-foreground': 'var(--sidebar-accent-foreground)',
-          border: 'var(--sidebar-border)',
-          ring: 'var(--sidebar-ring)',
+          DEFAULT: tok('--sidebar'),
+          foreground: tok('--sidebar-foreground'),
+          primary: tok('--sidebar-primary'),
+          'primary-foreground': tok('--sidebar-primary-foreground'),
+          accent: tok('--sidebar-accent'),
+          'accent-foreground': tok('--sidebar-accent-foreground'),
+          border: tok('--sidebar-border'),
+          ring: tok('--sidebar-ring'),
         },
       },
       fontFamily: {
@@ -56,9 +97,11 @@ export default {
         mono: ['var(--font-mono)'],
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        sm: '4px',
+        DEFAULT: 'var(--radius)',
+        md: 'var(--radius)',
+        lg: '8px',
+        xl: '12px',
       },
       animation: {
         'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',

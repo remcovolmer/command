@@ -8,6 +8,7 @@ import { getMonacoLanguage } from '../../utils/editorLanguages'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { normalizeFilePath } from '../../utils/paths'
 import type { FileWatchEvent } from '../../types'
+import { defineCommandMonacoTheme } from './EditorContainer'
 
 interface CodeEditorProps {
   tabId: string
@@ -18,6 +19,9 @@ interface CodeEditorProps {
 export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
   const api = getElectronAPI()
   const resolvedTheme = useProjectStore((s) => s.resolvedTheme)
+  // Registered (or re-registered) before the Editor below reads its theme
+  // prop, so command-light/command-dark are always defined by then.
+  defineCommandMonacoTheme(resolvedTheme)
   const setEditorDirty = useProjectStore((s) => s.setEditorDirty)
   const setEditorTabDeletedExternally = useProjectStore((s) => s.setEditorTabDeletedExternally)
   const isDeletedExternally = useProjectStore((s) => {
@@ -224,7 +228,7 @@ export function CodeEditor({ tabId, filePath, isActive }: CodeEditorProps) {
       <Editor
         defaultValue={content}
         language={getMonacoLanguage(filePath)}
-        theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
+        theme={resolvedTheme === 'dark' ? 'command-dark' : 'command-light'}
         onMount={handleMount}
         onChange={handleChange}
         options={{

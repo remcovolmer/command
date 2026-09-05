@@ -2,12 +2,56 @@ import { useState, lazy, Suspense } from 'react'
 import { Code, Eye } from 'lucide-react'
 import { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
+import { getCssVar } from '../../utils/terminalTheme'
 import { CodeEditor } from './CodeEditor'
 import { EditorSkeleton } from './EditorSkeleton'
 
 // Configure Monaco to use local package instead of CDN
 // This runs when this chunk loads, before any <Editor> mounts
 loader.config({ monaco })
+
+/**
+ * Register (or re-register) the Command Monaco theme matching the given app
+ * theme. Reads current token values via getCssVar — since these resolve
+ * live CSS variables, this must be called again whenever the app theme
+ * changes (the .dark class flips before resolvedTheme propagates, see
+ * useThemeResolver) so the newly active surface colors get picked up.
+ * monaco.editor.defineTheme is safe to call repeatedly with the same name.
+ */
+let definedFor: 'light' | 'dark' | null = null
+
+export function defineCommandMonacoTheme(resolvedTheme: 'light' | 'dark') {
+  // Called from editor render bodies (so the theme name exists before Monaco
+  // reads the prop); the token reads force style recalcs, so only redo the
+  // work when the theme actually changed since the last definition.
+  if (definedFor === resolvedTheme) return
+  definedFor = resolvedTheme
+  const name = resolvedTheme === 'dark' ? 'command-dark' : 'command-light'
+  const base = resolvedTheme === 'dark' ? 'vs-dark' : 'vs'
+  const borderStrong = getCssVar('--border-strong')
+
+  monaco.editor.defineTheme(name, {
+    base,
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': getCssVar('--screen'),
+      'editor.foreground': getCssVar('--fg'),
+      'editorLineNumber.foreground': getCssVar('--fg-faint'),
+      'editorLineNumber.activeForeground': getCssVar('--fg-muted'),
+      'editor.lineHighlightBackground': getCssVar('--raised'),
+      'editor.selectionBackground': getCssVar('--terminal-selection'),
+      'editorGutter.background': getCssVar('--screen'),
+      'editorWidget.background': getCssVar('--popover'),
+      'editorWidget.border': getCssVar('--border'),
+      'scrollbarSlider.background': `${borderStrong}66`,
+      'scrollbarSlider.hoverBackground': `${borderStrong}99`,
+      'scrollbarSlider.activeBackground': `${borderStrong}bf`,
+      'editorIndentGuide.background1': getCssVar('--border'),
+      focusBorder: getCssVar('--primary'),
+    },
+  })
+}
 
 const MarkdownEditor = lazy(() =>
   import('./MarkdownEditor').then((m) => ({ default: m.MarkdownEditor }))

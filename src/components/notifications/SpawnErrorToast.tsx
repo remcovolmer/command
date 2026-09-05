@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { AlertCircle } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
+import { Toast } from '../ui/Toast'
+import { btnSecondary } from '../ui/controls'
 import { terminalEvents } from '../../utils/terminalEvents'
 import { pushToastDismiss } from '../../utils/toastRegistry'
 import type { SpawnFailureCode } from '../../types'
@@ -138,50 +141,20 @@ export function SpawnErrorToast() {
       {toasts.map((toast) => {
         const { title, body } = describeSpawnError(toast.code, toast.cwd)
         return (
-          <div
+          <Toast
             key={toast.id}
-            role="status"
-            className="bg-red-900/90 text-white p-4 rounded-lg shadow-lg max-w-sm"
+            tone="danger"
+            icon={AlertCircle}
+            title={title}
+            onDismiss={() => dismiss(toast.id)}
           >
-            <div className="flex items-start gap-3">
-              <div className="text-red-400 mt-0.5">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">{title}</p>
-                <p className="text-sm text-red-200 mt-1 break-all">{body}</p>
-                {toast.code === 'SPAWN_FAILED' && (
-                  <button
-                    onClick={openLog}
-                    className="mt-3 px-3 py-1.5 bg-red-800 hover:bg-red-700 rounded text-sm font-medium transition-colors"
-                  >
-                    Open crash.log
-                  </button>
-                )}
-              </div>
-              <button
-                onClick={() => dismiss(toast.id)}
-                className="text-red-300 hover:text-white"
-                aria-label="Dismiss"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+            <p className="text-[12.5px] text-fg-muted mt-0.5 break-all">{body}</p>
+            {toast.code === 'SPAWN_FAILED' && (
+              <button onClick={openLog} className={`${btnSecondary} h-7 px-2.5 text-[12.5px] mt-3`}>
+                Open crash.log
               </button>
-            </div>
-          </div>
+            )}
+          </Toast>
         )
       })}
     </div>

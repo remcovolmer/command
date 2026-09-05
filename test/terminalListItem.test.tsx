@@ -103,17 +103,19 @@ describe('TerminalListItem attention rail (permission/question)', () => {
 
   const queryStateDot = (li: HTMLElement) => li.querySelector('.w-1\\.5.h-1\\.5.rounded-full')
 
-  test('permission state: rail + "wacht op jou" chip, no status dot', () => {
+  // Chip text changed from "wacht op jou" to "WACHT" (design overhaul WP2 —
+  // square mono attention chip, see docs/plan/2026-09-04-design-overhaul.html).
+  test('permission state: rail + "WACHT" chip, no status dot', () => {
     renderItem(makeTerminal({ state: 'permission' }), false)
     expect(screen.getByTestId('attention-rail')).toBeTruthy()
-    expect(screen.getByText('wacht op jou')).toBeTruthy()
+    expect(screen.getByText('WACHT')).toBeTruthy()
     expect(queryStateDot(screen.getByRole('listitem'))).toBeNull()
   })
 
   test('question state: exact same treatment as permission', () => {
     renderItem(makeTerminal({ state: 'question' }), false)
     expect(screen.getByTestId('attention-rail')).toBeTruthy()
-    expect(screen.getByText('wacht op jou')).toBeTruthy()
+    expect(screen.getByText('WACHT')).toBeTruthy()
     expect(queryStateDot(screen.getByRole('listitem'))).toBeNull()
   })
 
@@ -121,7 +123,7 @@ describe('TerminalListItem attention rail (permission/question)', () => {
     renderItem(makeTerminal({ state: 'done' }), false)
     const li = screen.getByRole('listitem')
     expect(screen.queryByTestId('attention-rail')).toBeNull()
-    expect(screen.queryByText('wacht op jou')).toBeNull()
+    expect(screen.queryByText('WACHT')).toBeNull()
     expect(queryStateDot(li)).toBeNull()
     expect(li.querySelector('svg')?.getAttribute('class')).toContain('var(--status-done)')
   })
@@ -130,7 +132,7 @@ describe('TerminalListItem attention rail (permission/question)', () => {
     renderItem(makeTerminal({ state: 'busy' }), false)
     const li = screen.getByRole('listitem')
     expect(screen.queryByTestId('attention-rail')).toBeNull()
-    expect(screen.queryByText('wacht op jou')).toBeNull()
+    expect(screen.queryByText('WACHT')).toBeNull()
     expect(queryStateDot(li)).toBeNull()
     expect(li.querySelector('svg')?.getAttribute('class')).toContain('var(--status-busy)')
   })

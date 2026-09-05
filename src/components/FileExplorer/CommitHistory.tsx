@@ -108,7 +108,7 @@ export function CommitHistory({ gitPath, contextId }: CommitHistoryProps) {
   if (!commitLog && isLoading) {
     return (
       <div className="flex items-center justify-center py-4">
-        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        <Loader2 className="w-4 h-4 animate-spin text-fg-muted" />
       </div>
     )
   }
@@ -116,8 +116,8 @@ export function CommitHistory({ gitPath, contextId }: CommitHistoryProps) {
   // Empty state
   if (commits.length === 0 && !isLoading) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-        <History className="w-4 h-4" />
+      <div className="flex items-center gap-2 px-3 py-2 text-[12.5px] text-fg-muted">
+        <History className="w-4 h-4" strokeWidth={1.5} />
         <span>No commits yet</span>
       </div>
     )
@@ -151,12 +151,9 @@ export function CommitHistory({ gitPath, contextId }: CommitHistoryProps) {
                 className="flex items-center justify-center"
               >
                 {isLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-fg-muted" />
                 ) : (
-                  <button
-                    onClick={loadMore}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
+                  <button onClick={loadMore} className="text-[11px] text-fg-muted hover:text-fg">
                     Load more...
                   </button>
                 )}

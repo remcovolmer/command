@@ -16,40 +16,42 @@ function formatRelativeTime(ts: number): string {
 export function SessionsPanel() {
   const activeTerminalId = useProjectStore((s) => s.activeTerminalId)
   const terminals = useProjectStore((s) => s.terminals)
+  const worktrees = useProjectStore((s) => s.worktrees)
 
   const terminal = activeTerminalId ? terminals[activeTerminalId] : null
+  const worktreeName = terminal?.worktreeId ? worktrees[terminal.worktreeId]?.name : undefined
 
   // Don't render anything if no active claude terminal
   if (!terminal || terminal.type !== 'claude') return null
 
   return (
-    <div className="px-2 py-2 border-b border-border bg-sidebar-accent/50 shrink-0">
+    <div className="px-3 py-2 border-b border-border bg-canvas shrink-0">
       {/* State + title row */}
       <div className="flex items-center gap-1.5 mb-0.5">
         <span
           className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT_COLORS[terminal.state]}`}
         />
-        <span className="text-xs font-medium text-sidebar-foreground truncate flex-1">
+        <span className="text-[12.5px] font-medium text-fg-strong truncate flex-1">
           {terminal.generatedTitle || terminal.title}
         </span>
-        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-          <Clock className="w-2.5 h-2.5" />
+        <span className="font-mono text-[10.5px] text-fg-muted tnum flex items-center gap-0.5">
+          <Clock className="w-2.5 h-2.5" strokeWidth={1.5} />
           {formatRelativeTime(terminal.lastActivity)}
         </span>
       </div>
 
       {/* Summary */}
       {terminal.summary && (
-        <p className="text-[11px] text-muted-foreground leading-snug truncate">
+        <p className="font-mono text-[11px] text-fg-muted leading-snug truncate">
           {terminal.summary}
         </p>
       )}
 
       {/* Branch */}
-      {terminal.worktreeId && (
-        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground">
-          <GitBranch className="w-2.5 h-2.5" />
-          <span className="truncate">{terminal.worktreeId.slice(0, 8)}...</span>
+      {worktreeName && (
+        <div className="flex items-center gap-1 mt-0.5 font-mono text-[10.5px] text-fg-muted">
+          <GitBranch className="w-2.5 h-2.5" strokeWidth={1.5} />
+          <span className="truncate">{worktreeName}</span>
         </div>
       )}
     </div>

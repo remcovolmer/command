@@ -4,11 +4,11 @@ import type { TerminalState } from '../types'
 // One palette for the whole app: the --status-* tokens (src/index.css) are
 // per-theme tuned and also drive the sidebar rail/chip/rollup treatments.
 export const STATE_DOT_COLORS: Record<TerminalState, string> = {
-  busy: 'bg-[var(--status-busy)]',
-  permission: 'bg-[var(--status-attention)]',
-  question: 'bg-[var(--status-attention)]',
-  done: 'bg-[var(--status-done)]',
-  stopped: 'bg-[var(--status-stopped)]',
+  busy: 'bg-status-busy',
+  permission: 'bg-status-attention',
+  question: 'bg-status-attention',
+  done: 'bg-status-done',
+  stopped: 'bg-status-stopped',
 }
 
 // Same palette as text color, for tinting the agent logo by state (the logo

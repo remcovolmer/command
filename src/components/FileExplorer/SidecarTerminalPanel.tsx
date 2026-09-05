@@ -39,7 +39,7 @@ function SidecarTerminalInstance({
   return (
     <div
       ref={containerRef}
-      className="terminal-container absolute inset-0 bg-sidebar"
+      className="terminal-container absolute inset-0 bg-screen"
       style={{
         visibility: isActive ? 'visible' : 'hidden',
         pointerEvents: isActive ? 'auto' : 'none',
@@ -61,8 +61,9 @@ export function SidecarTerminalPanel({
 }: SidecarTerminalPanelProps) {
   return (
     <div className="flex flex-col h-full">
-      {/* Tab bar */}
-      <div className="flex items-center bg-sidebar border-t border-b border-border shrink-0 overflow-x-auto">
+      {/* Tab bar — same underline treatment as the chat/content tabs, at a
+          smaller 32px/12px scale to fit the drawer. */}
+      <div className="flex items-end gap-0.5 px-2 h-8 bg-canvas border-t border-b border-border shrink-0 overflow-x-auto scroll-hidden">
         {terminals.map((term) => {
           const isActive = term.id === activeTerminalId
           return (
@@ -70,12 +71,13 @@ export function SidecarTerminalPanel({
               key={term.id}
               onClick={() => onSelectTerminal(term.id)}
               className={`
-                flex items-center gap-1 px-2 py-1 text-xs whitespace-nowrap shrink-0
-                transition-colors border-b-2
+                group relative flex items-center gap-1.5 h-8 px-2 text-xs whitespace-nowrap shrink-0
+                transition-colors select-none
+                ${isActive ? 'text-fg-strong' : 'text-fg-muted hover:text-fg'}
                 ${
                   isActive
-                    ? 'border-primary text-sidebar-foreground bg-sidebar-accent/50'
-                    : 'border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/30'
+                    ? 'after:absolute after:left-1.5 after:right-1.5 after:-bottom-px after:h-0.5 after:rounded-t after:bg-primary'
+                    : ''
                 }
               `}
             >
@@ -86,7 +88,7 @@ export function SidecarTerminalPanel({
                   e.stopPropagation()
                   onCloseTerminal(term.id)
                 }}
-                className="p-0.5 rounded hover:bg-muted/50 ml-0.5"
+                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-raised ml-0.5 transition-opacity"
                 title="Close Terminal"
               >
                 <X className="w-2.5 h-2.5" />
@@ -96,10 +98,10 @@ export function SidecarTerminalPanel({
         })}
         <button
           onClick={onCreateTerminal}
-          className="p-1 ml-0.5 rounded hover:bg-muted/50 transition-colors shrink-0"
+          className="p-1 mb-1 ml-0.5 rounded hover:bg-raised transition-colors shrink-0"
           title="New Terminal"
         >
-          <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+          <Plus className="w-3.5 h-3.5 text-fg-muted" />
         </button>
       </div>
 

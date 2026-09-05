@@ -362,6 +362,10 @@ export interface ElectronAPI {
     cancelClose: () => void
     storeHydrated: () => void
     syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>
+    setTitleBarOverlay: (
+      theme: 'light' | 'dark',
+      colors?: { color: string; symbolColor: string }
+    ) => Promise<void>
     onUncaughtError: (callback: (event: UncaughtErrorEvent) => void) => Unsubscribe
     openCrashLog: () => Promise<{ success: boolean; path?: string; error?: string }>
     openLogFile: () => Promise<{ success: boolean; path?: string; error?: string }>

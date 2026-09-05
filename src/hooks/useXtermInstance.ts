@@ -20,6 +20,12 @@ import { terminalPool } from '../utils/terminalPool'
 import { createSpaceKeyWatchdog } from '../utils/spaceKeyWatchdog'
 import { createOsc52ClipboardHandler } from '../utils/osc52Clipboard'
 
+// Bundled via @fontsource/ibm-plex-mono (see index.css); the rest is the
+// fallback stack for a still-loading face or a stripped install.
+const TERMINAL_FONT_STACK =
+  "'IBM Plex Mono', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace"
+const TERMINAL_FONT_SPEC = "14px 'IBM Plex Mono'"
+
 // Timing constants for terminal dimension calculations
 const FIT_RETRY_DELAY_MS = 50
 const FIT_MAX_RETRIES = 5
@@ -161,8 +167,8 @@ export function useXtermInstance({
       cursorBlink: true,
       cursorStyle: 'block',
       fontSize,
-      fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', monospace",
-      lineHeight: 1.0,
+      fontFamily: TERMINAL_FONT_STACK,
+      lineHeight: 1.15,
       scrollback,
       ...buildTerminalThemeOptions(resolvedTheme),
       allowProposedApi: true,
@@ -225,6 +231,30 @@ export function useXtermInstance({
     serializeAddonRef.current = serializeAddon
 
     terminal.open(containerRef.current)
+
+    // xterm measured its cell size at open(). If the bundled Plex Mono face is
+    // not resident yet (first terminal after a cold start), that measurement
+    // used the fallback stack and the grid is off by a column or row. Creating
+    // the terminal synchronously matters more (no dropped PTY data, focus and
+    // StrictMode stay simple), so instead re-measure once the face arrives:
+    // assigning a *different* fontFamily string forces xterm to re-measure
+    // and re-render, after which fit() corrects cols/rows.
+    if (
+      typeof document !== 'undefined' &&
+      document.fonts &&
+      !document.fonts.check(TERMINAL_FONT_SPEC)
+    ) {
+      document.fonts
+        .load(TERMINAL_FONT_SPEC)
+        .then(() => {
+          if (isDisposedRef.current || terminalRef.current !== terminal) return
+          terminal.options.fontFamily = `${TERMINAL_FONT_STACK}, serif`
+          safeFit()
+        })
+        .catch(() => {
+          /* fallback stack keeps rendering */
+        })
+    }
 
     // WebGL renderer for sharper block character and glyph rendering
     let webglAddon: WebglAddon | null = null

@@ -181,9 +181,7 @@ export function SortableProjectList({
           other sections so pinned projects keep their full type-specific UI. */}
       {pinnedProjects.length > 0 && (
         <section className="mb-2">
-          <h3 className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em]">
-            Pinned
-          </h3>
+          <h3 className="eyebrow px-3 pt-3 pb-1">Pinned</h3>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -217,9 +215,7 @@ export function SortableProjectList({
       {/* Active Projects Section */}
       {activeProjects.length > 0 && (
         <section className="mb-2">
-          <h3 className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em]">
-            Active
-          </h3>
+          <h3 className="eyebrow px-3 pt-3 pb-1">Active</h3>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -253,22 +249,19 @@ export function SortableProjectList({
       {/* Inactive Projects Section */}
       {inactiveProjects.length > 0 && (
         <section>
-          <button
-            onClick={toggleInactiveSectionCollapsed}
-            aria-expanded={!inactiveSectionCollapsed}
-            className="flex items-center gap-1 px-3 py-1.5 w-full text-left text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.1em] hover:text-muted-foreground transition-colors"
-          >
-            <ChevronRight
-              aria-hidden="true"
-              className={`w-3 h-3 transition-transform duration-150 ${!inactiveSectionCollapsed ? 'rotate-90' : ''}`}
-            />
-            <span>Inactive</span>
-            {inactiveSectionCollapsed && (
-              <span className="normal-case tracking-normal font-normal">
-                ({inactiveProjects.length})
-              </span>
-            )}
-          </button>
+          <h3 className="eyebrow px-3 pt-3 pb-1">
+            <button
+              onClick={toggleInactiveSectionCollapsed}
+              aria-expanded={!inactiveSectionCollapsed}
+              className="eyebrow flex items-center gap-1 w-full text-left hover:text-fg-muted transition-colors"
+            >
+              <ChevronRight
+                aria-hidden="true"
+                className={`w-3 h-3 transition-transform duration-150 ${!inactiveSectionCollapsed ? 'rotate-90' : ''}`}
+              />
+              <span>Inactive · {inactiveProjects.length}</span>
+            </button>
+          </h3>
           {!inactiveSectionCollapsed && (
             <DndContext
               sensors={sensors}

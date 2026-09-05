@@ -1,19 +1,60 @@
 import type { ITheme, ITerminalOptions } from '@xterm/xterm'
 
-// Helper to get computed CSS variable value as hex
-function getCssVar(name: string): string {
+/**
+ * Resolve a CSS custom property to a hex color xterm.js can consume.
+ *
+ * xterm's ITheme wants concrete colors, not `var(...)` references, so tokens
+ * defined as oklch()/color-mix() in index.css must be resolved through the
+ * DOM. Exported (rather than kept module-private) so it can be unit-tested
+ * directly and reused by other integrations (e.g. Monaco theme building).
+ */
+let scratchCtx: CanvasRenderingContext2D | null | undefined
+
+/**
+ * Paint a CSS color onto a 1×1 canvas and read the pixel back. Chromium
+ * serializes computed oklch()/color-mix() colors as `oklch(...)` (not rgb), so
+ * regex parsing alone cannot turn tokens into the hex that Monaco and xterm's
+ * ITheme want. Returns null where canvas is unavailable (jsdom).
+ */
+function canvasToHex(value: string): string | null {
+  if (scratchCtx === undefined) {
+    try {
+      scratchCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+    } catch {
+      scratchCtx = null
+    }
+  }
+  const ctx = scratchCtx
+  if (!ctx) return null
+  ctx.clearRect(0, 0, 1, 1)
+  ctx.fillStyle = '#000000'
+  ctx.fillStyle = value
+  // An unparsable color leaves fillStyle untouched — treat that as failure
+  // unless the caller really asked for black.
+  if (ctx.fillStyle === '#000000' && !/^(#000000|#000|black|rgb\(0,\s*0,\s*0\))$/i.test(value)) {
+    return null
+  }
+  ctx.fillRect(0, 0, 1, 1)
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+  return `#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+export function getCssVar(name: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  // Undefined token: return '' so callers can omit the slot instead of
+  // painting whatever the temp element's default color resolves to.
+  if (!value) return ''
   // If it's already hex, return it
   if (value.startsWith('#')) return value
-  // If it's oklch or other format, we need to convert it
-  // Create a temporary element to compute the color
+  const viaCanvas = canvasToHex(value)
+  if (viaCanvas) return viaCanvas
+  // Fallback (jsdom): resolve through a temp element and parse rgb()/rgba().
   const temp = document.createElement('div')
   temp.style.color = value
   document.body.appendChild(temp)
   const computed = getComputedStyle(temp).color
   document.body.removeChild(temp)
-  // Convert rgb(r, g, b) to hex
-  const match = computed.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+  const match = computed.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/)
   if (match) {
     const r = parseInt(match[1]).toString(16).padStart(2, '0')
     const g = parseInt(match[2]).toString(16).padStart(2, '0')
@@ -21,6 +62,36 @@ function getCssVar(name: string): string {
     return `#${r}${g}${b}`
   }
   return value
+}
+
+// The 16-color ANSI palette lives in src/index.css as --ansi-* tokens (one
+// set per theme, next to the other surface tokens) so a token tweak or a third
+// theme reaches the terminal too. Names are the xterm ITheme keys.
+const ANSI_KEYS = [
+  'red',
+  'green',
+  'yellow',
+  'blue',
+  'magenta',
+  'cyan',
+  'brightRed',
+  'brightGreen',
+  'brightYellow',
+  'brightBlue',
+  'brightMagenta',
+  'brightCyan',
+] as const
+type AnsiKey = (typeof ANSI_KEYS)[number]
+
+const toCssVar = (key: AnsiKey) => `--ansi-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`
+
+function readAnsiPalette(): Partial<Record<AnsiKey, string>> {
+  const out: Partial<Record<AnsiKey, string>> = {}
+  for (const key of ANSI_KEYS) {
+    const value = getCssVar(toCssVar(key))
+    if (value) out[key] = value
+  }
+  return out
 }
 
 let cachedTheme: ITheme | null = null
@@ -31,34 +102,38 @@ export function buildTerminalTheme(appTheme?: string): ITheme {
   const key = appTheme ?? 'default'
   if (cachedTheme && cachedThemeKey === key) return cachedTheme
 
-  const bg = getCssVar('--sidebar')
-  const fg = getCssVar('--sidebar-foreground')
+  const ansi = readAnsiPalette()
+
+  const bg = getCssVar('--screen')
+  const fg = getCssVar('--fg')
   const primary = getCssVar('--primary')
-  const muted = getCssVar('--muted-foreground')
-  const accent = getCssVar('--sidebar-accent')
+  const canvas = getCssVar('--canvas')
+  const faint = getCssVar('--fg-faint')
+  const strong = getCssVar('--fg-strong')
+  const selection = getCssVar('--terminal-selection')
 
   cachedTheme = {
     background: bg,
     foreground: fg,
     cursor: primary,
     cursorAccent: bg,
-    selectionBackground: accent,
-    black: getCssVar('--background'),
-    red: '#f7768e',
-    green: '#9ece6a',
-    yellow: '#e0af68',
-    blue: '#7aa2f7',
-    magenta: '#bb9af7',
-    cyan: '#7dcfff',
+    selectionBackground: selection,
+    black: canvas,
+    red: ansi.red,
+    green: ansi.green,
+    yellow: ansi.yellow,
+    blue: ansi.blue,
+    magenta: ansi.magenta,
+    cyan: ansi.cyan,
     white: fg,
-    brightBlack: muted,
-    brightRed: '#f7768e',
-    brightGreen: '#9ece6a',
-    brightYellow: '#e0af68',
-    brightBlue: '#7aa2f7',
-    brightMagenta: '#bb9af7',
-    brightCyan: '#7dcfff',
-    brightWhite: '#ffffff',
+    brightBlack: faint,
+    brightRed: ansi.brightRed,
+    brightGreen: ansi.brightGreen,
+    brightYellow: ansi.brightYellow,
+    brightBlue: ansi.brightBlue,
+    brightMagenta: ansi.brightMagenta,
+    brightCyan: ansi.brightCyan,
+    brightWhite: strong,
   }
   cachedThemeKey = key
 

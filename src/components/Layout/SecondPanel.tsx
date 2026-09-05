@@ -39,7 +39,7 @@ export function SecondPanel({
   }
 
   return (
-    <div className="h-full w-full flex flex-col bg-sidebar">
+    <div className="h-full w-full flex flex-col bg-screen">
       <ContentTabBar
         tabs={tabs}
         activeContentId={activeContentId}

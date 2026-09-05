@@ -134,7 +134,7 @@ export function WorkingTreeDiffView({ tab, isActive }: WorkingTreeDiffViewProps)
         original={original ?? ''}
         modified={modified ?? ''}
         language={getLanguageFromPath(tab.filePath)}
-        theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
+        theme={resolvedTheme === 'dark' ? 'command-dark' : 'command-light'}
         options={{
           readOnly: true,
           renderSideBySide: true,

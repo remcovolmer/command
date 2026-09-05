@@ -47,32 +47,30 @@ export function CommitRow({
   const relativeTime = useMemo(() => formatRelativeTime(commit.authorDate), [commit.authorDate])
 
   return (
-    <div className="border-t border-border/30 first:border-t-0">
+    <div className="border-t border-border first:border-t-0">
       {/* Compact row */}
       <button
         onClick={onToggleExpand}
-        className={`
-          w-full flex items-center gap-1.5 px-3 py-1.5 text-left
-          hover:bg-sidebar-accent transition-colors text-sm
-          ${isExpanded ? 'bg-sidebar-accent' : ''}
-        `}
+        className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-left hover:bg-raised transition-colors text-[12.5px] ${
+          isExpanded ? 'bg-raised' : ''
+        }`}
       >
         {/* Indicators */}
         <div className="flex items-center gap-1 flex-shrink-0">
           {isFirst && (
             <span title="HEAD">
-              <Tag className="w-3 h-3 text-primary" />
+              <Tag className="w-3 h-3 text-primary" strokeWidth={1.5} />
             </span>
           )}
           {isMerge && (
             <span title="Merge commit">
-              <GitMerge className="w-3 h-3 text-purple-500" />
+              <GitMerge className="w-3 h-3 text-fg-muted" strokeWidth={1.5} />
             </span>
           )}
         </div>
 
         {/* Commit message */}
-        <span className="truncate flex-1 text-sidebar-foreground">{commit.message}</span>
+        <span className="truncate flex-1 text-fg">{commit.message}</span>
 
         {/* Short hash (clickable to copy) */}
         <button
@@ -80,14 +78,14 @@ export function CommitRow({
             e.stopPropagation()
             onCopyHash()
           }}
-          className="flex-shrink-0 text-xs font-mono text-muted-foreground hover:text-primary transition-colors"
+          className="flex-shrink-0 font-mono text-[10.5px] text-fg-muted tnum hover:text-primary transition-colors"
           title={`Copy ${commit.hash}`}
         >
           {commit.shortHash}
         </button>
 
         {/* Relative time */}
-        <span className="flex-shrink-0 text-xs text-muted-foreground w-[4.5rem] text-right">
+        <span className="flex-shrink-0 font-mono text-[10.5px] text-fg-muted tnum w-[4.5rem] text-right">
           {relativeTime}
         </span>
       </button>

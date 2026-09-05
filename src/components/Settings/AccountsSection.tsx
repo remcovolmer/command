@@ -1,6 +1,18 @@
 import { useState, useCallback } from 'react'
 import { Plus, Trash2, Key, Zap, ChevronDown, ChevronRight } from 'lucide-react'
+import clsx from 'clsx'
 import { useProjectStore } from '../../stores/projectStore'
+import { Dialog } from '../ui/Dialog'
+import {
+  btnGhost,
+  btnIcon,
+  btnPrimary,
+  btnSecondary,
+  card,
+  input,
+  sectionHint,
+  sectionTitle,
+} from '../ui/controls'
 
 const VERTEX_TEMPLATE: Record<string, string> = {
   CLAUDE_CODE_USE_VERTEX: '1',
@@ -101,8 +113,8 @@ export function AccountsSection() {
     <div className="space-y-6">
       {/* Section header */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-1">Account Profiles</h3>
-        <p className="text-xs text-muted-foreground">
+        <h3 className={clsx(sectionTitle, 'mb-1')}>Account Profiles</h3>
+        <p className={sectionHint}>
           Manage profiles with environment variables for Vertex AI, Bedrock, or custom API
           configurations. Assign profiles to projects in General settings.
         </p>
@@ -110,19 +122,20 @@ export function AccountsSection() {
 
       {/* Active profile selector */}
       {profiles.length > 0 && (
-        <div className="rounded-lg border border-border p-4">
-          <label className="text-sm font-medium text-foreground">Active Profile (Global)</label>
-          <p className="text-xs text-muted-foreground mt-1 mb-3">
+        <div className={clsx(card, 'p-4')}>
+          <label className="text-[13px] font-medium text-fg-strong">Active Profile (Global)</label>
+          <p className={clsx(sectionHint, 'mt-1 mb-3')}>
             Shown in the sidebar footer as the currently active account.
           </p>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveProfile(null)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              className={clsx(
+                'px-3 py-1.5 text-xs font-medium rounded-md border transition-colors',
                 activeProfileId === null
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border hover:bg-muted text-muted-foreground'
-              }`}
+                  ? 'border-primary bg-primary-soft text-primary'
+                  : 'border-border hover:bg-raised text-fg-muted'
+              )}
             >
               None
             </button>
@@ -130,11 +143,12 @@ export function AccountsSection() {
               <button
                 key={profile.id}
                 onClick={() => setActiveProfile(profile.id)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                className={clsx(
+                  'px-3 py-1.5 text-xs font-medium rounded-md border transition-colors',
                   activeProfileId === profile.id
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border hover:bg-muted text-muted-foreground'
-                }`}
+                    ? 'border-primary bg-primary-soft text-primary'
+                    : 'border-border hover:bg-raised text-fg-muted'
+                )}
               >
                 {profile.name}
               </button>
@@ -146,7 +160,7 @@ export function AccountsSection() {
       {/* Profile list */}
       <div className="space-y-2">
         {profiles.map((profile) => (
-          <div key={profile.id} className="rounded-lg border border-border">
+          <div key={profile.id} className={card}>
             {/* Profile header */}
             <div
               className="flex items-center gap-3 p-4 cursor-pointer"
@@ -155,9 +169,9 @@ export function AccountsSection() {
               }
             >
               {expandedProfileId === profile.id ? (
-                <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                <ChevronDown className="w-4 h-4 text-fg-muted shrink-0" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                <ChevronRight className="w-4 h-4 text-fg-muted shrink-0" />
               )}
 
               <div className="flex-1 min-w-0">
@@ -173,11 +187,11 @@ export function AccountsSection() {
                     }}
                     onClick={(e) => e.stopPropagation()}
                     autoFocus
-                    className="w-full px-2 py-0.5 text-sm rounded border border-primary bg-background text-foreground focus:outline-none"
+                    className={clsx(input, 'w-full h-7')}
                   />
                 ) : (
                   <span
-                    className="text-sm font-medium text-foreground cursor-text"
+                    className="text-[13px] font-medium text-fg-strong cursor-text"
                     onDoubleClick={(e) => {
                       e.stopPropagation()
                       handleStartEdit(profile.id, profile.name)
@@ -190,7 +204,7 @@ export function AccountsSection() {
 
               {/* Env var count badge */}
               {profile.envVarCount > 0 && (
-                <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-primary/10 text-primary">
+                <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-primary-soft text-primary">
                   <Key className="w-3 h-3" />
                   {profile.envVarCount} var{profile.envVarCount !== 1 ? 's' : ''}
                 </span>
@@ -208,7 +222,7 @@ export function AccountsSection() {
                     removeProfile(profile.id)
                   }
                 }}
-                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                className={clsx(btnIcon, 'hover:text-danger')}
                 title="Delete profile"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -217,14 +231,14 @@ export function AccountsSection() {
 
             {/* Expanded content */}
             {expandedProfileId === profile.id && (
-              <div className="px-4 pb-4 pt-0 border-t border-border/30">
+              <div className="px-4 pb-4 pt-0 border-t border-border">
                 <div className="mt-3">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       handleOpenEnvEditor(profile.id)
                     }}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
+                    className={btnSecondary}
                   >
                     <Key className="w-3.5 h-3.5" />
                     Configure Environment Variables
@@ -249,26 +263,23 @@ export function AccountsSection() {
             }}
             placeholder="Profile name (e.g. Vertex EU)"
             autoFocus
-            className="flex-1 px-3 py-1.5 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className={clsx(input, 'flex-1')}
           />
           <button
             onClick={handleAddProfile}
             disabled={!newProfileName.trim()}
-            className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className={btnPrimary}
           >
             Add
           </button>
-          <button
-            onClick={() => setAddingProfile(false)}
-            className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
-          >
+          <button onClick={() => setAddingProfile(false)} className={btnSecondary}>
             Cancel
           </button>
         </div>
       ) : (
         <button
           onClick={() => setAddingProfile(true)}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-dashed border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          className={clsx(btnGhost, 'border border-dashed border-border')}
         >
           <Plus className="w-3.5 h-3.5" />
           Add Profile
@@ -276,80 +287,63 @@ export function AccountsSection() {
       )}
 
       {/* Env var editor dialog */}
-      {envEditorProfileId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setEnvEditorProfileId(null)}
-          />
-          <div className="relative bg-background rounded-lg border border-border p-6 max-w-lg w-full shadow-xl max-h-[80vh] overflow-y-auto">
-            <h3 className="text-sm font-semibold text-foreground mb-1">Environment Variables</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Values are encrypted at rest. Enter all values — existing values cannot be displayed.
-            </p>
-
-            {/* Vertex AI template button */}
-            <button
-              onClick={handleApplyVertexTemplate}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors mb-4"
-            >
-              <Zap className="w-3.5 h-3.5" />
-              Vertex AI Template
+      <Dialog
+        open={!!envEditorProfileId}
+        onClose={() => setEnvEditorProfileId(null)}
+        title="Environment Variables"
+        icon={Key}
+        size="md"
+        footer={
+          <>
+            <button onClick={() => setEnvEditorProfileId(null)} className={btnSecondary}>
+              Cancel
             </button>
-
-            {/* Key-value pairs */}
-            <div className="space-y-2">
-              {envPairs.map((pair, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={pair.key}
-                    onChange={(e) => handleEnvPairChange(index, 'key', e.target.value)}
-                    placeholder="KEY"
-                    className="flex-1 px-2 py-1 text-xs font-mono rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <input
-                    type="password"
-                    value={pair.value}
-                    onChange={(e) => handleEnvPairChange(index, 'value', e.target.value)}
-                    placeholder="value"
-                    className="flex-1 px-2 py-1 text-xs font-mono rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <button
-                    onClick={() => handleRemoveEnvPair(index)}
-                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={handleAddEnvPair}
-              className="flex items-center gap-1 mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              Add variable
+            <button onClick={handleSaveEnvVars} className={btnPrimary}>
+              Save & Encrypt
             </button>
+          </>
+        }
+      >
+        <p className={clsx(sectionHint, 'mb-4')}>
+          Values are encrypted at rest. Enter all values — existing values cannot be displayed.
+        </p>
 
-            <div className="flex justify-end gap-2 mt-6">
-              <button
-                onClick={() => setEnvEditorProfileId(null)}
-                className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEnvVars}
-                className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Save & Encrypt
+        {/* Vertex AI template button */}
+        <button onClick={handleApplyVertexTemplate} className={clsx(btnSecondary, 'mb-4')}>
+          <Zap className="w-3.5 h-3.5" />
+          Vertex AI Template
+        </button>
+
+        {/* Key-value pairs */}
+        <div className="space-y-2">
+          {envPairs.map((pair, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={pair.key}
+                onChange={(e) => handleEnvPairChange(index, 'key', e.target.value)}
+                placeholder="KEY"
+                className={clsx(input, 'flex-1 font-mono')}
+              />
+              <input
+                type="password"
+                value={pair.value}
+                onChange={(e) => handleEnvPairChange(index, 'value', e.target.value)}
+                placeholder="value"
+                className={clsx(input, 'flex-1 font-mono')}
+              />
+              <button onClick={() => handleRemoveEnvPair(index)} className={btnIcon}>
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
+          ))}
         </div>
-      )}
+
+        <button onClick={handleAddEnvPair} className={clsx(btnGhost, 'mt-2')}>
+          <Plus className="w-3 h-3" />
+          Add variable
+        </button>
+      </Dialog>
     </div>
   )
 }

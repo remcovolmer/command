@@ -54,34 +54,32 @@ export function CommitDetail({ commit, gitPath, detailCache }: CommitDetailProps
   if (loading) {
     return (
       <div className="px-3 py-2 flex items-center justify-center">
-        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-fg-muted" />
       </div>
     )
   }
 
   if (!detail) {
-    return (
-      <div className="px-3 py-2 text-xs text-muted-foreground">Failed to load commit details</div>
-    )
+    return <div className="px-3 py-2 text-[11px] text-fg-muted">Failed to load commit details</div>
   }
 
   return (
-    <div className="px-3 py-2 bg-sidebar-accent/50 border-t border-border/30">
+    <div className="px-3 py-2 bg-canvas border-t border-border">
       {/* Full commit message */}
       {detail.fullMessage !== commit.message && (
-        <p className="text-xs text-muted-foreground mb-2 whitespace-pre-wrap break-words">
+        <p className="text-[12px] text-fg-muted mb-2 whitespace-pre-wrap break-words">
           {detail.fullMessage}
         </p>
       )}
 
       {/* Author info */}
-      <div className="text-xs text-muted-foreground mb-2">
+      <div className="font-mono text-[11px] text-fg-muted tnum mb-2">
         {detail.authorName} &middot; {new Date(detail.authorDate).toLocaleString()}
       </div>
 
       {/* Merge indicator */}
       {detail.isMerge && (
-        <div className="text-xs text-purple-500 mb-2">
+        <div className="text-[11px] text-fg-muted mb-2">
           Merge commit ({detail.parentHashes.length} parents)
         </div>
       )}
@@ -89,35 +87,31 @@ export function CommitDetail({ commit, gitPath, detailCache }: CommitDetailProps
       {/* Changed files */}
       {detail.files.length > 0 && (
         <div className="space-y-0.5">
-          <div className="text-xs text-muted-foreground mb-1">
+          <div className="text-[11px] text-fg-muted mb-1">
             {detail.files.length} file{detail.files.length !== 1 ? 's' : ''} changed
           </div>
           {detail.files.map((file) => (
             <button
               key={file.path}
               onClick={() => handleFileClick(file)}
-              className="w-full flex items-center gap-1.5 py-0.5 px-1 rounded text-xs hover:bg-muted/50 transition-colors text-left"
+              className="w-full flex items-center gap-1.5 py-0.5 px-1 rounded text-[12px] hover:bg-raised transition-colors text-left"
               title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
             >
               <FileStatusIcon status={file.status} />
-              <span className="truncate flex-1 text-sidebar-foreground">
+              <span className="truncate flex-1 text-fg">
                 {file.oldPath ? (
                   <>
-                    <span className="text-muted-foreground">{file.oldPath.split('/').pop()}</span>
-                    <ArrowRight className="inline w-3 h-3 mx-0.5 text-muted-foreground" />
+                    <span className="text-fg-muted">{file.oldPath.split('/').pop()}</span>
+                    <ArrowRight className="inline w-3 h-3 mx-0.5 text-fg-muted" strokeWidth={1.5} />
                     {file.path.split('/').pop()}
                   </>
                 ) : (
                   file.path.split('/').pop()
                 )}
               </span>
-              <span className="flex-shrink-0 font-mono">
-                {file.additions > 0 && (
-                  <span className="text-green-600 dark:text-green-400">+{file.additions}</span>
-                )}
-                {file.deletions > 0 && (
-                  <span className="text-red-600 dark:text-red-400 ml-1">-{file.deletions}</span>
-                )}
+              <span className="flex-shrink-0 font-mono tnum">
+                {file.additions > 0 && <span className="text-success">+{file.additions}</span>}
+                {file.deletions > 0 && <span className="text-danger ml-1">-{file.deletions}</span>}
               </span>
             </button>
           ))}
@@ -132,19 +126,19 @@ function FileStatusIcon({ status }: { status: GitCommitFile['status'] }) {
   switch (status) {
     case 'added':
       return (
-        <FilePlus {...props} className={`${props.className} text-green-600 dark:text-green-400`} />
+        <FilePlus {...props} className={`${props.className} text-success`} />
       )
     case 'deleted':
-      return <FileX {...props} className={`${props.className} text-red-600 dark:text-red-400`} />
+      return <FileX {...props} className={`${props.className} text-danger`} />
     case 'renamed':
       return (
-        <ArrowRight {...props} className={`${props.className} text-blue-600 dark:text-blue-400`} />
+        <ArrowRight {...props} className={`${props.className} text-info`} />
       )
     default:
       return (
         <FileEdit
           {...props}
-          className={`${props.className} text-yellow-600 dark:text-yellow-400`}
+          className={`${props.className} text-warning`}
         />
       )
   }

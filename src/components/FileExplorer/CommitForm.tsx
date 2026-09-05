@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import { getElectronAPI } from '../../utils/electron'
+import { btnPrimary, textarea as textareaClass } from '../ui/controls'
 
 interface CommitFormProps {
   gitPath: string
@@ -57,7 +58,7 @@ export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFor
   }, [message])
 
   return (
-    <div className="border-t border-border/50 px-3 py-2">
+    <div className="border-t border-border px-3 py-2">
       <textarea
         ref={textareaRef}
         data-git-commit-input
@@ -67,16 +68,16 @@ export function CommitForm({ gitPath, hasStagedFiles, withOperation }: CommitFor
         placeholder="Commit message"
         disabled={isCommitting}
         rows={2}
-        className="w-full bg-input border border-border rounded-md px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+        className={`w-full ${textareaClass} resize-none disabled:opacity-50`}
       />
       <div className="flex items-center justify-between mt-1.5">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[11px] text-fg-muted">
           {hasStagedFiles ? '' : 'No staged files'}
         </span>
         <button
           onClick={handleCommit}
           disabled={!canCommit}
-          className="px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+          className={`${btnPrimary} h-7`}
           title="Commit staged changes (Ctrl+Enter)"
         >
           {isCommitting ? (

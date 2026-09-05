@@ -28,11 +28,11 @@ interface WorktreeItemProps {
 }
 
 const BADGE_KIND_CLASSES: Record<PRBadgeKind, string> = {
-  conflict: 'bg-red-500/15 text-red-600 dark:text-red-400',
-  'ci-fail': 'bg-red-500/15 text-red-600 dark:text-red-400',
-  pending: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  review: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  ready: 'bg-green-500/15 text-green-600 dark:text-green-400',
+  conflict: 'bg-danger/15 text-danger',
+  'ci-fail': 'bg-danger/15 text-danger',
+  pending: 'bg-warning/15 text-warning',
+  review: 'bg-warning/15 text-warning',
+  ready: 'bg-success/15 text-success',
 }
 
 const REVIEW_DECISION_LABELS: Record<string, string> = {
@@ -62,9 +62,9 @@ function PRStatusBadge({ status, badge }: { status: PRStatus; badge: PRBadge }) 
         <div className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg py-1.5 px-2 text-xs whitespace-nowrap">
           {hasDiffstat && (
             <div className="font-mono py-0.5">
-              <span className="text-green-500">+{status.additions ?? 0}</span>
+              <span className="text-success">+{status.additions ?? 0}</span>
               <span className="text-muted-foreground">/</span>
-              <span className="text-red-500">-{status.deletions ?? 0}</span>
+              <span className="text-danger">-{status.deletions ?? 0}</span>
             </div>
           )}
           {/* Review decision is masked when a higher-priority badge wins; keep it discoverable here */}
@@ -76,10 +76,10 @@ function PRStatusBadge({ status, badge }: { status: PRStatus; badge: PRBadge }) 
               <span
                 className={
                   c.bucket === 'pass'
-                    ? 'text-green-500'
+                    ? 'text-success'
                     : c.bucket === 'fail'
-                      ? 'text-red-500'
-                      : 'text-yellow-500'
+                      ? 'text-danger'
+                      : 'text-warning'
                 }
               >
                 {c.bucket === 'pass' ? '\u2713' : c.bucket === 'fail' ? '\u2717' : '\u25cb'}
@@ -109,7 +109,7 @@ function MergeButton({ badgeKind, checks, onMerge, isMerging }: MergeButtonProps
     return (
       <button
         disabled
-        className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-white transition-colors ml-auto bg-gray-500 opacity-75 cursor-not-allowed"
+        className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-white transition-colors ml-auto bg-fg-muted opacity-75 cursor-not-allowed"
         title="Merging in progress..."
       >
         <Loader2 className="w-3 h-3 animate-spin" />
@@ -119,7 +119,7 @@ function MergeButton({ badgeKind, checks, onMerge, isMerging }: MergeButtonProps
   }
 
   const btnColor =
-    badgeKind === 'ready' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
+    badgeKind === 'ready' ? 'bg-success hover:bg-success/90' : 'bg-fg-muted hover:bg-fg-muted/90'
 
   // Check names only feed the tooltip detail; the decision lives in badgeKind
   const failNames = checks.filter((c) => c.bucket === 'fail').map((c) => c.name)
@@ -344,16 +344,16 @@ export const WorktreeItem = memo(function WorktreeItem({
 
   return (
     <>
-      <div className="mt-0.5 border-l border-primary/30 ml-3">
+      <div className="mt-0.5 border-l border-border ml-3">
       {/* Row 1: Branch info + hover actions */}
       <div
         onClick={handleRowClick}
         onContextMenu={handleContextMenu}
         className={`
-          group relative flex items-center gap-2 px-2 py-1.5 cursor-pointer
+          group relative flex items-center gap-2 h-7 px-2 cursor-pointer
           transition-colors duration-150 rounded-t-md
           ${attentionRowBg(isAttention, isActive)}
-          ${isActive ? 'text-sidebar-foreground' : 'text-muted-foreground hover:text-sidebar-foreground'}
+          ${isActive ? 'text-fg-strong' : 'text-fg-muted hover:text-fg'}
           ${!hasPR ? 'rounded-b-md' : ''}
         `}
       >
@@ -375,11 +375,11 @@ export const WorktreeItem = memo(function WorktreeItem({
           </span>
         )}
 
-        {/* Branch name — no branch icon. "Worktree" is carried subtly: the
-            rust-tinted left rail (border-primary/30) plus this monospace,
-            faintly rust-tinted name read as a branch without a loud glyph. */}
+        {/* Branch name — no branch icon and no rust tint (that's reserved for
+            things that mean "active"/"primary"); the neutral border-l on the
+            container plus this monospace name read as a branch. */}
         <span
-          className="flex-1 text-xs font-mono truncate text-[color-mix(in_oklch,var(--primary)_55%,var(--sidebar-foreground))]"
+          className={`flex-1 font-mono text-[12px] truncate ${isActive ? 'text-fg-strong' : 'text-fg'}`}
           title={worktree.branch}
         >
           {worktree.name}

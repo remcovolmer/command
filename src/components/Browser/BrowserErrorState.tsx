@@ -1,4 +1,5 @@
 import { AlertTriangle, RotateCw } from 'lucide-react'
+import { btnSecondary } from '../ui/controls'
 
 interface BrowserErrorStateProps {
   url: string
@@ -14,16 +15,13 @@ interface BrowserErrorStateProps {
  */
 export function BrowserErrorState({ url, reason, onRetry }: BrowserErrorStateProps) {
   return (
-    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-background px-6 text-center">
-      <AlertTriangle className="w-8 h-8 text-muted-foreground" />
-      <div className="text-sm font-medium text-foreground">Kon de pagina niet laden</div>
-      <div className="max-w-md text-xs text-muted-foreground">{reason}</div>
-      <div className="max-w-md break-all font-mono text-xs text-muted-foreground/70">{url}</div>
-      <button
-        onClick={onRetry}
-        className="mt-1 flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted/50"
-      >
-        <RotateCw className="w-3.5 h-3.5" /> Opnieuw proberen
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-screen px-6 text-center">
+      <AlertTriangle className="w-8 h-8 text-fg-faint" strokeWidth={1.5} />
+      <div className="text-[15px] font-semibold text-fg-strong">Kon de pagina niet laden</div>
+      <div className="max-w-md text-[12.5px] text-fg-muted">{reason}</div>
+      <div className="max-w-md break-all font-mono text-[11px] text-fg-faint">{url}</div>
+      <button onClick={onRetry} className={`${btnSecondary} mt-1`}>
+        <RotateCw className="w-3.5 h-3.5" strokeWidth={1.5} /> Opnieuw proberen
       </button>
     </div>
   )

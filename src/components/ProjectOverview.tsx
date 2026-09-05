@@ -8,8 +8,12 @@ import {
   Clock,
   AlertTriangle,
 } from 'lucide-react'
+import { useProjectStore } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
+import { cleanSessionTitle } from '../utils/sessionTitle'
+import { DEFAULT_HOTKEY_CONFIG, formatBinding } from '../utils/hotkeys'
 import type { SessionIndexEntry } from '../types'
+import { btnPrimary, card, kbd } from './ui/controls'
 
 interface ProjectOverviewProps {
   projectId: string
@@ -46,6 +50,7 @@ function formatDuration(ms: number): string {
 }
 
 export function ProjectOverview({
+  projectId,
   projectName,
   projectPath,
   onCreateTerminal,
@@ -54,6 +59,11 @@ export function ProjectOverview({
   const [sessions, setSessions] = useState<SessionIndexEntry[]>([])
   const [loading, setLoading] = useState(true)
   const api = useMemo(() => getElectronAPI(), [])
+
+  const worktreeCount = useProjectStore(
+    (s) => Object.values(s.worktrees).filter((w) => w.projectId === projectId).length
+  )
+  const hotkeyConfig = useProjectStore((s) => s.hotkeyConfig) ?? DEFAULT_HOTKEY_CONFIG
 
   useEffect(() => {
     let cancelled = false
@@ -81,96 +91,100 @@ export function ProjectOverview({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-sidebar">
-        <div className="text-muted-foreground text-sm">Loading sessions...</div>
+      <div className="flex items-center justify-center h-full bg-screen">
+        <div className="text-fg-muted text-[13px]">Loading sessions...</div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full bg-sidebar">
+    <div className="h-full flex flex-col bg-screen">
       {/* Header */}
-      <div className="px-6 pt-8 pb-4">
-        <h2 className="text-xl font-semibold text-sidebar-foreground mb-1">{projectName}</h2>
-        <p className="text-muted-foreground text-sm">
-          {sessions.length > 0
-            ? `${sessions.length} recent session${sessions.length !== 1 ? 's' : ''}`
-            : 'No recent sessions'}
+      <div className="px-8 pt-8 pb-5">
+        <h1 className="text-[22px] font-semibold text-fg-strong tracking-[-0.01em]">
+          {projectName}
+        </h1>
+        <p className="font-mono text-[11.5px] text-fg-muted truncate mt-1" title={projectPath}>
+          {projectPath}
         </p>
-      </div>
+        <p className="font-mono text-[11.5px] text-fg-muted tnum mt-1">
+          {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+          {worktreeCount > 0 && ` · ${worktreeCount} worktree${worktreeCount !== 1 ? 's' : ''}`}
+        </p>
 
-      {/* New Chat button */}
-      <div className="px-6 pb-4">
-        <button
-          onClick={onCreateTerminal}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity text-sm shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          New Chat
-        </button>
+        <div className="flex items-center gap-2 mt-4">
+          <button onClick={onCreateTerminal} className={btnPrimary}>
+            <Plus className="w-4 h-4" />
+            New chat
+          </button>
+          <kbd className={kbd}>{formatBinding(hotkeyConfig['terminal.new'])}</kbd>
+        </div>
       </div>
 
       {/* Sessions list */}
       {sessions.length > 0 && (
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Recent Sessions
-          </h3>
+        <div className="flex-1 overflow-y-auto px-8 pb-8">
+          <h2 className="eyebrow mb-3">Recent sessions · {sessions.length}</h2>
           <div className="space-y-2">
             {sessions.map((session) => {
-              const sessionTitle = session.generatedTitle || session.summary || session.firstPrompt
-              const subtitle = session.generatedSummary || session.firstPrompt
+              const sessionTitle =
+                cleanSessionTitle(session.generatedTitle) ||
+                cleanSessionTitle(session.summary) ||
+                cleanSessionTitle(session.firstPrompt)
+              const rawSubtitle = session.generatedSummary || session.firstPrompt
+              const subtitle = cleanSessionTitle(rawSubtitle)
               return (
                 <button
                   key={session.sessionId}
                   onClick={() => onResumeSession(session.sessionId, sessionTitle)}
-                  className="w-full text-left p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+                  className={`${card} w-full text-left px-4 py-3 hover:bg-raised transition-colors group`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <span className="text-sm font-medium text-sidebar-foreground truncate flex-1">
+                    <span className="text-[13px] font-medium text-fg-strong truncate flex-1">
                       {sessionTitle || 'Untitled session'}
                     </span>
-                    <span className="text-[10px] text-muted-foreground flex-shrink-0 mt-0.5">
+                    <span className="font-mono text-[11px] text-fg-muted tnum shrink-0 mt-0.5">
                       {formatRelativeTime(session.modified)}
                     </span>
                   </div>
                   {subtitle && subtitle !== sessionTitle ? (
-                    <p className="text-xs text-muted-foreground line-clamp-3 mb-2">{subtitle}</p>
+                    <p className="text-[12.5px] text-fg-muted line-clamp-2 mb-2">{subtitle}</p>
                   ) : null}
-                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-3 font-mono text-[11px] text-fg-muted tnum">
                     {session.gitBranch && (
                       <span className="flex items-center gap-1">
-                        <GitBranch className="w-3 h-3" />
+                        <GitBranch className="w-3 h-3" strokeWidth={1.5} />
                         {session.gitBranch}
                       </span>
                     )}
-                    {session.worktreeName && (
-                      <span
-                        className="px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground"
-                        title={`Worktree: ${session.worktreeName}`}
-                      >
-                        worktree
-                      </span>
-                    )}
+                    {session.worktreeName &&
+                      session.worktreeName !== session.gitBranch?.replace(/\//g, '-') && (
+                        <span
+                          className="px-1 rounded bg-raised text-fg-muted"
+                          title={`Worktree: ${session.worktreeName}`}
+                        >
+                          {session.worktreeName}
+                        </span>
+                      )}
                     <span className="flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />
+                      <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
                       {session.messageCount}
                     </span>
                     {session.filesModified?.length > 0 && (
                       <span className="flex items-center gap-1">
-                        <FileEdit className="w-3 h-3" />
+                        <FileEdit className="w-3 h-3" strokeWidth={1.5} />
                         {session.filesModified.length}
                       </span>
                     )}
                     {session.durationMs > 0 && (
                       <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
+                        <Clock className="w-3 h-3" strokeWidth={1.5} />
                         {formatDuration(session.durationMs)}
                       </span>
                     )}
                     {session.errorCount > 0 && (
-                      <span className="flex items-center gap-1 text-destructive/70">
-                        <AlertTriangle className="w-3 h-3" />
+                      <span className="flex items-center gap-1 text-danger">
+                        <AlertTriangle className="w-3 h-3" strokeWidth={1.5} />
                         {session.errorCount}
                       </span>
                     )}
@@ -186,8 +200,8 @@ export function ProjectOverview({
       {sessions.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center px-8">
-            <TerminalSquare className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">
+            <TerminalSquare className="w-8 h-8 text-fg-faint mx-auto mb-3" strokeWidth={1.5} />
+            <p className="text-fg-muted text-[13px]">
               No recent sessions found. Start a new chat to get going.
             </p>
           </div>

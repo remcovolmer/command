@@ -1,9 +1,23 @@
 import { useState, useEffect } from 'react'
 import { AlertTriangle, Coins, Info } from 'lucide-react'
+import clsx from 'clsx'
 import { useProjectStore } from '../../stores/projectStore'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import type { AgentType, AuthMode, ClaudeMode } from '../../types'
 import { AGENT_DISPLAY, AGENT_IDS } from '@shared/agents'
+import { Dialog } from '../ui/Dialog'
+import {
+  btnPrimary,
+  btnSecondary,
+  card,
+  input,
+  select,
+  sectionHint,
+  sectionTitle,
+  segment,
+  segmentGroup,
+  segmentInactive,
+} from '../ui/controls'
 
 type ConfirmDialog = { projectId: string; mode: 'auto' | 'full-auto' } | null
 
@@ -118,14 +132,14 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
   ]
 
   const getModeColor = (mode: ClaudeMode, isActive: boolean) => {
-    if (!isActive) return 'bg-muted text-muted-foreground hover:bg-accent'
+    if (!isActive) return segmentInactive
     switch (mode) {
       case 'chat':
-        return 'bg-primary text-primary-foreground'
+        return 'bg-screen text-fg-strong shadow-[0_1px_2px_oklch(0_0_0/.08)]'
       case 'auto':
-        return 'bg-blue-500 text-white'
+        return 'bg-info text-white'
       case 'full-auto':
-        return 'bg-yellow-500 text-black'
+        return 'bg-warning text-fg-strong'
     }
   }
 
@@ -133,19 +147,21 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
     <div className="space-y-6">
       {/* Appearance section */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-1">Appearance</h3>
-        <p className="text-xs text-muted-foreground mb-3">Choose your preferred theme.</p>
-        <div className="rounded-lg border border-border p-4">
-          <div className="flex items-center gap-2">
+        <h3 className={clsx(sectionTitle, 'mb-1')}>Appearance</h3>
+        <p className={clsx(sectionHint, 'mb-3')}>Choose your preferred theme.</p>
+        <div className={clsx(card, 'p-4')}>
+          <div className={segmentGroup}>
             {(['light', 'dark', 'system'] as const).map((option) => (
               <button
                 key={option}
                 onClick={() => setTheme(option)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
+                className={clsx(
+                  segment,
+                  'capitalize',
                   theme === option
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-accent'
-                }`}
+                    ? 'bg-screen text-fg-strong shadow-[0_1px_2px_oklch(0_0_0/.08)]'
+                    : segmentInactive
+                )}
               >
                 {option}
               </button>
@@ -156,15 +172,13 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
       {/* Usage indicator section */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-1">Usage Indicator</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Show Claude plan usage in the sidebar footer.
-        </p>
-        <div className="rounded-lg border border-border p-4">
+        <h3 className={clsx(sectionTitle, 'mb-1')}>Usage Indicator</h3>
+        <p className={clsx(sectionHint, 'mb-3')}>Show Claude plan usage in the sidebar footer.</p>
+        <div className={clsx(card, 'p-4')}>
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
-              <span className="text-sm font-medium text-foreground">Show usage indicator</span>
-              <p className="text-xs text-muted-foreground mt-1">
+              <span className="text-[13px] font-medium text-fg-strong">Show usage indicator</span>
+              <p className={clsx(sectionHint, 'mt-1')}>
                 5-hour window with reset time; weekly limits and extra usage on hover. Hidden
                 automatically when no Claude Code credentials are found.
               </p>
@@ -173,14 +187,16 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
               role="switch"
               aria-checked={showUsageIndicator}
               onClick={toggleUsageIndicator}
-              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                showUsageIndicator ? 'bg-primary' : 'bg-muted'
-              }`}
+              className={clsx(
+                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+                showUsageIndicator ? 'bg-primary' : 'bg-border-strong'
+              )}
             >
               <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                className={clsx(
+                  'inline-block h-3.5 w-3.5 transform rounded-full bg-screen transition-transform',
                   showUsageIndicator ? 'translate-x-[18px]' : 'translate-x-1'
-                }`}
+                )}
               />
             </button>
           </div>
@@ -189,16 +205,19 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
       {/* Performance section */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-1">Performance</h3>
-        <p className="text-xs text-muted-foreground mb-3">Tune memory usage and performance.</p>
+        <h3 className={clsx(sectionTitle, 'mb-1')}>Performance</h3>
+        <p className={clsx(sectionHint, 'mb-3')}>Tune memory usage and performance.</p>
 
-        <div className="rounded-lg border border-border p-4">
+        <div className={clsx(card, 'p-4')}>
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
-              <label className="text-sm font-medium text-foreground" htmlFor="terminal-pool-size">
+              <label
+                className="text-[13px] font-medium text-fg-strong"
+                htmlFor="terminal-pool-size"
+              >
                 Active Terminal Limit
               </label>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className={clsx(sectionHint, 'mt-1')}>
                 Maximum xterm instances kept in memory. Inactive terminals beyond this limit are
                 serialized and restored on demand.
               </p>
@@ -213,7 +232,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 const val = parseInt(e.target.value, 10)
                 if (!isNaN(val)) setTerminalPoolSize(val)
               }}
-              className="w-16 px-2 py-1 text-sm text-center rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              className={clsx(input, 'w-16 text-center')}
             />
           </div>
         </div>
@@ -221,21 +240,19 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
       {/* Diagnostics section */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-1">Diagnostics</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Troubleshooting information for bug reports.
-        </p>
-        <div className="rounded-lg border border-border p-4">
+        <h3 className={clsx(sectionTitle, 'mb-1')}>Diagnostics</h3>
+        <p className={clsx(sectionHint, 'mb-3')}>Troubleshooting information for bug reports.</p>
+        <div className={clsx(card, 'p-4')}>
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
-              <span className="text-sm font-medium text-foreground">Log file</span>
-              <p className="text-xs text-muted-foreground mt-1">
+              <span className="text-[13px] font-medium text-fg-strong">Log file</span>
+              <p className={clsx(sectionHint, 'mt-1')}>
                 Rotating main-process log in the app data folder. Attach it when reporting an issue.
               </p>
             </div>
             <button
               onClick={() => void window.electronAPI?.app?.openLogFile?.()}
-              className="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted text-muted-foreground hover:bg-accent transition-colors shrink-0"
+              className={clsx(btnSecondary, 'shrink-0 h-7')}
             >
               Open log file
             </button>
@@ -245,10 +262,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
       {/* Project settings section */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-1">Project Settings</h3>
-        <p className="text-xs text-muted-foreground">
-          Configure settings per project. Changes apply to new chats only.
-        </p>
+        <h3 className={clsx(sectionTitle, 'mb-1')}>Project Settings</h3>
+        <p className={sectionHint}>Configure settings per project. Changes apply to new chats only.</p>
       </div>
 
       <div className="space-y-3">
@@ -260,16 +275,18 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
           const hasVertexConfig = projectVertexConfigs[project.id] ?? false
 
           return (
-            <div key={project.id} className="rounded-lg border border-border p-4">
+            <div key={project.id} className={clsx(card, 'p-4')}>
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-foreground truncate">{project.name}</h4>
-                  <p className="text-xs text-muted-foreground truncate">{project.path}</p>
+                  <h4 className="text-[13px] font-medium text-fg-strong truncate">
+                    {project.name}
+                  </h4>
+                  <p className="font-mono text-[11px] text-fg-muted truncate">{project.path}</p>
                 </div>
                 {/* Vertex AI indicator */}
                 {hasVertexConfig && (
                   <span
-                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-500/10 text-blue-500 shrink-0"
+                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-info/10 text-info shrink-0"
                     title="Vertex AI configured via .claude/settings.local.json"
                   >
                     <Coins className="w-3 h-3" />
@@ -280,8 +297,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
               {/* Default Agent selector */}
               <div className="mt-3">
-                <label className="text-sm font-medium text-foreground">Default Agent</label>
-                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                <label className="text-[13px] font-medium text-fg-strong">Default Agent</label>
+                <p className={clsx(sectionHint, 'mt-1 mb-2')}>
                   Which coding agent new chats use. Override per chat when creating one.
                 </p>
                 <select
@@ -289,7 +306,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                   onChange={(e) =>
                     handleDefaultAgentChange(project.id, project, e.target.value as AgentType)
                   }
-                  className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={clsx(select, 'h-7 text-xs')}
                 >
                   {AGENT_IDS.map((id) => (
                     <option key={id} value={id}>
@@ -301,8 +318,8 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
 
               {/* Agent Mode selector (provider-specific behavior) */}
               <div className="mt-3">
-                <label className="text-sm font-medium text-foreground">Agent Mode</label>
-                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                <label className="text-[13px] font-medium text-fg-strong">Agent Mode</label>
+                <p className={clsx(sectionHint, 'mt-1 mb-2')}>
                   {currentMode === 'chat' &&
                     'Normal mode — Claude and Codex use their default approval behavior.'}
                   {currentMode === 'auto' &&
@@ -310,15 +327,12 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                   {currentMode === 'full-auto' &&
                     'Full auto — Claude skips permission prompts; Codex runs without approvals or its internal sandbox.'}
                 </p>
-                <div className="flex items-center gap-1">
+                <div className={segmentGroup}>
                   {modeOptions.map((option) => (
                     <button
                       key={option.value}
                       onClick={() => handleModeChange(project.id, option.value)}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${getModeColor(
-                        option.value,
-                        currentMode === option.value
-                      )}`}
+                      className={clsx(segment, getModeColor(option.value, currentMode === option.value))}
                     >
                       {option.label}
                     </button>
@@ -327,9 +341,9 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
               </div>
 
               {/* Auth Mode */}
-              <div className="mt-3 pt-3 border-t border-border/30">
-                <label className="text-sm font-medium text-foreground">Auth Mode</label>
-                <p className="text-xs text-muted-foreground mt-1 mb-2">
+              <div className="mt-3 pt-3 border-t border-border">
+                <label className="text-[13px] font-medium text-fg-strong">Auth Mode</label>
+                <p className={clsx(sectionHint, 'mt-1 mb-2')}>
                   Choose how Claude Code authenticates for this project.
                 </p>
                 <div className="flex items-center gap-3">
@@ -338,7 +352,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                     onChange={(e) =>
                       handleAuthModeChange(project.id, project, e.target.value as AuthMode)
                     }
-                    className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={clsx(select, 'h-7 text-xs')}
                   >
                     <option value="subscription">Subscription (default)</option>
                     <option value="profile">Profile (env injection)</option>
@@ -348,7 +362,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                     <select
                       value={profileId ?? ''}
                       onChange={(e) => handleProfileSelect(project.id, project, e.target.value)}
-                      className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      className={clsx(select, 'h-7 text-xs')}
                     >
                       <option value="">Select profile...</option>
                       {profiles
@@ -368,75 +382,58 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
       </div>
 
       {/* Confirmation dialog for Auto and Full Auto modes */}
-      {confirmDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDialog(null)} />
-          <div className="relative bg-background rounded-lg border border-border p-6 max-w-md shadow-xl">
-            <div className="flex items-start gap-3">
-              {confirmDialog.mode === 'full-auto' ? (
-                <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
-              ) : (
-                <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+      <Dialog
+        open={hasConfirmDialog}
+        onClose={() => setConfirmDialog(null)}
+        title={confirmDialog?.mode === 'full-auto' ? 'Enable Full Auto Mode?' : 'Enable Auto Mode?'}
+        icon={confirmDialog?.mode === 'full-auto' ? AlertTriangle : Info}
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setConfirmDialog(null)} className={btnSecondary}>
+              Cancel
+            </button>
+            <button
+              onClick={confirmMode}
+              className={clsx(
+                btnPrimary,
+                confirmDialog?.mode === 'full-auto'
+                  ? '!bg-warning !text-fg-strong hover:!bg-warning/90'
+                  : '!bg-info !text-white hover:!bg-info/90'
               )}
-              <div>
-                {confirmDialog.mode === 'full-auto' ? (
-                  <>
-                    <h3 className="text-sm font-semibold text-foreground">
-                      Enable Full Auto Mode?
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This runs Claude Code with{' '}
-                      <code className="text-[11px] px-1 py-0.5 bg-muted rounded">
-                        --dangerously-skip-permissions
-                      </code>{' '}
-                      and Codex with{' '}
-                      <code className="text-[11px] px-1 py-0.5 bg-muted rounded">
-                        --dangerously-bypass-approvals-and-sandbox
-                      </code>
-                      . Claude skips permission prompts; Codex bypasses approvals and its internal
-                      sandbox.
-                    </p>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                      Only enable this in an externally sandboxed environment.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-sm font-semibold text-foreground">Enable Auto Mode?</h3>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This will run Claude Code with{' '}
-                      <code className="text-[11px] px-1 py-0.5 bg-muted rounded">
-                        --enable-auto-mode
-                      </code>
-                      . Claude will auto-accept safe actions (file edits, reads) but still ask
-                      permission for risky operations. Codex keeps its default approval and sandbox
-                      behavior.
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmMode}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  confirmDialog.mode === 'full-auto'
-                    ? 'bg-yellow-500 text-black hover:bg-yellow-400'
-                    : 'bg-blue-500 text-white hover:bg-blue-400'
-                }`}
-              >
-                Enable
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            >
+              Enable
+            </button>
+          </>
+        }
+      >
+        {confirmDialog?.mode === 'full-auto' ? (
+          <>
+            <p className="text-[13px] text-fg-muted">
+              This runs Claude Code with{' '}
+              <code className="text-[11px] px-1 py-0.5 bg-raised rounded">
+                --dangerously-skip-permissions
+              </code>{' '}
+              and Codex with{' '}
+              <code className="text-[11px] px-1 py-0.5 bg-raised rounded">
+                --dangerously-bypass-approvals-and-sandbox
+              </code>
+              . Claude skips permission prompts; Codex bypasses approvals and its internal
+              sandbox.
+            </p>
+            <p className="text-[13px] text-warning mt-2">
+              Only enable this in an externally sandboxed environment.
+            </p>
+          </>
+        ) : (
+          <p className="text-[13px] text-fg-muted">
+            This will run Claude Code with{' '}
+            <code className="text-[11px] px-1 py-0.5 bg-raised rounded">--enable-auto-mode</code>.
+            Claude will auto-accept safe actions (file edits, reads) but still ask permission for
+            risky operations. Codex keeps its default approval and sandbox behavior.
+          </p>
+        )}
+      </Dialog>
     </div>
   )
 }

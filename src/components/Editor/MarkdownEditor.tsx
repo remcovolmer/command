@@ -378,7 +378,7 @@ export function MarkdownEditor({ tabId, filePath, isActive, mode }: MarkdownEdit
           <Editor
             defaultValue={content}
             language="markdown"
-            theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
+            theme={resolvedTheme === 'dark' ? 'command-dark' : 'command-light'}
             onMount={handleRawMount}
             onChange={handleRawChange}
             options={{

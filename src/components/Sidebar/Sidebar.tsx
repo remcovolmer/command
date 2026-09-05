@@ -25,7 +25,6 @@ import { CreateWorktreeDialog } from '../Worktree/CreateWorktreeDialog'
 import { formatBinding, DEFAULT_HOTKEY_CONFIG } from '../../utils/hotkeys'
 import { AddProjectDialog } from '../Project/AddProjectDialog'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
-import { LogoIcon } from '../LogoIcon'
 import { fileWatcherEvents } from '../../utils/fileWatcherEvents'
 import { isHtmlFile } from '../../utils/editorLanguages'
 import { useAutomationUnreadCount } from '../../hooks/useAutomationUnreadCount'
@@ -405,38 +404,33 @@ export function Sidebar() {
 
   return (
     <>
-      <div className="flex flex-col h-full bg-sidebar" data-sidebar>
-        {/* Logo Header */}
-        <div className="flex items-center gap-2 px-4 py-5">
-          <LogoIcon className="w-6 h-6 text-primary" />
-          <h1 className="text-lg font-semibold text-sidebar-foreground">Command</h1>
-          <button
-            onClick={handleAddProject}
-            title="Add project"
-            className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Global Automations entry — above the project list. Opens the overview
-            in the center without changing the active project (R1, R3). */}
-        <div className="px-3 pt-1 pb-1">
+      <div className="flex flex-col h-full bg-canvas" data-sidebar>
+        {/* Toolbar row — replaces the old logo header. Left: the global
+            Automations entry (opens the overview without changing the active
+            project — R1, R3). Right: Add project. */}
+        <div className="h-8 shrink-0 flex items-center gap-1 px-2">
           <button
             onClick={() => setAutomationsOverviewVisible(true)}
-            className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors ${
+            className={`flex-1 h-7 min-w-0 px-2 rounded-md flex items-center gap-2 text-[13px] transition-colors ${
               automationsOverviewVisible
-                ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
-                : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
+                ? 'bg-selected text-fg-strong'
+                : 'text-fg-muted hover:bg-raised hover:text-fg'
             }`}
           >
             <Zap className="w-4 h-4 shrink-0" />
-            <span className="flex-1 text-left font-medium">Automations</span>
+            <span className="flex-1 text-left font-medium truncate">Automations</span>
             {automationUnread > 0 && (
               <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-[18px] text-center">
                 {automationUnread}
               </span>
             )}
+          </button>
+          <button
+            onClick={handleAddProject}
+            title="Add project"
+            className="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-fg-muted hover:bg-raised hover:text-fg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
           </button>
         </div>
 
@@ -488,17 +482,13 @@ export function Sidebar() {
         <div className="px-3 py-2 border-t border-border">
           <UsageIndicator />
           <div className="flex items-center">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-xs text-muted-foreground shrink-0">
-                {appVersion ? `v${appVersion}` : ''}
-              </span>
-              {/* Active profile badge */}
+            <div className="flex items-center gap-2 flex-1 min-w-0 font-mono text-[10.5px] tnum text-fg-muted">
+              <span className="shrink-0">{appVersion ? `v${appVersion}` : ''}</span>
+              {/* Active profile badge — no pill background, just an accent tint when active */}
               <button
                 onClick={() => setSettingsDialogOpen(true, 'accounts')}
-                className={`truncate px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
-                  activeProfileId
-                    ? 'text-primary bg-primary/10 hover:bg-primary/20'
-                    : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted'
+                className={`truncate transition-colors ${
+                  activeProfileId ? 'text-primary hover:text-primary-hover' : 'hover:text-fg'
                 }`}
                 title={
                   activeProfileId
@@ -515,14 +505,14 @@ export function Sidebar() {
               <button
                 onClick={handleCheckForUpdate}
                 disabled={updateStatus === 'checking'}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
                   updateStatus === 'available'
-                    ? 'bg-green-500/20 text-green-500'
+                    ? 'bg-success/20 text-success'
                     : updateStatus === 'up-to-date'
-                      ? 'text-green-500'
+                      ? 'text-success'
                       : updateStatus === 'error'
-                        ? 'text-red-500'
-                        : 'hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground'
+                        ? 'text-danger'
+                        : 'hover:bg-raised text-fg-muted hover:text-fg'
                 } disabled:opacity-50`}
                 title={
                   updateStatus === 'checking'
@@ -548,7 +538,7 @@ export function Sidebar() {
               </button>
               <button
                 onClick={toggleTheme}
-                className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+                className="w-7 h-7 rounded-md flex items-center justify-center transition-colors hover:bg-raised text-fg-muted hover:text-fg"
                 title={`Theme: ${theme} (${formatBinding(hotkeyConfig['ui.toggleTheme'])})`}
               >
                 {theme === 'light' ? (
@@ -561,14 +551,14 @@ export function Sidebar() {
               </button>
               <button
                 onClick={toggleNotchEnabled}
-                className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+                className="w-7 h-7 rounded-md flex items-center justify-center transition-colors hover:bg-raised text-fg-muted hover:text-fg"
                 title={`Notch: ${notchEnabled ? 'aan' : 'uit'} (${formatBinding(hotkeyConfig['ui.toggleNotch'])})`}
               >
                 {notchEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
               </button>
               <button
                 onClick={() => setSettingsDialogOpen(true)}
-                className="p-1.5 rounded-lg transition-colors hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground"
+                className="w-7 h-7 rounded-md flex items-center justify-center transition-colors hover:bg-raised text-fg-muted hover:text-fg"
                 title={`Settings (${formatBinding(hotkeyConfig['ui.openSettings'])})`}
               >
                 <Settings className="w-4 h-4" />

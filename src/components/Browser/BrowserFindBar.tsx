@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { X, ChevronUp, ChevronDown } from 'lucide-react'
+import { btnIcon } from '../ui/controls'
 
 interface BrowserFindBarProps {
   value: string
@@ -11,8 +12,7 @@ interface BrowserFindBarProps {
   onClose: () => void
 }
 
-const iconBtn =
-  'p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40'
+const iconBtn = `${btnIcon} w-6 h-6`
 
 /**
  * Find-in-page bar that floats over the top-right of the page. Enter /
@@ -34,7 +34,7 @@ export function BrowserFindBar({
   }, [])
 
   return (
-    <div className="absolute top-2 right-3 z-40 flex items-center gap-1 rounded-md border border-border bg-background shadow-lg px-2 py-1">
+    <div className="absolute top-2 right-3 z-40 flex items-center gap-1 rounded-lg border border-border bg-popover shadow-[0_8px_30px_-10px_oklch(0_0_0/.35)] px-2 py-1">
       <input
         ref={inputRef}
         value={value}
@@ -50,19 +50,29 @@ export function BrowserFindBar({
           }
         }}
         placeholder="Zoeken op pagina"
-        className="w-48 px-1 py-0.5 text-xs bg-transparent text-foreground focus:outline-none"
+        className="w-48 px-1 py-0.5 text-[12.5px] bg-transparent text-fg placeholder:text-fg-faint focus:outline-none"
       />
-      <span className="text-xs text-muted-foreground tabular-nums min-w-[46px] text-center">
+      <span className="font-mono text-[11px] text-fg-muted tnum min-w-[46px] text-center">
         {value ? `${activeMatch} / ${totalMatches}` : ''}
       </span>
-      <button onClick={onPrev} disabled={totalMatches === 0} title="Vorige (Shift+Enter)" className={iconBtn}>
-        <ChevronUp className="w-3.5 h-3.5" />
+      <button
+        onClick={onPrev}
+        disabled={totalMatches === 0}
+        title="Vorige (Shift+Enter)"
+        className={iconBtn}
+      >
+        <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} />
       </button>
-      <button onClick={onNext} disabled={totalMatches === 0} title="Volgende (Enter)" className={iconBtn}>
-        <ChevronDown className="w-3.5 h-3.5" />
+      <button
+        onClick={onNext}
+        disabled={totalMatches === 0}
+        title="Volgende (Enter)"
+        className={iconBtn}
+      >
+        <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />
       </button>
       <button onClick={onClose} title="Sluiten (Esc)" className={iconBtn}>
-        <X className="w-3.5 h-3.5" />
+        <X className="w-3.5 h-3.5" strokeWidth={1.5} />
       </button>
     </div>
   )

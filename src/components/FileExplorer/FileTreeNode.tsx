@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronRight, Loader2 } from 'lucide-react'
+import clsx from 'clsx'
 import type { FileSystemEntry } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { getElectronAPI } from '../../utils/electron'
 import { getFileIcon, getFolderIcon } from './fileIcons'
 import { isEditableFile, isHtmlFile } from '../../utils/editorLanguages'
 import { getParentPath } from '../../utils/paths'
+import { input as inputClass } from '../ui/controls'
 
 interface FileTreeNodeProps {
   entry: FileSystemEntry
@@ -222,24 +224,21 @@ export function FileTreeNode({
       <button
         onClick={handleClick}
         onContextMenu={handleRightClick}
-        className={`
-          w-full flex items-center gap-1.5 py-1 px-2 rounded text-left
-          text-sm text-sidebar-foreground
-          hover:bg-sidebar-accent transition-colors
-          cursor-pointer
-        `}
+        className="w-full h-7 flex items-center gap-1.5 px-2 rounded-md text-left text-[12.5px] text-fg hover:bg-raised transition-colors cursor-pointer"
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         {/* Chevron for directories */}
         {isDirectory && (
           <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
             {isLoading ? (
-              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+              <Loader2 className="w-3 h-3 animate-spin text-fg-muted" />
             ) : (
               <ChevronRight
-                className={`w-3 h-3 text-muted-foreground transition-transform duration-150 ${
-                  isExpanded ? 'rotate-90' : ''
-                }`}
+                className={clsx(
+                  'w-3 h-3 text-fg-faint transition-transform duration-150',
+                  isExpanded && 'rotate-90'
+                )}
+                strokeWidth={1.5}
               />
             )}
           </span>
@@ -267,9 +266,9 @@ export function FileTreeNode({
                 if (e.key === 'Escape') cancelRename()
               }}
               onBlur={handleRenameSubmit}
-              className="w-full bg-input border border-border rounded px-1 py-0 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+              className={clsx(inputClass, 'w-full h-6 text-[12px] px-1')}
             />
-            {renameError && <div className="text-xs text-destructive mt-0.5">{renameError}</div>}
+            {renameError && <div className="text-[11px] text-danger mt-0.5">{renameError}</div>}
           </div>
         ) : (
           <span className="truncate">{entry.name}</span>
@@ -310,10 +309,10 @@ export function FileTreeNode({
                     else handleCreateSubmit()
                   }}
                   placeholder={isCreating.type === 'file' ? 'filename' : 'folder name'}
-                  className="w-full bg-input border border-border rounded px-1 py-0 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
+                  className={clsx(inputClass, 'w-full h-6 text-[12px] px-1')}
                 />
                 {createError && (
-                  <div className="text-xs text-destructive mt-0.5">{createError}</div>
+                  <div className="text-[11px] text-danger mt-0.5">{createError}</div>
                 )}
               </div>
             </div>

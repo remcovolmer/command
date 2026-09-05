@@ -88,7 +88,7 @@ const PreviewInner = forwardRef<MarkdownPreviewHandle, PreviewInnerProps>(
     }), [getEditor, loading])
 
     return (
-      <div className="milkdown-wrapper h-full w-full overflow-auto bg-background">
+      <div className="milkdown-wrapper h-full w-full overflow-auto bg-screen">
         <Milkdown />
       </div>
     )

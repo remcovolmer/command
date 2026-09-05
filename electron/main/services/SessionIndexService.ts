@@ -6,6 +6,7 @@ import { homedir } from 'os'
 import { type BrowserWindow } from 'electron'
 import { createLogger } from './Logger'
 import type { SessionIndexEntry } from '../../../shared/ipc-types'
+import { cleanSessionTitle } from '../../../shared/sessionTitle'
 
 export type { SessionIndexEntry }
 
@@ -169,7 +170,9 @@ async function parseSessionJsonl(
               // "[!p]" or "[<a]".
               .replace(/\x1b\[[?<>!]?[\d;]*[a-zA-Z~]|\[<[\d;]+[Mm]/g, '')
               .trim()
-              .slice(0, 200)
+            // Clean before capping: slicing first can cut a closing tag off a
+            // caveat block, after which the markup can no longer be recognised.
+            firstPrompt = cleanSessionTitle(firstPrompt, 200)
             if (!gitBranch) gitBranch = obj.gitBranch || ''
           }
 
@@ -232,7 +235,11 @@ async function parseSessionJsonl(
     const sessionId = filePath.replace(/^.*[\\/]/, '').replace('.jsonl', '')
     return {
       sessionId,
-      summary: compactSummary || firstPrompt,
+      // Strip Claude Code's system markup (caveat blocks, slash-command tags,
+      // compaction preambles) here so every consumer — sidebar summary, notch,
+      // breadcrumb, overview — sees human text. Generous cap: display sites
+      // truncate further themselves.
+      summary: cleanSessionTitle(compactSummary, 400) || firstPrompt,
       firstPrompt,
       messageCount: userMessageCount,
       gitBranch,
@@ -460,8 +467,8 @@ export class SessionIndexService {
     for (const [sessionId, cacheEntry] of Object.entries(this.summaryCache)) {
       const entry = this.cache.get(sessionId)
       if (entry && cacheEntry.title && cacheEntry.summary) {
-        entry.generatedTitle = cacheEntry.title
-        entry.generatedSummary = cacheEntry.summary
+        entry.generatedTitle = cleanSessionTitle(cacheEntry.title, 400)
+        entry.generatedSummary = cleanSessionTitle(cacheEntry.summary, 400)
       }
     }
   }

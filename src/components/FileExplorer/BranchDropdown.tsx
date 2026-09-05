@@ -244,7 +244,7 @@ export function BranchDropdown({
                 {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Create'}
               </button>
             </div>
-            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+            {error && <p className="text-xs text-danger mt-1">{error}</p>}
           </div>
         ) : (
           <button
@@ -319,7 +319,7 @@ export function BranchDropdown({
 
       {/* Error display */}
       {error && !showNewBranch && (
-        <div className="px-3 py-1.5 text-xs text-red-500 border-t border-border/50">{error}</div>
+        <div className="px-3 py-1.5 text-xs text-danger border-t border-border/50">{error}</div>
       )}
 
       {/* Force delete confirmation */}

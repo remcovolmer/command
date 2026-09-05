@@ -9,6 +9,7 @@ import {
   Minus,
   Plus,
 } from 'lucide-react'
+import { btnIcon } from '../ui/controls'
 
 interface BrowserOverflowMenuProps {
   zoomLabel: string
@@ -21,8 +22,7 @@ interface BrowserOverflowMenuProps {
   onCopyUrl: () => void
 }
 
-const iconBtn =
-  'p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40'
+const iconBtn = btnIcon
 
 /**
  * The browser toolbar's "⋯" overflow menu. Houses the new QoL controls (zoom,
@@ -59,35 +59,43 @@ export function BrowserOverflowMenu(props: BrowserOverflowMenuProps) {
   const step = (fn: () => void) => () => fn()
 
   const item =
-    'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-muted/50 text-left'
+    'w-full flex items-center gap-2 h-7 px-3 text-[12.5px] text-fg hover:bg-raised text-left'
 
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
         title="Meer — zoom, zoeken, hard reload, systeembrowser"
-        className={`${iconBtn} ${open ? 'text-primary bg-muted/60' : ''}`}
+        className={`${iconBtn} ${open ? 'text-primary bg-raised' : ''}`}
       >
-        <MoreHorizontal className="w-3.5 h-3.5" />
+        <MoreHorizontal className="w-3.5 h-3.5" strokeWidth={1.5} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[224px] rounded-md border border-border bg-background shadow-lg py-1">
-          <div className="flex items-center justify-between px-3 py-1.5 text-xs text-foreground">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[224px] rounded-lg border border-border bg-popover shadow-[0_8px_30px_-10px_oklch(0_0_0/.35)] py-1">
+          <div className="flex items-center justify-between h-7 px-3 text-[12.5px] text-fg">
             <span className="flex items-center gap-2">
               <ZoomIn className="w-3.5 h-3.5" /> Zoom
             </span>
             <span className="flex items-center gap-1">
-              <button onClick={step(props.onZoomOut)} title="Uitzoomen" className={iconBtn}>
+              <button
+                onClick={step(props.onZoomOut)}
+                title="Uitzoomen"
+                className={`${iconBtn} w-6 h-6`}
+              >
                 <Minus className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={step(props.onZoomReset)}
                 title="Reset naar 100%"
-                className="min-w-[42px] text-center tabular-nums text-muted-foreground hover:text-foreground"
+                className="min-w-[42px] text-center font-mono text-[11px] tnum text-fg-muted hover:text-fg"
               >
                 {props.zoomLabel}
               </button>
-              <button onClick={step(props.onZoomIn)} title="Inzoomen" className={iconBtn}>
+              <button
+                onClick={step(props.onZoomIn)}
+                title="Inzoomen"
+                className={`${iconBtn} w-6 h-6`}
+              >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </span>
@@ -95,11 +103,11 @@ export function BrowserOverflowMenu(props: BrowserOverflowMenuProps) {
           <div className="my-1 h-px bg-border" />
           <button onClick={act(props.onFind)} className={item}>
             <Search className="w-3.5 h-3.5" /> Zoeken op pagina
-            <span className="ml-auto text-muted-foreground">Ctrl+F</span>
+            <span className="ml-auto font-mono text-[10.5px] text-fg-muted">Ctrl+F</span>
           </button>
           <button onClick={act(props.onHardReload)} className={item}>
             <RefreshCw className="w-3.5 h-3.5" /> Hard reload
-            <span className="ml-auto text-muted-foreground">Ctrl+Shift+R</span>
+            <span className="ml-auto font-mono text-[10.5px] text-fg-muted">Ctrl+Shift+R</span>
           </button>
           <div className="my-1 h-px bg-border" />
           <button onClick={act(props.onOpenExternal)} className={item}>

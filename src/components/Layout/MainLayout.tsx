@@ -5,6 +5,8 @@ import { TerminalArea } from './TerminalArea'
 import { FileExplorer } from '../FileExplorer/FileExplorer'
 import { ActivityRail } from './ActivityRail'
 import { ShellDrawer } from './ShellDrawer'
+import { TitleBar } from './TitleBar'
+import { hasCustomTitleBar } from '../../utils/platform'
 import { UpdateNotification } from '../UpdateNotification'
 import { SpawnErrorToast } from '../notifications/SpawnErrorToast'
 import { UncaughtErrorToast } from '../notifications/UncaughtErrorToast'
@@ -43,48 +45,51 @@ export function MainLayout() {
   }, [fileExplorerVisible, setFileExplorerVisible])
 
   return (
-    <div className="h-screen w-screen bg-background flex">
+    <div className="h-screen w-screen flex flex-col bg-canvas">
+      {hasCustomTitleBar() && <TitleBar />}
       <UpdateNotification />
       <SpawnErrorToast />
       <UncaughtErrorToast />
 
-      <div className="flex-1 min-w-0 relative">
-        <PanelGroup direction="horizontal" autoSaveId="main-layout-v2">
-          {/* Sidebar */}
-          <Panel id="sidebar" defaultSize={22} minSize={15} maxSize={35} className="bg-sidebar">
-            <Sidebar />
-          </Panel>
+      <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-w-0 relative">
+          <PanelGroup direction="horizontal" autoSaveId="main-layout-v3">
+            {/* Sidebar */}
+            <Panel id="sidebar" defaultSize={20} minSize={14} maxSize={35} className="bg-canvas">
+              <Sidebar />
+            </Panel>
 
-          <PanelResizeHandle className="w-1 transition-colors" />
+            <PanelResizeHandle className="w-1 transition-colors" />
 
-          {/* Center: chat column + second panel (top) over the shell drawer (bottom) */}
-          <Panel id="center" defaultSize={78} minSize={40}>
-            <div className="h-full flex flex-col">
-              <div className="flex-1 min-h-0">
-                <TerminalArea />
+            {/* Center: chat column + second panel (top) over the shell drawer (bottom) */}
+            <Panel id="center" defaultSize={80} minSize={40}>
+              <div className="h-full flex flex-col">
+                <div className="flex-1 min-h-0">
+                  <TerminalArea />
+                </div>
+                <ShellDrawer />
               </div>
-              <ShellDrawer />
-            </div>
-          </Panel>
-        </PanelGroup>
+            </Panel>
+          </PanelGroup>
 
-        {/* File-explorer flyout — always mounted (preserves git watchers), shown via
-            visibility so xterm/Monaco geometry stays valid (never display:none). */}
-        <div
-          ref={overlayRef}
-          className="absolute top-0 right-0 bottom-0 w-[340px] bg-sidebar border-l border-border shadow-2xl z-40"
-          style={{
-            visibility: fileExplorerVisible ? 'visible' : 'hidden',
-            pointerEvents: fileExplorerVisible ? 'auto' : 'none',
-            transform: fileExplorerVisible ? 'translateX(0)' : 'translateX(12px)',
-            transition: 'transform 120ms ease',
-          }}
-        >
-          <FileExplorer />
+          {/* File-explorer flyout — always mounted (preserves git watchers), shown via
+              visibility so xterm/Monaco geometry stays valid (never display:none). */}
+          <div
+            ref={overlayRef}
+            className="absolute top-0 right-0 bottom-0 w-[340px] bg-canvas border-l border-border shadow-xl z-40"
+            style={{
+              visibility: fileExplorerVisible ? 'visible' : 'hidden',
+              pointerEvents: fileExplorerVisible ? 'auto' : 'none',
+              transform: fileExplorerVisible ? 'translateX(0)' : 'translateX(12px)',
+              transition: 'transform 120ms ease',
+            }}
+          >
+            <FileExplorer />
+          </div>
         </div>
-      </div>
 
-      <ActivityRail />
+        <ActivityRail />
+      </div>
     </div>
   )
 }

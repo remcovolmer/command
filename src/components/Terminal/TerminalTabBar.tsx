@@ -32,7 +32,7 @@ export function TerminalTabBar({
   return (
     <div
       ref={containerRef}
-      className="flex items-center gap-1 px-3 py-1.5 bg-sidebar-accent border-b border-border overflow-x-auto scroll-hidden"
+      className="flex items-end gap-0.5 px-2 h-9 bg-canvas border-b border-border overflow-x-auto scroll-hidden"
     >
       {terminals.map((terminal) => {
         const isActive = terminal.id === activeTerminalId
@@ -43,12 +43,13 @@ export function TerminalTabBar({
             data-tab-id={terminal.id}
             onClick={() => onSelect(terminal.id)}
             className={`
-              group flex items-center gap-1.5 px-2.5 py-1 rounded-lg cursor-pointer
-              transition-colors select-none
+              group relative flex items-center gap-1.5 h-9 px-2.5 text-[12.5px] cursor-pointer
+              select-none transition-colors
+              ${isActive ? 'text-fg-strong' : 'text-fg-muted hover:text-fg'}
               ${
                 isActive
-                  ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50'
+                  ? 'after:absolute after:left-2 after:right-2 after:-bottom-px after:h-0.5 after:rounded-t after:bg-primary'
+                  : ''
               }
             `}
           >
@@ -56,7 +57,7 @@ export function TerminalTabBar({
                 orange=needs input, red=stopped) — it is the status indicator, so
                 no separate dot. */}
             <AgentBadge type={terminal.type} state={terminal.state} />
-            <span className="text-xs font-medium whitespace-nowrap">
+            <span className="font-medium whitespace-nowrap">
               {terminal.generatedTitle || terminal.title}
             </span>
             <button
@@ -64,7 +65,7 @@ export function TerminalTabBar({
                 e.stopPropagation()
                 onClose(terminal.id)
               }}
-              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-border transition-all"
+              className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-raised transition-all"
             >
               <X className="w-3 h-3" />
             </button>
@@ -75,7 +76,7 @@ export function TerminalTabBar({
       {canAdd && (
         <button
           onClick={onAdd}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-muted/50 transition-colors"
+          className="w-7 h-7 mb-1 rounded-md flex items-center justify-center text-fg-faint hover:text-fg hover:bg-raised transition-colors"
           title="New Chat"
         >
           <Plus className="w-4 h-4" />

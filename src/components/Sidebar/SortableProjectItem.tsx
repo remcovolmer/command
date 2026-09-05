@@ -281,12 +281,12 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         {...attributes}
         {...listeners}
         className={`
-          group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing
+          group flex items-center gap-2.5 h-[30px] px-2.5 rounded-md text-[13px] cursor-grab active:cursor-grabbing
           transition-colors duration-150
           ${
             isActive
-              ? 'bg-[var(--sidebar-highlight)] text-sidebar-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-sidebar-foreground'
+              ? 'bg-selected text-fg-strong'
+              : 'text-fg-muted hover:bg-raised hover:text-fg'
           }
         `}
       >
@@ -364,7 +364,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
             }`}
           >
             {collapsedCount && (
-              <span className="text-[11px] tabular-nums text-muted-foreground bg-muted rounded-full px-1.5 py-px">
+              <span className="font-mono text-[10.5px] tnum text-fg-muted bg-raised rounded px-1.5 py-px">
                 {collapsedCount}
               </span>
             )}
@@ -380,7 +380,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         {/* Indicators */}
         {hasVertexConfig && (
           <span title="Vertex AI configured via .claude/settings.local.json">
-            <Coins className="w-3 h-3 shrink-0 text-blue-400" />
+            <Coins className="w-3 h-3 shrink-0 text-info" />
           </span>
         )}
         {hasMismatch && (
@@ -391,7 +391,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                 : 'Selected profile is missing or has no environment variables'
             }
           >
-            <AlertTriangle className="w-3 h-3 shrink-0 text-yellow-500" />
+            <AlertTriangle className="w-3 h-3 shrink-0 text-warning" />
           </span>
         )}
 
@@ -433,7 +433,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
         <>
           {/* Direct Chats (not in worktree) */}
           {directTerminals.length > 0 && (
-            <ul className="ml-3 mt-1 space-y-0.5 border-l border-border/30">
+            <ul className="ml-3 mt-1 space-y-0.5 border-l border-border">
               {directTerminals.map((terminal) => (
                 <TerminalListItem
                   key={terminal.id}
@@ -463,7 +463,7 @@ export const SortableProjectItem = memo(function SortableProjectItem({
                   <button
                     onClick={() => toggleInactiveWorktrees(project.id)}
                     aria-expanded={showInactiveWorktrees}
-                    className="ml-3 flex items-center gap-1 pl-2 pr-3 py-1 w-full text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    className="ml-3 flex items-center gap-1 pl-2 pr-3 py-1 w-full text-left font-mono text-[10.5px] text-fg-faint hover:text-fg-muted transition-colors"
                   >
                     <ChevronRight
                       aria-hidden="true"

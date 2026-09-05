@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { X, GitBranch, Plus, Loader2 } from 'lucide-react'
+import { GitBranch, Plus, Loader2 } from 'lucide-react'
+import clsx from 'clsx'
 import { getElectronAPI } from '../../utils/electron'
 import { useDialogHotkeys } from '../../hooks/useHotkeys'
 import { useProjectStore } from '../../stores/projectStore'
 import { AGENT_DISPLAY, AGENT_IDS } from '@shared/agents'
 import type { AgentType } from '../../types'
+import { Dialog } from '../ui/Dialog'
+import { btnPrimary, btnSecondary, btnGhost, input, select } from '../ui/controls'
 
 interface CreateWorktreeDialogProps {
   projectId: string
@@ -165,217 +168,185 @@ export function CreateWorktreeDialog({
     return { local, remote }
   }, [localBranches, remoteOnlyBranches, currentBranch])
 
-  if (!isOpen) return null
+  const isCreateDisabled =
+    loading || creating || (!isNewBranch && !selectedBranch) || (isNewBranch && !newBranchName.trim())
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-
-      {/* Dialog */}
-      <div className="relative w-full max-w-md bg-sidebar rounded-xl shadow-2xl border border-border">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-sidebar-accent/30">
-          <div className="flex items-center gap-2">
-            <GitBranch className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">New Worktree</h2>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      title="New Worktree"
+      icon={GitBranch}
+      size="sm"
+      footer={
+        <>
+          <button onClick={onClose} disabled={creating} className={btnSecondary}>
+            Cancel
           </button>
-        </div>
-
-        {/* Content */}
-        <div className="px-5 py-4 space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <button onClick={handleCreate} disabled={isCreateDisabled} className={btnPrimary}>
+            {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+            Create Worktree
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <>
+            {/* Branch Selection Mode */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsNewBranch(false)}
+                className={clsx(
+                  'flex-1',
+                  !isNewBranch ? btnPrimary : btnGhost,
+                  'justify-center'
+                )}
+              >
+                Existing Branch
+              </button>
+              <button
+                onClick={() => setIsNewBranch(true)}
+                className={clsx('flex-1', isNewBranch ? btnPrimary : btnGhost, 'justify-center')}
+              >
+                <Plus className="w-4 h-4" />
+                New Branch
+              </button>
             </div>
-          ) : (
-            <>
-              {/* Branch Selection Mode */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsNewBranch(false)}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    !isNewBranch
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Existing Branch
-                </button>
-                <button
-                  onClick={() => setIsNewBranch(true)}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isNewBranch
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Plus className="w-4 h-4 inline mr-1" />
-                  New Branch
-                </button>
-              </div>
 
-              {/* Existing Branch Selection */}
-              {!isNewBranch && (
+            {/* Existing Branch Selection */}
+            {!isNewBranch && (
+              <div>
+                <label className="block text-[13px] font-medium text-fg mb-2">
+                  Select Branch
+                </label>
+                <select
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  className={clsx(select, 'w-full')}
+                >
+                  <option value="">Select a branch...</option>
+                  {availableBranches.local.length > 0 && (
+                    <optgroup label="Local Branches">
+                      {availableBranches.local.map((branch) => (
+                        <option key={branch} value={branch}>
+                          {branch}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {availableBranches.remote.length > 0 && (
+                    <optgroup label="Remote Branches">
+                      {availableBranches.remote.map((branch) => (
+                        <option key={branch} value={branch}>
+                          {branch}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                {availableBranches.local.length === 0 && availableBranches.remote.length === 0 && (
+                  <p className="mt-2 text-[12.5px] text-fg-muted">
+                    No available branches. Create a new branch instead.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* New Branch Input */}
+            {isNewBranch && (
+              <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Select Branch
+                  <label className="block text-[13px] font-medium text-fg mb-2">
+                    Branch Name
                   </label>
+                  <input
+                    type="text"
+                    value={newBranchName}
+                    onChange={(e) => setNewBranchName(e.target.value)}
+                    placeholder="feature/my-feature"
+                    className={clsx(input, 'w-full')}
+                    autoFocus
+                  />
+                </div>
+
+                {/* Source Branch Selection */}
+                <div>
+                  <label className="block text-[13px] font-medium text-fg mb-2">Based on</label>
                   <select
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={sourceBranch}
+                    onChange={(e) => setSourceBranch(e.target.value)}
+                    className={clsx(select, 'w-full')}
                   >
-                    <option value="">Select a branch...</option>
-                    {availableBranches.local.length > 0 && (
-                      <optgroup label="Local Branches">
-                        {availableBranches.local.map((branch) => (
-                          <option key={branch} value={branch}>
-                            {branch}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {availableBranches.remote.length > 0 && (
-                      <optgroup label="Remote Branches">
-                        {availableBranches.remote.map((branch) => (
-                          <option key={branch} value={branch}>
-                            {branch}
+                    {localBranches.map((branch) => (
+                      <option key={branch} value={branch}>
+                        {branch}
+                      </option>
+                    ))}
+                    {remoteOnlyBranches.length > 0 && (
+                      <optgroup label="Remote">
+                        {remoteOnlyBranches.map((branch) => (
+                          <option key={branch} value={`origin/${branch}`}>
+                            origin/{branch}
                           </option>
                         ))}
                       </optgroup>
                     )}
                   </select>
-                  {availableBranches.local.length === 0 &&
-                    availableBranches.remote.length === 0 && (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        No available branches. Create a new branch instead.
-                      </p>
-                    )}
                 </div>
-              )}
+              </>
+            )}
 
-              {/* New Branch Input */}
-              {isNewBranch && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Branch Name
-                    </label>
-                    <input
-                      type="text"
-                      value={newBranchName}
-                      onChange={(e) => setNewBranchName(e.target.value)}
-                      placeholder="feature/my-feature"
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      autoFocus
-                    />
-                  </div>
+            {/* Agent for the worktree's chat */}
+            <div>
+              <label className="block text-[13px] font-medium text-fg mb-2">Agent</label>
+              <select
+                value={agent}
+                onChange={(e) => setAgent(e.target.value as AgentType)}
+                className={clsx(select, 'w-full')}
+              >
+                {AGENT_IDS.map((id) => (
+                  <option key={id} value={id}>
+                    {AGENT_DISPLAY[id].label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                  {/* Source Branch Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Based on
-                    </label>
-                    <select
-                      value={sourceBranch}
-                      onChange={(e) => setSourceBranch(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      {localBranches.map((branch) => (
-                        <option key={branch} value={branch}>
-                          {branch}
-                        </option>
-                      ))}
-                      {remoteOnlyBranches.length > 0 && (
-                        <optgroup label="Remote">
-                          {remoteOnlyBranches.map((branch) => (
-                            <option key={branch} value={`origin/${branch}`}>
-                              origin/{branch}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                  </div>
-                </>
-              )}
+            {/* Custom Name (Optional) */}
+            <div>
+              <label className="block text-[13px] font-medium text-fg mb-2">
+                Worktree Name <span className="text-fg-muted font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder={
+                  isNewBranch
+                    ? newBranchName.replace(/\//g, '-')
+                    : selectedBranch.replace(/\//g, '-')
+                }
+                className={clsx(input, 'w-full')}
+              />
+              <p className="mt-1.5 text-[12px] text-fg-muted">
+                Defaults to branch name with / replaced by -
+              </p>
+            </div>
 
-              {/* Agent for the worktree's chat */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Agent</label>
-                <select
-                  value={agent}
-                  onChange={(e) => setAgent(e.target.value as AgentType)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {AGENT_IDS.map((id) => (
-                    <option key={id} value={id}>
-                      {AGENT_DISPLAY[id].label}
-                    </option>
-                  ))}
-                </select>
+            {/* Error Message */}
+            {error && (
+              <div className="px-3 py-2 rounded-md bg-danger/10 border border-danger/20">
+                <p className="text-[12.5px] text-danger">{error}</p>
               </div>
-
-              {/* Custom Name (Optional) */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Worktree Name{' '}
-                  <span className="text-muted-foreground font-normal">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder={
-                    isNewBranch
-                      ? newBranchName.replace(/\//g, '-')
-                      : selectedBranch.replace(/\//g, '-')
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Defaults to branch name with / replaced by -
-                </p>
-              </div>
-
-              {/* Error Message */}
-              {error && (
-                <div className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm text-destructive">{error}</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-border/30">
-          <button
-            onClick={onClose}
-            disabled={creating}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={
-              loading ||
-              creating ||
-              (!isNewBranch && !selectedBranch) ||
-              (isNewBranch && !newBranchName.trim())
-            }
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-            Create Worktree
-          </button>
-        </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </Dialog>
   )
 }

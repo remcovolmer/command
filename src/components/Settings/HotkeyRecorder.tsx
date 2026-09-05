@@ -3,6 +3,7 @@ import { X, Check, Delete } from 'lucide-react'
 import type { HotkeyBinding, ModifierKey } from '../../types/hotkeys'
 import { formatBinding, parseKeyEvent } from '../../utils/hotkeys'
 import { setHotkeyRecordingActive } from '../../hooks/useHotkeys'
+import { btnGhost, btnPrimary } from '../ui/controls'
 
 interface HotkeyRecorderProps {
   currentBinding: HotkeyBinding
@@ -87,57 +88,48 @@ export function HotkeyRecorder({ currentBinding, onComplete, onCancel }: HotkeyR
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <div className="absolute inset-0 bg-scrim backdrop-blur-[2px]" onClick={onCancel} />
 
       {/* Dialog */}
-      <div className="relative bg-background rounded-lg shadow-xl border border-border p-6 min-w-[400px]">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Record Keyboard Shortcut</h3>
+      <div className="relative bg-popover rounded-xl shadow-[0_1px_2px_oklch(0_0_0/.06),0_12px_40px_-12px_oklch(0_0_0/.35)] border border-border p-6 min-w-[400px] dialog-in">
+        <h3 className="text-[15px] font-semibold text-fg-strong mb-4">
+          Record Keyboard Shortcut
+        </h3>
 
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="text-[13px] text-fg-muted mb-6">
           Press the key combination you want to use for this action.
         </p>
 
         {/* Key Display */}
-        <div className="flex items-center justify-center py-8 px-4 rounded-lg bg-muted border-2 border-dashed border-border mb-6">
+        <div className="flex items-center justify-center py-8 px-4 rounded-lg bg-raised border-2 border-dashed border-border mb-6">
           {displayBinding ? (
-            <span className="text-2xl font-mono text-foreground">
+            <span className="text-2xl font-mono text-fg-strong">
               {formatBinding(displayBinding)}
             </span>
           ) : (
-            <span className="text-lg text-muted-foreground">Press a key combination...</span>
+            <span className="text-lg text-fg-muted">Press a key combination...</span>
           )}
         </div>
 
         {/* Current Binding Info */}
-        <p className="text-xs text-muted-foreground mb-4">
+        <p className="text-[12px] text-fg-muted mb-4">
           Current: <span className="font-mono">{formatBinding(currentBinding)}</span>
         </p>
 
         {/* Actions */}
         <div className="flex items-center justify-between">
-          <button
-            onClick={handleClear}
-            disabled={!recordedBinding}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Delete className="w-4 h-4" />
+          <button onClick={handleClear} disabled={!recordedBinding} className={btnGhost}>
+            <Delete className="w-3.5 h-3.5" />
             Clear
           </button>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={onCancel}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
+            <button onClick={onCancel} className={btnGhost}>
+              <X className="w-3.5 h-3.5" />
               Cancel
             </button>
-            <button
-              onClick={handleSave}
-              disabled={!recordedBinding}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Check className="w-4 h-4" />
+            <button onClick={handleSave} disabled={!recordedBinding} className={btnPrimary}>
+              <Check className="w-3.5 h-3.5" />
               Save
             </button>
           </div>

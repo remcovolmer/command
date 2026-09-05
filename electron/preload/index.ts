@@ -83,12 +83,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     resize: (width: number, height: number): void =>
       ipcRenderer.send('notch:resize', width, height),
     onState: (callback: (payload: NotchPayload) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: NotchPayload) => callback(payload)
+      const handler = (_event: Electron.IpcRendererEvent, payload: NotchPayload) =>
+        callback(payload)
       ipcRenderer.on('notch:state', handler)
       return () => ipcRenderer.removeListener('notch:state', handler)
     },
     onActivateTerminal: (callback: (terminalId: string) => void): Unsubscribe => {
-      const handler = (_event: Electron.IpcRendererEvent, terminalId: string) => callback(terminalId)
+      const handler = (_event: Electron.IpcRendererEvent, terminalId: string) =>
+        callback(terminalId)
       ipcRenderer.on('notch:activate-terminal', handler)
       return () => ipcRenderer.removeListener('notch:activate-terminal', handler)
     },
@@ -398,6 +400,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),
+
+    setTitleBarOverlay: (
+      theme: 'light' | 'dark',
+      colors?: { color: string; symbolColor: string }
+    ): Promise<void> => ipcRenderer.invoke('app:set-titlebar-overlay', theme, colors),
 
     onUncaughtError: (callback: (event: UncaughtErrorEvent) => void): Unsubscribe => {
       const handler = (_event: Electron.IpcRendererEvent, payload: UncaughtErrorEvent) =>
