@@ -364,17 +364,6 @@ body {
   animation: automation-spawn-flash 1.8s ease-out 1;
 }
 
-/* State line sweep (busy) — a light streak sliding across the 2px line under
-   the chat tab bar. Compositor-friendly: only background-position animates. */
-@keyframes state-line-sweep {
-  0% {
-    background-position: -40% 0;
-  }
-  100% {
-    background-position: 140% 0;
-  }
-}
-
 /* Dialog enter transition — opacity + scale, one-shot. */
 @keyframes dialog-in {
   0% {

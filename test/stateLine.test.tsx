@@ -30,12 +30,12 @@ describe('stateLineClass', () => {
 })
 
 describe('StateLine', () => {
-  test('busy renders the gradient sweep as inline style, not a background class', () => {
+  test('busy renders a static faint line: no animation, no status class', () => {
     const { container } = render(<StateLine state="busy" />)
     const el = container.firstElementChild as HTMLElement
     expect(el.className).not.toContain('bg-status')
-    expect(el.style.animation).toContain('state-line-sweep')
-    expect(el.style.background).toContain('linear-gradient')
+    expect(el.style.animation).toBe('')
+    expect(el.style.background).toContain('status-busy')
   })
 
   test('permission renders the attention-pulse class with no inline animation', () => {

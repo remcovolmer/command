@@ -116,7 +116,7 @@
   .tab.on::after{content:'';position:absolute;left:8px;right:8px;bottom:-1px;height:2px;background:var(--primary);border-radius:2px 2px 0 0}
   .tab .dot{width:9px;height:9px;border-radius:50%}
   .tab.plus{color:var(--fg-faint);font-size:16px;padding:0 8px}
-  .stateline{height:2px;background:linear-gradient(90deg,transparent 0%,color-mix(in oklch,var(--busy) 55%,transparent) 50%,transparent 100%);background-size:40% 100%;animation:sweep 2.4s linear infinite}
+  .stateline{height:2px;background:color-mix(in oklch,var(--busy) 35%,transparent)}
   .stateline.att{background:var(--attention);animation:pulse 1s ease-in-out infinite}
   .stateline.done{background:var(--done);animation:none}
   .term{flex:1;background:var(--screen);padding:14px 16px;font:12px/1.5 var(--mono);color:var(--fg);white-space:pre;overflow:hidden}
@@ -125,7 +125,6 @@
   .rail i{width:26px;height:26px;border-radius:6px;border:1.5px solid var(--fg-faint);opacity:.7}
   .rail i.on{background:var(--selected);border-color:var(--fg-muted);opacity:1}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-  @keyframes sweep{0%{background-position:-40% 0}100%{background-position:140% 0}}
   @media (prefers-reduced-motion: reduce){.stateline,.sb .row.att::before{animation:none}}
 
   .specimen{background:var(--screen);border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:24px}
@@ -254,7 +253,7 @@
   <p>Elke chat heeft al een status (bezig, klaar, wacht, gestopt) die in de sidebar en tabbalk als tint op het agentlogo zit. Maar op het ding waar je naar kijkt — de terminal zelf — staat niets. De state line is een 2px lijn tussen tabbalk en scherm die die status draagt. Je hoeft je blik niet te verplaatsen om te weten of je nu iets moet doen.</p>
   <table>
     <tr><th>Status</th><th>Lijn</th><th>Beweging</th><th>Waarom</th></tr>
-    <tr><td>bezig</td><td>grijs (<code>--status-busy</code>) op 55%</td><td>lichtvlek die van links naar rechts loopt, 2,4s lineair</td><td>Indeterminate progress: het systeem werkt, jij niet</td></tr>
+    <tr><td>bezig</td><td>grijs (<code>--status-busy</code>) op 35%</td><td>geen (was een lopende lichtvlek; geschrapt omdat elke nieuwe chat in <code>bezig</code> start en de beweging afleidde)</td><td>Het systeem werkt, jij niet — stil genoeg om te negeren</td></tr>
     <tr><td>wacht (permission/question)</td><td>amber vol</td><td>bestaande <code>attention-pulse</code> (opacity 1 → 0.55, 1s)</td><td>Zelfde puls als de sidebar-rail: één taal voor "kijk hier"</td></tr>
     <tr><td>klaar</td><td>groen vol</td><td>geen</td><td>Rust: klaar hoeft niet te knipperen</td></tr>
     <tr><td>gestopt</td><td>rood vol</td><td>geen</td><td>Fout is statisch, niet dwingend</td></tr>

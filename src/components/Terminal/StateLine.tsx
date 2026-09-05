@@ -2,15 +2,12 @@ import type { CSSProperties } from 'react'
 import type { TerminalState } from '../../types'
 import { STATE_DOT_COLORS, isAttentionState } from '../../utils/terminalState'
 
-// Busy needs a gradient sweep (background + background-size + animation) that
-// isn't expressible as a static Tailwind utility, so it's applied as inline
-// style rather than through stateLineClass. Only opacity/background-position
-// animate (compositor-friendly, same discipline as .attention-pulse).
+// Busy is deliberately static: a new chat sits in `busy` until the first hook
+// event, and a moving streak on every fresh chat pulled the eye away from the
+// terminal. A faint line still says "working"; motion is reserved for the
+// attention states, where it earns its cost.
 const BUSY_STYLE: CSSProperties = {
-  background:
-    'linear-gradient(90deg, transparent, color-mix(in oklch, var(--status-busy) 55%, transparent), transparent)',
-  backgroundSize: '40% 100%',
-  animation: 'state-line-sweep 2.4s linear infinite',
+  background: 'color-mix(in oklch, var(--status-busy) 35%, transparent)',
 }
 
 /**
