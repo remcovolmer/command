@@ -69,9 +69,9 @@ export type TerminalState =
 // Coding agents Command can drive as a chat session. Each is a CLI wrapped in a
 // PTY. Display metadata lives in shared/agents.ts; spawn spec (binary, resume,
 // mode flags, hook capability) in electron/main/services/agents.ts.
-export type AgentType = 'claude' | 'codex' | 'pi'
+export type AgentType = 'claude' | 'codex' | 'pi' | 'opencode'
 
-// Terminal type: an agent chat ('claude' | 'codex' | 'pi') or a plain shell ('normal').
+// Terminal type: an agent chat ('claude' | 'codex' | 'pi' | 'opencode') or a plain shell ('normal').
 export type TerminalType = AgentType | 'normal'
 
 // Unsubscribe function type for IPC listeners
@@ -84,7 +84,7 @@ export interface TerminalSession {
   state: TerminalState
   lastActivity: number
   title: string
-  type: TerminalType // agent chat ('claude' | 'codex' | 'pi') or 'normal' shell
+  type: TerminalType // agent chat ('claude' | 'codex' | 'pi' | 'opencode') or 'normal' shell
   summary?: string // Session summary from Claude Code's sessions-index.json
   generatedTitle?: string // LLM-generated title from Ollama via session-summary-hook
   origin?: 'automation' // set when spawned by an automation launch (drives the spawn cue)

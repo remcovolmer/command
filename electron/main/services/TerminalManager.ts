@@ -8,7 +8,7 @@ import { type ClaudeHookWatcher } from './ClaudeHookWatcher'
 import { SpawnError } from './errors'
 import type { ClaudeMode, TerminalState, TerminalType } from '../../../src/types'
 import { isAgentType } from '../../../shared/agents'
-import { buildAgentCommand, isHookCapableAgent } from './agents'
+import { buildAgentCommand, buildPromptArg, isHookCapableAgent } from './agents'
 import { createLogger } from './Logger'
 import { deriveShellSpec, quotePromptForShell } from '../utils/shell'
 
@@ -27,8 +27,9 @@ export interface CreateTerminalOptions {
   worktreeId?: string
   resumeSessionId?: string
   claudeMode?: ClaudeMode
-  /** When set, start the interactive Claude session with this prompt as its
-   *  positional argument (foreground automation launch). */
+  /** When set, start the interactive agent session with this prompt already
+   *  submitted (foreground automation launch). Passed positionally or via the
+   *  agent's prompt flag — see buildPromptArg. */
   initialPrompt?: string
   envOverrides?: Record<string, string>
 }
@@ -235,8 +236,8 @@ export class TerminalManager {
       killedDeliberately: false,
     }
 
-    // Register with hook watcher for state detection (hook-capable agents only:
-    // claude, codex). Hookless agents (pi) get state from output heuristics.
+    // Register with hook watcher for state detection (hook-capable agents only).
+    // Hookless agents (pi) get state from output heuristics.
     if (isHookCapableAgent(type) && this.hookWatcher) {
       this.hookWatcher.registerTerminal(id, cwd)
     }
@@ -320,14 +321,12 @@ export class TerminalManager {
         resumeSessionId,
         claudeMode: options.claudeMode,
       })
-      // Foreground automation launch: pass the prompt as the agent's positional
-      // argument so the interactive session starts with it already submitted.
-      // The `--` end-of-options separator is required: without it a prompt that
-      // starts with a dash (e.g. "--dangerously-skip-permissions", "--mcp-config=…")
-      // would be parsed as a FLAG, bypassing the project's permission mode. `--`
-      // forces everything after it to be positional.
+      // Foreground automation launch: start the interactive session with the
+      // prompt already submitted. Most agents take the prompt as a positional
+      // (guarded by `--`, see buildPromptArg); agents with a dedicated prompt
+      // flag (opencode `--prompt`) use their spec instead.
       const promptArg = options.initialPrompt
-        ? ' -- ' + quotePromptForShell(options.initialPrompt, shell)
+        ? buildPromptArg(type, quotePromptForShell(options.initialPrompt, shell))
         : ''
       const startCommand = `${command}${promptArg}\r`
       // Route through writePtySafe (chunked, backpressure-aware) rather than a

@@ -24,6 +24,14 @@ export interface AgentSpawnSpec {
   /** Provider-specific permission/mode flags derived from the shared project mode. */
   buildModeArgs(mode?: ClaudeMode): string[]
   /**
+   * Args that submit an initial prompt to the interactive chat, given the
+   * shell-quoted prompt (see quotePromptForShell — never interpolate raw
+   * user text). Empty array = this agent takes the prompt as a positional
+   * after the `--` end-of-options separator (claude/codex/pi). opencode's
+   * positional is a project PATH, so it needs its `--prompt` flag instead.
+   */
+  buildPromptArgs(quotedPrompt: string): string[]
+  /**
    * True when the agent reports lifecycle state via a hook that writes into the
    * shared state file (~/.claude/command-center-state.json). Drives whether a
    * terminal registers with the state watcher (see TerminalManager). Agents
@@ -41,6 +49,7 @@ export const AGENT_SPAWN: Record<AgentType, AgentSpawnSpec> = {
       if (mode === 'full-auto') return ['--dangerously-skip-permissions']
       return []
     },
+    buildPromptArgs: () => [],
     hasHook: true,
   },
   codex: {
@@ -50,6 +59,7 @@ export const AGENT_SPAWN: Record<AgentType, AgentSpawnSpec> = {
     buildResumeArgs: (sessionId) => [`resume "${sessionId}"`],
     buildModeArgs: (mode) =>
       mode === 'full-auto' ? ['--dangerously-bypass-approvals-and-sandbox'] : [],
+    buildPromptArgs: () => [],
     hasHook: true,
   },
   pi: {
@@ -59,7 +69,22 @@ export const AGENT_SPAWN: Record<AgentType, AgentSpawnSpec> = {
     binary: 'pi',
     buildResumeArgs: (sessionId) => [`--session "${sessionId}"`],
     buildModeArgs: () => [],
+    buildPromptArgs: () => [],
     hasHook: false,
+  },
+  opencode: {
+    // `opencode` with no flags launches the interactive TUI chat; `--session/-s
+    // <id>` resumes a prior session, `--continue/-c` the last one (verified
+    // live against opencode 1.18.29, see docs/solutions opencode-spikes).
+    // `--auto` approves permissions that are not explicitly denied.
+    binary: 'opencode',
+    buildResumeArgs: (sessionId) => [`--session "${sessionId}"`],
+    buildModeArgs: (mode) => (mode === 'full-auto' ? ['--auto'] : []),
+    // TUI positional is a project PATH, so the prompt goes via --prompt.
+    buildPromptArgs: (quotedPrompt) => [`--prompt ${quotedPrompt}`],
+    // State arrives via the command-center plugin in ~/.config/opencode/plugins
+    // (see HookInstaller + electron/main/hooks/opencode-command-center.js).
+    hasHook: true,
   },
 }
 
@@ -82,4 +107,37 @@ export function buildAgentCommand(
   if (options.resumeSessionId) args.push(...spec.buildResumeArgs(options.resumeSessionId))
   args.push(...spec.buildModeArgs(options.claudeMode))
   return [spec.binary, ...args].join(' ')
+}
+
+/**
+ * Build the shell fragment that submits an initial prompt to an interactive
+ * chat (leading space included, '' when no prompt). Agents whose positional
+ * takes the prompt (claude/codex/pi) use the `--` end-of-options separator:
+ * without it a prompt starting with a dash would parse as a FLAG, bypassing
+ * the project's permission mode. Agents with a dedicated prompt flag
+ * (opencode `--prompt`) use their spec instead.
+ */
+export function buildPromptArg(agent: AgentType, quotedPrompt: string): string {
+  const flagArgs = AGENT_SPAWN[agent].buildPromptArgs(quotedPrompt)
+  if (flagArgs.length > 0) return ' ' + flagArgs.join(' ')
+  return ' -- ' + quotedPrompt
+}
+
+/**
+ * Check `opencode session list --format json` output for a session id.
+ * Fail-closed: unparseable output (or a non-array) means "not resumable", so
+ * restore starts fresh instead of resuming a stale id. Pure function —
+ * exported for unit testing; the exec itself lives in main/index.ts.
+ */
+export function opencodeSessionListContains(stdout: string, sessionId: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(stdout)
+    if (!Array.isArray(parsed)) return false
+    return parsed.some(
+      (entry) =>
+        typeof entry === 'object' && entry !== null && (entry as { id?: unknown }).id === sessionId
+    )
+  } catch {
+    return false
+  }
 }

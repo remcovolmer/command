@@ -18,7 +18,7 @@
 import type { AgentType } from './ipc-types'
 
 /** All agent kinds Command can spawn as chats, for iteration and validation. */
-export const AGENT_IDS: readonly AgentType[] = ['claude', 'codex', 'pi']
+export const AGENT_IDS: readonly AgentType[] = ['claude', 'codex', 'pi', 'opencode']
 
 /** Runtime guard: is `value` a known agent id? */
 export function isAgentType(value: unknown): value is AgentType {
@@ -40,4 +40,5 @@ export const AGENT_DISPLAY: Record<AgentType, AgentDisplay> = {
   claude: { label: 'Claude' },
   codex: { label: 'Codex' },
   pi: { label: 'Pi' },
+  opencode: { label: 'OpenCode' },
 }

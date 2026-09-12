@@ -12,6 +12,8 @@ interface AgentIcon {
 // active/stopped tint. Claude (the sunburst) and OpenAI are their official marks;
 // pi is the pi.dev logo's mark (from its favicon), drawn without its dark
 // background tile so it matches the others and stays visible in dark mode.
+// opencode is a generic code-brackets mark (filled chevrons + slash), drawn in
+// the same fill-based style — swap for the official mark if one is preferred.
 const AGENT_ICONS: Record<AgentType, AgentIcon> = {
   claude: {
     viewBox: '0 0 24 24',
@@ -40,11 +42,19 @@ const AGENT_ICONS: Record<AgentType, AgentIcon> = {
       { d: 'M517.36 400H634.72V634.72H517.36Z' },
     ],
   },
+  opencode: {
+    viewBox: '0 0 24 24',
+    paths: [
+      { d: 'M10 5 3 12l7 7 1.8-1.8L6.6 12l5.2-5.2z' },
+      { d: 'M14 5l7 7-7 7-1.8-1.8 5.2-5.2-5.2-5.2z' },
+      { d: 'M13.4 4l-3.6 16 1.9.5 3.6-16z' },
+    ],
+  },
 }
 
 /**
- * Brand mark identifying which agent a chat runs (Claude / OpenAI / pi logo), so
- * Claude/Codex/Pi chats are distinguishable side by side. The mark doubles as the
+ * Brand mark identifying which agent a chat runs (Claude / OpenAI / pi / code
+ * brackets), so agent chats are distinguishable side by side. The mark doubles as the
  * status indicator: pass `state` to tint it (green=done, gray=busy, orange=needs
  * input, red=stopped) via currentColor, which removes the need for a separate
  * status dot. Renders nothing for non-agent ('normal') terminals.
