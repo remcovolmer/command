@@ -321,11 +321,11 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
                 <label className="text-[13px] font-medium text-fg-strong">Agent Mode</label>
                 <p className={clsx(sectionHint, 'mt-1 mb-2')}>
                   {currentMode === 'chat' &&
-                    'Normal mode — Claude and Codex use their default approval behavior.'}
+                    'Normal mode — Claude and Codex use their default approval behavior; OpenCode uses its default permissions.'}
                   {currentMode === 'auto' &&
-                    'Auto mode — Claude auto-accepts safe actions; Codex keeps its default behavior.'}
+                    'Auto mode — Claude auto-accepts safe actions; Codex and OpenCode keep their default behavior.'}
                   {currentMode === 'full-auto' &&
-                    'Full auto — Claude skips permission prompts; Codex runs without approvals or its internal sandbox.'}
+                    'Full auto — Claude skips permission prompts; Codex runs without approvals or its internal sandbox; OpenCode auto-approves anything not explicitly denied.'}
                 </p>
                 <div className={segmentGroup}>
                   {modeOptions.map((option) => (
@@ -413,13 +413,15 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
               This runs Claude Code with{' '}
               <code className="text-[11px] px-1 py-0.5 bg-raised rounded">
                 --dangerously-skip-permissions
-              </code>{' '}
-              and Codex with{' '}
+              </code>
+              , Codex with{' '}
               <code className="text-[11px] px-1 py-0.5 bg-raised rounded">
                 --dangerously-bypass-approvals-and-sandbox
               </code>
-              . Claude skips permission prompts; Codex bypasses approvals and its internal
-              sandbox.
+              , and OpenCode with{' '}
+              <code className="text-[11px] px-1 py-0.5 bg-raised rounded">--auto</code>.
+              Claude skips permission prompts; Codex bypasses approvals and its internal
+              sandbox; OpenCode auto-approves anything not explicitly denied.
             </p>
             <p className="text-[13px] text-warning mt-2">
               Only enable this in an externally sandboxed environment.
@@ -430,7 +432,7 @@ export function GeneralSection({ onNestedDialogChange }: GeneralSectionProps) {
             This will run Claude Code with{' '}
             <code className="text-[11px] px-1 py-0.5 bg-raised rounded">--enable-auto-mode</code>.
             Claude will auto-accept safe actions (file edits, reads) but still ask permission for
-            risky operations. Codex keeps its default approval and sandbox behavior.
+            risky operations. Codex and OpenCode keep their default approval behavior.
           </p>
         )}
       </Dialog>

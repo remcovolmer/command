@@ -158,10 +158,10 @@ export class AutomationService {
   ): void {
     this.githubService = githubService
 
-    // 1. Claude "done" trigger
+    // 1. Agent "done" trigger (fires for every agent's done state)
     const unsubHook = hookWatcher.addStateChangeListener((_terminalId, state) => {
       if (state !== 'done') return
-      this.handleClaudeDoneTrigger()
+      this.handleAgentDoneTrigger()
     })
     this.eventUnsubscribers.push(unsubHook)
 
@@ -180,10 +180,10 @@ export class AutomationService {
     log.info('Event triggers registered')
   }
 
-  private handleClaudeDoneTrigger(): void {
+  private handleAgentDoneTrigger(): void {
     const automations = this.persistence.getAutomations()
     for (const automation of automations) {
-      if (!automation.enabled || automation.trigger.type !== 'claude-done') continue
+      if (!automation.enabled || automation.trigger.type !== 'agent-done') continue
       this.triggerForProject(automation)
     }
   }
@@ -480,11 +480,19 @@ export class AutomationService {
         log.warn(`PR #${prContext.number} has no branch name, worktree will use HEAD`)
       }
 
+      // Headless runs follow the project's default agent (falls back to claude,
+      // the pre-opencode behavior). No per-automation agent setting — one
+      // concept less to configure, and the picker already exists per project.
+      const agent =
+        this.projectPersistence?.getProjects().find((p) => p.id === projectId)?.settings
+          ?.defaultAgent ?? 'claude'
+
       const result = await this.runner.run(runId, automationId, resolvedPrompt, projectPath, {
         timeoutMinutes: automation.timeoutMinutes,
         baseBranch: automation.baseBranch,
         sourceBranch:
           prContext?.branch && prContext.state !== 'MERGED' ? prContext.branch : undefined,
+        agent,
       })
 
       // Update run with result
@@ -505,7 +513,7 @@ export class AutomationService {
         worktreeBranch: result.worktreeBranch || undefined,
       }
 
-      // Check if Claude created a PR from the worktree branch
+      // Check if the agent created a PR from the worktree branch
       if (result.worktreeBranch && this.githubService && this.projectPersistence) {
         const project = this.projectPersistence.getProjects().find((p) => p.id === projectId)
         if (project) {

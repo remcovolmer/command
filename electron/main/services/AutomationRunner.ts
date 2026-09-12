@@ -1,6 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import type { AgentType } from '../../../shared/ipc-types'
+import { resolveHeadlessSpec, parseHeadlessOutput } from './agents'
 import type { WorktreeService } from './WorktreeService'
 import { createLogger } from './Logger'
 
@@ -63,9 +65,13 @@ export class AutomationRunner {
       timeoutMinutes?: number
       baseBranch?: string
       sourceBranch?: string
+      /** Headless agent for this run (default 'claude' — pre-opencode behavior). */
+      agent?: AgentType
     } = {}
   ): Promise<RunResult> {
     const { timeoutMinutes = 30, baseBranch, sourceBranch } = options
+    const agent = options.agent ?? 'claude'
+    const headless = resolveHeadlessSpec(agent)
     const timeoutMs = timeoutMinutes * 60 * 1000
     const startTime = Date.now()
 
@@ -114,9 +120,7 @@ export class AutomationRunner {
     const controller = new AbortController()
 
     return new Promise<RunResult>((resolve) => {
-      const args = ['-p', prompt, '--output-format', 'json', '--dangerously-skip-permissions']
-
-      const child = spawn('claude', args, {
+      const child = spawn(headless.binary, headless.buildArgs(prompt), {
         cwd: worktreePath,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
@@ -189,16 +193,10 @@ export class AutomationRunner {
           const stderr = Buffer.concat(stderrChunks).toString('utf-8')
           const durationMs = Date.now() - startTime
 
-          // Parse JSON output
-          let output = rawOutput
-          let sessionId: string | undefined
-          try {
-            const parsed = JSON.parse(rawOutput)
-            output = parsed.result || rawOutput
-            sessionId = parsed.session_id
-          } catch {
-            // Not valid JSON, use raw output
-          }
+          // Parse the agent's machine-readable output (claude: single JSON
+          // envelope; opencode: NDJSON event stream). Unparseable output
+          // falls back to raw stdout so the run record still shows it.
+          const { output, sessionId } = parseHeadlessOutput(agent, rawOutput)
 
           // Only do worktree cleanup if destroy() hasn't taken ownership
           let hasChanges = false

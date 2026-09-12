@@ -194,8 +194,11 @@ function validateTrigger(raw: unknown): AutomationTrigger {
       if (typeof obj.cron !== 'string' || obj.cron.length === 0 || obj.cron.length > 100)
         throw new Error('Invalid cron expression')
       return { type: 'schedule', cron: obj.cron }
+    case 'agent-done':
+      return { type: 'agent-done' }
     case 'claude-done':
-      return { type: 'claude-done' }
+      // Legacy name from before multi-agent support — same trigger.
+      return { type: 'agent-done' }
     case 'git-event':
       if (!VALID_GIT_EVENTS.includes(obj.event as GitEvent))
         throw new Error('Invalid git event type')

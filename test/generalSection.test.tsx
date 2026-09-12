@@ -13,7 +13,7 @@ const storeState = vi.hoisted(() => ({
     sortOrder: number
     settings?: {
       claudeMode?: 'chat' | 'auto' | 'full-auto'
-      defaultAgent?: 'claude' | 'codex' | 'pi'
+      defaultAgent?: 'claude' | 'codex' | 'pi' | 'opencode'
     }
   }>,
   updateProject: vi.fn(),
@@ -70,7 +70,7 @@ describe('GeneralSection Agent Mode', () => {
     expect(screen.queryByText('Claude Mode')).toBeNull()
     expect(
       screen.getByText(
-        'Auto mode — Claude auto-accepts safe actions; Codex keeps its default behavior.'
+        'Auto mode — Claude auto-accepts safe actions; Codex and OpenCode keep their default behavior.'
       )
     ).toBeTruthy()
   })

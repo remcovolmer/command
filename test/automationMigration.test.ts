@@ -146,3 +146,79 @@ describe('AutomationPersistence v1 → v2 migration', () => {
     expect(a.defaultTarget).toBe('chat')
   })
 })
+
+describe('AutomationPersistence v2 → v3 migration (claude-done → agent-done)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  test('renames claude-done triggers to agent-done, keeps the rest intact', () => {
+    seedFiles(
+      {
+        version: 2,
+        automations: [
+          {
+            id: 'b1',
+            name: 'after chat',
+            prompt: 'x',
+            projectId: 'proj-A',
+            defaultTarget: 'worktree',
+            trigger: { type: 'claude-done' },
+            enabled: true,
+            timeoutMinutes: 30,
+            createdAt: 't',
+            updatedAt: 't',
+          },
+          {
+            id: 'b2',
+            name: 'nightly',
+            prompt: 'y',
+            projectId: 'proj-A',
+            defaultTarget: 'worktree',
+            trigger: { type: 'schedule', cron: '0 9 * * *' },
+            enabled: true,
+            timeoutMinutes: 30,
+            createdAt: 't',
+            updatedAt: 't',
+          },
+        ],
+      },
+      { version: 2, runs: [] }
+    )
+
+    const p = new AutomationPersistence()
+    const [b1, b2] = p.getAutomations()
+
+    expect(b1.trigger).toEqual({ type: 'agent-done' })
+    expect(b1.name).toBe('after chat')
+    expect(b2.trigger).toEqual({ type: 'schedule', cron: '0 9 * * *' })
+  })
+
+  test('already-renamed agent-done triggers pass through untouched', () => {
+    seedFiles(
+      {
+        version: 2,
+        automations: [
+          {
+            id: 'b3',
+            name: 'after chat',
+            prompt: 'x',
+            projectId: 'proj-A',
+            defaultTarget: 'worktree',
+            trigger: { type: 'agent-done' },
+            enabled: true,
+            timeoutMinutes: 30,
+            createdAt: 't',
+            updatedAt: 't',
+          },
+        ],
+      },
+      { version: 2, runs: [] }
+    )
+
+    const p = new AutomationPersistence()
+    const [b3] = p.getAutomations()
+
+    expect(b3.trigger).toEqual({ type: 'agent-done' })
+  })
+})

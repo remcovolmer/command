@@ -16,7 +16,7 @@ type AutomationRunMode = 'foreground' | 'headless'
 
 type AutomationTrigger =
   | { type: 'schedule'; cron: string }
-  | { type: 'claude-done'; projectId?: string }
+  | { type: 'agent-done'; projectId?: string }
   | { type: 'git-event'; event: GitEvent }
   | { type: 'file-change'; patterns: string[]; cooldownSeconds: number }
 
@@ -74,7 +74,7 @@ interface AutomationRunState {
   runs: AutomationRun[]
 }
 
-const STATE_VERSION = 2
+const STATE_VERSION = 3
 const MAX_RUNS_PER_AUTOMATION = 50
 
 export class AutomationPersistence {
@@ -302,6 +302,8 @@ export class AutomationPersistence {
     // v1 → v2: collapse projectIds[] to a single projectId (first entry),
     // default the new defaultTarget to 'worktree' (matches prior headless behavior),
     // and disable any automation left without a project.
+    // v2 → v3: rename the 'claude-done' trigger to 'agent-done' (the watcher
+    // fires it for every agent's done state, not just Claude's).
     const automations = (oldState.automations ?? []).map((raw) => {
       const a = raw as AutomationV1
       const projectId =
@@ -314,7 +316,13 @@ export class AutomationPersistence {
       const enabled = projectId ? (a.enabled ?? true) : false
       const { projectIds: _drop, ...rest } = a
       void _drop
-      return { ...rest, projectId, defaultTarget, enabled } as unknown as Automation
+      const trigger =
+        typeof rest.trigger === 'object' &&
+        rest.trigger !== null &&
+        (rest.trigger as { type?: unknown }).type === 'claude-done'
+          ? { ...(rest.trigger as Record<string, unknown>), type: 'agent-done' }
+          : rest.trigger
+      return { ...rest, projectId, defaultTarget, enabled, trigger } as unknown as Automation
     })
     return { version: STATE_VERSION, automations }
   }

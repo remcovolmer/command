@@ -452,7 +452,7 @@ export class ClaudeHookWatcher {
     log.debug(`Emitting state ${hookState.state} for terminal ${terminalId}`)
     this.sendToRenderer('terminal:state', terminalId, hookState.state)
 
-    // Notify state change listeners (used by AutomationService for 'claude-done' triggers)
+    // Notify state change listeners (used by AutomationService for 'agent-done' triggers)
     for (const cb of this.stateChangeCallbacks) {
       try {
         cb(terminalId, hookState.state)

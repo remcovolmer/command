@@ -141,3 +141,102 @@ export function opencodeSessionListContains(stdout: string, sessionId: string): 
     return false
   }
 }
+
+export interface HeadlessRunResult {
+  output: string
+  sessionId?: string
+}
+
+/**
+ * Headless (non-interactive) run spec for automation worktree runs — the
+ * scripting counterpart to the interactive TUI/PTY chat above. Only agents
+ * with a verified machine-readable mode are listed; anything else falls back
+ * to claude (today's behavior — headless always ran claude regardless of the
+ * chat agent). argv-style args: the prompt travels as an element, never
+ * through a shell, so no quoting is needed.
+ */
+export interface AgentHeadlessSpec {
+  /** CLI binary for the headless run. */
+  binary: string
+  /** Full argv (prompt included, raw — no shell quoting). */
+  buildArgs(prompt: string): string[]
+  /** Extract assistant text + session id. Fail-soft: unparseable output
+   *  yields the raw stdout so the run record still shows what happened. */
+  parseOutput(stdout: string): HeadlessRunResult
+}
+
+/** Today's claude headless contract (single JSON envelope), strictly typed. */
+function parseClaudeJson(stdout: string): HeadlessRunResult {
+  try {
+    const parsed: unknown = JSON.parse(stdout)
+    if (typeof parsed === 'object' && parsed !== null) {
+      const record = parsed as { result?: unknown; session_id?: unknown }
+      return {
+        output: typeof record.result === 'string' ? record.result : stdout,
+        sessionId: typeof record.session_id === 'string' ? record.session_id : undefined,
+      }
+    }
+  } catch {
+    // Not valid JSON, use raw output below.
+  }
+  return { output: stdout }
+}
+
+/**
+ * opencode streams newline-delimited JSON events (`text` parts carry assistant
+ * text, `step_finish` ends the turn). Accumulate text; take the session id
+ * from any event. Shape verified live (see docs/solutions opencode-spikes).
+ */
+function parseOpencodeNdjson(stdout: string): HeadlessRunResult {
+  const texts: string[] = []
+  let sessionId: string | undefined
+  for (const line of stdout.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    let event: { type?: unknown; sessionID?: unknown; part?: { type?: unknown; text?: unknown } }
+    try {
+      event = JSON.parse(trimmed) as {
+        type?: unknown
+        sessionID?: unknown
+        part?: { type?: unknown; text?: unknown }
+      }
+    } catch {
+      continue
+    }
+    if (sessionId === undefined && typeof event.sessionID === 'string') {
+      sessionId = event.sessionID
+    }
+    if (event.type === 'text' && typeof event.part?.text === 'string') {
+      texts.push(event.part.text)
+    }
+  }
+  const output = texts.join('')
+  return output ? { output, sessionId } : { output: stdout, sessionId }
+}
+
+const CLAUDE_HEADLESS: AgentHeadlessSpec = {
+  binary: 'claude',
+  buildArgs: (prompt) => ['-p', prompt, '--output-format', 'json', '--dangerously-skip-permissions'],
+  parseOutput: parseClaudeJson,
+}
+
+export const AGENT_HEADLESS: Partial<Record<AgentType, AgentHeadlessSpec>> = {
+  claude: CLAUDE_HEADLESS,
+  opencode: {
+    // `run` is the non-interactive entrypoint; --auto keeps the run from
+    // hanging on approvals (explicit denies still hold).
+    binary: 'opencode',
+    buildArgs: (prompt) => ['run', '--format', 'json', '--auto', prompt],
+    parseOutput: parseOpencodeNdjson,
+  },
+}
+
+/** Headless spec for an agent, falling back to claude (pre-opencode behavior). */
+export function resolveHeadlessSpec(agent: AgentType): AgentHeadlessSpec {
+  return AGENT_HEADLESS[agent] ?? CLAUDE_HEADLESS
+}
+
+/** Parse headless stdout with the agent's parser (claude fallback). */
+export function parseHeadlessOutput(agent: AgentType, stdout: string): HeadlessRunResult {
+  return resolveHeadlessSpec(agent).parseOutput(stdout)
+}
