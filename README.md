@@ -69,8 +69,8 @@ Four tabs in a collapsible right panel:
 - **Worktree management** — Create and manage git worktrees for parallel feature development
 
 ### Automation Engine
-- **Schedule triggers** — Run Claude on a cron schedule
-- **Event triggers** — Fire on Claude done, git events (PR merged/opened, checks passed), or file changes
+- **Schedule triggers** — Run an agent on a cron schedule
+- **Event triggers** — Fire on agent done, git events (PR merged/opened, checks passed), or file changes
 - **Isolated execution** — Each run gets its own worktree to prevent conflicts
 - **Run history** — Full triage inbox with results, duration, and markdown-rendered output
 

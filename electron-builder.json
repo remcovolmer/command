@@ -11,7 +11,7 @@
     {
       "from": "electron/main/hooks",
       "to": "hooks",
-      "filter": ["*.cjs"]
+      "filter": ["*.cjs", "opencode-command-center.js"]
     },
     {
       "from": "electron/main/cli",

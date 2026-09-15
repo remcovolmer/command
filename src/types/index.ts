@@ -185,7 +185,7 @@ export type GitEvent = 'pr-merged' | 'pr-opened' | 'checks-passed' | 'merge-conf
 
 export type AutomationTrigger =
   | { type: 'schedule'; cron: string }
-  | { type: 'claude-done'; projectId?: string }
+  | { type: 'agent-done'; projectId?: string }
   | { type: 'git-event'; event: GitEvent }
   | { type: 'file-change'; patterns: string[]; cooldownSeconds: number }
 

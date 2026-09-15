@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join, dirname } from 'path'
 import { homedir } from 'os'
 import { app } from 'electron'
@@ -229,8 +229,91 @@ export function uninstallCodexHooks(): void {
   uninstallTarget(codexTarget())
 }
 
+/**
+ * OpenCode state plugin (file-drop, not config-merge).
+ *
+ * OpenCode has no hooks.json equivalent: plugins in
+ * ~/.config/opencode/plugins/ load automatically, so installing = dropping
+ * our plugin file there. The user's opencode.json is never touched. The core
+ * takes explicit paths so unit tests can exercise it without Electron.
+ */
+export const OPENCODE_PLUGIN_FILENAME = 'command-center.js'
+const OPENCODE_PLUGIN_SOURCE = 'opencode-command-center.js'
+const OPENCODE_PLUGIN_MARKER = 'command-center-state-plugin'
+
+function getOpencodePluginSourcePath(): string {
+  const isDev = !app.isPackaged
+  if (isDev) {
+    return join(app.getAppPath(), 'electron', 'main', 'hooks', OPENCODE_PLUGIN_SOURCE)
+  }
+  return join(process.resourcesPath, 'hooks', OPENCODE_PLUGIN_SOURCE)
+}
+
+export type OpencodePluginInstallResult = 'installed' | 'up-to-date' | 'skipped-foreign'
+
+export function installOpencodePluginFromSource(
+  source: string,
+  homeDir: string
+): OpencodePluginInstallResult {
+  const dest = join(homeDir, '.config', 'opencode', 'plugins', OPENCODE_PLUGIN_FILENAME)
+  if (existsSync(dest)) {
+    const current = readFileSync(dest, 'utf-8')
+    if (current === source) {
+      return 'up-to-date'
+    }
+    // Never clobber a foreign file that happens to share our filename.
+    if (!current.includes(OPENCODE_PLUGIN_MARKER)) {
+      log.warn(`Skipping OpenCode plugin install: ${dest} exists and is not ours`)
+      return 'skipped-foreign'
+    }
+  }
+  mkdirSync(join(homeDir, '.config', 'opencode', 'plugins'), { recursive: true })
+  writeFileSync(dest, source)
+  return 'installed'
+}
+
+export function uninstallOpencodePluginFromHome(homeDir: string): boolean {
+  const dest = join(homeDir, '.config', 'opencode', 'plugins', OPENCODE_PLUGIN_FILENAME)
+  if (!existsSync(dest)) {
+    return false
+  }
+  // Only remove what we installed — leave foreign files alone.
+  if (!readFileSync(dest, 'utf-8').includes(OPENCODE_PLUGIN_MARKER)) {
+    return false
+  }
+  unlinkSync(dest)
+  return true
+}
+
+/** Install the OpenCode state plugin (~/.config/opencode/plugins/). */
+export function installOpencodePlugin(): void {
+  log.info('Installing OpenCode plugin...')
+  let source: string
+  try {
+    source = readFileSync(getOpencodePluginSourcePath(), 'utf-8')
+  } catch (e) {
+    log.error('OpenCode plugin source not found, skipping:', e)
+    return
+  }
+  const result = installOpencodePluginFromSource(source, homedir())
+  if (result === 'up-to-date') {
+    log.info('OpenCode plugin already up to date')
+  } else if (result === 'installed') {
+    log.info('OpenCode plugin installed successfully')
+    log.info('Note: Restart OpenCode for the plugin to take effect')
+  }
+}
+
+/** Remove the Command state plugin, leaving anything else in place. */
+export function uninstallOpencodePlugin(): void {
+  if (uninstallOpencodePluginFromHome(homedir())) {
+    log.info('OpenCode plugin uninstalled successfully')
+  }
+}
+
 /** Install hooks for every hook-capable agent. */
 export function installAgentHooks(): void {
   installClaudeHooks()
   installCodexHooks()
+  installOpencodePlugin()
 }

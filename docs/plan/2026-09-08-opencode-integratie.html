@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: OpenCode toevoegen aan Command — 4e agent in bestaand registry</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --ink:#1a2332; --muted:#5b6b82; --line:#e2e8f0; --bg:#f7f9fc;
+    --card:#ffffff; --accent:#0f62fe; --accent-soft:#e8effd;
+    --green:#137333; --green-bg:#e6f4ea; --orange:#b06000; --orange-bg:#fef0e0;
+    --red:#b3261e; --red-bg:#fce8e6; --slate:#334155;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height:1.6;font-size:16px}
+  .wrap{max-width:1020px;margin:0 auto;padding:32px 20px 80px}
+  header.hero{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:28px 30px;margin-bottom:22px}
+  .kicker{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:4px 12px;margin-bottom:12px}
+  h1{font-size:28px;line-height:1.25;margin:0 0 8px}
+  .sub{color:var(--muted);margin:0;max-width:70ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .meta span{font-size:13px;color:var(--slate);background:#f1f5f9;border:1px solid var(--line);
+    border-radius:999px;padding:3px 12px}
+  section.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:24px 26px;margin:18px 0}
+  h2{font-size:20px;margin:0 0 6px}
+  h3{font-size:16px;margin:20px 0 8px}
+  .action-title{font-size:17px;font-weight:700;margin:0 0 10px}
+  p{margin:8px 0}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:12px 0}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f1f5f9;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--slate)}
+  tr:last-child td{border-bottom:none}
+  code{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:13px;background:#f1f5f9;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px 16px;overflow:auto;font-size:13px;line-height:1.55}
+  pre code{background:none;border:none;color:inherit;padding:0}
+  .callout{border-radius:10px;padding:12px 16px;margin:14px 0;font-size:14.5px;border:1px solid}
+  .callout.green{background:var(--green-bg);border-color:#b7dfc2;color:#0d4d23}
+  .callout.orange{background:var(--orange-bg);border-color:#f2c38f;color:#7a3f00}
+  .callout.blue{background:var(--accent-soft);border-color:#b6ccf7;color:#0b3fa8}
+  .callout.red{background:var(--red-bg);border-color:#f1b3ae;color:#7a1a14}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr} h1{font-size:23px}}
+  .pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;white-space:nowrap}
+  .p-f1{background:#e8effd;color:#0b3fa8}.p-f2{background:#e6f4ea;color:#0d4d23}.p-f3{background:#fef0e0;color:#7a3f00}
+  .p-spike{background:#f1f5f9;color:#334155;border:1px solid var(--line)}
+  ul.tight li{margin:4px 0}
+  .check li{list-style:none;margin:6px 0;padding-left:28px;position:relative}
+  .check li::before{content:"☐";position:absolute;left:0;color:var(--muted)}
+  .mermaid{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;overflow:auto}
+  footer{color:var(--muted);font-size:13px;margin-top:26px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">docs / plan · 2026-09-08</div>
+  <h1>OpenCode toevoegen aan Command wordt een 4e agent in het bestaande registry — geen refactor nodig</h1>
+  <p class="sub">Command is al gemigreerd van <code>Codex|normal</code> naar een generiek registry-model
+  (<code>AgentType = 'claude' | 'codex' | 'pi'</code>). OpenCode lift daarop mee: gefaseerd eerst hookless
+  (pi-pariteit, uren werk), daarna pas de plugin-hook en headless-automations. Dit plan is MECE per bestand,
+  met open spikes expliciet timeboxed.</p>
+  <div class="meta">
+    <span>Status: plan — geen code gewijzigd</span>
+    <span>Scope: chat + state-indicator + restore + automations</span>
+    <span>Bronnen: codebase + opencode.ai/docs (sept 2026)</span>
+  </div>
+</header>
+
+<section class="card">
+  <p class="action-title">1. Command heeft geen “Codex-integratie” meer — er is één generiek agent-seam, en dát versnelt alles</p>
+  <p><strong>Situatie.</strong> Command beheert PTY-chats voor meerdere coding-agents in één Electron-window.
+  Vroeger stond er <code>type === 'Codex'</code> door de code; nu is alles <code>isAgentType()</code> /
+  <code>AGENT_IDS</code>-gedreven. <strong>Complicatie.</strong> “OpenCode toevoegen” klinkt als een grote feature,
+  maar het echte werk zit op drie plekken met elk een ander risicoprofiel: (a) spawn/resume-vlaggen,
+  (b) state-detectie — OpenCode heeft géén <code>hooks.json</code> maar een <strong>plugin-systeem op Bun</strong>,
+  (c) headless-runs voor automations met een ander JSON-contract. <strong>Resolutie.</strong> Gefaseerd leveren:
+  Fase&nbsp;1 hookless = direct bruikbaar zonder enig OpenCode-specifiek state-werk; Fase&nbsp;2/3 voegen precisie toe.</p>
+  <div class="callout green"><strong>Kernbevinding (geverifieerd in code):</strong>
+    <code>shared/agents.ts:21</code> (<code>AGENT_IDS</code>), <code>shared/ipc-types.ts:72</code> (<code>AgentType</code>) en
+    <code>electron/main/services/agents.ts:35</code> (<code>AGENT_SPAWN: Record&lt;AgentType,…&gt;</code>) forceren via het type-systeem
+    een entry voor elke agent — een ontbrekende OpenCode-entry is een <em>compile-error</em>, geen runtime-verrassing.
+    <code>TerminalManager</code>, store, IPC en de meeste UI hoeven niet te veranderen.</div>
+</section>
+
+<section class="card">
+  <p class="action-title">2. Zo past OpenCode in de huidige architectuur (alleen de grijze vakken zijn nieuw)</p>
+  <div class="mermaid">
+flowchart LR
+  subgraph R[Renderer]
+    Picker[Agent-picker<br/>AGENT_IDS + AGENT_DISPLAY]
+    Badge[AgentBadge]
+  end
+  subgraph M[Main]
+    TM[TerminalManager<br/>buildAgentCommand]
+    REG[agents.ts<br/>AGENT_SPAWN]
+    HI[HookInstaller]
+    W[ClaudeHookWatcher<br/>state-file]
+    VR[verifyAgentSessionAsync]
+    AR[AutomationRunner<br/>headless]
+  end
+  subgraph OC[OpenCode kant]
+    BIN[opencode TUI<br/>--session/--continue/--auto]
+    PLUG[command-center plugin<br/>~/.config/opencode/plugins/]
+    SF[(~/.claude/command-center-state.json<br/>gedeeld)]
+    SESS[(sessions<br/>session list / db)]
+  end
+  Picker --> REG --> TM --> BIN
+  HI -.->|Fase 2: plugin droppen| PLUG
+  PLUG -.->|session/permission events| SF
+  W --> SF
+  VR -.->|Fase 3| SESS
+  AR -.->|Fase 3: opencode run --format json| BIN
+  REG -.->|nieuw: opencode entry| Badge
+  </div>
+  <div class="mermaid" style="margin-top:12px">
+stateDiagram-v2
+  [*] --> busy: SessionStart / UserPromptSubmit<br/>(plugin: session.created/updated)
+  busy --> busy: PreToolUse / tool.execute.before
+  busy --> permission: PermissionRequest<br/>(plugin: permission.asked)
+  permission --> busy: permission.replied allow
+  busy --> done: Stop<br/>(plugin: session.idle)
+  busy --> question: question-tool gevraagd<br/>(alleen als opencode dit event heeft)
+  done --> busy: nieuwe prompt
+  </div>
+</section>
+
+<section class="card">
+  <p class="action-title">3. Eerst de snelste waarde: Fase 1 (hookless) levert een werkende OpenCode-chat in een halve dag</p>
+  <div class="grid2">
+    <div>
+      <h3>Aanbevolen fasering</h3>
+      <table>
+        <tr><th>Fase</th><th>Wat</th><th>Pariteit</th><th>Inspanning</th></tr>
+        <tr><td><span class="pill p-spike">Spike 0</span></td><td>5 verificaties, timeboxed 2u (zie §6)</td><td>—</td><td>2u</td></tr>
+        <tr><td><span class="pill p-f1">Fase 1</span></td><td>Hookless chat: spawn, resume-args, badge, defaultAgent</td><td>pi</td><td>4–6u</td></tr>
+        <tr><td><span class="pill p-f2">Fase 2</span></td><td>State-plugin: busy/permission/done-indicator</td><td>codex</td><td>1–2d</td></tr>
+        <tr><td><span class="pill p-f3">Fase 3</span></td><td>Restore-check + headless automations + polish/docs</td><td>claude-achtig</td><td>1d</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Wat je per fase krijgt</h3>
+      <ul class="tight">
+        <li><strong>Na Fase 1:</strong> gebruiker kiest OpenCode in picker, chat start, sessie hervat met <code>--session</code>; state valt terug op output-heuristiek (<code>bumpHooklessActivity</code>, zelfde als pi).</li>
+        <li><strong>Na Fase 2:</strong> oranje/groene aandacht-indicator werkt zoals bij Codex; terminal registreert bij watcher.</li>
+        <li><strong>Na Fase 3:</strong> restart-restore, <code>opencode run</code>-automations en agent-done-triggers.</li>
+      </ul>
+      <div class="callout blue"><strong>Scope-bewaking:</strong> <code>SessionIndexService</code> (history-panel),
+      <code>UsageService</code> (<code>opencode stats</code>) en notch-pop-policy blijven buiten scope — Codex/pi hebben die ook niet.</div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <p class="action-title">4. Fase 1 is vijf kleine edits — elk bestand staat hieronder met regelnummer</p>
+  <table>
+    <tr><th>#</th><th>Bestand</th><th>Wijziging</th><th>Notitie</th></tr>
+    <tr><td>1</td><td><code>shared/ipc-types.ts:72</code></td><td><code>AgentType += 'opencode'</code></td><td>Type-only; compile-error dwingt #2–#3 af.</td></tr>
+    <tr><td>2</td><td><code>shared/agents.ts:21,39</code></td><td><code>AGENT_IDS += 'opencode'</code>; <code>AGENT_DISPLAY.opencode = {label:'OpenCode'}</code></td><td>Renderer-importeerbaar, geen Node-imports.</td></tr>
+    <tr><td>3</td><td><code>electron/main/services/agents.ts:35</code></td><td>Nieuwe <code>AGENT_SPAWN.opencode</code> (zie snippet)</td><td><code>hasHook:false</code> in Fase 1 → gratis pi-gedrag.</td></tr>
+    <tr><td>4</td><td><code>src/components/AgentBadge.tsx:15</code></td><td><code>AGENT_ICONS.opencode</code> SVG toevoegen</td><td>Zonder dit compileert de app niet; zelfstandig, monochroom via <code>currentColor</code>.</td></tr>
+    <tr><td>5</td><td><code>—</code> (geen wijziging)</td><td>Verificatie: picker, <code>useCreateTerminal.ts:39</code>, <code>projectStore</code>-limiet (10), IPC <code>terminal.create</code></td><td><code>defaultAgent='opencode'</code> werkt direct na #1–#3.</td></tr>
+  </table>
+<pre><code>// agents.ts — Fase-1 voorstel (vlaggen pas definitief na Spike 0)
+opencode: {
+  binary: 'opencode',
+  // TUI-resume (docs /cli): -s/--session &lt;id&gt;, -c/--continue
+  buildResumeArgs: (sessionId) =&gt; [`--session "${sessionId}"`],
+  // opencode default = allow-all; --auto keurt goed tenzij expliciet denied
+  // Mapping-voorstel: chat → [], auto/full-auto → ['--auto'] (Spike S1 beslist)
+  buildModeArgs: (mode) =&gt; (mode === 'full-auto' ? ['--auto'] : []),
+  hasHook: false, // Fase 1: hookless zoals pi → Fase 2: true
+},</code></pre>
+  <div class="callout orange"><strong>Let op — initialPrompt met <code>--</code>:</strong>
+  <code>TerminalManager.ts:317-332</code> plakt een initiële prompt als <code>' -- ' + quotePromptForShell()</code> (flag-injectie-guard).
+  Spike S1 moet bevestigen dat <code>opencode</code> een positionele prompt na <code>--</code> accepteert zoals <code>claude/codex</code>;
+  zo niet, dan is een kleine per-agent <code>buildPromptArgs</code> nodig.</div>
+  <h3>Definition of Done — Fase 1</h3>
+  <ul class="check">
+    <li><code>npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run test:unit</code> groen</li>
+    <li>OpenCode staat in agent-picker; nieuwe chat spawn <code>opencode</code> in project/worktree-cwd</li>
+    <li>Resume met vorig session-id werkt via <code>--session</code>; fresh-start als id ontbreekt (zoals pi)</li>
+    <li>Badge toont OpenCode-mark; geen <code>type === 'claude'</code>-regressie (zie <code>TerminalListItem.tsx:35</code> — bewust buiten scope)</li>
+  </ul>
+</section>
+
+<section class="card">
+  <p class="action-title">5. Fase 2 is het enige echte OpenCode-werk: een Bun-plugin in plaats van een hooks.json-entry</p>
+  <p>OpenCode kent géén <code>~/.codex/hooks.json</code>-equivalent. State loopt via <strong>plugins</strong>
+  (officieel gedocumenteerd, <code>opencode.ai/docs/plugins</code>): bestanden in
+  <code>~/.config/opencode/plugins/</code> (globaal) en <code>.opencode/plugins/</code> (project) worden automatisch geladen;
+  npm-plugins via <code>plugin:[…]</code> in <code>opencode.json</code>. Relevante events:
+  <code>session.created / session.status / session.idle / session.updated / session.error</code>,
+  <code>permission.asked / permission.replied</code>, <code>tool.execute.before/after</code>.</p>
+  <table>
+    <tr><th>Bestand</th><th>Wijziging</th></tr>
+    <tr><td><code>electron/main/hooks/opencode-command-center.ts</code> <strong>(nieuw)</strong></td>
+      <td>Plugin <code>export const CommandCenter: Plugin</code> die op session/permission-events naar het <strong>zelfde</strong>
+      <code>~/.claude/command-center-state.json</code> schrijft als <code>{session_id, cwd, state, timestamp, hook_event}</code>
+      (zelfde read-merge-write + atomic <code>tmp+rename</code> + stale-sweep als <code>codex-state-hook.cjs</code>). Mapping-voorstel:
+      <code>session.created/updated + tool.execute.before → busy</code>, <code>permission.asked → permission</code>,
+      <code>session.idle → done</code>, <code>session.error → stopped</code>- Wortel? Nee: stopped blijft PTY-exit.</td></tr>
+    <tr><td><code>electron/main/services/HookInstaller.ts</code></td>
+      <td><code>opencodeTarget()</code> toevoegen — maar anders dan claude/codex: <strong>bestand droppen</strong> in
+      <code>~/.config/opencode/plugins/command-center.cjs</code> (geen JSON-merge; veiliger, raakt <code>opencode.json</code> van de gebruiker niet).
+      Opnemen in <code>installAgentHooks()</code> + <code>install/uninstallOpencodeHooks()</code>. Idempotent + migratiepad.</td></tr>
+    <tr><td><code>electron/main/services/agents.ts</code></td><td><code>hasHook: false → true</code>; daarna registreert <code>TerminalManager.ts:240</code> automatisch bij de watcher.</td></tr>
+    <tr><td><code>electron/main/services/ClaudeHookWatcher.ts:40</code></td><td>Alleen aanpassen als <code>session_id</code>-formaat afwijkt van <code>isHookStateData()</code> (Codex = UUID; OpenCode-formaat volgt uit Spike S2).</td></tr>
+    <tr><td><code>electron-builder.json</code></td><td>Check: <code>extraResources: hooks/*.cjs</code> pikt de plugin alleen op als hij onder <code>hooks/</code> staat of de glob wordt uitgebreid.</td></tr>
+  </table>
+  <div class="callout red"><strong>Grootste risico — Bun vs Node:</strong> OpenCode-plugins draaien <em>binnen</em> OpenCode op <strong>Bun</strong>
+  (ctx met <code>client/$/directory/worktree</code>), niet als los <code>node script.cjs</code>-proces zoals Claude/Codex-hooks.
+  De <code>.cjs</code>-kopieer-aanpak is dus niet 1-op-1 herbruikbaar: de plugin moet Bun-compatibele <code>fs</code>-writes doen en mag nooit de sessie breken
+  (silent-fail, zoals de bestaande hooks). Spike S2 moet dit als eerste bewijzen.</div>
+  <div class="callout blue"><strong>Meelifters zonder wijziging:</strong> watcher-poll (250&nbsp;ms), <code>INPUT_STATE_GUARD_MS</code>-race-guard,
+  <code>registerTerminal / preAssociateSession / getTerminalSessions</code> en <code>before-quit</code>-persist (<code>main/index.ts:2084</code>)
+  zijn agent-agnostisch — hookless <code>pi</code> wordt vandaag overgeslagen, <code>opencode</code> gaat na <code>hasHook:true</code> vanzelf mee.</div>
+</section>
+
+<section class="card">
+  <p class="action-title">6. Vijf timeboxed spikes (2u totaal) nemen alle OpenCode-onzekerheid weg vóór Fase 2/3</p>
+  <table>
+    <tr><th>ID</th><th>Vraag</th><th>Commando / check</th><th>Beslist</th></tr>
+    <tr><td>S1</td><td>Resume- + prompt- + mode-vlaggen?</td><td><code>opencode --session "&lt;id&gt;"</code>, <code>opencode --continue</code>, prompt na <code>--</code>, <code>--auto</code> vs <code>ClaudeMode</code></td><td><code>buildResumeArgs / buildModeArgs</code></td></tr>
+    <tr><td>S2</td><td>Plugin-event-payload: waar zit <code>sessionID + cwd</code>?</td><td>Minimale plugin die <code>session.created / permission.asked / session.idle</code> als JSON naar een tmp-log schrijft</td><td>plugin-mapping + <code>isHookStateData</code></td></tr>
+    <tr><td>S3</td><td>Sessie-verificatie bij restore?</td><td><code>opencode session list --format json</code> en <code>opencode db path</code> (sqlite?); sessie-id-formaat noteren</td><td><code>verifyAgentSessionAsync</code>-branch (<code>main/index.ts:286</code>; claude = <code>~/.claude/projects/…</code>, codex = <code>~/.codex/sessions/**</code>, pi = <code>false</code>)</td></tr>
+    <tr><td>S4</td><td>Headless-contract voor automations?</td><td><code>opencode run --format json --auto "…" </code> vs huidig <code>claude -p … --output-format json</code> (<code>AutomationRunner.ts:117</code>); stdout-schema + exit-codes</td><td>per-agent headless-spec + parser</td></tr>
+    <tr><td>S5</td><td>Windows-pad?</td><td>Binaire-naam op PATH, <code>OPENCODE_GIT_BASH_PATH</code>-interactie, <code>getShell()</code> (<code>TerminalManager.ts:825</code>)</td><td>go/no-go Windows</td></tr>
+  </table>
+  <p style="color:var(--muted);font-size:14px">Bron: <code>opencode.ai/docs/cli</code> (tui-flags <code>--continue/-c</code>, <code>--session/-s</code>, <code>--prompt/--model/--agent/--auto</code>;
+  <code>run</code>-flags <code>--session/--continue/--format/--title/--dir/--attach</code>; <code>session list/delete</code>, <code>export/import</code>, <code>db path</code>),
+  <code>/plugins</code> (event-lijst + load-order) en <code>/permissions</code> (<code>--auto</code> ≈ non-denied goedkeuren).</p>
+</section>
+
+<section class="card">
+  <p class="action-title">7. Fase 3 maakt OpenCode volwaardig: restore, automations en de drie bewuste niet-doelen</p>
+  <table>
+    <tr><th>Onderdeel</th><th>Bestand</th><th>Aanpak</th></tr>
+    <tr><td>Sessie-restore</td><td><code>electron/main/index.ts:286</code> (<code>verifyAgentSessionAsync</code>), <code>handlers/restoreSessions.ts:93</code></td>
+      <td>OpenCode-branch o.b.v. Spike S3 (bijv. <code>session list --format json</code> includes id); anders fresh-start zoals pi. <code>ProjectPersistence.ts</code> (<code>STATE_VERSION=7</code>) hoeft geen bump voor een nieuwe enum-waarde.</td></tr>
+    <tr><td>Headless automations</td><td><code>AutomationRunner.ts:57-119</code></td>
+      <td>Per-agent headless-spec: <code>opencode run --format json --auto</code> + eigen output-parser (Claude verwacht <code>{result, session_id}</code>). Voorkeur: kleine <code>AgentHeadlessSpec</code> naast <code>AGENT_SPAWN</code> i.p.v. <code>if agent ===</code>.</td></tr>
+    <tr><td>Agent-done-trigger</td><td><code>AutomationService.ts:154-183</code>, <code>src/types/index.ts:188</code> (<code>{type:'claude-done'}</code>)</td>
+      <td>Keuze (productbesluit): generieke <code>{type:'agent-done', agent?}</code> vs extra <code>opencode-done</code>. Aanbeveling: generiek met optionele agent-filter — voorkomt trigger-explosie bij elke nieuwe agent.</td></tr>
+    <tr><td>Polish</td><td><code>SortableProjectItem</code> (defaultAgent-picker), <code>GeneralSection</code> (mode-uitleg: opencode default-allow vs Claude default-ask), docs</td>
+      <td>Geen nieuwe hotkey nodig (bestaande agent-cycle <code>Ctrl+Shift+M</code> hergebruiken — voldoet aan hotkey-regel in <code>AGENTS.md</code>).</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="callout green"><strong>Bewust buiten scope (ook Codex/pi hebben dit niet):</strong>
+    <br>① <code>SessionIndexService</code> history-lezer (Claude-only <code>~/.claude/projects</code>) — OpenCode-summary blijft leeg zoals bij Codex.
+    <br>② <code>UsageService</code>-tegel (<code>opencode stats</code> pas als er vraag naar is).
+    <br>③ <code>TerminalListItem.tsx:35</code> <code>isClaude</code>-summary — pas uitbreiden als #① ooit komt.</div>
+    <div class="callout orange"><strong>AGENTS.md-drift (gratis meenemen):</strong> regel 80 zegt <code>~/.Codex/settings.json</code>,
+    code gebruikt <code>~/.codex/hooks.json</code> (<code>HookInstaller.ts:87</code>). Eén regel fixen voorkomt verwarring bij de OpenCode-review.</div>
+  </div>
+  <h3>Testplan (alle fasen)</h3>
+  <ul class="tight">
+    <li>Unit: <code>buildAgentCommand('opencode', …)</code> (resume/mode/prompt), plugin <code>mapEventToState</code>-tabel, installer-idempotentie (bestaande hook-teststijl volgen).</li>
+    <li>Regression: bestaande <code>TerminalPool</code>- en <code>projectStore</code>-tests in <code>test/</code>; <code>npm run test -- path/to/test.ts</code> voor gericht draaien.</li>
+    <li>Verificatie-gate per fase: <code>npm run typecheck &amp;&amp; npm run lint &amp;&amp; npm run test:unit</code> (conform <code>CLAUDE.md</code>: altijd suite draaien voor “klaar”).</li>
+    <li>Handmatig: matrix {Windows Git-Bash, PowerShell} × {fresh, <code>--session</code>-resume, <code>--continue</code>} × {Fase 1 heuristiek, Fase 2 plugin-states}.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <p class="action-title">8. Volgende stap: opportunity-window van 10 minuten — of timeboxed Spike 0</p>
+  <div class="grid2">
+    <div class="callout blue"><strong>Optie A — kleinste eerste stap (10 min, aanbevolen):</strong>
+    voer Fase 1, items #1–#4 door (4 bestanden) en check <code>npm run typecheck</code>. Geen OpenCode-installatie nodig om de compile-gate te bewijzen; runtime-test volgt met <code>opencode --version</code> op je machine.</div>
+    <div class="callout blue"><strong>Optie B — eerst zekerheid (2u):</strong>
+    draai Spike S1–S5 en leg de vijf antwoorden vast in <code>docs/solutions/</code> (met YAML-frontmatter <code>module/tags/problem_type</code>).
+    Daarna Fase 1–3 zonder herwerk.</div>
+  </div>
+  <p style="color:var(--muted);font-size:14px">Aanbeveling: <strong>A, daarna B</strong> — A bewijst dat het registry-model klopt (en is omkeerbaar in één commit);
+  B voorkomt dat Fase 2 op aannames over Bun-plugin-payloads bouwt. Eén ding tegelijk, geen scope-creep in dezelfde PR (bugfix ≠ refactor).</p>
+</section>
+
+<footer>
+  Plan opgesteld 2026-09-08 · Bronnen: <code>shared/ipc-types.ts</code>, <code>shared/agents.ts</code>,
+  <code>electron/main/services/agents.ts</code>, <code>HookInstaller.ts</code>, <code>ClaudeHookWatcher.ts</code>,
+  <code>TerminalManager.ts</code>, <code>AutomationRunner.ts</code>, <code>AgentBadge.tsx</code>, <code>opencode.ai/docs/{cli,plugins,permissions,config}</code>.
+  Geen code gewijzigd.
+</footer>
+
+</div>
+<script>mermaid.initialize({startOnLoad:true, theme:'neutral'});</script>
+</body>
+</html>

@@ -38,7 +38,7 @@ import type {
   NotchSession,
 } from '../../shared/ipc-types'
 import { isAgentType } from '../../shared/agents'
-import { isHookCapableAgent } from './services/agents'
+import { isHookCapableAgent, opencodeSessionListContains } from './services/agents'
 import { GitService } from './services/GitService'
 import { WorktreeService } from './services/WorktreeService'
 import { ClaudeHookWatcher } from './services/ClaudeHookWatcher'
@@ -194,8 +194,11 @@ function validateTrigger(raw: unknown): AutomationTrigger {
       if (typeof obj.cron !== 'string' || obj.cron.length === 0 || obj.cron.length > 100)
         throw new Error('Invalid cron expression')
       return { type: 'schedule', cron: obj.cron }
+    case 'agent-done':
+      return { type: 'agent-done' }
     case 'claude-done':
-      return { type: 'claude-done' }
+      // Legacy name from before multi-agent support — same trigger.
+      return { type: 'agent-done' }
     case 'git-event':
       if (!VALID_GIT_EVENTS.includes(obj.event as GitEvent))
         throw new Error('Invalid git event type')
@@ -281,6 +284,9 @@ let skillInstaller: SkillInstaller | null = null
  * transcripts differently:
  *  - claude: ~/.claude/projects/{encoded-cwd}/{sessionId}.json
  *  - codex:  ~/.codex/sessions/**\/rollout-*-{sessionId}.jsonl (date-nested)
+ *  - opencode: `opencode session list --format json` membership (fail-closed:
+ *    any exec/parse failure means "not resumable" → fresh start, never a
+ *    resume of a stale id)
  *  - pi:     no reliable id-based transcript lookup → treated as not resumable
  */
 async function verifyAgentSessionAsync(
@@ -300,6 +306,20 @@ async function verifyAgentSessionAsync(
       const codexSessions = path.join(os.homedir(), '.codex', 'sessions')
       const entries = await fs.readdir(codexSessions, { recursive: true })
       return entries.some((e) => typeof e === 'string' && e.includes(sessionId))
+    }
+    if (agentType === 'opencode') {
+      const stdout = await new Promise<string>((resolve, reject) => {
+        execFile(
+          'opencode',
+          ['session', 'list', '--format', 'json'],
+          { timeout: 15_000, windowsHide: true },
+          (err, out) => {
+            if (err) reject(err)
+            else resolve(out)
+          }
+        )
+      })
+      return opencodeSessionListContains(stdout, sessionId)
     }
     return false
   } catch {

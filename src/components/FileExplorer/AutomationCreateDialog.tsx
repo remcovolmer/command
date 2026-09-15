@@ -14,7 +14,7 @@ interface AutomationCreateDialogProps {
   editAutomation?: Automation | null
 }
 
-type TriggerType = 'schedule' | 'claude-done' | 'git-event' | 'file-change'
+type TriggerType = 'schedule' | 'agent-done' | 'git-event' | 'file-change'
 
 function segButton(active: boolean, disabled = false) {
   return clsx(
@@ -109,8 +109,8 @@ export function AutomationCreateDialog({
     switch (triggerType) {
       case 'schedule':
         return { type: 'schedule', cron: cron.trim() }
-      case 'claude-done':
-        return { type: 'claude-done' }
+      case 'agent-done':
+        return { type: 'agent-done' }
       case 'git-event':
         return { type: 'git-event', event: gitEvent }
       case 'file-change':
@@ -283,7 +283,7 @@ export function AutomationCreateDialog({
             {(
               [
                 { value: 'schedule', label: 'Schedule' },
-                { value: 'claude-done', label: 'Claude Done' },
+                { value: 'agent-done', label: 'Agent done' },
                 { value: 'git-event', label: 'Git Event' },
                 { value: 'file-change', label: 'File Change' },
               ] as const

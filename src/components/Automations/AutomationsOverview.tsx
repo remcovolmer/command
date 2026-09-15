@@ -50,8 +50,8 @@ function triggerLabel(trigger: Automation['trigger']): string {
   switch (trigger.type) {
     case 'schedule':
       return `Cron: ${trigger.cron}`
-    case 'claude-done':
-      return 'On Claude done'
+    case 'agent-done':
+      return 'On agent done'
     case 'git-event':
       return `Git: ${trigger.event}`
     case 'file-change':
