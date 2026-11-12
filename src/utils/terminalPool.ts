@@ -1,4 +1,5 @@
 import type { TerminalSession, TerminalState } from '../types'
+import { trimPreservingModes } from '@shared/ptyBuffer'
 
 const MAX_SERIALIZED_SIZE = 2 * 1024 * 1024 // 2MB per terminal
 // PTY output that reaches the renderer while a terminal has no live xterm
@@ -91,7 +92,9 @@ export class TerminalPool {
    */
   appendPendingData(terminalId: string, data: string): void {
     const existing = this.pendingData.get(terminalId) ?? ''
-    this.pendingData.set(terminalId, trimFront(existing + data, MAX_PENDING_SIZE))
+    // Mode-preserving: for a never-opened chat the discarded prefix holds
+    // Claude Code's startup mode setup (alt screen, mouse tracking).
+    this.pendingData.set(terminalId, trimPreservingModes(existing + data, MAX_PENDING_SIZE))
   }
 
   /** Return and clear the pending PTY output for a terminal ('' when none). */

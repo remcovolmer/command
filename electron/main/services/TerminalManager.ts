@@ -11,7 +11,7 @@ import { isAgentType } from '../../../shared/agents'
 import { buildAgentCommand, isHookCapableAgent } from './agents'
 import { createLogger } from './Logger'
 import { deriveShellSpec, quotePromptForShell } from '../utils/shell'
-import { trimPreservingModes } from '../utils/ptyBuffer'
+import { trimPreservingModes } from '../../../shared/ptyBuffer'
 import { type PtySize } from '../utils/ptySize'
 
 const log = createLogger('TerminalManager')

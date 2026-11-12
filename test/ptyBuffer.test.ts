@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { findSafeCut, modeRestorePrefix, trimPreservingModes } from '../electron/main/utils/ptyBuffer'
+import { findSafeCut, modeRestorePrefix, trimPreservingModes } from '../shared/ptyBuffer'
 
 const fill = (n: number, ch = 'x') => ch.repeat(n)
 

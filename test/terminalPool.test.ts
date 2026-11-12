@@ -464,6 +464,16 @@ describe('TerminalPool', () => {
       expect(data.endsWith('y')).toBe(true)
     })
 
+    test('trimming keeps the mode setup of the discarded prefix', () => {
+      const setup = '\x1b[?1049h\x1b[?1000;1006h'
+      pool.appendPendingData('a', setup + 'x'.repeat(600 * 1024) + '\n')
+      pool.appendPendingData('a', 'y'.repeat(600 * 1024))
+      const data = pool.takePendingData('a')
+      expect(data.startsWith('\x1b[?1049h\x1b[?1000h\x1b[?1006h')).toBe(true)
+      expect(data).not.toContain('x')
+      expect(data.endsWith('y')).toBe(true)
+    })
+
     test('is dropped when the terminal is removed', () => {
       pool.appendPendingData('a', 'late')
       pool.remove('a')

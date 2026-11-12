@@ -1,5 +1,6 @@
 /**
- * Mode-preserving trim for the capped PTY output buffers in TerminalManager.
+ * Mode-preserving trim for the capped PTY output buffers (main's TerminalManager
+ * and the renderer's TerminalPool pending data).
  *
  * When an evicted terminal's buffer exceeds its cap we must drop the oldest
  * output. A naive front-trim can discard the DECSET/DECRST sequences that put
