@@ -5,6 +5,7 @@ import { SettingsDialog } from './components/Settings/SettingsDialog'
 import { ShortcutsOverlay } from './components/Settings/ShortcutsOverlay'
 import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
+import { estimateTerminalGrid } from './utils/terminalGrid'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
 import { useNotchFeed } from './hooks/useNotchFeed'
 import { fileWatcherEvents } from './utils/fileWatcherEvents'
@@ -241,7 +242,14 @@ function App() {
       const agent = projects.find((p) => p.id === activeProjectId)?.settings?.defaultAgent ?? 'claude'
 
       ;(async () => {
-        const terminalId = await api.terminal.create(activeProjectId, undefined, agent)
+        const terminalId = await api.terminal.create(
+          activeProjectId,
+          undefined,
+          agent,
+          undefined,
+          undefined,
+          estimateTerminalGrid('chat', useProjectStore.getState().activeTerminalId)
+        )
         if (!terminalId) return // spawn-failed event surfaces the error to the user
         const terminal: TerminalSession = {
           id: terminalId,

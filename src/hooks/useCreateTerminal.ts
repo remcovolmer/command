@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
+import { estimateTerminalGrid } from '../utils/terminalGrid'
 import type { AgentType, TerminalSession } from '../types'
 
 interface CreateTerminalOptions {
@@ -68,7 +69,14 @@ export function useCreateTerminal() {
 
       let terminalId: string | null
       try {
-        terminalId = await api.terminal.create(projectId, worktreeId, agent)
+        terminalId = await api.terminal.create(
+          projectId,
+          worktreeId,
+          agent,
+          undefined,
+          undefined,
+          estimateTerminalGrid('chat', useProjectStore.getState().activeTerminalId)
+        )
       } catch {
         api.notification.show('Error', 'Failed to create terminal')
         return null

@@ -106,7 +106,7 @@ export function SidecarTerminalPanel({
       </div>
 
       {/* Terminal content */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="flex-1 min-h-0 relative" data-terminal-viewport="sidecar">
         {terminals.map((term) => (
           <SidecarTerminalInstance
             key={term.id}

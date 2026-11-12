@@ -20,8 +20,8 @@ import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
 import { CrashLogger, writeCrashFallback, type LogEntry } from './services/CrashLogger'
 import { initLogger, createLogger, getLogFilePath } from './services/Logger'
-import { handleTerminalCreate } from './handlers/terminalCreate'
-import { sanitizePtySize } from './utils/ptySize'
+import { handleTerminalCreate, parseCreateSize } from './handlers/terminalCreate'
+import { sanitizePtySize, type PtySize } from './utils/ptySize'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
 import {
@@ -329,8 +329,9 @@ async function pathExistsAsync(targetPath: string): Promise<boolean> {
  * Restore sessions from previous app close. Thin wrapper around the testable
  * implementation in ./handlers/restoreSessions.
  */
-async function restoreSessions(): Promise<void> {
+async function restoreSessions(size?: PtySize): Promise<void> {
   return restoreSessionsImpl({
+    size,
     projectPersistence,
     terminalManager,
     hookWatcher,
@@ -2065,15 +2066,15 @@ app.whenReady().then(async () => {
 
   // Restore sessions once the renderer store is hydrated (with fallback timeout)
   let sessionsRestored = false
-  const doRestore = () => {
+  const doRestore = (size?: unknown) => {
     if (sessionsRestored) return
     sessionsRestored = true
-    restoreSessions().catch((err) => {
+    restoreSessions(parseCreateSize(size) ?? undefined).catch((err) => {
       mainLog.error('Session restoration failed:', err)
     })
   }
-  ipcMain.once('store:hydrated', (_event) => doRestore())
-  setTimeout(doRestore, 3000) // Fallback if hydration signal never arrives
+  ipcMain.once('store:hydrated', (_event, size?: unknown) => doRestore(size))
+  setTimeout(() => doRestore(), 3000) // Fallback if hydration signal never arrives
 
   // Check for updates after app is loaded (with delay to not block UI)
   setTimeout(() => {

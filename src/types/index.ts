@@ -366,7 +366,8 @@ export interface ElectronAPI {
     onCloseRequest: (callback: () => void) => Unsubscribe
     confirmClose: () => void
     cancelClose: () => void
-    storeHydrated: () => void
+    /** `size`: estimated chat grid for the PTYs of sessions restored at startup. */
+    storeHydrated: (size?: { cols: number; rows: number }) => void
     syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>
     setTitleBarOverlay: (
       theme: 'light' | 'dark',

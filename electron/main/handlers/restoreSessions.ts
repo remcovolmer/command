@@ -12,6 +12,7 @@ import type { ProjectPersistence } from '../services/ProjectPersistence'
 import type { ClaudeHookWatcher } from '../services/ClaudeHookWatcher'
 import type { BrowserWindow } from 'electron'
 import type { AgentType } from '../../../shared/ipc-types'
+import type { PtySize } from '../utils/ptySize'
 
 const log = createLogger('Session')
 
@@ -25,6 +26,9 @@ export interface RestoreSessionsDeps {
   resolveEnvOverrides: (
     project: { settings?: { authMode?: string; profileId?: string } } | undefined
   ) => Record<string, string> | undefined
+  /** Validated chat grid estimated by the renderer (store:hydrated). Omitted →
+   *  the manager's fallback (last applied size, then 80x24). */
+  size?: PtySize
 }
 
 export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> {
@@ -36,6 +40,7 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
     verifyAgentSession,
     pathExists,
     resolveEnvOverrides,
+    size,
   } = deps
   const win = getWindow()
   if (!projectPersistence || !terminalManager || !win) {
@@ -125,6 +130,7 @@ export async function restoreSessions(deps: RestoreSessionsDeps): Promise<void> 
         resumeSessionId: sessionFileExists ? session.claudeSessionId : undefined,
         claudeMode: project?.settings?.claudeMode,
         envOverrides,
+        size,
       })
 
       if (sessionFileExists && hookWatcher) {

@@ -14,6 +14,7 @@ import { SecondPanel } from './SecondPanel'
 import { ProjectOverview } from '../ProjectOverview'
 import { AutomationsOverview } from '../Automations/AutomationsOverview'
 import { getElectronAPI } from '../../utils/electron'
+import { estimateTerminalGrid } from '../../utils/terminalGrid'
 import { useCreateTerminal } from '../../hooks/useCreateTerminal'
 import { LogoIcon } from '../LogoIcon'
 import { DEFAULT_HOTKEY_CONFIG, formatBinding } from '../../utils/hotkeys'
@@ -135,7 +136,14 @@ export function TerminalArea() {
   const handleResumeSession = useCallback(
     async (sessionId: string, initialTitle?: string) => {
       if (!activeProjectId) return
-      const terminalId = await api.terminal.create(activeProjectId, undefined, 'claude', sessionId)
+      const terminalId = await api.terminal.create(
+        activeProjectId,
+        undefined,
+        'claude',
+        sessionId,
+        undefined,
+        estimateTerminalGrid('chat', activeTerminalId)
+      )
       if (terminalId) {
         addTerminal({
           id: terminalId,
@@ -148,7 +156,7 @@ export function TerminalArea() {
         })
       }
     },
-    [activeProjectId, api, addTerminal]
+    [activeProjectId, activeTerminalId, api, addTerminal]
   )
 
   // Show project overview when there are no chats, or when explicitly toggled on.
@@ -239,7 +247,7 @@ export function TerminalArea() {
               <StateLine
                 state={activeTerminalId ? (terminals[activeTerminalId]?.state ?? null) : null}
               />
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0" data-terminal-viewport="chat">
                 <TerminalViewport terminals={mountedChats} activeTerminalId={viewportActiveId} />
               </div>
             </div>

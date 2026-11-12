@@ -92,10 +92,12 @@ describe('restoreSessions handler', () => {
       verifyAgentSession: async () => true,
       pathExists: async () => true,
       resolveEnvOverrides: () => undefined,
+      size: { cols: 132, rows: 40 },
     })
 
-    // Both createTerminal attempts were made
+    // Both createTerminal attempts were made, at the renderer-estimated grid
     expect(createTerminal).toHaveBeenCalledTimes(2)
+    expect(createTerminal.mock.calls[1][0]).toMatchObject({ size: { cols: 132, rows: 40 } })
 
     // Only the survivor produced a session:restored event
     const restoredCalls = send.mock.calls.filter((c) => c[0] === 'session:restored')

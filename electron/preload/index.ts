@@ -401,7 +401,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     cancelClose: (): void => ipcRenderer.send('app:cancel-close'),
 
-    storeHydrated: (): void => ipcRenderer.send('store:hydrated'),
+    storeHydrated: (size?: { cols: number; rows: number }): void =>
+      ipcRenderer.send('store:hydrated', size),
 
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),

@@ -22,11 +22,13 @@ import { createOsc52ClipboardHandler } from '../utils/osc52Clipboard'
 import { buildModeRestoreSequence, readTerminalModes } from '../utils/terminalModes'
 import { buildPasteAction } from '../utils/terminalPaste'
 import { createContextLossPolicy } from '../utils/webglRecovery'
+import {
+  TERMINAL_FONT_STACK,
+  TERMINAL_LINE_HEIGHT,
+  registerLiveGrid,
+  unregisterLiveGrid,
+} from '../utils/terminalGrid'
 
-// Bundled via @fontsource/ibm-plex-mono (see index.css); the rest is the
-// fallback stack for a still-loading face or a stripped install.
-const TERMINAL_FONT_STACK =
-  "'IBM Plex Mono', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace"
 const TERMINAL_FONT_SPEC = "14px 'IBM Plex Mono'"
 
 // Timing constants for terminal dimension calculations
@@ -171,7 +173,7 @@ export function useXtermInstance({
       cursorStyle: 'block',
       fontSize,
       fontFamily: TERMINAL_FONT_STACK,
-      lineHeight: 1.15,
+      lineHeight: TERMINAL_LINE_HEIGHT,
       scrollback,
       ...buildTerminalThemeOptions(resolvedTheme),
       allowProposedApi: true,
@@ -221,6 +223,8 @@ export function useXtermInstance({
     terminal.onResize(({ cols, rows }) => {
       api.terminal.resize(id, cols, rows)
     })
+    // Lets a terminal created next to this one spawn its PTY at this grid.
+    registerLiveGrid(id, termSession?.type === 'normal' ? 'sidecar' : 'chat', terminal)
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
@@ -532,6 +536,7 @@ export function useXtermInstance({
         /* already disposed */
       }
       webglAddon = null
+      unregisterLiveGrid(id)
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
