@@ -941,3 +941,52 @@ describe('TerminalManager PTY pipeline (terminal audit)', () => {
     expect(send).toHaveBeenCalledWith('terminal:exit', id, 0)
   })
 })
+
+describe('TerminalManager Enter → busy heuristic', () => {
+  let manager: TerminalManager
+  const send = vi.fn()
+  const mockWindow = { isDestroyed: vi.fn(() => false), webContents: { send } }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockWrite.mockClear()
+    send.mockClear()
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // Put the cached state at 'done' so a busy transition would be observable.
+  function settleToDone(id: string) {
+    const terminals = (manager as unknown as { terminals: Map<string, { state: string }> })
+      .terminals
+    const t = terminals.get(id)
+    if (!t) throw new Error('terminal not found')
+    t.state = 'done'
+    send.mockClear()
+  }
+
+  const busyEmits = () =>
+    send.mock.calls.filter((c) => c[0] === 'terminal:state' && c[2] === 'busy')
+
+  test.each([['claude'], ['codex']] as const)(
+    'Enter on a hook-capable %s chat does not guess busy (UserPromptSubmit decides)',
+    async (type) => {
+      const id = manager.createTerminal({ cwd: '/test', type })
+      await vi.runAllTimersAsync()
+      settleToDone(id)
+      await manager.writeToTerminal(id, '\r')
+      expect(busyEmits()).toHaveLength(0)
+    }
+  )
+
+  test('Enter on a hookless pi chat still marks it busy', async () => {
+    const id = manager.createTerminal({ cwd: '/test', type: 'pi' })
+    await vi.runAllTimersAsync()
+    settleToDone(id)
+    await manager.writeToTerminal(id, 'hi\r')
+    expect(busyEmits()).toHaveLength(1)
+  })
+})

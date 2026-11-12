@@ -3,14 +3,15 @@
  * Claude Code Hook Script for Command
  *
  * This script receives hook events from Claude Code via stdin (JSON)
- * and writes the state to a file that the Electron app watches.
+ * and writes the session's state to ~/.claude/command-center-state/<session_id>.json,
+ * which the Electron app polls. Stale-file cleanup is the watcher's job.
  */
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
+const crypto = require('crypto')
 
 // Configuration constants
-const STALE_SESSION_TIMEOUT_MS = 60 * 60 * 1000 // 1 hour
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // How long a freshly-surfaced input state (question/permission) is protected from being
@@ -27,24 +28,57 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const INPUT_STATE_GUARD_MS = 2500
 
 const INPUT_STATES = new Set(['question', 'permission'])
+const PER_TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure'])
 
 /**
  * Map a raw Claude Code hook event to a Command terminal state.
  * Returns null when the event should not change state.
  */
 function mapEventToState(data) {
+  const state = mapMainEventToState(data)
+  // Events fired inside a subagent / in-process teammate carry `agent_id` and
+  // share the parent's session_id. Their 'busy' says nothing about the main
+  // chat (a background agent keeps calling tools after the main turn's Stop),
+  // so only their input requests (permission/question) may change state.
+  if (state === 'busy' && data.agent_id) return null
+  return state
+}
+
+function mapMainEventToState(data) {
   switch (data.hook_event_name) {
     case 'PreToolUse':
       // AskUserQuestion = Claude is asking the user something (orange); any other
       // tool call means Claude is working (gray).
       return data.tool_name === 'AskUserQuestion' ? 'question' : 'busy'
-    case 'SessionStart':
+    case 'PostToolUse':
+    case 'PostToolUseFailure':
+      // The tool ran (or failed) — any permission/question it raised is resolved
+      // and Claude continues the turn.
       return 'busy'
+    case 'SessionStart':
+      // /clear and interactive /resume leave Claude idle at the prompt; startup,
+      // compact (mid-turn auto-compact) and fork keep the existing busy default.
+      return data.source === 'clear' || data.source === 'resume' ? 'done' : 'busy'
     case 'Stop':
-    case 'SessionEnd':
+    case 'StopFailure':
+      // StopFailure = turn ended by an API error. Claude is still running and
+      // back at the prompt waiting for the user, exactly like after Stop, so it
+      // is 'done' — 'stopped' means the agent process is gone.
       return 'done'
+    case 'SessionEnd':
+      // clear/resume: the same CLI continues with a new session (a SessionStart
+      // follows). Any other reason means Claude exited — even if the shell lives on.
+      return data.reason === 'clear' || data.reason === 'resume' ? 'done' : 'stopped'
     case 'Notification':
       if (data.notification_type === 'permission_prompt') return 'permission'
+      // MCP elicitation form/URL dialogs and agents waiting on the user = question.
+      if (
+        data.notification_type === 'elicitation_dialog' ||
+        data.notification_type === 'elicitation_url_dialog' ||
+        data.notification_type === 'agent_needs_input'
+      ) {
+        return 'question'
+      }
       // Claude waiting 60+ seconds for user input = done (green).
       if (data.notification_type === 'idle_prompt') return 'done'
       // auth_success and other types don't change state.
@@ -72,9 +106,9 @@ function shouldSkipWrite(current, incoming, now, guardMs = INPUT_STATE_GUARD_MS)
   if (!current) return false
   const cur = current.state
 
-  // 1. Redundant busy from PreToolUse — already busy, nothing changes.
-  //    Reduces file writes by ~80% during active work (PreToolUse fires per tool call).
-  if (incoming.hook_event === 'PreToolUse' && incoming.state === 'busy' && cur === 'busy') {
+  // 1. Redundant busy from a per-tool-call event — already busy, nothing changes.
+  //    Reduces file writes by ~80% during active work (these fire per tool call).
+  if (PER_TOOL_EVENTS.has(incoming.hook_event) && incoming.state === 'busy' && cur === 'busy') {
     return true
   }
 
@@ -97,7 +131,110 @@ function shouldSkipWrite(current, incoming, now, guardMs = INPUT_STATE_GUARD_MS)
   return false
 }
 
-module.exports = { mapEventToState, shouldSkipWrite, INPUT_STATE_GUARD_MS }
+// One state file per session in this directory (under ~/.claude). A single shared
+// file read-merge-written by concurrent hook processes loses updates: one
+// session's write can erase another session's transition. Per-session files have
+// exactly one writer stream each, so cross-session races cannot occur.
+const STATE_DIR_NAME = 'command-center-state'
+
+const RENAME_RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
+const RENAME_RETRIES = 4
+
+function stateDirFor(home) {
+  return path.join(home, '.claude', STATE_DIR_NAME)
+}
+
+/**
+ * Build the state entry for one event. `terminal_id` comes from the
+ * COMMAND_CENTER_TERMINAL_ID env var that Command injects into every PTY (Claude
+ * Code passes its env on to hooks): it is the authoritative session→terminal key
+ * for the watcher, so a second session in the same cwd cannot take over a chat.
+ */
+function buildStateEntry(data, state, env, now) {
+  const entry = {
+    session_id: data.session_id,
+    cwd: data.cwd,
+    state: state,
+    timestamp: now,
+    hook_event: data.hook_event_name,
+  }
+  const terminalId = env.COMMAND_CENTER_TERMINAL_ID
+  if (typeof terminalId === 'string' && UUID_REGEX.test(terminalId)) {
+    entry.terminal_id = terminalId
+  }
+  return entry
+}
+
+async function readSessionState(file) {
+  try {
+    const parsed = JSON.parse(await fs.promises.readFile(file, 'utf-8'))
+    return parsed && typeof parsed === 'object' ? parsed : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Unique temp file + rename; retries Windows EPERM/EBUSY while a reader has the target open. */
+async function writeFileAtomic(file, content) {
+  const tempFile = `${file}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`
+  await fs.promises.writeFile(tempFile, content)
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fs.promises.rename(tempFile, file)
+      return
+    } catch (e) {
+      if (attempt < RENAME_RETRIES && e && RENAME_RETRY_CODES.has(e.code)) {
+        await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)))
+        continue
+      }
+      try {
+        await fs.promises.unlink(tempFile)
+      } catch {
+        /* best-effort temp cleanup */
+      }
+      throw e
+    }
+  }
+}
+
+/**
+ * Map one hook payload to a state and persist it to the session's own file.
+ * Returns 'ignored' (no state change / invalid), 'skipped' (guarded) or 'written'.
+ */
+async function recordState(stateDir, data, env, now = Date.now) {
+  // Validate session_id format: it becomes a file name (no path traversal).
+  if (!data || typeof data.session_id !== 'string' || !UUID_REGEX.test(data.session_id)) {
+    return 'ignored'
+  }
+  const state = mapEventToState(data)
+  if (!state) return 'ignored'
+
+  const entry = buildStateEntry(data, state, env, now())
+  const file = path.join(stateDir, `${data.session_id}.json`)
+
+  // Early skip using the state read at entry (redundant busy / protected input state).
+  if (shouldSkipWrite(await readSessionState(file), entry, now())) return 'skipped'
+
+  // For downgrade writes (busy/done) re-read immediately before writing. This catches
+  // an input state (question/permission) that ANOTHER hook process of this session
+  // wrote after our first read (AskUserQuestion fires several events at once).
+  if (state === 'busy' || state === 'done') {
+    if (shouldSkipWrite(await readSessionState(file), entry, now())) return 'skipped'
+  }
+
+  await fs.promises.mkdir(stateDir, { recursive: true })
+  await writeFileAtomic(file, JSON.stringify(entry))
+  return 'written'
+}
+
+module.exports = {
+  mapEventToState,
+  shouldSkipWrite,
+  buildStateEntry,
+  recordState,
+  stateDirFor,
+  INPUT_STATE_GUARD_MS,
+}
 
 // Only wire up stdin when executed directly by Claude Code (not when required by tests).
 if (require.main === module) {
@@ -105,89 +242,9 @@ if (require.main === module) {
   process.stdin.on('data', (chunk) => (input += chunk))
   process.stdin.on('end', async () => {
     try {
-      const data = JSON.parse(input)
-
-      // Validate session_id format to prevent prototype pollution
-      if (!data.session_id || !UUID_REGEX.test(data.session_id)) {
-        process.exit(0) // Invalid session ID, skip
-      }
-
-      const stateFile = path.join(
-        process.env.HOME || process.env.USERPROFILE || os.homedir(),
-        '.claude',
-        'command-center-state.json'
-      )
-
-      const state = mapEventToState(data)
-      if (!state) {
-        process.exit(0) // Event doesn't change state
-      }
-      const hookEvent = data.hook_event_name
-
-      const stateData = {
-        session_id: data.session_id,
-        cwd: data.cwd,
-        state: state,
-        timestamp: Date.now(),
-        hook_event: hookEvent,
-      }
-
-      // Read-merge-write pattern for multi-session support.
-      // Use Object.create(null) to prevent prototype pollution.
-      const readStates = async () => {
-        let all = Object.create(null)
-        try {
-          const existing = await fs.promises.readFile(stateFile, 'utf-8')
-          all = Object.assign(Object.create(null), JSON.parse(existing))
-        } catch (e) {
-          // Start fresh if file doesn't exist or is invalid
-        }
-        return all
-      }
-
-      let allStates = await readStates()
-
-      // Early skip using the state read at entry (redundant busy / protected input state).
-      if (shouldSkipWrite(allStates[data.session_id], stateData, Date.now())) {
-        process.exit(0)
-      }
-
-      // For downgrade writes (busy/done) re-read immediately before writing. This catches
-      // an input state (question/permission) that ANOTHER hook process wrote AFTER our
-      // first read — the actual async write-order race that silently erased the orange dot.
-      if (state === 'busy' || state === 'done') {
-        const fresh = await readStates()
-        if (shouldSkipWrite(fresh[data.session_id], stateData, Date.now())) {
-          process.exit(0)
-        }
-        allStates = fresh
-      }
-
-      // Write this session's state keyed by session_id
-      allStates[data.session_id] = stateData
-
-      // Cleanup stale sessions
-      const now = Date.now()
-      for (const sid in allStates) {
-        if (allStates[sid].timestamp && now - allStates[sid].timestamp > STALE_SESSION_TIMEOUT_MS) {
-          delete allStates[sid]
-        }
-      }
-
-      // Atomic write: temp file + rename to avoid TOCTOU race conditions
-      const tempFile = stateFile + '.tmp.' + process.pid
-      try {
-        await fs.promises.writeFile(tempFile, JSON.stringify(allStates))
-        await fs.promises.rename(tempFile, stateFile)
-      } catch (writeErr) {
-        // Cleanup temp file on error
-        try {
-          await fs.promises.unlink(tempFile)
-        } catch {
-          /* best-effort temp cleanup */
-        }
-      }
-    } catch (e) {
+      const home = process.env.HOME || process.env.USERPROFILE || os.homedir()
+      await recordState(stateDirFor(home), JSON.parse(input), process.env)
+    } catch {
       // Silent fail - don't interfere with Claude Code
     }
 

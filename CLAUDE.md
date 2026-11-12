@@ -64,8 +64,8 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | Service | Purpose |
 |---------|---------|
 | `TerminalManager.ts` | PTY spawning via node-pty, data routing, session resume, auto-naming |
-| `ClaudeHookWatcher.ts` | Polls `~/.claude/command-center-state.json` every 250ms, maps session states to terminals via BiMap |
-| `HookInstaller.ts` | Injects `claude-state-hook.cjs` into `~/.claude/settings.json` for 6 Claude Code events |
+| `ClaudeHookWatcher.ts` | Polls `~/.claude/command-center-state/` (per-session files) and the legacy `command-center-state.json` every 250ms, maps session states to terminals by terminal ID (cwd fallback) via BiMap |
+| `HookInstaller.ts` | Injects `claude-state-hook.cjs` into `~/.claude/settings.json` for 10 Claude Code events (and the Codex hook into `~/.codex/hooks.json`) |
 | `ProjectPersistence.ts` | JSON file storage in `userData/projects.json`, session persistence for resume |
 | `WorktreeService.ts` | Git worktree CRUD (create, list, remove, has-changes) |
 | `GitService.ts` | Git operations (status, fetch, pull, push, commit log/detail) |
@@ -84,11 +84,11 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 
 This is the core mechanism that powers the attention indicator:
 
-1. `HookInstaller` writes into `~/.claude/settings.json` to register `claude-state-hook.cjs` for events: `PreToolUse`, `Stop`, `SessionStart`, `UserPromptSubmit`, `PermissionRequest`, `Notification`
+1. `HookInstaller` writes into `~/.claude/settings.json` (atomically; never when the file doesn't parse) to register `claude-state-hook.cjs` for events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Notification`, `Stop`, `StopFailure`, `SessionEnd` (all `async` except `SessionEnd`, which must finish before Claude exits)
 2. When Claude Code fires an event, it executes the hook script which reads JSON from stdin
-3. The hook maps events to states and writes atomically to `~/.claude/command-center-state.json`
-4. `ClaudeHookWatcher` polls this file, matches sessions to terminals via a BiMap (session ID ↔ terminal ID), and emits `terminal:state` events
-5. States: `busy` (gray), `permission` (orange), `question` (orange), `done` (green), `stopped` (red)
+3. The hook maps events to states and writes atomically to its own per-session file `~/.claude/command-center-state/<session_id>.json`, including `terminal_id` (the PTY's `COMMAND_CENTER_TERMINAL_ID`). The Codex hook (and older Claude hook scripts) still write the legacy shared `~/.claude/command-center-state.json`
+4. `ClaudeHookWatcher` polls both (dir: stat/mtime every 250ms, deletes files idle >1h). Entries with `terminal_id` map to that terminal only (unregistered IDs such as sidecars are ignored; the most recent session on a terminal ID owns it); entries without it fall back to cwd matching, which never takes an ID-owned chat. Mapping is a BiMap (session ID ↔ terminal ID), emitted as `terminal:state` events
+5. States: `busy` (gray), `permission` (orange), `question` (orange), `done` (green), `stopped` (red; also on `SessionEnd` when Claude exits while the shell stays alive)
 
 ### Terminal Pool & LRU Eviction
 

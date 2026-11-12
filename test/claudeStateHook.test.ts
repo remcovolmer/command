@@ -1,10 +1,13 @@
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, beforeEach, afterEach } from 'vitest'
 import { createRequire } from 'module'
+import { mkdtempSync, rmSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 
 // The hook is a standalone .cjs executed by Claude Code per event. Its pure decision
 // logic is exported (the stdin wiring is guarded by `require.main === module`).
 const require = createRequire(import.meta.url)
-const { mapEventToState, shouldSkipWrite, INPUT_STATE_GUARD_MS } =
+const { mapEventToState, shouldSkipWrite, recordState, stateDirFor, INPUT_STATE_GUARD_MS } =
   require('../electron/main/hooks/claude-state-hook.cjs') as {
     mapEventToState: (data: Record<string, unknown>) => string | null
     shouldSkipWrite: (
@@ -13,6 +16,13 @@ const { mapEventToState, shouldSkipWrite, INPUT_STATE_GUARD_MS } =
       now: number,
       guardMs?: number
     ) => boolean
+    recordState: (
+      stateDir: string,
+      data: Record<string, unknown>,
+      env: Record<string, string | undefined>,
+      now?: () => number
+    ) => Promise<'ignored' | 'skipped' | 'written'>
+    stateDirFor: (home: string) => string
     INPUT_STATE_GUARD_MS: number
   }
 
@@ -55,11 +65,52 @@ describe('mapEventToState', () => {
     expect(mapEventToState({ hook_event_name: 'SessionStart' })).toBe('busy')
     expect(mapEventToState({ hook_event_name: 'UserPromptSubmit' })).toBe('busy')
     expect(mapEventToState({ hook_event_name: 'Stop' })).toBe('done')
-    expect(mapEventToState({ hook_event_name: 'SessionEnd' })).toBe('done')
+  })
+
+  // Full event → state table, including the events added for the audit findings.
+  test.each([
+    [{ hook_event_name: 'SessionStart', source: 'startup' }, 'busy'],
+    [{ hook_event_name: 'SessionStart', source: 'compact' }, 'busy'],
+    [{ hook_event_name: 'SessionStart', source: 'clear' }, 'done'],
+    [{ hook_event_name: 'SessionStart', source: 'resume' }, 'done'],
+    [{ hook_event_name: 'UserPromptSubmit' }, 'busy'],
+    [{ hook_event_name: 'PreToolUse', tool_name: 'Bash' }, 'busy'],
+    [{ hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion' }, 'question'],
+    [{ hook_event_name: 'PermissionRequest', tool_name: 'Bash' }, 'permission'],
+    [{ hook_event_name: 'PostToolUse', tool_name: 'Bash' }, 'busy'],
+    [{ hook_event_name: 'PostToolUseFailure', tool_name: 'Bash' }, 'busy'],
+    [{ hook_event_name: 'Stop' }, 'done'],
+    [{ hook_event_name: 'StopFailure', error: 'rate_limit' }, 'done'],
+    [{ hook_event_name: 'SessionEnd', reason: 'clear' }, 'done'],
+    [{ hook_event_name: 'SessionEnd', reason: 'resume' }, 'done'],
+    [{ hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' }, 'stopped'],
+    [{ hook_event_name: 'SessionEnd', reason: 'logout' }, 'stopped'],
+    [{ hook_event_name: 'SessionEnd', reason: 'other' }, 'stopped'],
+    [{ hook_event_name: 'Notification', notification_type: 'permission_prompt' }, 'permission'],
+    [{ hook_event_name: 'Notification', notification_type: 'elicitation_dialog' }, 'question'],
+    [{ hook_event_name: 'Notification', notification_type: 'elicitation_url_dialog' }, 'question'],
+    [{ hook_event_name: 'Notification', notification_type: 'agent_needs_input' }, 'question'],
+    [{ hook_event_name: 'Notification', notification_type: 'idle_prompt' }, 'done'],
+    [{ hook_event_name: 'Notification', notification_type: 'agent_completed' }, null],
+    [{ hook_event_name: 'SubagentStop' }, null],
+  ])('%o maps to %s', (data, expected) => {
+    expect(mapEventToState(data)).toBe(expected)
+  })
+
+  test('subagent events (agent_id) never report busy, but input requests still surface', () => {
+    const sub = { agent_id: 'agent-1', agent_type: 'Explore' }
+    expect(mapEventToState({ ...sub, hook_event_name: 'PreToolUse', tool_name: 'Bash' })).toBeNull()
+    expect(
+      mapEventToState({ ...sub, hook_event_name: 'PostToolUse', tool_name: 'Bash' })
+    ).toBeNull()
+    expect(mapEventToState({ ...sub, hook_event_name: 'PermissionRequest' })).toBe('permission')
+    expect(
+      mapEventToState({ ...sub, hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion' })
+    ).toBe('question')
   })
 
   test('unknown event maps to null', () => {
-    expect(mapEventToState({ hook_event_name: 'PostToolUse' })).toBeNull()
+    expect(mapEventToState({ hook_event_name: 'PreCompact' })).toBeNull()
     expect(mapEventToState({})).toBeNull()
   })
 })
@@ -69,6 +120,28 @@ describe('shouldSkipWrite', () => {
 
   test('no current state never skips', () => {
     expect(shouldSkipWrite(undefined, { state: 'busy', hook_event: 'PreToolUse' }, now)).toBe(false)
+  })
+
+  test('skips redundant PostToolUse busy when already busy', () => {
+    expect(
+      shouldSkipWrite(
+        { state: 'busy', timestamp: now },
+        { state: 'busy', hook_event: 'PostToolUse' },
+        now
+      )
+    ).toBe(true)
+  })
+
+  test('PostToolUse busy clears a permission once the guard window has passed', () => {
+    const current = { state: 'permission', timestamp: now - (INPUT_STATE_GUARD_MS + 100) }
+    expect(shouldSkipWrite(current, { state: 'busy', hook_event: 'PostToolUse' }, now)).toBe(false)
+  })
+
+  test('SessionEnd stopped is never skipped, even over a fresh input state', () => {
+    const current = { state: 'permission', timestamp: now - 10 }
+    expect(shouldSkipWrite(current, { state: 'stopped', hook_event: 'SessionEnd' }, now)).toBe(
+      false
+    )
   })
 
   test('skips redundant busy when already busy', () => {
@@ -116,5 +189,114 @@ describe('shouldSkipWrite', () => {
     expect(
       shouldSkipWrite(current, { state: 'permission', hook_event: 'PermissionRequest' }, now)
     ).toBe(false)
+  })
+})
+
+describe('recordState (per-session state files)', () => {
+  const SID_A = 'aaaaaaaa-1111-4111-8111-111111111111'
+  const SID_B = 'bbbbbbbb-2222-4222-8222-222222222222'
+  const TERMINAL = 'cccccccc-3333-4333-8333-333333333333'
+  let home: string
+  let dir: string
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'claude-state-hook-'))
+    dir = stateDirFor(home)
+  })
+  afterEach(() => {
+    rmSync(home, { recursive: true, force: true })
+  })
+
+  const read = (sid: string) => JSON.parse(readFileSync(join(dir, `${sid}.json`), 'utf-8'))
+
+  test('stateDirFor points at ~/.claude/command-center-state', () => {
+    expect(stateDirFor(home)).toBe(join(home, '.claude', 'command-center-state'))
+  })
+
+  test('writes one file per session, with the PTY terminal id from the env', async () => {
+    const result = await recordState(
+      dir,
+      { session_id: SID_A, cwd: 'C:/p', hook_event_name: 'UserPromptSubmit' },
+      { COMMAND_CENTER_TERMINAL_ID: TERMINAL }
+    )
+    expect(result).toBe('written')
+    expect(read(SID_A)).toMatchObject({
+      session_id: SID_A,
+      cwd: 'C:/p',
+      state: 'busy',
+      hook_event: 'UserPromptSubmit',
+      terminal_id: TERMINAL,
+    })
+    // No temp files left behind
+    expect(readdirSync(dir)).toEqual([`${SID_A}.json`])
+  })
+
+  test('omits terminal_id outside Command or when the env value is not a UUID', async () => {
+    await recordState(dir, { session_id: SID_A, hook_event_name: 'Stop' }, {})
+    expect(read(SID_A).terminal_id).toBeUndefined()
+    await recordState(
+      dir,
+      { session_id: SID_B, hook_event_name: 'Stop' },
+      { COMMAND_CENTER_TERMINAL_ID: '../evil' }
+    )
+    expect(read(SID_B).terminal_id).toBeUndefined()
+  })
+
+  test('rejects non-UUID session ids (they become file names)', async () => {
+    expect(await recordState(dir, { session_id: '../../x', hook_event_name: 'Stop' }, {})).toBe(
+      'ignored'
+    )
+  })
+
+  test('events that do not change state write nothing', async () => {
+    expect(await recordState(dir, { session_id: SID_A, hook_event_name: 'PreCompact' }, {})).toBe(
+      'ignored'
+    )
+  })
+
+  test('concurrent writes of different sessions never erase each other (lost-update fix)', async () => {
+    const sids = Array.from(
+      { length: 12 },
+      (_, i) => `${String(i).padStart(8, '0')}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`
+    )
+    await Promise.all(
+      sids.map((sid) => recordState(dir, { session_id: sid, hook_event_name: 'Stop' }, {}))
+    )
+    for (const sid of sids) expect(read(sid).state).toBe('done')
+  })
+
+  test('the input-state guard reads the session file: a racing busy does not clobber a fresh question', async () => {
+    let t = 1_000_000
+    const now = () => t
+    await recordState(
+      dir,
+      { session_id: SID_A, hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion' },
+      {},
+      now
+    )
+    t += 100
+    expect(
+      await recordState(dir, { session_id: SID_A, hook_event_name: 'UserPromptSubmit' }, {}, now)
+    ).toBe('skipped')
+    expect(read(SID_A).state).toBe('question')
+    t += INPUT_STATE_GUARD_MS + 1
+    expect(
+      await recordState(
+        dir,
+        { session_id: SID_A, hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion' },
+        {},
+        now
+      )
+    ).toBe('written')
+    expect(read(SID_A).state).toBe('busy')
+  })
+
+  test('a corrupt existing session file is overwritten, not fatal', async () => {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, `${SID_A}.json`), '{not json')
+    expect(await recordState(dir, { session_id: SID_A, hook_event_name: 'Stop' }, {})).toBe(
+      'written'
+    )
+    expect(read(SID_A).state).toBe('done')
   })
 })

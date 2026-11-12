@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'fs'
 import { join, dirname } from 'path'
+import { randomUUID } from 'crypto'
 import { homedir } from 'os'
 import { app } from 'electron'
 import { normalizePath } from '../utils/paths'
@@ -45,6 +46,12 @@ interface AgentHookTarget {
    * hooks must be synchronous or they never fire.
    */
   async: boolean
+  /**
+   * Events that must run synchronously even when `async` is true. SessionEnd
+   * fires while the agent exits; a background hook can be torn down with the
+   * process before it writes, losing the "session ended" signal.
+   */
+  syncEvents?: string[]
 }
 
 /**
@@ -66,9 +73,14 @@ function claudeTarget(): AgentHookTarget {
     configPath: join(homedir(), '.claude', 'settings.json'),
     scriptName: 'claude-state-hook.cjs',
     // Claude fires all of these; Notification/SessionEnd are Claude-specific.
+    // PostToolUse(Failure) clear 'permission' once an approved tool has run;
+    // StopFailure ends a turn on an API error (Stop does not fire then).
     events: [
       'PreToolUse',
+      'PostToolUse',
+      'PostToolUseFailure',
       'Stop',
+      'StopFailure',
       'Notification',
       'SessionStart',
       'SessionEnd',
@@ -77,6 +89,7 @@ function claudeTarget(): AgentHookTarget {
     ],
     matchToken: 'claude-state-hook',
     async: true,
+    syncEvents: ['SessionEnd'],
   }
 }
 
@@ -94,12 +107,92 @@ function codexTarget(): AgentHookTarget {
   }
 }
 
+const RENAME_RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
+const RENAME_RETRIES = 5
+const RETRY_DELAY_MS = 50
+const PARSE_RETRY_DELAY_MS = 150
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+function errorCode(e: unknown): string | undefined {
+  if (e && typeof e === 'object' && 'code' in e && typeof e.code === 'string') return e.code
+  return undefined
+}
+
+/**
+ * Write a file atomically: unique temp file in the same directory, then rename
+ * over the target. The agent CLI reads (and rewrites) this config itself, so an
+ * in-place write could be observed half-written. Windows rename fails with
+ * EPERM/EBUSY while another process has the target open — retry briefly.
+ * Exported for testing.
+ */
+export function writeFileAtomicSync(filePath: string, content: string): void {
+  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`
+  writeFileSync(tempPath, content)
+  for (let attempt = 0; ; attempt++) {
+    try {
+      renameSync(tempPath, filePath)
+      return
+    } catch (e) {
+      const code = errorCode(e)
+      if (attempt < RENAME_RETRIES && code !== undefined && RENAME_RETRY_CODES.has(code)) {
+        sleepSync(RETRY_DELAY_MS * (attempt + 1))
+        continue
+      }
+      try {
+        unlinkSync(tempPath)
+      } catch {
+        /* best-effort temp cleanup */
+      }
+      throw e
+    }
+  }
+}
+
+type ReadConfigResult = { ok: true; config: HookConfig; raw: string | null } | { ok: false }
+
+/**
+ * Read and parse an existing JSON config. A missing file is an empty config; a
+ * file that does not parse is NOT — it may be mid-write by the agent or carry a
+ * user typo, and treating it as `{}` would overwrite every user setting. Retries
+ * once (mid-write case), then reports failure so the caller writes nothing.
+ */
+function readConfig(label: string, configPath: string): ReadConfigResult {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let raw: string
+    try {
+      raw = readFileSync(configPath, 'utf-8')
+    } catch (e) {
+      if (errorCode(e) === 'ENOENT') return { ok: true, config: {}, raw: null }
+      log.error(`Cannot read ${label} config ${configPath}; hooks not changed:`, e)
+      return { ok: false }
+    }
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return { ok: true, config: parsed as HookConfig, raw }
+      }
+    } catch {
+      /* fall through to retry / failure */
+    }
+    if (attempt === 0) sleepSync(PARSE_RETRY_DELAY_MS)
+  }
+  log.error(
+    `${label} config ${configPath} is not valid JSON; leaving it untouched and skipping hook ` +
+      `changes (state detection stays off until the file is fixed and Command restarts)`
+  )
+  return { ok: false }
+}
+
 /**
  * Install one agent's hooks into its config file, idempotently. Reads the
  * existing JSON (preserving unrelated keys), adds or migrates our hook entry for
- * each event, and writes back only if something changed.
+ * each event, and writes back (atomically) only if something changed. Returns
+ * false when the config could not be parsed or written.
  */
-function installTarget(target: AgentHookTarget): void {
+function installTarget(target: AgentHookTarget): boolean {
   const { label, configPath, scriptName, events, matchToken, async: useAsync } = target
   const hookScriptPath = getHookScriptPath(scriptName)
   const configDir = dirname(configPath)
@@ -111,29 +204,25 @@ function installTarget(target: AgentHookTarget): void {
     mkdirSync(configDir, { recursive: true })
   }
 
-  let config: HookConfig = {}
-  if (existsSync(configPath)) {
-    try {
-      config = JSON.parse(readFileSync(configPath, 'utf-8'))
-    } catch (e) {
-      log.warn(`Failed to parse existing ${label} config, creating new`)
-      config = {}
-    }
-  }
+  const read = readConfig(label, configPath)
+  if (!read.ok) return false
+  const config = read.config
 
   config.hooks = config.hooks || {}
 
-  const hookCommand: { type: string; command: string; timeout: number; async?: boolean } = {
-    type: 'command',
-    command: `node "${normalizePath(hookScriptPath)}"`,
-    timeout: 5,
-  }
-  // Only emit async when the agent supports it (Claude yes, Codex no).
-  if (useAsync) hookCommand.async = true
-  const ourHook = { hooks: [hookCommand] }
-
   let changed = false
   for (const event of events) {
+    // Only emit async when the agent supports it (Claude yes, Codex no) and the
+    // event need not finish before the agent exits (see syncEvents).
+    const eventAsync = useAsync && !target.syncEvents?.includes(event)
+    const hookCommand: { type: string; command: string; timeout: number; async?: boolean } = {
+      type: 'command',
+      command: `node "${normalizePath(hookScriptPath)}"`,
+      timeout: 5,
+    }
+    if (eventAsync) hookCommand.async = true
+    const ourHook = { hooks: [hookCommand] }
+
     config.hooks[event] = config.hooks[event] || []
 
     const existingIdx = config.hooks[event].findIndex((h) =>
@@ -151,25 +240,27 @@ function installTarget(target: AgentHookTarget): void {
       // matches what this agent needs (migrates the old async:true codex entry).
       if (
         hookEntry &&
-        (Boolean(hookEntry.async) !== useAsync || hookEntry.command !== ourHook.hooks[0].command)
+        (Boolean(hookEntry.async) !== eventAsync || hookEntry.command !== hookCommand.command)
       ) {
         config.hooks[event][existingIdx] = ourHook
         changed = true
-        log.info(`Migrated ${label} hook for ${event} (async: ${useAsync})`)
+        log.info(`Migrated ${label} hook for ${event} (async: ${eventAsync})`)
       }
     }
   }
 
-  if (changed) {
-    try {
-      writeFileSync(configPath, JSON.stringify(config, null, 2))
-      log.info(`${label} hooks installed/updated successfully`)
-      log.info(`Note: Restart ${label} for hooks to take effect`)
-    } catch (e) {
-      log.error(`Failed to write ${label} hooks:`, e)
-    }
-  } else {
+  if (!changed) {
     log.info(`${label} hooks already up to date`)
+    return true
+  }
+  try {
+    writeFileAtomicSync(configPath, JSON.stringify(config, null, 2))
+    log.info(`${label} hooks installed/updated successfully`)
+    log.info(`Note: Restart ${label} for hooks to take effect`)
+    return true
+  } catch (e) {
+    log.error(`Failed to write ${label} hooks:`, e)
+    return false
   }
 }
 
@@ -183,12 +274,13 @@ function uninstallTarget(target: AgentHookTarget): void {
     return
   }
 
+  const read = readConfig(label, configPath)
+  if (!read.ok) return
+  const config = read.config
+  if (!config.hooks) {
+    return
+  }
   try {
-    const config: HookConfig = JSON.parse(readFileSync(configPath, 'utf-8'))
-    if (!config.hooks) {
-      return
-    }
-
     for (const event of Object.keys(config.hooks)) {
       config.hooks[event] = config.hooks[event].filter(
         (h) => !h.hooks?.some((hh) => hh.command?.includes(matchToken))
@@ -202,16 +294,16 @@ function uninstallTarget(target: AgentHookTarget): void {
       delete config.hooks
     }
 
-    writeFileSync(configPath, JSON.stringify(config, null, 2))
+    writeFileAtomicSync(configPath, JSON.stringify(config, null, 2))
     log.info(`${label} hooks uninstalled successfully`)
   } catch (e) {
     log.error(`Failed to uninstall ${label} hooks:`, e)
   }
 }
 
-/** Install Claude Code hooks for Command state detection. */
-export function installClaudeHooks(): void {
-  installTarget(claudeTarget())
+/** Install Claude Code hooks for Command state detection. False on failure. */
+export function installClaudeHooks(): boolean {
+  return installTarget(claudeTarget())
 }
 
 /** Remove Command hooks from Claude settings. */
@@ -220,8 +312,8 @@ export function uninstallClaudeHooks(): void {
 }
 
 /** Install Codex hooks for Command state detection (~/.codex/hooks.json). */
-export function installCodexHooks(): void {
-  installTarget(codexTarget())
+export function installCodexHooks(): boolean {
+  return installTarget(codexTarget())
 }
 
 /** Remove Command hooks from the Codex hooks config. */
