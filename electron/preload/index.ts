@@ -347,6 +347,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('browser:shortcut', handler)
       return () => ipcRenderer.removeListener('browser:shortcut', handler)
     },
+    // Pull native keyboard focus back from a focused <webview> guest to the host
+    // webContents (the guest keeps OS focus otherwise; see useFocusRecovery).
+    focusHost: (): void => ipcRenderer.send('browser:focus-host'),
   },
 
   // Editor events from CommandServer

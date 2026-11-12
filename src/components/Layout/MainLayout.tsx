@@ -27,11 +27,11 @@ export function MainLayout() {
       if (rail?.contains(target)) return
       setFileExplorerVisible(false)
     }
-    // Clicks inside an iframe (browser tab / HTML preview) don't bubble to the
-    // document, so also close when focus moves into an iframe in the content area.
+    // Clicks inside the browser tab's <webview> guest don't reach this document,
+    // so also close when focus moves into the webview (the host window blurs).
     const onWindowBlur = () => {
       window.setTimeout(() => {
-        if (document.activeElement?.tagName === 'IFRAME') {
+        if (document.activeElement?.tagName === 'WEBVIEW') {
           setFileExplorerVisible(false)
         }
       }, 0)
