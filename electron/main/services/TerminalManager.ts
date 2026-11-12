@@ -89,6 +89,13 @@ export class TerminalManager {
   private readonly BRACKETED_PASTE_START = '\x1b[200~'
   private readonly BRACKETED_PASTE_END = '\x1b[201~'
 
+  // Per-terminal FIFO write queue. writePtySafe yields between chunks, so
+  // without serialization a keystroke typed during a large paste (or a second
+  // paste) would land in the middle of it. An entry exists only while a write
+  // is pending; the chain never rejects, so a failed write cannot wedge it.
+  private writeQueues: Map<string, Promise<void>> = new Map()
+
+
   constructor(
     window: BrowserWindow,
     hookWatcher?: ClaudeHookWatcher,
@@ -303,6 +310,7 @@ export class TerminalManager {
       this.terminalTitled.delete(id)
       this.evictedBuffers.delete(id)
       this.sidecarBuffers.delete(id)
+      this.writeQueues.delete(id)
     })
 
     this.terminals.set(id, terminal)
@@ -336,7 +344,7 @@ export class TerminalManager {
       // truncated under ConPTY/node-pty backpressure, dropping the trailing CR
       // and hanging the launch on an unterminated quote.
       const startTimeout = setTimeout(() => {
-        if (this.terminals.has(id)) void this.writePtySafe(id, startCommand)
+        if (this.terminals.has(id)) void this.enqueueWrite(id, startCommand)
       }, SHELL_READY_DELAY_MS)
       terminal.timeouts.push(startTimeout)
     } else {
@@ -362,7 +370,39 @@ export class TerminalManager {
       this.updateTerminalState(terminalId, 'busy')
     }
 
-    await this.writePtySafe(terminalId, data)
+    await this.enqueueWrite(terminalId, data)
+  }
+
+  /**
+   * Append a write to the terminal's FIFO queue. When nothing is pending and
+   * the payload is on writePtySafe's fast path, write synchronously so typical
+   * keystrokes keep zero added latency (ordering is trivially preserved).
+   * Errors are logged and never propagated into the chain, so one failed
+   * write does not block every later write to that terminal.
+   */
+  private enqueueWrite(terminalId: string, data: string): Promise<void> {
+    if (data.length === 0) return Promise.resolve()
+
+    const pending = this.writeQueues.get(terminalId)
+    if (!pending && data.length <= this.PTY_CHUNK_THRESHOLD) {
+      try {
+        this.terminals.get(terminalId)?.pty?.write(data)
+      } catch (err) {
+        log.warn(`PTY write failed for ${terminalId}:`, err)
+      }
+      return Promise.resolve()
+    }
+
+    const next = (pending ?? Promise.resolve())
+      .then(() => this.writePtySafe(terminalId, data))
+      .catch((err: unknown) => {
+        log.warn(`PTY write failed for ${terminalId}:`, err)
+      })
+    this.writeQueues.set(terminalId, next)
+    void next.then(() => {
+      if (this.writeQueues.get(terminalId) === next) this.writeQueues.delete(terminalId)
+    })
+    return next
   }
 
   /**
@@ -418,9 +458,10 @@ export class TerminalManager {
 
   /**
    * Split `data` into chunks of up to PTY_CHUNK_SIZE bytes, never cutting
-   * across a 6-byte bracketed-paste marker. If a naive boundary would split
-   * a marker, the boundary is rewound so the full marker lands in the next
-   * chunk.
+   * across a 6-byte bracketed-paste marker or between the two UTF-16 halves
+   * of a surrogate pair (a lone surrogate is encoded as U+FFFD on its way to
+   * the PTY, corrupting emoji). If a naive boundary would split either, it is
+   * rewound so the whole unit lands in the next chunk.
    */
   private chunkForPty(data: string): string[] {
     if (data.length <= this.PTY_CHUNK_SIZE) return [data]
@@ -450,6 +491,11 @@ export class TerminalManager {
             }
             break
           }
+        }
+
+        const last = data.charCodeAt(end - 1)
+        if (end - 1 > pos && last >= 0xd800 && last <= 0xdbff) {
+          end -= 1
         }
       }
 
@@ -578,6 +624,9 @@ export class TerminalManager {
 
       // Clean up sidecar buffer
       this.sidecarBuffers.delete(terminalId)
+
+      // Drop the write queue; queued chunks see the terminal gone and stop.
+      this.writeQueues.delete(terminalId)
 
       // Clean up hookless quiet timer (pi)
       this.clearHooklessQuietTimer(terminalId)
@@ -767,7 +816,9 @@ export class TerminalManager {
   writeToPty(terminalId: string, data: string): boolean {
     const terminal = this.terminals.get(terminalId)
     if (!terminal?.pty) return false
-    terminal.pty.write(data)
+    // Same FIFO queue as user input so a ccli/automation command never lands
+    // inside a paste that is still being chunked.
+    void this.enqueueWrite(terminalId, data)
     return true
   }
 
