@@ -11,6 +11,7 @@ import { isAgentType } from '../../../shared/agents'
 import { buildAgentCommand, isHookCapableAgent } from './agents'
 import { createLogger } from './Logger'
 import { deriveShellSpec, quotePromptForShell } from '../utils/shell'
+import { trimPreservingModes } from '../utils/ptyBuffer'
 
 const log = createLogger('TerminalManager')
 
@@ -717,15 +718,14 @@ export class TerminalManager {
     const buffer = this.evictedBuffers.get(terminalId)
     if (buffer === undefined) return
 
-    // Flush buffered data to renderer
-    if (buffer.length > 0) {
-      // Defer flush to next tick to guarantee renderer event handlers are registered
-      setImmediate(() => {
-        this.sendToRenderer('terminal:data', terminalId, buffer)
-      })
-    }
-
+    // Flush synchronously, in the same tick that stops buffering. The renderer
+    // subscribes to terminal:data before it sends terminal:restore, so no
+    // deferral is needed — and deferring let a PTY onData firing in between
+    // reach the renderer BEFORE the older buffered output.
     this.evictedBuffers.delete(terminalId)
+    if (buffer.length > 0) {
+      this.sendToRenderer('terminal:data', terminalId, buffer)
+    }
   }
 
   /**
@@ -736,14 +736,9 @@ export class TerminalManager {
     let buffer = this.evictedBuffers.get(terminalId)
     if (buffer === undefined) return
 
-    buffer += data
-    if (buffer.length > this.MAX_BUFFER_SIZE) {
-      // Trim from front at a line boundary
-      const excess = buffer.length - this.MAX_BUFFER_SIZE
-      const lineBreak = buffer.indexOf('\n', excess)
-      buffer = lineBreak !== -1 ? buffer.slice(lineBreak + 1) : buffer.slice(excess)
-    }
-
+    // Trim from the front (line boundary preferred) while keeping the terminal
+    // mode state of the dropped output and never cutting a sequence in half.
+    buffer = trimPreservingModes(buffer + data, this.MAX_BUFFER_SIZE)
     this.evictedBuffers.set(terminalId, buffer)
   }
 
@@ -751,14 +746,11 @@ export class TerminalManager {
    * Buffer PTY data for a sidecar terminal with size cap.
    */
   private bufferSidecarData(terminalId: string, data: string): void {
-    let buffer = this.sidecarBuffers.get(terminalId) ?? ''
-    buffer += data
-    if (buffer.length > this.MAX_SIDECAR_BUFFER_SIZE) {
-      const excess = buffer.length - this.MAX_SIDECAR_BUFFER_SIZE
-      const lineBreak = buffer.indexOf('\n', excess)
-      buffer = lineBreak !== -1 ? buffer.slice(lineBreak + 1) : buffer.slice(excess)
-    }
-    this.sidecarBuffers.set(terminalId, buffer)
+    const buffer = this.sidecarBuffers.get(terminalId) ?? ''
+    this.sidecarBuffers.set(
+      terminalId,
+      trimPreservingModes(buffer + data, this.MAX_SIDECAR_BUFFER_SIZE)
+    )
   }
 
   /**

@@ -98,7 +98,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 - When over limit: evicts least-recently-used terminal (serializes scrollback, destroys xterm DOM)
 - Protected from eviction: `busy`, `permission`, `question` states; active terminal; split-view terminals
 - Eviction preference: `stopped` terminals first, then oldest by LRU
-- Main process buffers PTY data for evicted terminals (1MB cap); replayed on restore
+- Main process buffers PTY data for evicted terminals (1MB cap); replayed synchronously on restore. Trimming over the cap preserves DECSET/DECRST mode state (alt screen, mouse, focus, bracketed paste) and never cuts an escape sequence (`electron/main/utils/ptyBuffer.ts`)
 
 ### Data Flow
 
