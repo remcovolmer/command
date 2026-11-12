@@ -34,5 +34,6 @@ test/screenshots/
 
 
 .worktrees
+.claude/worktrees/
 .claude/commands/ccli.md
 *.tsbuildinfo
