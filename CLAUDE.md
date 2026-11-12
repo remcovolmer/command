@@ -99,13 +99,16 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 - Protected from eviction: `busy`, `permission`, `question` states; active terminal; split-view terminals
 - Eviction preference: `stopped` terminals first, then oldest by LRU
 - Main process buffers PTY data for evicted terminals (1MB cap); replayed on restore
+- Chats of all projects stay mounted (hidden) across project switches and overviews, so only the pool tears xterms down; an unmount of a terminal still in the store goes through eviction (`evictOnUnmount`), never a bare dispose
+- PTY data that reaches the renderer without a live xterm (in flight at eviction, or a never-opened chat) is parked in the pool (1MB cap) and replayed after the serialized buffer
+- The serialized buffer re-applies what SerializeAddon omits: SGR mouse encoding (`?1006`/`?1016`) and a hidden cursor (`?25l`) — see `src/utils/terminalModes.ts`
 
 ### Data Flow
 
 1. User adds project → `project:add` IPC → `ProjectPersistence` saves to `userData/projects.json`
 2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command (with `--resume <sessionId>` if resuming)
-3. Chat output → `terminal:data` event → `TerminalEventManager` routes to specific `Terminal` component → xterm.js renders
-4. Claude state changes → hook file → `ClaudeHookWatcher` → `terminal:state` event → UI shows attention indicator
+3. Chat output → `terminal:data` event → `TerminalEventManager` routes to specific `Terminal` component → xterm.js renders (no live xterm → parked in `terminalPool` for replay)
+4. Claude state changes → hook file → `ClaudeHookWatcher` → `terminal:state` event → `TerminalEventManager` updates the store for every terminal (xterm or not) → UI shows attention indicator
 5. On app close → `ClaudeHookWatcher.getTerminalSessions()` captures session IDs → persisted for resume on restart
 
 ### Key Patterns

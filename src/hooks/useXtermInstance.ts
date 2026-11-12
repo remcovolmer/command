@@ -19,6 +19,9 @@ import { isHtmlFile } from '../utils/editorLanguages'
 import { terminalPool } from '../utils/terminalPool'
 import { createSpaceKeyWatchdog } from '../utils/spaceKeyWatchdog'
 import { createOsc52ClipboardHandler } from '../utils/osc52Clipboard'
+import { buildModeRestoreSequence, readTerminalModes } from '../utils/terminalModes'
+import { buildPasteAction } from '../utils/terminalPaste'
+import { createContextLossPolicy } from '../utils/webglRecovery'
 
 // Bundled via @fontsource/ibm-plex-mono (see index.css); the rest is the
 // fallback stack for a still-loading face or a stripped install.
@@ -32,6 +35,8 @@ const FIT_MAX_RETRIES = 5
 const RESIZE_DEBOUNCE_MS = 100
 const READY_DELAY_MS = 50
 const FOCUS_REFIT_DELAY_MS = 50
+// Give the GPU process a moment after a context loss before asking for a new context.
+const WEBGL_RECOVERY_DELAY_MS = 500
 
 export interface UseXtermInstanceOptions {
   id: string
@@ -70,8 +75,6 @@ export function useXtermInstance({
   const hasInitializedRef = useRef(false)
   const cleanupRef = useRef<(() => void) | null>(null)
 
-  const updateTerminalState = useProjectStore((s) => s.updateTerminalState)
-  const updateTerminalTitle = useProjectStore((s) => s.updateTerminalTitle)
   const resolvedTheme = useProjectStore((s) => s.resolvedTheme)
   const terminalState = useProjectStore((s) => s.terminals[id]?.state)
   const api = useMemo(() => getElectronAPI(), [])
@@ -213,6 +216,12 @@ export function useXtermInstance({
         : undefined,
     })
 
+    // Registered before the first fit below so main's PTY size always follows
+    // xterm's, including the synchronous pre-restore fit.
+    terminal.onResize(({ cols, rows }) => {
+      api.terminal.resize(id, cols, rows)
+    })
+
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.loadAddon(
@@ -232,6 +241,16 @@ export function useXtermInstance({
 
     terminal.open(containerRef.current)
 
+    // Force xterm to re-measure its cell size and re-render, then refit:
+    // assigning a *different* fontFamily string is the only public trigger.
+    const remeasure = () => {
+      terminal.options.fontFamily =
+        terminal.options.fontFamily === TERMINAL_FONT_STACK
+          ? `${TERMINAL_FONT_STACK}, serif`
+          : TERMINAL_FONT_STACK
+      safeFit()
+    }
+
     // xterm measured its cell size at open(). If the bundled Plex Mono face is
     // not resident yet (first terminal after a cold start), that measurement
     // used the fallback stack and the grid is off by a column or row. Creating
@@ -248,29 +267,61 @@ export function useXtermInstance({
         .load(TERMINAL_FONT_SPEC)
         .then(() => {
           if (isDisposedRef.current || terminalRef.current !== terminal) return
-          terminal.options.fontFamily = `${TERMINAL_FONT_STACK}, serif`
-          safeFit()
+          remeasure()
         })
         .catch(() => {
           /* fallback stack keeps rendering */
         })
     }
 
-    // WebGL renderer for sharper block character and glyph rendering
+    // WebGL renderer for sharper block character and glyph rendering. On
+    // context loss (GPU reset, too many contexts) the addon is disposed and,
+    // rate-limited, re-created; otherwise the terminal would stay on the DOM
+    // renderer for the rest of its life.
     let webglAddon: WebglAddon | null = null
+    let webglRecoveryTimer: ReturnType<typeof setTimeout> | null = null
+    const contextLossPolicy = createContextLossPolicy()
+    const loadWebgl = (): boolean => {
+      try {
+        const addon = new WebglAddon()
+        addon.onContextLoss(() => {
+          try {
+            addon.dispose()
+          } catch {
+            /* already disposed */
+          }
+          if (webglAddon === addon) webglAddon = null
+          if (isDisposedRef.current || !contextLossPolicy.shouldRecover()) return
+          if (webglRecoveryTimer) clearTimeout(webglRecoveryTimer)
+          webglRecoveryTimer = setTimeout(() => {
+            webglRecoveryTimer = null
+            if (isDisposedRef.current || terminalRef.current !== terminal) return
+            // The renderer swap leaves stale render dimensions behind; a real
+            // re-measure gives the viewport fresh ones (a no-op fit would not).
+            if (loadWebgl()) remeasure()
+          }, WEBGL_RECOVERY_DELAY_MS)
+        })
+        terminal.loadAddon(addon)
+        webglAddon = addon
+        return true
+      } catch {
+        // WebGL not available, fall back to default DOM renderer
+        return false
+      }
+    }
+    loadWebgl()
+
+    // Fit BEFORE replaying anything: a restored buffer written at the default
+    // 80x24 reflows and garbles once the real size is applied.
     try {
-      webglAddon = new WebglAddon()
-      webglAddon.onContextLoss(() => {
-        webglAddon?.dispose()
-        webglAddon = null
-      })
-      terminal.loadAddon(webglAddon)
+      fitAddon.fit()
     } catch {
-      // WebGL not available, fall back to default canvas renderer
-      webglAddon = null
+      /* container not measurable yet; the deferred fits below correct it */
     }
 
-    // Restore serialized buffer if this terminal was previously evicted
+    // Replay what this terminal accumulated without a live xterm: the
+    // serialized screen from eviction (with mouse encoding / cursor modes
+    // re-applied, see terminalModes.ts), then PTY output that arrived after it.
     const wasEvicted = terminalPool.isEvicted(id)
     if (wasEvicted) {
       const savedBuffer = terminalPool.getBuffer(id)
@@ -280,14 +331,21 @@ export function useXtermInstance({
       terminalPool.clearBuffer(id)
       terminalPool.markRestored(id)
     }
+    const pendingData = terminalPool.takePendingData(id)
+    if (pendingData) {
+      terminal.write(pendingData)
+    }
 
     // Register pool callbacks for LRU eviction
     terminalPool.registerCallbacks(
       id,
       () => {
-        // Serializer: serialize the current scrollback buffer
+        // Serializer: serialize the current scrollback buffer, plus the modes
+        // SerializeAddon omits (SGR mouse encoding, hidden cursor).
         try {
-          return serializeAddonRef.current?.serialize() ?? null
+          const serialized = serializeAddonRef.current?.serialize()
+          if (serialized === undefined) return null
+          return serialized + buildModeRestoreSequence(readTerminalModes(terminal))
         } catch {
           return null
         }
@@ -352,11 +410,19 @@ export function useXtermInstance({
 
       if (event.ctrlKey && event.key === 'v') {
         event.preventDefault()
+        // Electron clipboard (navigator.clipboard is unavailable under file://).
+        // Text goes through xterm's input path so it is bracketed when the app
+        // enabled DECSET 2004; no text (e.g. an image) forwards a raw ^V so
+        // Claude Code reads the clipboard image itself.
         api.clipboard
           .readText()
           .then((text) => {
-            if (text && !isDisposedRef.current) {
-              api.terminal.write(id, text)
+            if (isDisposedRef.current) return
+            const action = buildPasteAction(text, terminal.modes.bracketedPasteMode)
+            if (action.kind === 'input') {
+              terminal.input(action.data)
+            } else {
+              api.terminal.write(id, action.data)
             }
           })
           .catch(() => {})
@@ -391,11 +457,17 @@ export function useXtermInstance({
       api.terminal.write(id, data)
     })
 
-    terminal.onResize(({ cols, rows }) => {
-      api.terminal.resize(id, cols, rows)
+    // Mouse reports in DEFAULT (X10) encoding are emitted via onBinary, not
+    // onData; without this they are silently dropped. xterm hands a string with
+    // one char per byte. terminal:write only carries strings, so bytes >= 0x80
+    // (cells beyond column/row 95) arrive UTF-8 encoded; SGR (restored via
+    // terminalModes.ts) is unaffected.
+    terminal.onBinary((data) => {
+      api.terminal.write(id, data)
     })
 
-    // Subscribe to terminal events via centralized manager
+    // Subscribe to terminal events via centralized manager. State and the
+    // default title update reach the store globally (terminalEvents.init).
     terminalEvents.subscribe(
       id,
       (data) => {
@@ -403,14 +475,8 @@ export function useXtermInstance({
           terminalRef.current.write(data)
         }
       },
-      (state) => {
-        updateTerminalState(id, state)
-      },
       onExit ? () => onExit() : undefined,
-      onTitle ??
-        ((title) => {
-          updateTerminalTitle(id, title)
-        })
+      onTitle
     )
 
     // Flush main-process buffer after subscribing to events (ensures flushed data is captured)
@@ -447,6 +513,7 @@ export function useXtermInstance({
       isReadyRef.current = false
       hasInitializedRef.current = false
       clearTimeout(readyTimer)
+      if (webglRecoveryTimer) clearTimeout(webglRecoveryTimer)
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current)
       }
@@ -474,17 +541,23 @@ export function useXtermInstance({
     // Intentionally excludes: projectId, onExit, onTitle, fontSize, scrollback.
     // This effect initializes once per terminal (guarded by hasInitializedRef).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, id, updateTerminalState, updateTerminalTitle, api, safeFit])
+  }, [isActive, id, api, safeFit])
 
   // Cleanup on unmount only (terminal closed or component removed)
   useEffect(() => {
     return () => {
+      const stillExists = Boolean(useProjectStore.getState().terminals[id])
+      // The session outlives this component (panel teardown, remount): go
+      // through eviction (serialize, mark evicted, main buffers) so the
+      // screen, modes and PTY output survive. A bare dispose would lose them.
+      if (stillExists && cleanupRef.current && terminalPool.evictOnUnmount(id)) {
+        api.terminal.evict(id)
+      }
       cleanupRef.current?.()
       cleanupRef.current = null
       // Only remove from pool if terminal is actually closing (not just remounting).
       // This preserves serialized buffers for evicted terminals across React remounts.
-      const terminals = useProjectStore.getState().terminals
-      if (!terminals[id]) {
+      if (!stillExists) {
         terminalPool.remove(id)
       }
     }
