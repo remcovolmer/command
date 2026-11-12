@@ -5,8 +5,9 @@ import { useProjectStore } from '../stores/projectStore'
 
 /**
  * Hook that manages the terminal LRU pool eviction lifecycle.
- * Call this once per project viewport. It watches for terminal switches
- * and triggers eviction when the pool exceeds its max size.
+ * Called by the single chat viewport (which mounts the chats of all
+ * projects). It watches for terminal switches and triggers eviction when the
+ * pool exceeds its max size. Pass null when no chat is on screen.
  *
  * Terminal removal from pool is handled by useXtermInstance on unmount.
  */

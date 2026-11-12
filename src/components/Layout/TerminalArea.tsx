@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import {
@@ -6,6 +6,7 @@ import {
   MAX_TERMINALS_PER_PROJECT,
   getVisibleTerminals,
 } from '../../stores/projectStore'
+import { getMountedChats, getViewportActiveTerminalId } from '../../utils/terminalMounting'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { StateLine } from '../Terminal/StateLine'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
@@ -71,6 +72,15 @@ export function TerminalArea() {
         ? getVisibleTerminals(terminals, worktrees, sidecarTerminals, activeProjectId)
         : [],
     [terminals, worktrees, sidecarTerminals, activeProjectId]
+  )
+
+  // Every chat of every project stays mounted (hidden unless active), so a
+  // project switch or an overview never tears down a live xterm: its screen,
+  // scrollback and terminal modes survive and no PTY output is dropped. The
+  // LRU pool bounds how many of them hold a live xterm.
+  const mountedChats = useMemo(
+    () => getMountedChats(terminals, sidecarTerminals),
+    [terminals, sidecarTerminals]
   )
 
   // Content tabs (editors/diffs) scoped to the active chat — the second panel.
@@ -141,18 +151,22 @@ export function TerminalArea() {
     [activeProjectId, api, addTerminal]
   )
 
-  // Global automations overview — independent of the active project (R3, R5, AE5).
-  // Rendered before the no-project branch so it shows regardless of selection.
-  if (automationsOverviewVisible) {
-    return <AutomationsOverview />
-  }
+  // Show project overview when there are no chats, or when explicitly toggled on.
+  const showOverview = projectTerminals.length === 0 || projectOverviewVisible
 
-  // No project selected - show welcome
-  if (!activeProjectId || !activeProject) {
+  // Whatever covers the chat column. The chat column itself stays mounted
+  // underneath (visibility:hidden, like inactive chats) so its xterms survive.
+  let overlay: ReactNode = null
+  if (automationsOverviewVisible) {
+    // Global automations overview: independent of the active project (R3, R5, AE5).
+    // Checked before the no-project branch so it shows regardless of selection.
+    overlay = <AutomationsOverview />
+  } else if (!activeProjectId || !activeProject) {
+    // No project selected - show welcome
     const newChatBinding = hotkeyConfig['terminal.new']
     const shortcutsBinding = hotkeyConfig['ui.showShortcuts']
 
-    return (
+    overlay = (
       <div className="flex flex-col items-center justify-center h-full bg-screen">
         <div className="text-center max-w-md mx-auto px-8">
           <LogoIcon className="w-10 h-10 text-primary mx-auto mb-4" />
@@ -177,12 +191,8 @@ export function TerminalArea() {
         </div>
       </div>
     )
-  }
-
-  // Show project overview when there are no chats, or when explicitly toggled on.
-  const showOverview = projectTerminals.length === 0 || projectOverviewVisible
-  if (showOverview) {
-    return (
+  } else if (showOverview) {
+    overlay = (
       <ProjectOverview
         projectId={activeProjectId}
         projectName={activeProject.name}
@@ -193,44 +203,67 @@ export function TerminalArea() {
     )
   }
 
-  const hasContent = chatContentTabs.length > 0
+  const chatsVisible = overlay === null
+  // Only a chat of the active project, with nothing covering it, is active
+  // (focus, fit, pool protection); everything else is mounted but hidden.
+  const viewportActiveId = getViewportActiveTerminalId(
+    terminals,
+    activeTerminalId,
+    activeProjectId,
+    chatsVisible
+  )
+  const hasContent = chatsVisible && chatContentTabs.length > 0
 
   return (
-    <PanelGroup direction="horizontal" autoSaveId="center-split">
-      {/* Chat column — always visible; fills the width when nothing is open */}
-      <Panel id="chat-col" order={1} defaultSize={55} minSize={25}>
-        <div className="h-full w-full flex flex-col bg-screen">
-          <TerminalTabBar
-            terminals={projectTerminals}
-            activeTerminalId={activeTerminalId}
-            onSelect={handleSelectTerminal}
-            onClose={handleCloseTerminal}
-            onAdd={handleCreateTerminal}
-            canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
-          />
-          <StateLine state={activeTerminalId ? (terminals[activeTerminalId]?.state ?? null) : null} />
-          <div className="flex-1 min-h-0">
-            <TerminalViewport terminals={projectTerminals} activeTerminalId={activeTerminalId} />
-          </div>
-        </div>
-      </Panel>
-
-      {/* Second panel — only mounted when the active chat has open content,
-          so the chat column fills the full width otherwise. */}
-      {hasContent && (
-        <>
-          <PanelResizeHandle className="w-1 transition-colors" />
-          <Panel id="second-panel" order={2} defaultSize={45} minSize={20}>
-            <SecondPanel
-              tabs={chatContentTabs}
-              activeContentId={activeContentId}
-              onSelect={handleSelectContent}
-              onClose={handleCloseContent}
-              onBrowserUrlChange={setBrowserTabUrl}
-            />
+    <div className="relative h-full w-full">
+      <div
+        className="absolute inset-0"
+        style={{
+          visibility: chatsVisible ? 'visible' : 'hidden',
+          pointerEvents: chatsVisible ? 'auto' : 'none',
+        }}
+        aria-hidden={!chatsVisible}
+      >
+        <PanelGroup direction="horizontal" autoSaveId="center-split">
+          {/* Chat column — always visible; fills the width when nothing is open */}
+          <Panel id="chat-col" order={1} defaultSize={55} minSize={25}>
+            <div className="h-full w-full flex flex-col bg-screen">
+              <TerminalTabBar
+                terminals={projectTerminals}
+                activeTerminalId={activeTerminalId}
+                onSelect={handleSelectTerminal}
+                onClose={handleCloseTerminal}
+                onAdd={handleCreateTerminal}
+                canAdd={projectTerminals.length < MAX_TERMINALS_PER_PROJECT}
+              />
+              <StateLine
+                state={activeTerminalId ? (terminals[activeTerminalId]?.state ?? null) : null}
+              />
+              <div className="flex-1 min-h-0">
+                <TerminalViewport terminals={mountedChats} activeTerminalId={viewportActiveId} />
+              </div>
+            </div>
           </Panel>
-        </>
-      )}
-    </PanelGroup>
+
+          {/* Second panel — only mounted when the active chat has open content,
+              so the chat column fills the full width otherwise. */}
+          {hasContent && (
+            <>
+              <PanelResizeHandle className="w-1 transition-colors" />
+              <Panel id="second-panel" order={2} defaultSize={45} minSize={20}>
+                <SecondPanel
+                  tabs={chatContentTabs}
+                  activeContentId={activeContentId}
+                  onSelect={handleSelectContent}
+                  onClose={handleCloseContent}
+                  onBrowserUrlChange={setBrowserTabUrl}
+                />
+              </Panel>
+            </>
+          )}
+        </PanelGroup>
+      </div>
+      {overlay && <div className="absolute inset-0">{overlay}</div>}
+    </div>
   )
 }

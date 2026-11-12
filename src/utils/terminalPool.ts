@@ -1,6 +1,17 @@
 import type { TerminalSession, TerminalState } from '../types'
 
 const MAX_SERIALIZED_SIZE = 2 * 1024 * 1024 // 2MB per terminal
+// PTY output that reaches the renderer while a terminal has no live xterm
+// (in flight at eviction, or before first open). Mirrors main's 1MB cap.
+const MAX_PENDING_SIZE = 1024 * 1024
+
+/** Keep the tail of `text` within `max` chars, cutting at a line boundary when possible. */
+function trimFront(text: string, max: number): string {
+  if (text.length <= max) return text
+  const truncateAt = text.length - max
+  const lineBreak = text.indexOf('\n', truncateAt)
+  return lineBreak !== -1 ? text.slice(lineBreak + 1) : text.slice(truncateAt)
+}
 
 // Terminal states that are protected from eviction (require user attention)
 const PROTECTED_STATES: Set<TerminalState> = new Set(['busy', 'permission', 'question'])
@@ -13,6 +24,7 @@ export class TerminalPool {
   private lruOrder: string[] = [] // terminal IDs, most-recent first
   private serializedBuffers: Map<string, string> = new Map()
   private evictedSet: Set<string> = new Set()
+  private pendingData: Map<string, string> = new Map()
 
   // Callback registry: each terminal registers its serializer and cleanup
   private serializers: Map<string, SerializeFn> = new Map()
@@ -50,6 +62,7 @@ export class TerminalPool {
     const idx = this.lruOrder.indexOf(terminalId)
     if (idx !== -1) this.lruOrder.splice(idx, 1)
     this.serializedBuffers.delete(terminalId)
+    this.pendingData.delete(terminalId)
     this.evictedSet.delete(terminalId)
     this.serializers.delete(terminalId)
     this.cleanups.delete(terminalId)
@@ -67,16 +80,25 @@ export class TerminalPool {
 
   /** Store serialized scrollback buffer for an evicted terminal */
   storeBuffer(terminalId: string, serialized: string): void {
-    if (serialized.length > MAX_SERIALIZED_SIZE) {
-      const truncateAt = serialized.length - MAX_SERIALIZED_SIZE
-      const lineBreak = serialized.indexOf('\n', truncateAt)
-      this.serializedBuffers.set(
-        terminalId,
-        lineBreak !== -1 ? serialized.slice(lineBreak + 1) : serialized.slice(truncateAt)
-      )
-    } else {
-      this.serializedBuffers.set(terminalId, serialized)
-    }
+    this.serializedBuffers.set(terminalId, trimFront(serialized, MAX_SERIALIZED_SIZE))
+  }
+
+  /**
+   * Hold PTY output that arrived while the terminal had no live xterm. This
+   * covers data main sent before it processed `terminal:evict` (IPC ordering
+   * puts it before anything main buffers afterwards) and output for a chat that
+   * was never opened. Replayed after the serialized buffer on the next open.
+   */
+  appendPendingData(terminalId: string, data: string): void {
+    const existing = this.pendingData.get(terminalId) ?? ''
+    this.pendingData.set(terminalId, trimFront(existing + data, MAX_PENDING_SIZE))
+  }
+
+  /** Return and clear the pending PTY output for a terminal ('' when none). */
+  takePendingData(terminalId: string): string {
+    const data = this.pendingData.get(terminalId) ?? ''
+    this.pendingData.delete(terminalId)
+    return data
   }
 
   /** Get stored serialized buffer for a terminal */
@@ -110,6 +132,9 @@ export class TerminalPool {
     const candidates = this.lruOrder.filter((id) => {
       if (this.evictedSet.has(id)) return false
       if (id === activeTerminalId) return false
+      // No live xterm registered (not opened yet, or already torn down):
+      // nothing to evict, and picking it would abort the eviction loop.
+      if (!this.serializers.has(id)) return false
       const terminal = terminals[id]
       if (!terminal) return false
       if (terminal.type === 'normal') return false // Sidecar terminals are lightweight — never evict
@@ -157,6 +182,28 @@ export class TerminalPool {
       console.error(`[TerminalPool] Cleanup failed for ${terminalId}:`, err)
     }
 
+    return true
+  }
+
+  /**
+   * Evict a terminal whose component is unmounting while the session still
+   * exists (project switch, panel teardown, remount). Unlike evict() this never
+   * refuses once an xterm is registered: a failed serialization stores an empty
+   * screen so the session still goes through the evicted/restore path and main
+   * buffers its output instead of the renderer dropping it.
+   * Returns true when the terminal is now evicted and main must be told to buffer.
+   */
+  evictOnUnmount(terminalId: string): boolean {
+    if (!this.serializers.has(terminalId)) return false
+    if (this.evict(terminalId)) return true
+
+    this.storeBuffer(terminalId, '')
+    this.evictedSet.add(terminalId)
+    try {
+      this.cleanups.get(terminalId)?.()
+    } catch (err) {
+      console.error(`[TerminalPool] Cleanup failed for ${terminalId}:`, err)
+    }
     return true
   }
 
