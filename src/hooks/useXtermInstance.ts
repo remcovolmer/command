@@ -459,11 +459,10 @@ export function useXtermInstance({
 
     // Mouse reports in DEFAULT (X10) encoding are emitted via onBinary, not
     // onData; without this they are silently dropped. xterm hands a string with
-    // one char per byte. terminal:write only carries strings, so bytes >= 0x80
-    // (cells beyond column/row 95) arrive UTF-8 encoded; SGR (restored via
-    // terminalModes.ts) is unaffected.
+    // one char per byte; the binary flag makes main write those raw bytes, so
+    // bytes >= 0x80 (cells beyond column/row 95) are not UTF-8 expanded.
     terminal.onBinary((data) => {
-      api.terminal.write(id, data)
+      api.terminal.write(id, data, true)
     })
 
     // Subscribe to terminal events via centralized manager. State and the

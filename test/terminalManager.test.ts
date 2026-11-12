@@ -785,6 +785,16 @@ describe('TerminalManager PTY pipeline (terminal audit)', () => {
     expect(writes()).toBe(paste + 'k')
   })
 
+  test('binary input is written as raw bytes, in FIFO order behind a large paste', async () => {
+    const id = createNormal()
+    const paste = 'p'.repeat(3000)
+    const mouse = Buffer.from('\x1b[M\x20\xa0\xa0', 'latin1')
+    await Promise.all([manager.writeToTerminal(id, paste), manager.writeToTerminal(id, mouse)])
+    const last = mockWrite.mock.calls[mockWrite.mock.calls.length - 1][0]
+    expect(last).toBe(mouse)
+    expect(mockWrite.mock.calls.slice(0, -1).map((c) => c[0] as string).join('')).toBe(paste)
+  })
+
   test('two large pastes are written back to back without interleaving', async () => {
     const id = createNormal()
     const a = 'a'.repeat(2000)

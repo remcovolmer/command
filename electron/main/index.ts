@@ -56,7 +56,11 @@ import { normalizePath } from './utils/paths'
 import { hardenWebviewPreferences, BROWSER_PARTITION } from './utils/webviewSecurity'
 import { matchBrowserShortcut } from './utils/browserShortcut'
 import { isAllowedMainWindowNavigation } from './utils/mainWindowNavigation'
-import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
+import {
+  encodePtyInput,
+  formatOversizeMessage,
+  validateTerminalWritePayload,
+} from './utils/terminalWriteLimits'
 import { sanitizeClipboardText, sanitizeClipboardImage } from './utils/clipboardLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
@@ -687,7 +691,7 @@ ipcMain.handle(
   }
 )
 
-ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
+ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown, binary?: unknown) => {
   if (!isValidUUID(terminalId)) return
   const result = validateTerminalWritePayload(data)
   if (!result.ok) {
@@ -700,7 +704,9 @@ ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
     }
     return
   }
-  terminalManager?.writeToTerminal(terminalId, result.data)
+  const input = encodePtyInput(result.data, binary)
+  if (input === null) return
+  terminalManager?.writeToTerminal(terminalId, input)
 })
 
 ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: number) => {

@@ -121,8 +121,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         size
       ),
 
-    write: (terminalId: string, data: string): void =>
-      ipcRenderer.send('terminal:write', terminalId, data),
+    write: (terminalId: string, data: string, binary?: boolean): void =>
+      ipcRenderer.send('terminal:write', terminalId, data, binary === true),
 
     resize: (terminalId: string, cols: number, rows: number): void =>
       ipcRenderer.send('terminal:resize', terminalId, cols, rows),

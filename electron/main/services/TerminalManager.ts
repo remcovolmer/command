@@ -375,9 +375,16 @@ export class TerminalManager {
     return id
   }
 
-  async writeToTerminal(terminalId: string, data: string): Promise<void> {
+  async writeToTerminal(terminalId: string, data: string | Buffer): Promise<void> {
     const terminal = this.terminals.get(terminalId)
     if (!terminal?.pty) return
+
+    // Raw bytes (xterm onBinary mouse reports) are not typed input: no
+    // auto-naming, no busy guess, no chunking — just keep FIFO order.
+    if (typeof data !== 'string') {
+      await this.enqueueWrite(terminalId, data)
+      return
+    }
 
     // Auto-naming: buffer input and extract title on Enter (agent chats only)
     if (isAgentType(terminal.type) && !this.terminalTitled.get(terminalId)) {
@@ -407,7 +414,7 @@ export class TerminalManager {
    * Errors are logged and never propagated into the chain, so one failed
    * write does not block every later write to that terminal.
    */
-  private enqueueWrite(terminalId: string, data: string): Promise<void> {
+  private enqueueWrite(terminalId: string, data: string | Buffer): Promise<void> {
     if (data.length === 0) return Promise.resolve()
 
     const pending = this.writeQueues.get(terminalId)
@@ -445,10 +452,10 @@ export class TerminalManager {
    * On Windows, \r bytes inside a bracketed-paste block are stripped because
    * ConPTY interprets CRLF inconsistently mid-paste.
    */
-  private async writePtySafe(terminalId: string, data: string): Promise<void> {
+  private async writePtySafe(terminalId: string, data: string | Buffer): Promise<void> {
     if (data.length === 0) return
 
-    if (data.length <= this.PTY_CHUNK_THRESHOLD) {
+    if (typeof data !== 'string' || data.length <= this.PTY_CHUNK_THRESHOLD) {
       const terminal = this.terminals.get(terminalId)
       terminal?.pty?.write(data)
       return
