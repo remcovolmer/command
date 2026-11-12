@@ -60,6 +60,7 @@ export const TerminalListItem = memo(function TerminalListItem({
   return (
     <>
       <li
+        data-chat-select-id={terminal.id}
         onClick={onSelect}
         onContextMenu={handleContextMenu}
         className={`relative ${className ?? defaultClassName} ${isAutomation ? 'automation-spawn' : ''}`}

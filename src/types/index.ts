@@ -355,6 +355,7 @@ export interface ElectronAPI {
   }
   browser: {
     onShortcut: (callback: (action: string) => void) => Unsubscribe
+    focusHost: () => void
   }
   app: {
     onCloseRequest: (callback: () => void) => Unsubscribe

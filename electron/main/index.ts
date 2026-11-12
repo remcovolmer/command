@@ -1736,6 +1736,14 @@ ipcMain.on('app:cancel-close', () => {
   // User cancelled, do nothing
 })
 
+// A focused <webview> guest keeps native keyboard focus; the renderer asks for
+// it back when the user presses into host UI or the browser tab hides. No
+// arguments; only the main window's own renderer may ask.
+ipcMain.on('browser:focus-host', (event) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) return
+  win.webContents.focus()
+})
+
 ipcMain.handle('app:open-crash-log', async () => {
   const logPath = crashLogger.getLogPath()
   try {

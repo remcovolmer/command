@@ -16,6 +16,12 @@ import {
   isBrowserShortcutAction,
   type BrowserShortcutAction,
 } from './utils/browserShortcutBus'
+import {
+  ACTIVE_CHAT_TEXTAREA_SELECTOR,
+  focusActiveChatTerminal,
+  shouldConsumeToastEscape,
+} from './utils/focusRecovery'
+import { useFocusRecovery } from './hooks/useFocusRecovery'
 
 const emitBrowserShortcutHandled = (action: BrowserShortcutAction): boolean => {
   emitBrowserShortcut(action)
@@ -41,14 +47,12 @@ function App() {
 
   // Refocus the active terminal's xterm textarea (e.g. after closing dialogs)
   const refocusActiveTerminal = useCallback(() => {
-    requestAnimationFrame(() => {
-      const terminal = document.querySelector('[data-terminal-active="true"]')
-      if (terminal) {
-        const textarea = terminal.querySelector('.xterm-helper-textarea') as HTMLElement
-        textarea?.focus()
-      }
-    })
+    requestAnimationFrame(() => focusActiveChatTerminal())
   }, [])
+
+  // Generic focus dead-end recovery (focus fell back to <body>), window-focus
+  // restore, webview→host focus handoff and the stray-file-drop guard.
+  useFocusRecovery()
 
   // Use ref to access current value in callback without re-registering listener
   const hasActiveTerminalsRef = useRef(hasActiveTerminals)
@@ -194,9 +198,7 @@ function App() {
     'nav.focusSidebar': () => focusFirstIn('[data-sidebar]'),
 
     'nav.focusTerminal': () => {
-      const textarea = document.querySelector<HTMLElement>(
-        '[data-terminal-active="true"] .xterm-helper-textarea'
-      )
+      const textarea = document.querySelector<HTMLElement>(ACTIVE_CHAT_TEXTAREA_SELECTOR)
       if (!textarea) return false
       textarea.focus()
       return true
@@ -559,6 +561,9 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!matchesBinding(e, dismissBindingRef.current)) return
       if (!dismissTopmostToast()) return
+      // In a terminal Esc is also Claude Code's interrupt: the toast is gone,
+      // but the key must still reach xterm.
+      if (!shouldConsumeToastEscape(e.target)) return
       // A toast was consumed — stop dialog-close and any other Escape handlers
       // on this same press from firing.
       e.preventDefault()
@@ -572,13 +577,6 @@ function App() {
 
   // Resolve theme preference (system/light/dark) → apply to DOM + sync to Claude Code
   useThemeResolver()
-
-  // Restore terminal focus when window regains focus
-  useEffect(() => {
-    const handleWindowFocus = () => refocusActiveTerminal()
-    window.addEventListener('focus', handleWindowFocus)
-    return () => window.removeEventListener('focus', handleWindowFocus)
-  }, [refocusActiveTerminal])
 
   // Initialize file watcher events (centralized IPC listener)
   useEffect(() => {
