@@ -354,10 +354,16 @@ export class TerminalManager {
       this.handleAutoNaming(terminalId, data)
     }
 
-    // When the user presses Enter, set to busy immediately (agent chats only).
-    // Hook-capable agents get corrected by their hook; pi relies on this plus the
-    // output heuristic to return to done.
-    if (isAgentType(terminal.type) && (data.includes('\r') || data.includes('\n'))) {
+    // When the user presses Enter, set to busy immediately — hookless agents (pi)
+    // only, which rely on this plus the output heuristic to return to done.
+    // Hook-capable agents get busy from their UserPromptSubmit hook: an Enter on an
+    // empty prompt, a dialog confirmation or a paste fires no hook event that would
+    // clear a guessed busy again.
+    if (
+      isAgentType(terminal.type) &&
+      !isHookCapableAgent(terminal.type) &&
+      (data.includes('\r') || data.includes('\n'))
+    ) {
       this.updateTerminalState(terminalId, 'busy')
     }
 
