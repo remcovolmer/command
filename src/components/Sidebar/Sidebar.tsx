@@ -156,7 +156,8 @@ export function Sidebar() {
       fileWatcherEvents.subscribe(project.id, 'worktree-sidebar', (events) => {
         const hasWorktreeChange = events.some(
           (e) =>
-            (e.type === 'dir-added' || e.type === 'dir-removed') && e.path.includes('/.worktrees/')
+            (e.type === 'dir-added' || e.type === 'dir-removed') &&
+            (e.path.includes('/.claude/worktrees/') || e.path.includes('/.worktrees/'))
         )
         if (!hasWorktreeChange) return
 

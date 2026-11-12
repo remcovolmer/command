@@ -17,7 +17,12 @@ export interface WorktreeInfo {
 }
 
 export class WorktreeService {
-  private static readonly WORKTREES_DIR = '.worktrees'
+  // New worktrees live where Claude Code itself puts them.
+  private static readonly WORKTREES_DIR = path.join('.claude', 'worktrees')
+  // Worktrees created before the move stay in place and remain managed.
+  private static readonly LEGACY_WORKTREES_DIR = '.worktrees'
+  // .gitignore entry (always forward slashes, independent of platform).
+  private static readonly GITIGNORE_ENTRY = '.claude/worktrees/'
 
   private normalizePath(p: string): string {
     const normalized = path.resolve(path.normalize(p))
@@ -35,38 +40,35 @@ export class WorktreeService {
   }
 
   /**
-   * Get the .worktrees directory path for a project
+   * Get the directory new worktrees are created in (`<project>/.claude/worktrees`)
    */
   getWorktreesDir(projectPath: string): string {
     return path.join(projectPath, WorktreeService.WORKTREES_DIR)
   }
 
   /**
-   * Ensure the .worktrees directory exists and is in .gitignore
+   * Ensure the .claude/worktrees directory exists and is in .gitignore
    */
   async ensureWorktreesDir(projectPath: string): Promise<void> {
     const worktreesDir = this.getWorktreesDir(projectPath)
 
-    // Create .worktrees directory if it doesn't exist
+    // Create .claude/worktrees directory if it doesn't exist
     if (!existsSync(worktreesDir)) {
       mkdirSync(worktreesDir, { recursive: true })
     }
 
-    // Add .worktrees to .gitignore if not already present
+    // Add .claude/worktrees/ to .gitignore unless it (or all of .claude) is already ignored
     const gitignorePath = path.join(projectPath, '.gitignore')
-    const ignoreEntry = WorktreeService.WORKTREES_DIR
+    const ignoreEntry = WorktreeService.GITIGNORE_ENTRY
 
     if (existsSync(gitignorePath)) {
       const content = readFileSync(gitignorePath, 'utf-8')
       const lines = content.split('\n').map((l) => l.trim())
 
-      const alreadyIgnored = lines.some(
-        (l) =>
-          l === ignoreEntry ||
-          l === `/${ignoreEntry}` ||
-          l === `${ignoreEntry}/` ||
-          l === `/${ignoreEntry}/`
-      )
+      const alreadyIgnored = lines.some((l) => {
+        const bare = l.replace(/^\//, '').replace(/\/$/, '')
+        return bare === '.claude/worktrees' || bare === '.claude'
+      })
 
       if (!alreadyIgnored) {
         // Add to .gitignore with a newline before if file doesn't end with newline
@@ -220,7 +222,7 @@ export class WorktreeService {
     worktreeName?: string,
     sourceBranch?: string
   ): Promise<{ path: string; branch: string }> {
-    // Ensure .worktrees directory exists
+    // Ensure .claude/worktrees directory exists
     await this.ensureWorktreesDir(projectPath)
 
     // Fetch + fast-forward to ensure local is up to date
@@ -413,15 +415,17 @@ export class WorktreeService {
   }
 
   /**
-   * Check if path is within .worktrees directory
+   * Check if path is within a managed worktrees directory: `.claude/worktrees`
+   * or the legacy `.worktrees`
    */
   isWorktreePath(projectPath: string, checkPath: string): boolean {
-    const worktreesDir = this.getWorktreesDir(projectPath)
     const normalizedCheck = this.normalizePath(checkPath)
-    const normalizedWorktrees = this.normalizePath(worktreesDir)
-    return (
-      normalizedCheck === normalizedWorktrees ||
-      normalizedCheck.startsWith(normalizedWorktrees + path.sep)
-    )
+    return [WorktreeService.WORKTREES_DIR, WorktreeService.LEGACY_WORKTREES_DIR].some((dir) => {
+      const normalizedWorktrees = this.normalizePath(path.join(projectPath, dir))
+      return (
+        normalizedCheck === normalizedWorktrees ||
+        normalizedCheck.startsWith(normalizedWorktrees + path.sep)
+      )
+    })
   }
 }

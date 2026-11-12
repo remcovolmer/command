@@ -1603,7 +1603,7 @@ ipcMain.handle('worktree:remove', async (_event, worktreeId: string, force: bool
     throw new Error(`Project not found: ${worktree.projectId}`)
   }
 
-  // Validate worktree path is within the managed .worktrees directory
+  // Validate worktree path is within a managed worktrees directory (.claude/worktrees or legacy .worktrees)
   if (!worktreeService!.isWorktreePath(project.path, worktree.path)) {
     throw new Error('Worktree path is outside the managed directory')
   }

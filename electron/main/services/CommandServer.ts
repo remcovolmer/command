@@ -214,9 +214,12 @@ export class CommandServer {
         return { ok: false, error: 'Project not found' }
       }
 
-      // Validate path is under project's .worktrees/ directory
+      // Validate path is under project's .claude/worktrees/ (or legacy .worktrees/) directory
       if (!context.worktreeService.isWorktreePath(project.path, worktreePath)) {
-        return { ok: false, error: 'Path is not under the project .worktrees/ directory' }
+        return {
+          ok: false,
+          error: 'Path is not under the project .claude/worktrees/ (or legacy .worktrees/) directory',
+        }
       }
 
       // Validate it's a git worktree by reading the .git file

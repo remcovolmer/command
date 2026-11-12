@@ -319,7 +319,7 @@ describe('CommandServer worktree routes', () => {
       expect(res.body.error).toContain('X-Terminal-ID')
     })
 
-    test('returns 400 when path is not under .worktrees/', async () => {
+    test('returns 400 when path is not under a managed worktrees directory', async () => {
       server.setDeps(
         createMockDeps({
           worktreeService: {
@@ -339,7 +339,7 @@ describe('CommandServer worktree routes', () => {
 
       expect(res.statusCode).toBe(400)
       expect(res.body.ok).toBe(false)
-      expect(res.body.error).toContain('.worktrees/')
+      expect(res.body.error).toContain('.claude/worktrees/')
     })
   })
 

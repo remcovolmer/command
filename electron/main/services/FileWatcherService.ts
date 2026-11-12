@@ -29,7 +29,7 @@ const MAX_RESTART_ATTEMPTS = 3
 // path string, a RegExp, or a predicate. The old glob strings (e.g.
 // `**/node_modules/**`) silently matched nothing under v4, so the watcher
 // walked the entire tree — including every node_modules and every nested
-// worktree under .worktrees/ — pegging the main process for tens of seconds
+// worktree under .claude/worktrees/ (or legacy .worktrees/) — pegging the main process for tens of seconds
 // on switch to a worktree-heavy project. Match by path segment (relative to
 // the watch root) so chokidar prunes the whole subtree at the directory and
 // never descends into it.
@@ -42,8 +42,13 @@ const IGNORED_DIRS = new Set([
   'coverage',
   '__pycache__',
   '.venv',
-  '.worktrees',
+  '.worktrees', // legacy worktrees location
 ])
+
+// Directories identified by a parent/child segment pair rather than a single
+// name: `.claude/worktrees` holds full worktree checkouts, but the rest of
+// `.claude/` (settings, skills) must stay watched.
+const IGNORED_DIR_PAIRS: ReadonlyArray<readonly [string, string]> = [['.claude', 'worktrees']]
 
 const IGNORED_FILES = new Set(['.DS_Store', 'Thumbs.db'])
 
@@ -60,7 +65,11 @@ export function isIgnoredPath(filePath: string, rootPath: string): boolean {
   const segments = rel.split(/[\\/]/).filter(Boolean)
   const basename = segments[segments.length - 1] ?? ''
   if (IGNORED_FILES.has(basename) || basename.endsWith('.log')) return true
-  return segments.some((segment) => IGNORED_DIRS.has(segment))
+  return segments.some(
+    (segment, i) =>
+      IGNORED_DIRS.has(segment) ||
+      IGNORED_DIR_PAIRS.some(([parent, child]) => segments[i - 1] === parent && segment === child)
+  )
 }
 
 /**
