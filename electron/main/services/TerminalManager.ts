@@ -322,6 +322,12 @@ export class TerminalManager {
           message: 'PTY worker exited before any output (likely cwd or shell issue)',
         })
       }
+      // An evicted chat whose shell exits keeps its tab (state 'stopped'), but
+      // its buffer is dropped below and restoreTerminal would find nothing:
+      // hand the output since eviction to the renderer now. With no live xterm
+      // it is parked in the pool and replayed after the serialized screen.
+      const evictedOutput = this.evictedBuffers.get(id)
+      if (evictedOutput) this.sendToRenderer('terminal:data', id, evictedOutput)
       this.sendToRenderer('terminal:state', id, 'stopped')
       this.sendToRenderer('terminal:exit', id, exitCode)
 

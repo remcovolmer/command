@@ -760,6 +760,19 @@ describe('TerminalManager PTY pipeline (terminal audit)', () => {
     expect(dataSentFor(id)).toEqual(['old-1 old-2 ', 'new'])
   })
 
+  test('a PTY exiting while evicted hands its buffered output over before the exit', () => {
+    const id = createNormal()
+    const onData = lastOnData()
+    manager.evictTerminal(id)
+    onData('last words')
+    lastOnExit()({ exitCode: 0 })
+    expect(dataSentFor(id)).toEqual(['last words'])
+    const order = send.mock.calls.filter((c) => c[1] === id).map((c) => c[0])
+    expect(order.indexOf('terminal:data')).toBeLessThan(order.indexOf('terminal:exit'))
+    manager.restoreTerminal(id) // terminal gone: nothing flushed twice
+    expect(dataSentFor(id)).toEqual(['last words'])
+  })
+
   // --- Finding 2: mode-preserving evicted-buffer trim ----------------------
 
   test('evicted buffer over the 1MB cap keeps alt-screen/mouse modes from the dropped prefix', () => {

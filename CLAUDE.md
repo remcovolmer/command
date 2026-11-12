@@ -96,9 +96,9 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 
 - On terminal switch: `touch()` updates LRU order
 - When over limit: evicts least-recently-used terminal (serializes scrollback, destroys xterm DOM)
-- Protected from eviction: `busy`, `permission`, `question` states; active terminal; split-view terminals
+- Protected from eviction: `busy`, `permission`, `question` states; the on-screen chat; sidecar shells (never evicted); chats without a live xterm. No eviction runs while an overlay (overview) covers the chat column
 - Eviction preference: `stopped` terminals first, then oldest by LRU
-- Main process buffers PTY data for evicted terminals (1MB cap); replayed synchronously on restore. Trimming over the cap preserves DECSET/DECRST mode state (alt screen, mouse, focus, bracketed paste) and never cuts an escape sequence (`shared/ptyBuffer.ts`)
+- Main process buffers PTY data for evicted terminals (1MB cap); replayed synchronously on restore, or handed to the renderer (parked in the pool) when the PTY exits while evicted. Trimming over the cap preserves DECSET/DECRST mode state (alt screen, mouse, focus, bracketed paste) and never cuts an escape sequence (`shared/ptyBuffer.ts`)
 - Chats of all projects stay mounted (hidden) across project switches and overviews, so only the pool tears xterms down; an unmount of a terminal still in the store goes through eviction (`evictOnUnmount`), never a bare dispose
 - PTY data that reaches the renderer without a live xterm (in flight at eviction, or a never-opened chat) is parked in the pool (1MB cap, same mode-preserving trim) and replayed after the serialized buffer
 - The serialized buffer re-applies what SerializeAddon omits: SGR mouse encoding (`?1006`/`?1016`) and a hidden cursor (`?25l`) — see `src/utils/terminalModes.ts`
