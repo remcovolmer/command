@@ -54,6 +54,7 @@ import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
 import { hardenWebviewPreferences, BROWSER_PARTITION } from './utils/webviewSecurity'
 import { matchBrowserShortcut } from './utils/browserShortcut'
+import { isAllowedMainWindowNavigation } from './utils/mainWindowNavigation'
 import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
 import { sanitizeClipboardText, sanitizeClipboardImage } from './utils/clipboardLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
@@ -564,6 +565,15 @@ async function createWindow() {
       // Invalid URL, ignore
     }
     return { action: 'deny' }
+  })
+
+  // The app UI never navigates top-level: block anything that would replace it
+  // (a file dropped onto the window navigates to file://… by default).
+  win.webContents.on('will-navigate', (event, url) => {
+    const current = win?.webContents.getURL() ?? ''
+    if (!isAllowedMainWindowNavigation(url, current, VITE_DEV_SERVER_URL)) {
+      event.preventDefault()
+    }
   })
 
   // Close-to-tray: the X hides the window and keeps Command running so the
