@@ -21,6 +21,7 @@ import { TerminalManager } from './services/TerminalManager'
 import { CrashLogger, writeCrashFallback, type LogEntry } from './services/CrashLogger'
 import { initLogger, createLogger, getLogFilePath } from './services/Logger'
 import { handleTerminalCreate } from './handlers/terminalCreate'
+import { sanitizePtySize } from './utils/ptySize'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
 import {
@@ -659,7 +660,8 @@ ipcMain.handle(
     worktreeId?: string,
     type: TerminalType = 'claude',
     resumeSessionId?: string,
-    initialPrompt?: string
+    initialPrompt?: string,
+    size?: unknown
   ) => {
     return handleTerminalCreate(
       {
@@ -670,7 +672,7 @@ ipcMain.handle(
         resolveEnvOverrides,
         isValidUUID,
       },
-      { projectId, worktreeId, type, resumeSessionId, initialPrompt }
+      { projectId, worktreeId, type, resumeSessionId, initialPrompt, size }
     )
   }
 )
@@ -693,11 +695,9 @@ ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
 
 ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: number) => {
   if (!isValidUUID(terminalId)) return
-  if (typeof cols !== 'number' || !Number.isFinite(cols)) return
-  if (typeof rows !== 'number' || !Number.isFinite(rows)) return
-  const safeCols = clamp(cols, 1, 500)
-  const safeRows = clamp(rows, 1, 200)
-  terminalManager?.resizeTerminal(terminalId, safeCols, safeRows)
+  const size = sanitizePtySize(cols, rows)
+  if (!size) return
+  terminalManager?.resizeTerminal(terminalId, size.cols, size.rows)
 })
 
 ipcMain.on('terminal:close', (_event, terminalId: string) => {

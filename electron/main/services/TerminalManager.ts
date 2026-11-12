@@ -12,6 +12,7 @@ import { buildAgentCommand, isHookCapableAgent } from './agents'
 import { createLogger } from './Logger'
 import { deriveShellSpec, quotePromptForShell } from '../utils/shell'
 import { trimPreservingModes } from '../utils/ptyBuffer'
+import { type PtySize } from '../utils/ptySize'
 
 const log = createLogger('TerminalManager')
 
@@ -32,7 +33,13 @@ export interface CreateTerminalOptions {
    *  positional argument (foreground automation launch). */
   initialPrompt?: string
   envOverrides?: Record<string, string>
+  /** Initial PTY grid size (already validated/clamped by the IPC layer). When
+   *  omitted, the last size the renderer applied to a terminal of the same
+   *  kind is used, falling back to 80x24. */
+  size?: PtySize
 }
+
+const DEFAULT_PTY_SIZE: PtySize = { cols: 80, rows: 24 }
 
 interface TerminalInstance {
   id: string
@@ -95,6 +102,11 @@ export class TerminalManager {
   // is pending; the chain never rejects, so a failed write cannot wedge it.
   private writeQueues: Map<string, Promise<void>> = new Map()
 
+  // Last grid size the renderer applied, per terminal kind (center chats vs
+  // sidecar shells). Used as the spawn size when terminal:create carries none,
+  // so a new/resumed session starts at the real width instead of 80 columns
+  // and skips the resize burst (ConPTY repaint) on first activation.
+  private lastKnownSize: { agent?: PtySize; normal?: PtySize } = {}
 
   constructor(
     window: BrowserWindow,
@@ -181,6 +193,14 @@ export class TerminalManager {
       env.FORCE_HYPERLINK = '1'
     }
 
+    // node-pty only sets TERM on Unix (from the `name` option). On Windows the
+    // child would otherwise see no TERM/COLORTERM and CLIs fall back to
+    // conservative color/terminal detection. Inherited values win.
+    if (process.platform === 'win32') {
+      if (!env.TERM) env.TERM = 'xterm-256color'
+      if (!env.COLORTERM) env.COLORTERM = 'truecolor'
+    }
+
     // Prepend CLI directory to PATH so `ccli` is available
     const existingPath = env.PATH || env.Path || ''
     env.PATH = this.cliDir + path.delimiter + existingPath
@@ -216,12 +236,14 @@ export class TerminalManager {
     // failures (e.g. TOCTOU race between statSync and CreateProcessW). The
     // try/catch here covers synchronous spawn failures; async failures still
     // route through the global uncaughtException handler (see CrashLogger).
+    const size =
+      options.size ?? this.lastKnownSize[type === 'normal' ? 'normal' : 'agent'] ?? DEFAULT_PTY_SIZE
     let ptyProcess: pty.IPty
     try {
       ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
-        cols: 80,
-        rows: 24,
+        cols: size.cols,
+        rows: size.rows,
         cwd,
         env,
       })
@@ -289,9 +311,9 @@ export class TerminalManager {
       terminal.state = 'stopped'
 
       if (orphanedSpawnFailure) {
-        // Skip the normal terminal:state / terminal:exit pair — the renderer
-        // never finished setting up this terminal in the first place. Surface
-        // it as a toast instead so the user sees what happened.
+        // terminal:create already returned this id, so the renderer has a tab
+        // for it. Surface the failure as a toast AND still emit the
+        // state/exit pair below — otherwise that tab stays 'busy' forever.
         this.sendToRenderer('terminal:spawn-failed', {
           projectId: terminal.projectId,
           worktreeId: terminal.worktreeId,
@@ -299,10 +321,9 @@ export class TerminalManager {
           cwd: terminal.cwd,
           message: 'PTY worker exited before any output (likely cwd or shell issue)',
         })
-      } else {
-        this.sendToRenderer('terminal:state', id, 'stopped')
-        this.sendToRenderer('terminal:exit', id, exitCode)
       }
+      this.sendToRenderer('terminal:state', id, 'stopped')
+      this.sendToRenderer('terminal:exit', id, exitCode)
 
       this.clearHooklessQuietTimer(id)
       this.terminals.delete(id)
@@ -595,8 +616,15 @@ export class TerminalManager {
 
   resizeTerminal(terminalId: string, cols: number, rows: number): void {
     const terminal = this.terminals.get(terminalId)
-    if (terminal?.pty) {
+    if (!terminal?.pty) return
+    this.lastKnownSize[terminal.type === 'normal' ? 'normal' : 'agent'] = { cols, rows }
+    try {
       terminal.pty.resize(cols, rows)
+    } catch (err) {
+      // node-pty throws "Cannot resize a pty that has already exited" when a
+      // resize races the PTY exit (onExit not yet delivered). Harmless — do
+      // not let it escape as an uncaughtException crash toast.
+      log.debug(`Ignoring resize for exited PTY ${terminalId}:`, err)
     }
   }
 

@@ -14,6 +14,7 @@ import type { CrashLogger } from '../services/CrashLogger'
 import type { BrowserWindow } from 'electron'
 import type { TerminalType } from '../../../src/types'
 import { isAgentType } from '../../../shared/agents'
+import { sanitizePtySize, type PtySize } from '../utils/ptySize'
 
 const log = createLogger('Terminal')
 
@@ -35,6 +36,20 @@ export interface TerminalCreateArgs {
   resumeSessionId?: string
   /** Foreground automation launch: start `claude` with this prompt submitted. */
   initialPrompt?: string
+  /** Optional initial grid size from the renderer. Untrusted: validated and
+   *  clamped here; invalid values fall back to the manager's default. */
+  size?: unknown
+}
+
+/**
+ * Validate the optional `{ cols, rows }` size payload. Non-objects and
+ * non-finite dimensions yield null (spawn falls back to the default size);
+ * finite values are clamped like `terminal:resize`.
+ */
+export function parseCreateSize(raw: unknown): PtySize | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { cols, rows } = raw as { cols?: unknown; rows?: unknown }
+  return sanitizePtySize(cols, rows)
 }
 
 /**
@@ -100,6 +115,7 @@ export async function handleTerminalCreate(
   }
 
   const envOverrides = resolveEnvOverrides(project)
+  const size = parseCreateSize(args.size)
 
   try {
     return (
@@ -113,6 +129,7 @@ export async function handleTerminalCreate(
         initialPrompt: initialPrompt ?? undefined,
         claudeMode: project?.settings?.claudeMode,
         envOverrides,
+        size: size ?? undefined,
       }) ?? null
     )
   } catch (error) {
