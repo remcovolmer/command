@@ -583,6 +583,7 @@ export function BrowserTab({
     <div
       className="absolute inset-0 flex flex-col bg-screen"
       style={{ visibility: isActive ? 'visible' : 'hidden' }}
+      data-browser-pane
     >
       <div className="flex items-center gap-1 h-9 px-2 border-b border-border bg-canvas shrink-0">
         <button

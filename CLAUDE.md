@@ -124,7 +124,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 - Tailwind CSS for styling (all colors via CSS variables for runtime theming)
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
-- **Hotkey Requirement**: Core features and primary workflows should include keyboard shortcuts — peripheral or in-surface tools (e.g. panel-local controls) don't require one. When adding a shortcut: define it in `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG) and the `HotkeyAction` union in `src/types/hotkeys.ts`, register the handler in `src/App.tsx`. Press `Ctrl + /` in-app afterwards to verify the binding and check for conflicts.
+- **Hotkey Requirement**: Core features and primary workflows should include keyboard shortcuts — peripheral or in-surface tools (e.g. panel-local controls) don't require one. When adding a shortcut: define it in `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG) and the `HotkeyAction` union in `src/types/hotkeys.ts`, register the handler in `src/App.tsx` (handlers return `true` when they handled the key — only then is it consumed — and `false` to let it reach xterm/Monaco; region-specific actions also get a focus predicate in `HOTKEY_SCOPES`, `src/utils/hotkeyDispatch.ts`). Press `Ctrl + /` in-app afterwards to verify the binding and check for conflicts.
 
 ## Windows Development
 

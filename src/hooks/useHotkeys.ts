@@ -1,9 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useProjectStore } from '../stores/projectStore'
-import type { HotkeyAction, HotkeyConfig } from '../types/hotkeys'
+import type { HotkeyConfig } from '../types/hotkeys'
 import { matchesBinding, DEFAULT_HOTKEY_CONFIG } from '../utils/hotkeys'
-
-type HotkeyHandlers = Partial<Record<HotkeyAction, () => void>>
+import { dispatchHotkey, getFocusContext, type HotkeyHandlers } from '../utils/hotkeyDispatch'
 
 // Module-level flag to suppress hotkey actions while recording a new binding.
 // Without this, pressing e.g. Ctrl+T in the recorder would both record the
@@ -27,12 +26,15 @@ interface UseHotkeysOptions {
 /**
  * Hook for registering hotkey handlers
  *
- * @param handlers - Object mapping hotkey actions to handler functions
+ * @param handlers - Object mapping hotkey actions to handler functions. Each
+ *   handler returns true when it handled the key (it is then consumed) and
+ *   false when its preconditions don't hold (the key passes through).
+ *   Region-scoped actions are filtered first via HOTKEY_SCOPES.
  * @param options - Configuration options
  *
  * @example
  * useHotkeys({
- *   'terminal.new': () => createTerminal(),
+ *   'terminal.new': () => { createTerminal(); return true },
  *   'nav.previousProject': () => switchProject(-1),
  * });
  */
@@ -66,33 +68,22 @@ export function useHotkeys(handlers: HotkeyHandlers, options: UseHotkeysOptions 
       const config = configRef.current
       if (matchesBinding(e, config['dialog.close'])) {
         const handler = handlersRef.current['dialog.close']
-        if (handler) {
-          e.preventDefault()
-          handler()
-        }
+        if (handler?.()) e.preventDefault()
       }
       return
     }
 
-    const config = configRef.current
-    const handlers = handlersRef.current
-
-    // Check each registered handler against the event
-    for (const [action, handler] of Object.entries(handlers) as [HotkeyAction, () => void][]) {
-      if (!handler) continue
-
-      // Persisted configs from existing users may predate newly added actions;
-      // fall back to the default binding so new hotkeys work without a reset
-      // (same pattern as dialog.dismissTopmostToast in App.tsx).
-      const binding = config[action] ?? DEFAULT_HOTKEY_CONFIG[action]
-      if (!binding) continue
-
-      if (matchesBinding(e, binding)) {
-        e.preventDefault()
-        e.stopPropagation()
-        handler()
-        return
-      }
+    // Only consume the key when a matching, in-scope handler actually handled
+    // it — otherwise it continues to xterm / Monaco / the focused control.
+    const handled = dispatchHotkey(
+      e,
+      configRef.current,
+      handlersRef.current,
+      getFocusContext(e.target)
+    )
+    if (handled) {
+      e.preventDefault()
+      e.stopPropagation()
     }
   }, [])
 
