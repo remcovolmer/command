@@ -22,6 +22,21 @@ describe('isIgnoredPath', () => {
     expect(isIgnoredPath(p('.worktrees', 'feat-x', 'node_modules', 'x.js'), root)).toBe(true)
   })
 
+  it('ignores the .claude/worktrees subtree but keeps the rest of .claude watched', () => {
+    expect(isIgnoredPath(p('.claude', 'worktrees'), root)).toBe(true)
+    expect(isIgnoredPath(p('.claude', 'worktrees', 'x', 'src', 'a.ts'), root)).toBe(true)
+    expect(isIgnoredPath('/home/dev/command/.claude/worktrees/x/a.ts', '/home/dev/command')).toBe(
+      true
+    )
+    expect(isIgnoredPath(p('.claude'), root)).toBe(false)
+    expect(isIgnoredPath(p('.claude', 'settings.json'), root)).toBe(false)
+    expect(isIgnoredPath(p('.claude', 'skills', 'x', 'SKILL.md'), root)).toBe(false)
+    // Only the exact `.claude/worktrees` pair — not look-alikes or a bare `worktrees` dir
+    expect(isIgnoredPath(p('.claude', 'worktrees-evil', 'a.ts'), root)).toBe(false)
+    expect(isIgnoredPath(p('worktrees', 'a.ts'), root)).toBe(false)
+    expect(isIgnoredPath(p('src', 'worktrees', 'a.ts'), root)).toBe(false)
+  })
+
   it('ignores .git, dist, build, coverage and the rest', () => {
     expect(isIgnoredPath(p('.git', 'HEAD'), root)).toBe(true)
     expect(isIgnoredPath(p('dist', 'bundle.js'), root)).toBe(true)
