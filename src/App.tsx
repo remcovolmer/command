@@ -6,6 +6,7 @@ import { ShortcutsOverlay } from './components/Settings/ShortcutsOverlay'
 import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
 import { estimateTerminalGrid } from './utils/terminalGrid'
+import { areChatsVisible, getCloseHotkeyDecision } from './utils/terminalMounting'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
 import { useNotchFeed } from './hooks/useNotchFeed'
 import { fileWatcherEvents } from './utils/fileWatcherEvents'
@@ -266,10 +267,31 @@ function App() {
     },
 
     // Scoped away from the shell drawer and the browser pane (HOTKEY_SCOPES):
-    // Ctrl+W is delete-word in a sidecar shell. Closes without confirmation.
+    // Ctrl+W is delete-word in a sidecar shell. Ctrl+W is also delete-word in
+    // the chat's own input, so a running chat asks first (getCloseHotkeyDecision);
+    // a stopped one closes directly, and one hidden behind an overlay is ignored.
     'terminal.close': () => {
-      const { activeProjectId, activeTerminalId, removeTerminal } = useProjectStore.getState()
-      if (!activeProjectId || !activeTerminalId) return false
+      const state = useProjectStore.getState()
+      const { activeProjectId, activeTerminalId, terminals, removeTerminal } = state
+      const chatsVisible = areChatsVisible({
+        automationsOverviewVisible: state.automationsOverviewVisible,
+        projectOverviewVisible: state.projectOverviewVisible,
+        hasActiveProject: state.projects.some((p) => p.id === activeProjectId),
+        projectChatCount: activeProjectId ? state.getProjectTerminals(activeProjectId).length : 0,
+      })
+      const decision = getCloseHotkeyDecision(
+        terminals,
+        activeTerminalId,
+        activeProjectId,
+        chatsVisible
+      )
+      if (decision === 'ignore' || !activeTerminalId) return false
+      if (
+        decision === 'confirm' &&
+        !window.confirm(`Close "${terminals[activeTerminalId].title}"? The running session will end.`)
+      ) {
+        return true // deliberately cancelled: don't let the key reach the chat as delete-word
+      }
 
       api.terminal.close(activeTerminalId)
       removeTerminal(activeTerminalId)

@@ -6,7 +6,11 @@ import {
   MAX_TERMINALS_PER_PROJECT,
   getVisibleTerminals,
 } from '../../stores/projectStore'
-import { getMountedChats, getViewportActiveTerminalId } from '../../utils/terminalMounting'
+import {
+  areChatsVisible,
+  getMountedChats,
+  getViewportActiveTerminalId,
+} from '../../utils/terminalMounting'
 import { TerminalTabBar } from '../Terminal/TerminalTabBar'
 import { StateLine } from '../Terminal/StateLine'
 import { TerminalViewport } from '../Terminal/TerminalViewport'
@@ -211,7 +215,13 @@ export function TerminalArea() {
     )
   }
 
-  const chatsVisible = overlay === null
+  // Same rule as the overlay branches above; the close-chat hotkey reads it too.
+  const chatsVisible = areChatsVisible({
+    automationsOverviewVisible,
+    projectOverviewVisible,
+    hasActiveProject: !!activeProjectId && !!activeProject,
+    projectChatCount: projectTerminals.length,
+  })
   // Only a chat of the active project, with nothing covering it, is active
   // (focus, fit, pool protection); everything else is mounted but hidden.
   const viewportActiveId = getViewportActiveTerminalId(
