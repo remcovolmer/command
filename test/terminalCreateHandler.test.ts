@@ -173,6 +173,27 @@ describe('terminal:create IPC handler body', () => {
     ).rejects.toThrow(/Invalid terminal type/)
   })
 
+  test('forwards a clamped initial size to createTerminal', async () => {
+    const { deps, createTerminal } = makeDeps()
+    await handleTerminalCreate(deps, {
+      projectId: VALID_PROJECT_ID,
+      size: { cols: 9000, rows: 37.6 },
+    })
+    expect(createTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({ size: { cols: 500, rows: 37 } })
+    )
+  })
+
+  test('a malformed size is ignored (spawn falls back to the default), not rejected', async () => {
+    const { deps, createTerminal } = makeDeps()
+    const result = await handleTerminalCreate(deps, {
+      projectId: VALID_PROJECT_ID,
+      size: { cols: 'wide', rows: 30 },
+    })
+    expect(result).toBe('new-id')
+    expect(createTerminal).toHaveBeenCalledWith(expect.objectContaining({ size: undefined }))
+  })
+
   // Use the spy variable so eslint doesn't flag it; vitest will auto-restore
   // between tests but we hold a reference for assertions above.
   void consoleWarnSpy

@@ -249,7 +249,10 @@ export interface ElectronAPI {
       worktreeId?: string,
       type?: TerminalType,
       resumeSessionId?: string,
-      initialPrompt?: string
+      initialPrompt?: string,
+      /** Initial PTY grid size. Omit to let main use the last size applied to
+       *  a terminal of the same kind (fallback 80x24). */
+      size?: { cols: number; rows: number }
     ) => Promise<string | null>
     write: (terminalId: string, data: string) => void
     resize: (terminalId: string, cols: number, rows: number) => void

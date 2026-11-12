@@ -108,7 +108,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       worktreeId?: string,
       type?: TerminalType,
       resumeSessionId?: string,
-      initialPrompt?: string
+      initialPrompt?: string,
+      size?: { cols: number; rows: number }
     ): Promise<string | null> =>
       ipcRenderer.invoke(
         'terminal:create',
@@ -116,7 +117,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         worktreeId,
         type,
         resumeSessionId,
-        initialPrompt
+        initialPrompt,
+        size
       ),
 
     write: (terminalId: string, data: string): void =>
