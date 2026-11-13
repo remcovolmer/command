@@ -1,5 +1,14 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs'
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+  symlinkSync,
+  lstatSync,
+} from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
@@ -15,7 +24,11 @@ vi.mock('os', async () => {
 // Real fs, with renameSync wrapped so tests can inject Windows EPERM failures.
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs')
-  return { ...actual, renameSync: vi.fn(actual.renameSync) }
+  return {
+    ...actual,
+    renameSync: vi.fn(actual.renameSync),
+    realpathSync: vi.fn(actual.realpathSync),
+  }
 })
 
 // HookInstaller resolves the script path via electron's app.
@@ -30,7 +43,7 @@ import {
   uninstallClaudeHooks,
   writeFileAtomicSync,
 } from '../electron/main/services/HookInstaller'
-import { renameSync, readdirSync, statSync } from 'fs'
+import { renameSync, realpathSync, readdirSync, statSync } from 'fs'
 
 interface HookConfig {
   hooks?: Record<string, Array<{ hooks: Array<{ command: string; async?: boolean }> }>>
@@ -263,5 +276,62 @@ describe('HookInstaller (per-agent, generalized)', () => {
 
     expect(readFileSync(target, 'utf-8')).toBe('old')
     expect(readdirSync(fakeHome)).toEqual(['f.json'])
+  })
+
+  test('writeFileAtomicSync writes through a symlinked target and keeps the link', (ctx) => {
+    // Dotfiles setups symlink settings.json into a repo elsewhere.
+    const dotfiles = mkdtempSync(join(tmpdir(), 'hook-installer-dotfiles-'))
+    try {
+      const realFile = join(dotfiles, 'settings.json')
+      writeFileSync(realFile, 'old')
+      const link = join(fakeHome, 'settings.json')
+      try {
+        symlinkSync(realFile, link, 'file')
+      } catch (e) {
+        // Windows without Developer Mode / admin cannot create file symlinks.
+        if ((e as NodeJS.ErrnoException).code === 'EPERM') return ctx.skip()
+        throw e
+      }
+
+      writeFileAtomicSync(link, 'new')
+
+      expect(lstatSync(link).isSymbolicLink()).toBe(true)
+      expect(readFileSync(realFile, 'utf-8')).toBe('new')
+      expect(readdirSync(dotfiles)).toEqual(['settings.json'])
+      expect(readdirSync(fakeHome)).toEqual(['settings.json'])
+    } finally {
+      rmSync(dotfiles, { recursive: true, force: true })
+    }
+  })
+
+  // Runs without symlink privileges: proves temp + rename land on the resolved path.
+  test('writeFileAtomicSync places the temp next to, and renames onto, the resolved target', () => {
+    const realDir = mkdtempSync(join(tmpdir(), 'hook-installer-real-'))
+    try {
+      const realFile = join(realDir, 'settings.json')
+      writeFileSync(realFile, 'old')
+      const linkPath = join(fakeHome, 'settings.json')
+      vi.mocked(realpathSync).mockImplementationOnce(() => realFile)
+      vi.mocked(renameSync).mockClear()
+
+      writeFileAtomicSync(linkPath, 'new')
+
+      const [from, to] = vi.mocked(renameSync).mock.calls[0]
+      expect(String(to)).toBe(realFile)
+      expect(String(from).startsWith(`${realFile}.`)).toBe(true)
+      expect(readFileSync(realFile, 'utf-8')).toBe('new')
+      expect(existsSync(linkPath)).toBe(false)
+    } finally {
+      rmSync(realDir, { recursive: true, force: true })
+    }
+  })
+
+  test('writeFileAtomicSync creates a missing target (nothing to resolve)', () => {
+    const target = join(fakeHome, 'new.json')
+
+    writeFileAtomicSync(target, 'fresh')
+
+    expect(readFileSync(target, 'utf-8')).toBe('fresh')
+    expect(readdirSync(fakeHome)).toEqual(['new.json'])
   })
 })

@@ -1,4 +1,12 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'fs'
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+} from 'fs'
 import { join, dirname } from 'path'
 import { randomUUID } from 'crypto'
 import { homedir } from 'os'
@@ -129,11 +137,22 @@ function errorCode(e: unknown): string | undefined {
  * Exported for testing.
  */
 export function writeFileAtomicSync(filePath: string, content: string): void {
-  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`
+  // Rename over the symlink's *target*, not the link: renaming onto a symlinked
+  // settings.json (dotfiles repos) would replace the link with a plain file and
+  // silently detach it from the real file. Temp sits next to the resolved target
+  // so the rename stays on one volume. A missing file has nothing to resolve.
+  let targetPath: string
+  try {
+    targetPath = realpathSync(filePath)
+  } catch (e) {
+    if (errorCode(e) !== 'ENOENT') throw e
+    targetPath = filePath
+  }
+  const tempPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`
   writeFileSync(tempPath, content)
   for (let attempt = 0; ; attempt++) {
     try {
-      renameSync(tempPath, filePath)
+      renameSync(tempPath, targetPath)
       return
     } catch (e) {
       const code = errorCode(e)
