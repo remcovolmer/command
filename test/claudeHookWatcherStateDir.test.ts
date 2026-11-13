@@ -138,6 +138,35 @@ describe('ClaudeHookWatcher per-session state directory', () => {
     expect(emitted()).toEqual([])
   })
 
+  test('the stale sweep also forgets the session, so an ending owner never reverts to it', async () => {
+    const now = Date.now()
+    const bump = (name: string, offsetMs: number) => {
+      const t = new Date(Date.now() + offsetMs)
+      utimesSync(join(stateDir, name), t, t)
+    }
+    writeEntry(`${SID2}.json`, entry({ session_id: SID2, timestamp: now }))
+    await watcher.pollStateDir() // SID2 owns T1, busy and recent
+    writeEntry(`${SID}.json`, entry({ state: 'question', timestamp: now + 10 }))
+    await watcher.pollStateDir() // SID tracked on T1, not emitted
+    expect(watcher.getTerminalSessions()).toEqual([{ terminalId: T1, sessionId: SID2 }])
+
+    bump(`${SID}.json`, -2 * 60 * 60 * 1000)
+    await watcher.pollStateDir() // sweep deletes SID's file
+    expect(existsSync(join(stateDir, `${SID}.json`))).toBe(false)
+
+    writeEntry(
+      `${SID2}.json`,
+      entry({ session_id: SID2, state: 'stopped', hook_event: 'SessionEnd', timestamp: now + 20 })
+    )
+    bump(`${SID2}.json`, 5000)
+    await watcher.pollStateDir()
+    expect(emitted()).toEqual([
+      [T1, 'busy'],
+      [T1, 'stopped'],
+    ])
+    expect(watcher.getTerminalSessions()).toEqual([])
+  })
+
   test('in-flight temp files and entries whose name does not match the session are ignored', async () => {
     writeEntry(`${SID}.json.123.abc.tmp`, entry())
     writeEntry(`${SID2}.json`, entry()) // claims SID inside SID2's file

@@ -16,6 +16,7 @@ import {
   isHookStateData,
   normalizeStateFile,
   ClaudeHookWatcher,
+  OWNER_LIVENESS_WINDOW_MS,
 } from '../electron/main/services/ClaudeHookWatcher'
 
 function makeHookState(overrides: Record<string, unknown> = {}) {
@@ -822,17 +823,82 @@ describe('ClaudeHookWatcher terminal-ID mapping (COMMAND_CENTER_TERMINAL_ID)', (
     expect(owner('t2')).toBe('legacy')
   })
 
-  test('nested session on the same terminal: most recent wins, owner reverts when it ends', () => {
-    ev('main', 'UserPromptSubmit', 'busy', 1000, 't1')
+  test('nested session while the owner is busy and recent: tracked, never emitted or persisted', () => {
+    const listener = vi.fn()
+    watcher.addStateChangeListener(listener)
+    const now = Date.now()
+    ev('main', 'UserPromptSubmit', 'busy', now, 't1')
     // A tool in the chat runs `claude -p` → same terminal id, new session
-    ev('nested', 'SessionStart', 'busy', 1100, 't1')
-    expect(owner('t1')).toBe('nested')
-    ev('nested', 'SessionEnd', 'stopped', 1200, 't1')
-    // Ownership returns to the chat's own session, with its last state re-emitted
+    ev('nested', 'SessionStart', 'busy', now + 10, 't1')
+    ev('nested', 'Stop', 'done', now + 20, 't1')
     expect(owner('t1')).toBe('main')
-    expect(emitted().at(-1)).toEqual(['t1', 'busy'])
-    ev('main', 'Stop', 'done', 1300, 't1')
+    expect(emitted()).toEqual([['t1', 'busy']])
+    expect(listener).not.toHaveBeenCalledWith('t1', 'done')
+  })
+
+  test('nested session ends: the owner is untouched and keeps routing', () => {
+    const now = Date.now()
+    ev('main', 'PreToolUse', 'permission', now, 't1')
+    ev('nested', 'SessionStart', 'busy', now + 10, 't1')
+    ev('nested', 'SessionEnd', 'stopped', now + 20, 't1')
+    expect(owner('t1')).toBe('main')
+    expect(emitted()).toEqual([['t1', 'permission']])
+    ev('main', 'Stop', 'done', now + 30, 't1')
     expect(emitted().at(-1)).toEqual(['t1', 'done'])
+  })
+
+  test('a new session takes over when the owner is done or silent for too long', () => {
+    const now = Date.now()
+    // Owner done (/clear, /resume path)
+    ev('s1', 'Stop', 'done', now, 't1')
+    ev('s2', 'SessionStart', 'done', now + 1, 't1')
+    expect(owner('t1')).toBe('s2')
+    // Owner busy but its last event is older than the liveness window
+    ev('s3', 'UserPromptSubmit', 'busy', now - OWNER_LIVENESS_WINDOW_MS - 1000, 't2')
+    ev('s4', 'SessionStart', 'busy', now, 't2')
+    ev('s4', 'Stop', 'done', now + 1, 't2')
+    expect(owner('t2')).toBe('s4')
+    expect(emitted().at(-1)).toEqual(['t2', 'done'])
+  })
+
+  test('owner ends: reverts to a session active during its ownership, with that state re-emitted', () => {
+    const now = Date.now()
+    ev('a', 'SessionStart', 'busy', 1000, 't1') // long silent → displaceable
+    ev('b', 'SessionStart', 'busy', now, 't1')
+    expect(owner('t1')).toBe('b')
+    ev('a', 'PreToolUse', 'question', now + 10, 't1') // b is live: a only tracked
+    expect(owner('t1')).toBe('b')
+    ev('b', 'SessionEnd', 'stopped', now + 20, 't1')
+    expect(owner('t1')).toBe('a')
+    expect(emitted().at(-1)).toEqual(['t1', 'question'])
+  })
+
+  test('owner ends with only a dead (silent) session left: stopped, no re-emission of its old state', () => {
+    const now = Date.now()
+    ev('dead', 'PreToolUse', 'permission', 1000, 't1') // died without SessionEnd
+    ev('s2', 'SessionStart', 'busy', now, 't1')
+    ev('s2', 'SessionEnd', 'stopped', now + 10, 't1')
+    expect(owner('t1')).toBeUndefined()
+    expect(emitted()).toEqual([
+      ['t1', 'permission'],
+      ['t1', 'busy'],
+      ['t1', 'stopped'],
+    ])
+  })
+
+  test('a late event after SessionEnd does not revive the session; a newer SessionStart (resume) does', () => {
+    const now = Date.now()
+    ev('s1', 'UserPromptSubmit', 'busy', now, 't1')
+    ev('s1', 'SessionEnd', 'stopped', now + 200, 't1')
+    // Async hooks landing after the end: older and newer timestamps alike
+    ev('s1', 'Stop', 'done', now + 100, 't1')
+    ev('s1', 'PostToolUse', 'busy', now + 300, 't1')
+    expect(owner('t1')).toBeUndefined()
+    expect(emitted().at(-1)).toEqual(['t1', 'stopped'])
+    // `claude --resume <same id>` in the same shell
+    ev('s1', 'SessionStart', 'busy', now + 400, 't1')
+    expect(owner('t1')).toBe('s1')
+    expect(emitted().at(-1)).toEqual(['t1', 'busy'])
   })
 
   test('a restart after a crash (no SessionEnd) takes the chat over', () => {
