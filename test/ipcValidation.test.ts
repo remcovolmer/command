@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest'
 import {
   MAX_TERMINAL_WRITE_BYTES,
+  encodePtyInput,
   formatOversizeMessage,
   validateTerminalWritePayload,
 } from '../electron/main/utils/terminalWriteLimits'
@@ -224,5 +225,28 @@ describe('formatOversizeMessage', () => {
     const msg = formatOversizeMessage(1_500_000, MAX_TERMINAL_WRITE_BYTES)
     expect(msg.body).toMatch(/KB/)
     expect(msg.body.toLowerCase()).toMatch(/file|too large|exceeds/)
+  })
+})
+
+describe('encodePtyInput (terminal:write binary flag)', () => {
+  test('text input stays a string (node-pty encodes it as UTF-8)', () => {
+    expect(encodePtyInput('héllo', undefined)).toBe('héllo')
+    expect(encodePtyInput('x', false)).toBe('x')
+  })
+
+  test('only a literal true selects the raw-byte path', () => {
+    expect(encodePtyInput('x', 'true')).toBe('x')
+    expect(encodePtyInput('x', 1)).toBe('x')
+  })
+
+  test('binary input becomes one byte per char, so >= 0x80 is not UTF-8 expanded', () => {
+    const report = '\x1b[M\x20\xa0\xff'
+    const out = encodePtyInput(report, true)
+    expect(Buffer.isBuffer(out)).toBe(true)
+    expect([...(out as Buffer)]).toEqual([0x1b, 0x5b, 0x4d, 0x20, 0xa0, 0xff])
+  })
+
+  test('a binary string with a char above 0xFF is rejected', () => {
+    expect(encodePtyInput('\x1b[MĀ', true)).toBeNull()
   })
 })

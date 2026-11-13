@@ -11,6 +11,8 @@ import { isAgentType } from '../../../shared/agents'
 import { buildAgentCommand, isHookCapableAgent } from './agents'
 import { createLogger } from './Logger'
 import { deriveShellSpec, quotePromptForShell } from '../utils/shell'
+import { trimPreservingModes } from '../../../shared/ptyBuffer'
+import { type PtySize } from '../utils/ptySize'
 
 const log = createLogger('TerminalManager')
 
@@ -31,7 +33,13 @@ export interface CreateTerminalOptions {
    *  positional argument (foreground automation launch). */
   initialPrompt?: string
   envOverrides?: Record<string, string>
+  /** Initial PTY grid size (already validated/clamped by the IPC layer). When
+   *  omitted, the last size the renderer applied to a terminal of the same
+   *  kind is used, falling back to 80x24. */
+  size?: PtySize
 }
+
+const DEFAULT_PTY_SIZE: PtySize = { cols: 80, rows: 24 }
 
 interface TerminalInstance {
   id: string
@@ -87,6 +95,18 @@ export class TerminalManager {
   private readonly PTY_CHUNK_SIZE = 512
   private readonly BRACKETED_PASTE_START = '\x1b[200~'
   private readonly BRACKETED_PASTE_END = '\x1b[201~'
+
+  // Per-terminal FIFO write queue. writePtySafe yields between chunks, so
+  // without serialization a keystroke typed during a large paste (or a second
+  // paste) would land in the middle of it. An entry exists only while a write
+  // is pending; the chain never rejects, so a failed write cannot wedge it.
+  private writeQueues: Map<string, Promise<void>> = new Map()
+
+  // Last grid size the renderer applied, per terminal kind (center chats vs
+  // sidecar shells). Used as the spawn size when terminal:create carries none,
+  // so a new/resumed session starts at the real width instead of 80 columns
+  // and skips the resize burst (ConPTY repaint) on first activation.
+  private lastKnownSize: { agent?: PtySize; normal?: PtySize } = {}
 
   constructor(
     window: BrowserWindow,
@@ -173,6 +193,14 @@ export class TerminalManager {
       env.FORCE_HYPERLINK = '1'
     }
 
+    // node-pty only sets TERM on Unix (from the `name` option). On Windows the
+    // child would otherwise see no TERM/COLORTERM and CLIs fall back to
+    // conservative color/terminal detection. Inherited values win.
+    if (process.platform === 'win32') {
+      if (!env.TERM) env.TERM = 'xterm-256color'
+      if (!env.COLORTERM) env.COLORTERM = 'truecolor'
+    }
+
     // Prepend CLI directory to PATH so `ccli` is available
     const existingPath = env.PATH || env.Path || ''
     env.PATH = this.cliDir + path.delimiter + existingPath
@@ -208,12 +236,14 @@ export class TerminalManager {
     // failures (e.g. TOCTOU race between statSync and CreateProcessW). The
     // try/catch here covers synchronous spawn failures; async failures still
     // route through the global uncaughtException handler (see CrashLogger).
+    const size =
+      options.size ?? this.lastKnownSize[type === 'normal' ? 'normal' : 'agent'] ?? DEFAULT_PTY_SIZE
     let ptyProcess: pty.IPty
     try {
       ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
-        cols: 80,
-        rows: 24,
+        cols: size.cols,
+        rows: size.rows,
         cwd,
         env,
       })
@@ -281,9 +311,9 @@ export class TerminalManager {
       terminal.state = 'stopped'
 
       if (orphanedSpawnFailure) {
-        // Skip the normal terminal:state / terminal:exit pair — the renderer
-        // never finished setting up this terminal in the first place. Surface
-        // it as a toast instead so the user sees what happened.
+        // terminal:create already returned this id, so the renderer has a tab
+        // for it. Surface the failure as a toast AND still emit the
+        // state/exit pair below — otherwise that tab stays 'busy' forever.
         this.sendToRenderer('terminal:spawn-failed', {
           projectId: terminal.projectId,
           worktreeId: terminal.worktreeId,
@@ -291,10 +321,15 @@ export class TerminalManager {
           cwd: terminal.cwd,
           message: 'PTY worker exited before any output (likely cwd or shell issue)',
         })
-      } else {
-        this.sendToRenderer('terminal:state', id, 'stopped')
-        this.sendToRenderer('terminal:exit', id, exitCode)
       }
+      // An evicted chat whose shell exits keeps its tab (state 'stopped'), but
+      // its buffer is dropped below and restoreTerminal would find nothing:
+      // hand the output since eviction to the renderer now. With no live xterm
+      // it is parked in the pool and replayed after the serialized screen.
+      const evictedOutput = this.evictedBuffers.get(id)
+      if (evictedOutput) this.sendToRenderer('terminal:data', id, evictedOutput)
+      this.sendToRenderer('terminal:state', id, 'stopped')
+      this.sendToRenderer('terminal:exit', id, exitCode)
 
       this.clearHooklessQuietTimer(id)
       this.terminals.delete(id)
@@ -302,6 +337,7 @@ export class TerminalManager {
       this.terminalTitled.delete(id)
       this.evictedBuffers.delete(id)
       this.sidecarBuffers.delete(id)
+      this.writeQueues.delete(id)
     })
 
     this.terminals.set(id, terminal)
@@ -335,7 +371,7 @@ export class TerminalManager {
       // truncated under ConPTY/node-pty backpressure, dropping the trailing CR
       // and hanging the launch on an unterminated quote.
       const startTimeout = setTimeout(() => {
-        if (this.terminals.has(id)) void this.writePtySafe(id, startCommand)
+        if (this.terminals.has(id)) void this.enqueueWrite(id, startCommand)
       }, SHELL_READY_DELAY_MS)
       terminal.timeouts.push(startTimeout)
     } else {
@@ -345,23 +381,68 @@ export class TerminalManager {
     return id
   }
 
-  async writeToTerminal(terminalId: string, data: string): Promise<void> {
+  async writeToTerminal(terminalId: string, data: string | Buffer): Promise<void> {
     const terminal = this.terminals.get(terminalId)
     if (!terminal?.pty) return
+
+    // Raw bytes (xterm onBinary mouse reports) are not typed input: no
+    // auto-naming, no busy guess, no chunking — just keep FIFO order.
+    if (typeof data !== 'string') {
+      await this.enqueueWrite(terminalId, data)
+      return
+    }
 
     // Auto-naming: buffer input and extract title on Enter (agent chats only)
     if (isAgentType(terminal.type) && !this.terminalTitled.get(terminalId)) {
       this.handleAutoNaming(terminalId, data)
     }
 
-    // When the user presses Enter, set to busy immediately (agent chats only).
-    // Hook-capable agents get corrected by their hook; pi relies on this plus the
-    // output heuristic to return to done.
-    if (isAgentType(terminal.type) && (data.includes('\r') || data.includes('\n'))) {
+    // When the user presses Enter, set to busy immediately — hookless agents (pi)
+    // only, which rely on this plus the output heuristic to return to done.
+    // Hook-capable agents get busy from their UserPromptSubmit hook: an Enter on an
+    // empty prompt, a dialog confirmation or a paste fires no hook event that would
+    // clear a guessed busy again.
+    if (
+      isAgentType(terminal.type) &&
+      !isHookCapableAgent(terminal.type) &&
+      (data.includes('\r') || data.includes('\n'))
+    ) {
       this.updateTerminalState(terminalId, 'busy')
     }
 
-    await this.writePtySafe(terminalId, data)
+    await this.enqueueWrite(terminalId, data)
+  }
+
+  /**
+   * Append a write to the terminal's FIFO queue. When nothing is pending and
+   * the payload is on writePtySafe's fast path, write synchronously so typical
+   * keystrokes keep zero added latency (ordering is trivially preserved).
+   * Errors are logged and never propagated into the chain, so one failed
+   * write does not block every later write to that terminal.
+   */
+  private enqueueWrite(terminalId: string, data: string | Buffer): Promise<void> {
+    if (data.length === 0) return Promise.resolve()
+
+    const pending = this.writeQueues.get(terminalId)
+    if (!pending && data.length <= this.PTY_CHUNK_THRESHOLD) {
+      try {
+        this.terminals.get(terminalId)?.pty?.write(data)
+      } catch (err) {
+        log.warn(`PTY write failed for ${terminalId}:`, err)
+      }
+      return Promise.resolve()
+    }
+
+    const next = (pending ?? Promise.resolve())
+      .then(() => this.writePtySafe(terminalId, data))
+      .catch((err: unknown) => {
+        log.warn(`PTY write failed for ${terminalId}:`, err)
+      })
+    this.writeQueues.set(terminalId, next)
+    void next.then(() => {
+      if (this.writeQueues.get(terminalId) === next) this.writeQueues.delete(terminalId)
+    })
+    return next
   }
 
   /**
@@ -377,10 +458,10 @@ export class TerminalManager {
    * On Windows, \r bytes inside a bracketed-paste block are stripped because
    * ConPTY interprets CRLF inconsistently mid-paste.
    */
-  private async writePtySafe(terminalId: string, data: string): Promise<void> {
+  private async writePtySafe(terminalId: string, data: string | Buffer): Promise<void> {
     if (data.length === 0) return
 
-    if (data.length <= this.PTY_CHUNK_THRESHOLD) {
+    if (typeof data !== 'string' || data.length <= this.PTY_CHUNK_THRESHOLD) {
       const terminal = this.terminals.get(terminalId)
       terminal?.pty?.write(data)
       return
@@ -417,9 +498,10 @@ export class TerminalManager {
 
   /**
    * Split `data` into chunks of up to PTY_CHUNK_SIZE bytes, never cutting
-   * across a 6-byte bracketed-paste marker. If a naive boundary would split
-   * a marker, the boundary is rewound so the full marker lands in the next
-   * chunk.
+   * across a 6-byte bracketed-paste marker or between the two UTF-16 halves
+   * of a surrogate pair (a lone surrogate is encoded as U+FFFD on its way to
+   * the PTY, corrupting emoji). If a naive boundary would split either, it is
+   * rewound so the whole unit lands in the next chunk.
    */
   private chunkForPty(data: string): string[] {
     if (data.length <= this.PTY_CHUNK_SIZE) return [data]
@@ -449,6 +531,11 @@ export class TerminalManager {
             }
             break
           }
+        }
+
+        const last = data.charCodeAt(end - 1)
+        if (end - 1 > pos && last >= 0xd800 && last <= 0xdbff) {
+          end -= 1
         }
       }
 
@@ -548,8 +635,15 @@ export class TerminalManager {
 
   resizeTerminal(terminalId: string, cols: number, rows: number): void {
     const terminal = this.terminals.get(terminalId)
-    if (terminal?.pty) {
+    if (!terminal?.pty) return
+    this.lastKnownSize[terminal.type === 'normal' ? 'normal' : 'agent'] = { cols, rows }
+    try {
       terminal.pty.resize(cols, rows)
+    } catch (err) {
+      // node-pty throws "Cannot resize a pty that has already exited" when a
+      // resize races the PTY exit (onExit not yet delivered). Harmless — do
+      // not let it escape as an uncaughtException crash toast.
+      log.debug(`Ignoring resize for exited PTY ${terminalId}:`, err)
     }
   }
 
@@ -577,6 +671,9 @@ export class TerminalManager {
 
       // Clean up sidecar buffer
       this.sidecarBuffers.delete(terminalId)
+
+      // Drop the write queue; queued chunks see the terminal gone and stop.
+      this.writeQueues.delete(terminalId)
 
       // Clean up hookless quiet timer (pi)
       this.clearHooklessQuietTimer(terminalId)
@@ -717,15 +814,14 @@ export class TerminalManager {
     const buffer = this.evictedBuffers.get(terminalId)
     if (buffer === undefined) return
 
-    // Flush buffered data to renderer
-    if (buffer.length > 0) {
-      // Defer flush to next tick to guarantee renderer event handlers are registered
-      setImmediate(() => {
-        this.sendToRenderer('terminal:data', terminalId, buffer)
-      })
-    }
-
+    // Flush synchronously, in the same tick that stops buffering. The renderer
+    // subscribes to terminal:data before it sends terminal:restore, so no
+    // deferral is needed — and deferring let a PTY onData firing in between
+    // reach the renderer BEFORE the older buffered output.
     this.evictedBuffers.delete(terminalId)
+    if (buffer.length > 0) {
+      this.sendToRenderer('terminal:data', terminalId, buffer)
+    }
   }
 
   /**
@@ -736,14 +832,9 @@ export class TerminalManager {
     let buffer = this.evictedBuffers.get(terminalId)
     if (buffer === undefined) return
 
-    buffer += data
-    if (buffer.length > this.MAX_BUFFER_SIZE) {
-      // Trim from front at a line boundary
-      const excess = buffer.length - this.MAX_BUFFER_SIZE
-      const lineBreak = buffer.indexOf('\n', excess)
-      buffer = lineBreak !== -1 ? buffer.slice(lineBreak + 1) : buffer.slice(excess)
-    }
-
+    // Trim from the front (line boundary preferred) while keeping the terminal
+    // mode state of the dropped output and never cutting a sequence in half.
+    buffer = trimPreservingModes(buffer + data, this.MAX_BUFFER_SIZE)
     this.evictedBuffers.set(terminalId, buffer)
   }
 
@@ -751,14 +842,11 @@ export class TerminalManager {
    * Buffer PTY data for a sidecar terminal with size cap.
    */
   private bufferSidecarData(terminalId: string, data: string): void {
-    let buffer = this.sidecarBuffers.get(terminalId) ?? ''
-    buffer += data
-    if (buffer.length > this.MAX_SIDECAR_BUFFER_SIZE) {
-      const excess = buffer.length - this.MAX_SIDECAR_BUFFER_SIZE
-      const lineBreak = buffer.indexOf('\n', excess)
-      buffer = lineBreak !== -1 ? buffer.slice(lineBreak + 1) : buffer.slice(excess)
-    }
-    this.sidecarBuffers.set(terminalId, buffer)
+    const buffer = this.sidecarBuffers.get(terminalId) ?? ''
+    this.sidecarBuffers.set(
+      terminalId,
+      trimPreservingModes(buffer + data, this.MAX_SIDECAR_BUFFER_SIZE)
+    )
   }
 
   /**
@@ -775,7 +863,9 @@ export class TerminalManager {
   writeToPty(terminalId: string, data: string): boolean {
     const terminal = this.terminals.get(terminalId)
     if (!terminal?.pty) return false
-    terminal.pty.write(data)
+    // Same FIFO queue as user input so a ccli/automation command never lands
+    // inside a paste that is still being chunked.
+    void this.enqueueWrite(terminalId, data)
     return true
   }
 

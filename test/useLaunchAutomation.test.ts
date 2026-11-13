@@ -95,7 +95,8 @@ describe('useLaunchAutomation — focus-neutral launch (R21)', () => {
       undefined,
       'claude',
       undefined,
-      'review the code'
+      'review the code',
+      undefined // no DOM / live xterm here → size estimate unavailable
     )
     expect(api.worktree.create).not.toHaveBeenCalled()
     // Logged into run history.
@@ -122,7 +123,8 @@ describe('useLaunchAutomation — focus-neutral launch (R21)', () => {
       'wt1',
       'claude',
       undefined,
-      'review the code'
+      'review the code',
+      undefined // no DOM / live xterm here → size estimate unavailable
     )
     expect(state.activeProjectId).toBe('p1')
     expect(state.activeTerminalId).toBe('term-existing')

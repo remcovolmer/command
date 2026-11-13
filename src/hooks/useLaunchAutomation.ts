@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useProjectStore, MAX_TERMINALS_PER_PROJECT } from '../stores/projectStore'
 import { getElectronAPI } from '../utils/electron'
+import { estimateTerminalGrid } from '../utils/terminalGrid'
 import type { Automation, AutomationTarget, TerminalSession } from '../types'
 
 /**
@@ -106,7 +107,8 @@ export function useLaunchAutomation() {
           worktreeId,
           'claude',
           undefined,
-          automation.prompt
+          automation.prompt,
+          estimateTerminalGrid('chat', useProjectStore.getState().activeTerminalId)
         )
       } catch {
         cleanupOrphanWorktree()

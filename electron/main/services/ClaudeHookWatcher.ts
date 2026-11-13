@@ -6,8 +6,10 @@ import {
   renameSync,
   existsSync,
   mkdirSync,
+  unlinkSync,
 } from 'fs'
-import { readFile } from 'fs/promises'
+import { readFile, readdir, stat, unlink } from 'fs/promises'
+import { randomUUID } from 'crypto'
 import { join } from 'path'
 import { type BrowserWindow } from 'electron'
 import { homedir } from 'os'
@@ -21,6 +23,19 @@ const log = createLogger('HookWatcher')
 // Configuration constants
 const POLL_INTERVAL_MS = 250
 const MAX_PENDING_QUEUE_SIZE = 10
+// Per-session state files untouched for this long are deleted (the hook used to
+// prune the shared file with the same window).
+const STALE_SESSION_TIMEOUT_MS = 60 * 60 * 1000
+// The owner of an ID-bound chat counts as alive (and so cannot be displaced by
+// another session on the same terminal ID, e.g. a nested `claude -p`) while it
+// is busy/permission/question and its last event is younger than this.
+export const OWNER_LIVENESS_WINDOW_MS = 10 * 60 * 1000
+// Upper bound on remembered ended session IDs (tombstones against late events).
+const MAX_ENDED_SESSIONS = 256
+/** Directory (under ~/.claude) holding one `<session_id>.json` per session. */
+export const STATE_DIR_NAME = 'command-center-state'
+/** Legacy shared file, still written by the Codex hook and older Claude hook scripts. */
+export const LEGACY_STATE_FILE_NAME = 'command-center-state.json'
 
 interface HookStateData {
   session_id: string
@@ -28,6 +43,8 @@ interface HookStateData {
   state: TerminalState
   timestamp: number
   hook_event: string
+  /** COMMAND_CENTER_TERMINAL_ID of the PTY the session runs in (newer Claude hook only). */
+  terminal_id?: string
 }
 
 // Multi-session state file format: { [session_id]: HookStateData }
@@ -44,7 +61,8 @@ export function isHookStateData(value: unknown): value is HookStateData {
     typeof obj.session_id === 'string' &&
     typeof obj.state === 'string' &&
     typeof obj.timestamp === 'number' &&
-    typeof obj.hook_event === 'string'
+    typeof obj.hook_event === 'string' &&
+    (obj.terminal_id === undefined || typeof obj.terminal_id === 'string')
     // Note: cwd can be undefined
   )
 }
@@ -91,10 +109,41 @@ export function normalizeStateFile(parsed: unknown): MultiSessionState {
  * `isHookCapableAgent` / `TerminalManager`); hookless agents (pi) get state from
  * output heuristics instead. The name is retained for back-compat with existing
  * imports; its behavior is not Claude-specific.
+ *
+ * Two sources feed the same pipeline:
+ * - `~/.claude/command-center-state/<session_id>.json` — one file per session,
+ *   written by the current Claude hook (no cross-session lost updates). Polled
+ *   every 250ms with a stat/mtime check; only changed files are read.
+ * - `~/.claude/command-center-state.json` — the legacy shared file, still written
+ *   by the Codex hook and by an older Claude hook script still installed in
+ *   settings.json (dev and packaged builds may alternate).
+ *
+ * Session → terminal mapping:
+ * - Entries with `terminal_id` (the PTY's COMMAND_CENTER_TERMINAL_ID) are
+ *   authoritative: routed only to that terminal, and only when it is a
+ *   registered (hook-capable) chat — sessions started from a sidecar shell carry
+ *   the sidecar's ID and are ignored. When several sessions report the same
+ *   terminal ID (e.g. a nested `claude -p` run by a tool inside the chat, or a
+ *   restart after a crash without SessionEnd), the session with the most recent
+ *   event takes the chat over — unless the owner is alive (busy/permission/
+ *   question with an event < OWNER_LIVENESS_WINDOW_MS old): then the newcomer is
+ *   only tracked, emits nothing and is not persisted. When the owner ends,
+ *   ownership reverts to the most recent session with an event after the owner
+ *   took over (its last state is re-emitted); otherwise the end state is
+ *   emitted. Ended session IDs are tombstoned against late async events.
+ *   Subagent events share the parent's session_id, so they never create a
+ *   second session.
+ * - Entries without `terminal_id` (legacy hook, Codex) fall back to cwd matching,
+ *   which never takes a terminal owned by an ID-confirmed session.
  */
 export class ClaudeHookWatcher {
   private watching: boolean = false
   private stateFilePath: string
+  private stateDirPath: string
+  private dirPollTimer: ReturnType<typeof setInterval> | null = null
+  // file name → mtimeMs/size seen at the last read, for the cheap change check
+  private dirFileStats: Map<string, { mtimeMs: number; size: number }> = new Map()
+  private isPollingDir: boolean = false
   private window: BrowserWindow
 
   // Session ID matching: session_id → terminal_id
@@ -103,6 +152,17 @@ export class ClaudeHookWatcher {
   private terminalToSession: Map<string, string> = new Map()
   // Multiple terminals can share same cwd (e.g., split terminals)
   private cwdToTerminals: Map<string, Set<string>> = new Map()
+  // All registered (hook-capable chat) terminal IDs
+  private registeredTerminals: Set<string> = new Set()
+  // terminal_id → live ID-confirmed sessions on it (session → last state/time)
+  private idSessions: Map<string, Map<string, { state: TerminalState; timestamp: number }>> =
+    new Map()
+  // terminal_id → event timestamp since which its current ID-bound owner owns it
+  private ownerSince: Map<string, number> = new Map()
+  // Ended session ID → SessionEnd timestamp (bounded, insertion-ordered). Late
+  // async events of an ended session are dropped; only a newer SessionStart
+  // (resume of the same ID) brings it back.
+  private endedSessions: Map<string, number> = new Map()
 
   // Per-session composite state tracking for deduplication
   // Tracks timestamp + hookEvent + state to distinguish genuine state changes
@@ -118,10 +178,11 @@ export class ClaudeHookWatcher {
   // Queue for states arriving before terminal is registered
   private pendingStates: Map<string, HookStateData[]> = new Map()
 
-  constructor(window: BrowserWindow) {
+  constructor(window: BrowserWindow, options?: { claudeDir?: string }) {
     this.window = window
-    const claudeDir = join(homedir(), '.claude')
-    this.stateFilePath = join(claudeDir, 'command-center-state.json')
+    const claudeDir = options?.claudeDir ?? join(homedir(), '.claude')
+    this.stateFilePath = join(claudeDir, LEGACY_STATE_FILE_NAME)
+    this.stateDirPath = join(claudeDir, STATE_DIR_NAME)
 
     // Ensure .claude directory exists
     if (!existsSync(claudeDir)) {
@@ -163,9 +224,71 @@ export class ClaudeHookWatcher {
     watchFile(this.stateFilePath, { interval: POLL_INTERVAL_MS }, () => {
       this.onStateChange()
     })
+
+    // Per-session state directory (current Claude hook)
+    try {
+      mkdirSync(this.stateDirPath, { recursive: true })
+    } catch (e) {
+      log.warn('Cannot create state dir:', e)
+    }
+    this.dirPollTimer = setInterval(() => void this.pollStateDir(), POLL_INTERVAL_MS)
+    void this.pollStateDir()
     this.watching = true
 
-    log.info('Started watching:', this.stateFilePath)
+    log.info('Started watching:', this.stateFilePath, this.stateDirPath)
+  }
+
+  /**
+   * One poll of the per-session state directory: stat every `<id>.json`, read
+   * only files whose mtime/size changed since the last poll, delete stale files,
+   * and process the changed entries oldest-first (so ownership on a shared
+   * terminal follows event order). Exported via the class for tests.
+   */
+  async pollStateDir(): Promise<void> {
+    if (this.isPollingDir) return
+    this.isPollingDir = true
+    try {
+      let names: string[]
+      try {
+        names = await readdir(this.stateDirPath)
+      } catch {
+        return // dir missing or unreadable — nothing to do this cycle
+      }
+      const now = Date.now()
+      const seen = new Set<string>()
+      const changed: HookStateData[] = []
+      for (const name of names) {
+        if (!name.endsWith('.json')) continue // skips in-flight `*.tmp` writes
+        seen.add(name)
+        const filePath = join(this.stateDirPath, name)
+        try {
+          const st = await stat(filePath)
+          if (now - st.mtimeMs > STALE_SESSION_TIMEOUT_MS) {
+            await unlink(filePath).catch(() => undefined)
+            this.dirFileStats.delete(name)
+            this.forgetStaleSession(name.slice(0, -'.json'.length))
+            continue
+          }
+          const prev = this.dirFileStats.get(name)
+          if (prev && prev.mtimeMs === st.mtimeMs && prev.size === st.size) continue
+          const parsed: unknown = JSON.parse(await readFile(filePath, 'utf-8'))
+          this.dirFileStats.set(name, { mtimeMs: st.mtimeMs, size: st.size })
+          // The file name is the session id; reject entries that disagree.
+          if (isHookStateData(parsed) && `${parsed.session_id}.json` === name) {
+            changed.push(parsed)
+          }
+        } catch {
+          // Vanished between readdir and read, or mid-rename — retry next poll
+        }
+      }
+      for (const name of this.dirFileStats.keys()) {
+        if (!seen.has(name)) this.dirFileStats.delete(name)
+      }
+      changed.sort((a, b) => a.timestamp - b.timestamp)
+      for (const entry of changed) this.processSessionState(entry)
+    } finally {
+      this.isPollingDir = false
+    }
   }
 
   /**
@@ -192,6 +315,7 @@ export class ClaudeHookWatcher {
       this.cwdToTerminals.set(normalizedCwd, terminals)
     }
     terminals.add(terminalId)
+    this.registeredTerminals.add(terminalId)
 
     log.debug(`Registered terminal ${terminalId} for cwd: ${normalizedCwd}`)
     log.debug(`  Terminals in this cwd: ${Array.from(terminals).join(', ')}`)
@@ -212,6 +336,10 @@ export class ClaudeHookWatcher {
    * Unregister terminal and cleanup all mappings
    */
   unregisterTerminal(terminalId: string): void {
+    this.registeredTerminals.delete(terminalId)
+    this.idSessions.delete(terminalId)
+    this.ownerSince.delete(terminalId)
+
     // Remove from cwd mapping
     for (const [cwd, terminals] of this.cwdToTerminals) {
       if (terminals.has(terminalId)) {
@@ -269,6 +397,15 @@ export class ClaudeHookWatcher {
     const sessionId = hookState.session_id
     if (!sessionId) return
 
+    // An ended session stays ended: its late async events (written after the
+    // SessionEnd cleanup removed its dedup state) must not revive it. Only a
+    // newer SessionStart — the same ID resumed — lifts the tombstone.
+    const endedAt = this.endedSessions.get(sessionId)
+    if (endedAt !== undefined) {
+      if (hookState.hook_event !== 'SessionStart' || hookState.timestamp <= endedAt) return
+      this.endedSessions.delete(sessionId)
+    }
+
     // Composite deduplication: skip if timestamp is stale, or if timestamp+event+state
     // are identical (unchanged session re-read during polling). This prevents duplicate
     // IPC emissions when one session updates the shared state file and other sessions
@@ -293,6 +430,12 @@ export class ClaudeHookWatcher {
         return // Stale event
       }
     }
+
+    if (typeof hookState.terminal_id === 'string' && hookState.terminal_id) {
+      this.processTerminalBoundState(hookState, hookState.terminal_id)
+      return
+    }
+
     const normalizedCwd = hookState.cwd ? normalizePath(hookState.cwd) : undefined
 
     log.debug(`State change: ${hookState.hook_event} -> ${hookState.state}`)
@@ -333,9 +476,133 @@ export class ClaudeHookWatcher {
     // On SessionEnd: cleanup session mapping and remove stale entry from state file
     // to prevent ghost re-emissions on the next poll cycle
     if (hookState.hook_event === 'SessionEnd') {
+      // Queued (unrouted) ends are replayed on register, so only tombstone routed ones.
+      if (terminalId) this.markSessionEnded(sessionId, hookState.timestamp)
       this.clearSessionMappingBySession(sessionId)
       this.removeSessionFromStateFile(sessionId)
     }
+  }
+
+  /**
+   * Route a state that carries the PTY's terminal ID (authoritative key).
+   * See the class doc for the ownership rules on a shared terminal ID.
+   */
+  private processTerminalBoundState(hookState: HookStateData, terminalId: string): void {
+    const sessionId = hookState.session_id
+    if (!this.registeredTerminals.has(terminalId)) {
+      // A sidecar shell, a closed chat, or a terminal of a previous app run —
+      // never attach it to some other chat by cwd.
+      log.debug(`Ignoring session ${sessionId}: terminal ${terminalId} is not a registered chat`)
+      return
+    }
+    this.lastProcessedState.set(sessionId, {
+      timestamp: hookState.timestamp,
+      hookEvent: hookState.hook_event,
+      state: hookState.state,
+    })
+
+    let live = this.idSessions.get(terminalId)
+    if (!live) {
+      live = new Map()
+      this.idSessions.set(terminalId, live)
+    }
+
+    if (hookState.hook_event === 'SessionEnd') {
+      live.delete(sessionId)
+      this.markSessionEnded(sessionId, hookState.timestamp)
+      const wasOwner = this.terminalToSession.get(terminalId) === sessionId
+      this.clearSessionMappingBySession(sessionId)
+      this.removeSessionFromStateFile(sessionId)
+      if (!wasOwner) return
+      // Revert to the most recent other session that was active while the
+      // ending session owned the chat (e.g. the chat whose `claude -p` took over
+      // and just ended). Sessions silent since then are presumed dead — a
+      // crash without SessionEnd — and must not get their stale state re-emitted.
+      const since = this.ownerSince.get(terminalId) ?? -Infinity
+      let next: { sessionId: string; state: TerminalState; timestamp: number } | undefined
+      for (const [sid, info] of live) {
+        if (info.timestamp <= since) continue
+        if (!next || info.timestamp > next.timestamp) next = { sessionId: sid, ...info }
+      }
+      if (next) {
+        this.bindOwner(next.sessionId, terminalId, hookState.timestamp)
+        this.emitState(next.state, terminalId)
+      } else {
+        this.ownerSince.delete(terminalId)
+        this.emitState(hookState.state, terminalId)
+      }
+      return
+    }
+
+    live.set(sessionId, { state: hookState.state, timestamp: hookState.timestamp })
+    const ownerId = this.terminalToSession.get(terminalId)
+    const owner = ownerId !== undefined ? live.get(ownerId) : undefined
+    if (ownerId === sessionId) {
+      // Owner bound without bindOwner (restore pre-association): start its clock now.
+      if (!this.ownerSince.has(terminalId)) this.ownerSince.set(terminalId, hookState.timestamp)
+    } else {
+      // An older event of a non-owner session must not take the chat back.
+      if (owner && owner.timestamp > hookState.timestamp) return
+      // A live owner keeps the chat: the newcomer (typically a nested `claude -p`
+      // inheriting COMMAND_CENTER_TERMINAL_ID) is tracked in `live` so its own
+      // SessionEnd is handled, but emits nothing and is never persisted for resume.
+      if (owner && this.isOwnerAlive(owner)) return
+      this.bindOwner(sessionId, terminalId, hookState.timestamp)
+    }
+    this.emitState(hookState.state, terminalId)
+  }
+
+  /** Owner is mid-turn (busy/permission/question) with a recent last event. */
+  private isOwnerAlive(owner: { state: TerminalState; timestamp: number }): boolean {
+    const active =
+      owner.state === 'busy' || owner.state === 'permission' || owner.state === 'question'
+    return active && Date.now() - owner.timestamp < OWNER_LIVENESS_WINDOW_MS
+  }
+
+  /** Tombstone an ended session ID, evicting the oldest beyond the cap. */
+  private markSessionEnded(sessionId: string, timestamp: number): void {
+    this.endedSessions.delete(sessionId) // re-insert at the newest position
+    this.endedSessions.set(sessionId, timestamp)
+    if (this.endedSessions.size > MAX_ENDED_SESSIONS) {
+      const oldest = this.endedSessions.keys().next().value
+      if (oldest !== undefined) this.endedSessions.delete(oldest)
+    }
+  }
+
+  /**
+   * The stale sweep deleted this session's state file: drop it from the live
+   * sets so it can never be picked when an owner ends. A chat's own owner is
+   * kept (an idle chat is still that chat, and its ID is persisted for resume).
+   */
+  private forgetStaleSession(sessionId: string): void {
+    for (const [terminalId, live] of this.idSessions) {
+      if (this.terminalToSession.get(terminalId) !== sessionId) live.delete(sessionId)
+    }
+    if (!this.sessionToTerminal.has(sessionId)) this.lastProcessedState.delete(sessionId)
+  }
+
+  /**
+   * Make `sessionId` the owner of `terminalId`, detaching whatever session
+   * (ID-bound or cwd-matched) owned it before and any other terminal the session
+   * was mapped to. Keeps dedup state: a displaced live session may resume.
+   */
+  private bindOwner(sessionId: string, terminalId: string, since: number): void {
+    this.ownerSince.set(terminalId, since)
+    const prevTerminal = this.sessionToTerminal.get(sessionId)
+    if (prevTerminal !== undefined && prevTerminal !== terminalId) {
+      this.terminalToSession.delete(prevTerminal)
+      this.ownerSince.delete(prevTerminal)
+    }
+    const prevSession = this.terminalToSession.get(terminalId)
+    if (prevSession !== undefined && prevSession !== sessionId) {
+      this.sessionToTerminal.delete(prevSession)
+    }
+    this.setSessionMapping(sessionId, terminalId)
+  }
+
+  /** True when an ID-confirmed session is live on the terminal — cwd matching must not take it. */
+  private isIdOwned(terminalId: string): boolean {
+    return (this.idSessions.get(terminalId)?.size ?? 0) > 0
   }
 
   /**
@@ -355,8 +622,8 @@ export class ClaudeHookWatcher {
     if (!terminalId) {
       const terminals = this.cwdToTerminals.get(normalizedCwd)
       if (terminals && terminals.size > 0) {
-        const first = terminals.values().next()
-        terminalId = first.done ? undefined : first.value
+        // Never steal a chat whose session is confirmed by terminal ID.
+        terminalId = [...terminals].find((t) => !this.isIdOwned(t))
         if (terminalId) {
           log.warn(`SessionStart: stealing terminal ${terminalId} (old session likely dead)`)
         }
@@ -391,7 +658,7 @@ export class ClaudeHookWatcher {
 
     // Find first unassigned terminal
     for (const terminalId of terminals) {
-      if (!assignedTerminals.has(terminalId)) {
+      if (!assignedTerminals.has(terminalId) && !this.isIdOwned(terminalId)) {
         return terminalId
       }
     }
@@ -423,6 +690,12 @@ export class ClaudeHookWatcher {
    * stale data from being re-read on the next poll cycle.
    */
   private removeSessionFromStateFile(sessionId: string): void {
+    // Per-session file: the session is over, its file has no further use.
+    try {
+      unlinkSync(join(this.stateDirPath, `${sessionId}.json`))
+    } catch {
+      // Not there (legacy hook) or already cleaned
+    }
     try {
       const content = readFileSync(this.stateFilePath, 'utf-8')
       const parsed = JSON.parse(content)
@@ -430,8 +703,9 @@ export class ClaudeHookWatcher {
         delete parsed[sessionId]
         // Atomic write (temp + rename, same pattern as ProjectPersistence):
         // Claude Code hooks poll/write this file concurrently, so a partial
-        // in-place write would be read back as corrupt JSON.
-        const tempPath = `${this.stateFilePath}.tmp`
+        // in-place write would be read back as corrupt JSON. Unique temp name so
+        // two cleanups never write through the same temp file.
+        const tempPath = `${this.stateFilePath}.${randomUUID()}.tmp`
         writeFileSync(tempPath, JSON.stringify(parsed))
         renameSync(tempPath, this.stateFilePath)
       }
@@ -444,18 +718,22 @@ export class ClaudeHookWatcher {
    * Process a state and emit to renderer
    */
   private processStateForTerminal(hookState: HookStateData, terminalId: string): void {
+    this.emitState(hookState.state, terminalId)
+  }
+
+  private emitState(state: string, terminalId: string): void {
     // Validate state before emitting
-    if (!isValidTerminalState(hookState.state)) {
-      log.warn(`Invalid state "${hookState.state}" for terminal ${terminalId}`)
+    if (!isValidTerminalState(state)) {
+      log.warn(`Invalid state "${state}" for terminal ${terminalId}`)
       return
     }
-    log.debug(`Emitting state ${hookState.state} for terminal ${terminalId}`)
-    this.sendToRenderer('terminal:state', terminalId, hookState.state)
+    log.debug(`Emitting state ${state} for terminal ${terminalId}`)
+    this.sendToRenderer('terminal:state', terminalId, state)
 
     // Notify state change listeners (used by AutomationService for 'claude-done' triggers)
     for (const cb of this.stateChangeCallbacks) {
       try {
-        cb(terminalId, hookState.state)
+        cb(terminalId, state)
       } catch (err) {
         // State changes arrive at human pace (hook events), so an
         // unconditional warn cannot spam the log.
@@ -494,6 +772,8 @@ export class ClaudeHookWatcher {
   stop(): void {
     if (this.watching) {
       unwatchFile(this.stateFilePath)
+      if (this.dirPollTimer) clearInterval(this.dirPollTimer)
+      this.dirPollTimer = null
       this.watching = false
       log.info('Stopped watching')
     }
@@ -504,6 +784,11 @@ export class ClaudeHookWatcher {
     this.sessionToTerminal.clear()
     this.terminalToSession.clear()
     this.cwdToTerminals.clear()
+    this.registeredTerminals.clear()
+    this.idSessions.clear()
+    this.ownerSince.clear()
+    this.endedSessions.clear()
+    this.dirFileStats.clear()
     this.lastProcessedState.clear()
     this.pendingStates.clear()
     this.stateChangeCallbacks.length = 0

@@ -24,6 +24,7 @@ import type {
 import type { HotkeyAction, HotkeyBinding, HotkeyConfig } from '../types/hotkeys'
 import { DEFAULT_HOTKEY_CONFIG, mergeMissingHotkeyDefaults } from '../utils/hotkeys'
 import { getElectronAPI } from '../utils/electron'
+import { estimateChatGridWhenReady, estimateTerminalGrid } from '../utils/terminalGrid'
 import { terminalPool } from '../utils/terminalPool'
 import { pathToFileUrl } from '../utils/browserUrls'
 
@@ -780,7 +781,14 @@ export const useProjectStore = create<ProjectStore>()(
         if (existing.length >= 5) return
 
         const api = getElectronAPI()
-        const terminalId = await api.terminal.create(projectId, worktreeId, 'normal')
+        const terminalId = await api.terminal.create(
+          projectId,
+          worktreeId,
+          'normal',
+          undefined,
+          undefined,
+          estimateTerminalGrid('sidecar', state.activeSidecarTerminalId[contextKey])
+        )
         if (!terminalId) return // spawn-failed event surfaces the error to the user
 
         set((state) => {
@@ -2066,9 +2074,13 @@ export const useProjectStore = create<ProjectStore>()(
           state.fileExplorerActiveTab = 'files'
         }
         // Signal main process that store is hydrated (triggers session restoration)
+        // Waits (bounded) for the chat viewport so restored sessions spawn at
+        // the real grid size instead of 80x24 + a resize burst.
         try {
           const api = getElectronAPI()
-          api.app.storeHydrated()
+          void estimateChatGridWhenReady()
+            .catch(() => undefined)
+            .then((size) => api.app.storeHydrated(size))
         } catch {
           // Ignore if electronAPI not available (e.g., in tests)
         }

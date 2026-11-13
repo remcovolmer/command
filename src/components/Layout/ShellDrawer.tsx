@@ -56,7 +56,7 @@ export function ShellDrawer() {
   if (sidecarTerminals.length === 0 || sidecarTerminalCollapsed) return null
 
   return (
-    <div className="shrink-0 flex flex-col h-72">
+    <div className="shrink-0 flex flex-col h-72" data-shell-drawer>
       <SidecarTerminalPanel
         terminals={sidecarTerminals}
         activeTerminalId={activeSidecarTerminalId}

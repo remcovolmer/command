@@ -697,3 +697,319 @@ describe('TerminalManager createTerminal cwd validation', () => {
     expect(manager.hasActiveTerminals()).toBe(false)
   })
 })
+
+describe('TerminalManager PTY pipeline (terminal audit)', () => {
+  let manager: TerminalManager
+  const send = vi.fn()
+  const mockWindow = { isDestroyed: vi.fn(() => false), webContents: { send } }
+  const mockedSpawn = ptySpawn as unknown as ReturnType<typeof vi.fn>
+  const originalPlatform = process.platform
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    mockWrite.mockReset()
+    mockOnData.mockClear()
+    mockOnExit.mockClear()
+    mockResize.mockReset()
+    mockedSpawn.mockClear()
+    send.mockClear()
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
+  })
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform })
+  })
+
+  function createNormal(): string {
+    const id = manager.createTerminal({ cwd: '/test', type: 'normal' })
+    mockWrite.mockClear()
+    send.mockClear()
+    return id
+  }
+
+  function lastOnData(): (d: string) => void {
+    return mockOnData.mock.calls[mockOnData.mock.calls.length - 1][0] as (d: string) => void
+  }
+
+  function lastOnExit(): (e: { exitCode: number }) => void {
+    return mockOnExit.mock.calls[mockOnExit.mock.calls.length - 1][0] as (e: {
+      exitCode: number
+    }) => void
+  }
+
+  function dataSentFor(id: string): string[] {
+    return send.mock.calls
+      .filter((c) => c[0] === 'terminal:data' && c[1] === id)
+      .map((c) => c[2] as string)
+  }
+
+  function writes(): string {
+    return mockWrite.mock.calls.map((c) => c[0] as string).join('')
+  }
+
+  // --- Finding 1: restore flush ordering -----------------------------------
+
+  test('restore flushes the evicted buffer synchronously, before any newer PTY data', () => {
+    const id = createNormal()
+    const onData = lastOnData()
+    manager.evictTerminal(id)
+    onData('old-1 ')
+    onData('old-2 ')
+    manager.restoreTerminal(id)
+    onData('new')
+    expect(dataSentFor(id)).toEqual(['old-1 old-2 ', 'new'])
+  })
+
+  test('a PTY exiting while evicted hands its buffered output over before the exit', () => {
+    const id = createNormal()
+    const onData = lastOnData()
+    manager.evictTerminal(id)
+    onData('last words')
+    lastOnExit()({ exitCode: 0 })
+    expect(dataSentFor(id)).toEqual(['last words'])
+    const order = send.mock.calls.filter((c) => c[1] === id).map((c) => c[0])
+    expect(order.indexOf('terminal:data')).toBeLessThan(order.indexOf('terminal:exit'))
+    manager.restoreTerminal(id) // terminal gone: nothing flushed twice
+    expect(dataSentFor(id)).toEqual(['last words'])
+  })
+
+  // --- Finding 2: mode-preserving evicted-buffer trim ----------------------
+
+  test('evicted buffer over the 1MB cap keeps alt-screen/mouse modes from the dropped prefix', () => {
+    const id = createNormal()
+    const onData = lastOnData()
+    manager.evictTerminal(id)
+    onData('\x1b[?1049h\x1b[?1000;1006h\x1b[?2004h')
+    onData('x'.repeat(1_048_576))
+    onData('\ntail')
+    manager.restoreTerminal(id)
+    const [flushed] = dataSentFor(id)
+    expect(flushed).toBe('\x1b[?1049h\x1b[?1000h\x1b[?1006h\x1b[?2004h' + 'tail')
+  })
+
+  // --- Finding 3: FIFO write ordering + surrogate-safe chunking ------------
+
+  test('a keystroke typed during a large paste lands after the paste, not inside it', async () => {
+    const id = createNormal()
+    const paste = '\x1b[200~' + 'p'.repeat(3000) + '\x1b[201~'
+    const pasteDone = manager.writeToTerminal(id, paste)
+    const keyDone = manager.writeToTerminal(id, 'k')
+    await Promise.all([pasteDone, keyDone])
+    expect(writes()).toBe(paste + 'k')
+  })
+
+  test('binary input is written as raw bytes, in FIFO order behind a large paste', async () => {
+    const id = createNormal()
+    const paste = 'p'.repeat(3000)
+    const mouse = Buffer.from('\x1b[M\x20\xa0\xa0', 'latin1')
+    await Promise.all([manager.writeToTerminal(id, paste), manager.writeToTerminal(id, mouse)])
+    const last = mockWrite.mock.calls[mockWrite.mock.calls.length - 1][0]
+    expect(last).toBe(mouse)
+    expect(mockWrite.mock.calls.slice(0, -1).map((c) => c[0] as string).join('')).toBe(paste)
+  })
+
+  test('two large pastes are written back to back without interleaving', async () => {
+    const id = createNormal()
+    const a = 'a'.repeat(2000)
+    const b = 'b'.repeat(2000)
+    await Promise.all([manager.writeToTerminal(id, a), manager.writeToTerminal(id, b)])
+    expect(writes()).toBe(a + b)
+  })
+
+  test('a failing write does not wedge the queue for later writes', async () => {
+    const id = createNormal()
+    mockWrite.mockImplementationOnce(() => {
+      throw new Error('EPIPE')
+    })
+    // First chunk throws → that write is abandoned (logged), the chain survives.
+    await manager.writeToTerminal(id, 'f'.repeat(2000))
+    await manager.writeToTerminal(id, 'after')
+    expect(mockWrite.mock.calls[mockWrite.mock.calls.length - 1][0]).toBe('after')
+  })
+
+  test('a failing fast-path write is swallowed (no throw into the IPC handler)', async () => {
+    const id = createNormal()
+    mockWrite.mockImplementationOnce(() => {
+      throw new Error('EPIPE')
+    })
+    await expect(manager.writeToTerminal(id, 'x')).resolves.toBeUndefined()
+  })
+
+  test('writeToPty (ccli path) queues behind a paste that is still chunking', async () => {
+    const id = createNormal()
+    const paste = 'q'.repeat(2000)
+    const pasteDone = manager.writeToTerminal(id, paste)
+    expect(manager.writeToPty(id, 'cmd\n')).toBe(true)
+    await pasteDone
+    await new Promise((r) => setImmediate(r))
+    expect(writes()).toBe(paste + 'cmd\n')
+  })
+
+  test('closing a terminal drops its pending queue without writing further chunks', async () => {
+    // Non-Windows so closeTerminal skips `taskkill /pid 12345` (the mock pid
+    // could belong to a real process on the test machine).
+    Object.defineProperty(process, 'platform', { value: 'linux' })
+    const id = createNormal()
+    const pending = manager.writeToTerminal(id, 'z'.repeat(5000))
+    manager.closeTerminal(id)
+    await pending
+    const written = writes()
+    expect(written.length).toBeLessThan(5000)
+    await manager.writeToTerminal(id, 'late')
+    expect(writes()).toBe(written)
+  })
+
+  test('chunker never splits a surrogate pair across chunks', async () => {
+    const id = createNormal()
+    // Emoji starts at index 511, so a naive 512 boundary would cut it in half.
+    const payload = 'a'.repeat(511) + '\u{1F600}' + 'b'.repeat(600)
+    await manager.writeToTerminal(id, payload)
+    const chunks = mockWrite.mock.calls.map((c) => c[0] as string)
+    expect(chunks.length).toBeGreaterThan(1)
+    for (const chunk of chunks) {
+      const last = chunk.charCodeAt(chunk.length - 1)
+      expect(last >= 0xd800 && last <= 0xdbff).toBe(false)
+      const first = chunk.charCodeAt(0)
+      expect(first >= 0xdc00 && first <= 0xdfff).toBe(false)
+    }
+    expect(chunks.join('')).toBe(payload)
+  })
+
+  // --- Finding 4: spawn size + TERM/COLORTERM ------------------------------
+
+  function lastSpawnOptions(): { cols: number; rows: number; env: Record<string, string> } {
+    const calls = mockedSpawn.mock.calls
+    return calls[calls.length - 1][2] as { cols: number; rows: number; env: Record<string, string> }
+  }
+
+  test('spawns at the size passed by terminal:create', () => {
+    manager.createTerminal({ cwd: '/test', type: 'normal', size: { cols: 160, rows: 48 } })
+    expect(lastSpawnOptions()).toMatchObject({ cols: 160, rows: 48 })
+  })
+
+  test('without a size, the first terminal spawns at 80x24', () => {
+    manager.createTerminal({ cwd: '/test', type: 'normal' })
+    expect(lastSpawnOptions()).toMatchObject({ cols: 80, rows: 24 })
+  })
+
+  test('without a size, spawns at the last size applied to a terminal of the same kind', () => {
+    const chat = manager.createTerminal({ cwd: '/test', type: 'claude' })
+    const shell = manager.createTerminal({ cwd: '/test', type: 'normal' })
+    manager.resizeTerminal(chat, 180, 50)
+    manager.resizeTerminal(shell, 90, 20)
+
+    manager.createTerminal({ cwd: '/test', type: 'codex' })
+    expect(lastSpawnOptions()).toMatchObject({ cols: 180, rows: 50 })
+    manager.createTerminal({ cwd: '/test', type: 'normal' })
+    expect(lastSpawnOptions()).toMatchObject({ cols: 90, rows: 20 })
+  })
+
+  test('Windows: sets TERM and COLORTERM when the inherited env lacks them', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    const saved = { TERM: process.env.TERM, COLORTERM: process.env.COLORTERM }
+    delete process.env.TERM
+    delete process.env.COLORTERM
+    try {
+      manager.createTerminal({ cwd: '/test', type: 'normal' })
+      const { env } = lastSpawnOptions()
+      expect(env.TERM).toBe('xterm-256color')
+      expect(env.COLORTERM).toBe('truecolor')
+    } finally {
+      if (saved.TERM !== undefined) process.env.TERM = saved.TERM
+      if (saved.COLORTERM !== undefined) process.env.COLORTERM = saved.COLORTERM
+    }
+  })
+
+  test('Windows: an inherited TERM is left alone', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    const saved = process.env.TERM
+    process.env.TERM = 'screen-256color'
+    try {
+      manager.createTerminal({ cwd: '/test', type: 'normal' })
+      expect(lastSpawnOptions().env.TERM).toBe('screen-256color')
+    } finally {
+      if (saved === undefined) delete process.env.TERM
+      else process.env.TERM = saved
+    }
+  })
+
+  // --- Finding 5: resize after exit -----------------------------------------
+
+  test('resize on an already-exited PTY does not throw', () => {
+    const id = createNormal()
+    mockResize.mockImplementationOnce(() => {
+      throw new Error('Cannot resize a pty that has already exited')
+    })
+    expect(() => manager.resizeTerminal(id, 100, 30)).not.toThrow()
+  })
+
+  // --- Finding 6: orphan exit still emits terminal:exit ---------------------
+
+  test('orphaned spawn failure emits the spawn-failed toast AND stopped state + exit', () => {
+    const id = createNormal()
+    lastOnExit()({ exitCode: 1 })
+    const channels = send.mock.calls.map((c) => c[0])
+    expect(channels).toContain('terminal:spawn-failed')
+    expect(send).toHaveBeenCalledWith('terminal:state', id, 'stopped')
+    expect(send).toHaveBeenCalledWith('terminal:exit', id, 1)
+  })
+
+  test('normal exit after output emits state + exit without a spawn-failed toast', () => {
+    const id = createNormal()
+    lastOnData()('prompt$ ')
+    send.mockClear()
+    lastOnExit()({ exitCode: 0 })
+    const channels = send.mock.calls.map((c) => c[0])
+    expect(channels).not.toContain('terminal:spawn-failed')
+    expect(send).toHaveBeenCalledWith('terminal:exit', id, 0)
+  })
+})
+
+describe('TerminalManager Enter → busy heuristic', () => {
+  let manager: TerminalManager
+  const send = vi.fn()
+  const mockWindow = { isDestroyed: vi.fn(() => false), webContents: { send } }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockWrite.mockClear()
+    send.mockClear()
+    manager = new TerminalManager(mockWindow as unknown as BrowserWindow)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // Put the cached state at 'done' so a busy transition would be observable.
+  function settleToDone(id: string) {
+    const terminals = (manager as unknown as { terminals: Map<string, { state: string }> })
+      .terminals
+    const t = terminals.get(id)
+    if (!t) throw new Error('terminal not found')
+    t.state = 'done'
+    send.mockClear()
+  }
+
+  const busyEmits = () =>
+    send.mock.calls.filter((c) => c[0] === 'terminal:state' && c[2] === 'busy')
+
+  test.each([['claude'], ['codex']] as const)(
+    'Enter on a hook-capable %s chat does not guess busy (UserPromptSubmit decides)',
+    async (type) => {
+      const id = manager.createTerminal({ cwd: '/test', type })
+      await vi.runAllTimersAsync()
+      settleToDone(id)
+      await manager.writeToTerminal(id, '\r')
+      expect(busyEmits()).toHaveLength(0)
+    }
+  )
+
+  test('Enter on a hookless pi chat still marks it busy', async () => {
+    const id = manager.createTerminal({ cwd: '/test', type: 'pi' })
+    await vi.runAllTimersAsync()
+    settleToDone(id)
+    await manager.writeToTerminal(id, 'hi\r')
+    expect(busyEmits()).toHaveLength(1)
+  })
+})

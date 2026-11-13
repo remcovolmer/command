@@ -16,6 +16,7 @@ import {
   isHookStateData,
   normalizeStateFile,
   ClaudeHookWatcher,
+  OWNER_LIVENESS_WINDOW_MS,
 } from '../electron/main/services/ClaudeHookWatcher'
 
 function makeHookState(overrides: Record<string, unknown> = {}) {
@@ -176,12 +177,16 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   renameSync: vi.fn(),
+  unlinkSync: vi.fn(),
   watchFile: vi.fn(),
   unwatchFile: vi.fn(),
 }))
 
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
+  readdir: vi.fn(),
+  stat: vi.fn(),
+  unlink: vi.fn(),
 }))
 
 // Mocked fs functions (see vi.mock above) for atomic-write assertions
@@ -666,7 +671,8 @@ describe('ClaudeHookWatcher state file atomic write', () => {
     // Write goes to the temp file, never directly to the state file
     expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
     const [writePath, written] = vi.mocked(fs.writeFileSync).mock.calls[0]
-    expect(String(writePath)).toMatch(/command-center-state\.json\.tmp$/)
+    // Unique temp name: two cleanups never share one temp file
+    expect(String(writePath)).toMatch(/command-center-state\.json\.[0-9a-f-]{36}\.tmp$/)
     expect(JSON.parse(String(written))).toEqual({})
 
     // Rename moves the temp file over the state file, after the write
@@ -737,5 +743,210 @@ describe('ClaudeHookWatcher state change listeners', () => {
     expect(loggerSpies.warn).toHaveBeenCalledWith('State change listener threw:', expect.any(Error))
     // The renderer emission still happened despite the throwing listener
     expect(getSend(mockWindow)).toHaveBeenCalledWith('terminal:state', 't1', 'busy')
+  })
+})
+
+describe('ClaudeHookWatcher terminal-ID mapping (COMMAND_CENTER_TERMINAL_ID)', () => {
+  let watcher: ClaudeHookWatcher
+  let mockWindow: ReturnType<typeof createMockWindow>
+  const CWD = 'C:\\projects\\foo'
+
+  function processState(hookState: Record<string, unknown>) {
+    ;(
+      watcher as unknown as { processSessionState(s: Record<string, unknown>): void }
+    ).processSessionState(hookState)
+  }
+
+  function ev(session: string, hookEvent: string, state: string, ts: number, terminalId?: string) {
+    processState({
+      session_id: session,
+      cwd: CWD,
+      state,
+      timestamp: ts,
+      hook_event: hookEvent,
+      ...(terminalId ? { terminal_id: terminalId } : {}),
+    })
+  }
+
+  const emitted = () =>
+    getSend(mockWindow)
+      .mock.calls.filter((c) => c[0] === 'terminal:state')
+      .map((c) => [c[1], c[2]])
+  const owner = (terminalId: string) =>
+    watcher.getTerminalSessions().find((s) => s.terminalId === terminalId)?.sessionId
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockWindow = createMockWindow()
+    watcher = new ClaudeHookWatcher(mockWindow)
+    watcher.registerTerminal('t1', 'C:/projects/foo')
+    watcher.registerTerminal('t2', 'C:/projects/foo')
+  })
+
+  test('routes by terminal id, not by cwd order', () => {
+    ev('s2', 'SessionStart', 'busy', 1000, 't2')
+    ev('s1', 'SessionStart', 'busy', 1001, 't1')
+    expect(owner('t1')).toBe('s1')
+    expect(owner('t2')).toBe('s2')
+    expect(emitted()).toEqual([
+      ['t2', 'busy'],
+      ['t1', 'busy'],
+    ])
+  })
+
+  test('a session from a sidecar shell (unregistered terminal id) is never attached to a chat', () => {
+    ev('sidecar', 'SessionStart', 'busy', 1000, 'sidecar-terminal')
+    ev('sidecar', 'Stop', 'done', 1001, 'sidecar-terminal')
+    expect(watcher.getTerminalSessions()).toHaveLength(0)
+    expect(emitted()).toEqual([])
+  })
+
+  test('a cwd-only SessionStart (legacy hook, claude -p elsewhere) cannot steal an ID-confirmed chat', () => {
+    ev('s1', 'SessionStart', 'busy', 1000, 't1')
+    ev('s2', 'SessionStart', 'busy', 1001, 't2')
+    // Both chats ID-owned: the old steal-first-terminal fallback must not fire.
+    ev('intruder', 'SessionStart', 'busy', 1002)
+    ev('intruder', 'Stop', 'done', 1003)
+    expect(owner('t1')).toBe('s1')
+    expect(owner('t2')).toBe('s2')
+    expect(emitted().filter(([, s]) => s === 'done')).toEqual([])
+  })
+
+  test('an ID-bound session displaces a cwd-matched session on its terminal', () => {
+    ev('legacy', 'SessionStart', 'busy', 1000) // cwd fallback → t1
+    expect(owner('t1')).toBe('legacy')
+    ev('s1', 'SessionStart', 'busy', 1001, 't1')
+    expect(owner('t1')).toBe('s1')
+    // The displaced legacy session re-binds to the free chat, never back onto t1
+    ev('legacy', 'Stop', 'done', 1002)
+    expect(owner('t1')).toBe('s1')
+    expect(owner('t2')).toBe('legacy')
+  })
+
+  test('nested session while the owner is busy and recent: tracked, never emitted or persisted', () => {
+    const listener = vi.fn()
+    watcher.addStateChangeListener(listener)
+    const now = Date.now()
+    ev('main', 'UserPromptSubmit', 'busy', now, 't1')
+    // A tool in the chat runs `claude -p` → same terminal id, new session
+    ev('nested', 'SessionStart', 'busy', now + 10, 't1')
+    ev('nested', 'Stop', 'done', now + 20, 't1')
+    expect(owner('t1')).toBe('main')
+    expect(emitted()).toEqual([['t1', 'busy']])
+    expect(listener).not.toHaveBeenCalledWith('t1', 'done')
+  })
+
+  test('nested session ends: the owner is untouched and keeps routing', () => {
+    const now = Date.now()
+    ev('main', 'PreToolUse', 'permission', now, 't1')
+    ev('nested', 'SessionStart', 'busy', now + 10, 't1')
+    ev('nested', 'SessionEnd', 'stopped', now + 20, 't1')
+    expect(owner('t1')).toBe('main')
+    expect(emitted()).toEqual([['t1', 'permission']])
+    ev('main', 'Stop', 'done', now + 30, 't1')
+    expect(emitted().at(-1)).toEqual(['t1', 'done'])
+  })
+
+  test('a new session takes over when the owner is done or silent for too long', () => {
+    const now = Date.now()
+    // Owner done (/clear, /resume path)
+    ev('s1', 'Stop', 'done', now, 't1')
+    ev('s2', 'SessionStart', 'done', now + 1, 't1')
+    expect(owner('t1')).toBe('s2')
+    // Owner busy but its last event is older than the liveness window
+    ev('s3', 'UserPromptSubmit', 'busy', now - OWNER_LIVENESS_WINDOW_MS - 1000, 't2')
+    ev('s4', 'SessionStart', 'busy', now, 't2')
+    ev('s4', 'Stop', 'done', now + 1, 't2')
+    expect(owner('t2')).toBe('s4')
+    expect(emitted().at(-1)).toEqual(['t2', 'done'])
+  })
+
+  test('owner ends: reverts to a session active during its ownership, with that state re-emitted', () => {
+    const now = Date.now()
+    ev('a', 'SessionStart', 'busy', 1000, 't1') // long silent → displaceable
+    ev('b', 'SessionStart', 'busy', now, 't1')
+    expect(owner('t1')).toBe('b')
+    ev('a', 'PreToolUse', 'question', now + 10, 't1') // b is live: a only tracked
+    expect(owner('t1')).toBe('b')
+    ev('b', 'SessionEnd', 'stopped', now + 20, 't1')
+    expect(owner('t1')).toBe('a')
+    expect(emitted().at(-1)).toEqual(['t1', 'question'])
+  })
+
+  test('owner ends with only a dead (silent) session left: stopped, no re-emission of its old state', () => {
+    const now = Date.now()
+    ev('dead', 'PreToolUse', 'permission', 1000, 't1') // died without SessionEnd
+    ev('s2', 'SessionStart', 'busy', now, 't1')
+    ev('s2', 'SessionEnd', 'stopped', now + 10, 't1')
+    expect(owner('t1')).toBeUndefined()
+    expect(emitted()).toEqual([
+      ['t1', 'permission'],
+      ['t1', 'busy'],
+      ['t1', 'stopped'],
+    ])
+  })
+
+  test('a late event after SessionEnd does not revive the session; a newer SessionStart (resume) does', () => {
+    const now = Date.now()
+    ev('s1', 'UserPromptSubmit', 'busy', now, 't1')
+    ev('s1', 'SessionEnd', 'stopped', now + 200, 't1')
+    // Async hooks landing after the end: older and newer timestamps alike
+    ev('s1', 'Stop', 'done', now + 100, 't1')
+    ev('s1', 'PostToolUse', 'busy', now + 300, 't1')
+    expect(owner('t1')).toBeUndefined()
+    expect(emitted().at(-1)).toEqual(['t1', 'stopped'])
+    // `claude --resume <same id>` in the same shell
+    ev('s1', 'SessionStart', 'busy', now + 400, 't1')
+    expect(owner('t1')).toBe('s1')
+    expect(emitted().at(-1)).toEqual(['t1', 'busy'])
+  })
+
+  test('a restart after a crash (no SessionEnd) takes the chat over', () => {
+    ev('crashed', 'UserPromptSubmit', 'busy', 1000, 't1')
+    ev('fresh', 'SessionStart', 'busy', 5000, 't1')
+    ev('fresh', 'Stop', 'done', 6000, 't1')
+    expect(owner('t1')).toBe('fresh')
+    expect(emitted().at(-1)).toEqual(['t1', 'done'])
+  })
+
+  test('an out-of-order older event from a displaced session does not take the chat back', () => {
+    ev('a', 'SessionStart', 'busy', 1000, 't1')
+    ev('b', 'SessionStart', 'busy', 2000, 't1')
+    ev('a', 'PreToolUse', 'busy', 1500, 't1')
+    expect(owner('t1')).toBe('b')
+  })
+
+  test('SessionEnd exit marks the chat stopped and clears the mapping; /clear hands over to the new session', () => {
+    ev('s1', 'SessionStart', 'busy', 1000, 't1')
+    ev('s1', 'SessionEnd', 'stopped', 2000, 't1')
+    expect(owner('t1')).toBeUndefined()
+    expect(emitted().at(-1)).toEqual(['t1', 'stopped'])
+
+    // Relaunch claude in the same shell, then /clear
+    ev('s2', 'SessionStart', 'busy', 3000, 't1')
+    ev('s2', 'SessionEnd', 'done', 4000, 't1')
+    ev('s3', 'SessionStart', 'done', 4001, 't1')
+    expect(owner('t1')).toBe('s3')
+    expect(emitted().slice(-3)).toEqual([
+      ['t1', 'busy'],
+      ['t1', 'done'],
+      ['t1', 'done'],
+    ])
+  })
+
+  test('SessionEnd of a non-owner session does not touch the chat state', () => {
+    ev('old', 'SessionStart', 'busy', 1000, 't1')
+    ev('new', 'SessionStart', 'busy', 2000, 't1')
+    const before = emitted().length
+    ev('old', 'SessionEnd', 'stopped', 3000, 't1')
+    expect(emitted().length).toBe(before)
+    expect(owner('t1')).toBe('new')
+  })
+
+  test('unregistering a terminal drops its ID-bound sessions', () => {
+    ev('s1', 'SessionStart', 'busy', 1000, 't1')
+    watcher.unregisterTerminal('t1')
+    ev('s1', 'Stop', 'done', 2000, 't1')
+    expect(watcher.getTerminalSessions()).toHaveLength(0)
   })
 })

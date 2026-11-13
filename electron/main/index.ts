@@ -20,7 +20,8 @@ import { execFile } from 'node:child_process'
 import { TerminalManager } from './services/TerminalManager'
 import { CrashLogger, writeCrashFallback, type LogEntry } from './services/CrashLogger'
 import { initLogger, createLogger, getLogFilePath } from './services/Logger'
-import { handleTerminalCreate } from './handlers/terminalCreate'
+import { handleTerminalCreate, parseCreateSize } from './handlers/terminalCreate'
+import { sanitizePtySize, type PtySize } from './utils/ptySize'
 import { restoreSessions as restoreSessionsImpl } from './handlers/restoreSessions'
 import { ProjectPersistence, type PersistedSession } from './services/ProjectPersistence'
 import {
@@ -54,7 +55,12 @@ import { SessionIndexService } from './services/SessionIndexService'
 import { normalizePath } from './utils/paths'
 import { hardenWebviewPreferences, BROWSER_PARTITION } from './utils/webviewSecurity'
 import { matchBrowserShortcut } from './utils/browserShortcut'
-import { formatOversizeMessage, validateTerminalWritePayload } from './utils/terminalWriteLimits'
+import { isAllowedMainWindowNavigation } from './utils/mainWindowNavigation'
+import {
+  encodePtyInput,
+  formatOversizeMessage,
+  validateTerminalWritePayload,
+} from './utils/terminalWriteLimits'
 import { sanitizeClipboardText, sanitizeClipboardImage } from './utils/clipboardLimits'
 import type { AutomationTrigger } from './services/AutomationPersistence'
 import { SecureEnvStore } from './services/SecureEnvStore'
@@ -323,8 +329,9 @@ async function pathExistsAsync(targetPath: string): Promise<boolean> {
  * Restore sessions from previous app close. Thin wrapper around the testable
  * implementation in ./handlers/restoreSessions.
  */
-async function restoreSessions(): Promise<void> {
+async function restoreSessions(size?: PtySize): Promise<void> {
   return restoreSessionsImpl({
+    size,
     projectPersistence,
     terminalManager,
     hookWatcher,
@@ -566,6 +573,15 @@ async function createWindow() {
     return { action: 'deny' }
   })
 
+  // The app UI never navigates top-level: block anything that would replace it
+  // (a file dropped onto the window navigates to file://… by default).
+  win.webContents.on('will-navigate', (event, url) => {
+    const current = win?.webContents.getURL() ?? ''
+    if (!isAllowedMainWindowNavigation(url, current, VITE_DEV_SERVER_URL)) {
+      event.preventDefault()
+    }
+  })
+
   // Close-to-tray: the X hides the window and keeps Command running so the
   // notch stays alive. Only an explicit quit (tray → Afsluiten, or any
   // app.quit() path, which sets isQuitting in before-quit) closes the window.
@@ -659,7 +675,8 @@ ipcMain.handle(
     worktreeId?: string,
     type: TerminalType = 'claude',
     resumeSessionId?: string,
-    initialPrompt?: string
+    initialPrompt?: string,
+    size?: unknown
   ) => {
     return handleTerminalCreate(
       {
@@ -670,12 +687,12 @@ ipcMain.handle(
         resolveEnvOverrides,
         isValidUUID,
       },
-      { projectId, worktreeId, type, resumeSessionId, initialPrompt }
+      { projectId, worktreeId, type, resumeSessionId, initialPrompt, size }
     )
   }
 )
 
-ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
+ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown, binary?: unknown) => {
   if (!isValidUUID(terminalId)) return
   const result = validateTerminalWritePayload(data)
   if (!result.ok) {
@@ -688,16 +705,16 @@ ipcMain.on('terminal:write', (_event, terminalId: string, data: unknown) => {
     }
     return
   }
-  terminalManager?.writeToTerminal(terminalId, result.data)
+  const input = encodePtyInput(result.data, binary)
+  if (input === null) return
+  terminalManager?.writeToTerminal(terminalId, input)
 })
 
 ipcMain.on('terminal:resize', (_event, terminalId: string, cols: number, rows: number) => {
   if (!isValidUUID(terminalId)) return
-  if (typeof cols !== 'number' || !Number.isFinite(cols)) return
-  if (typeof rows !== 'number' || !Number.isFinite(rows)) return
-  const safeCols = clamp(cols, 1, 500)
-  const safeRows = clamp(rows, 1, 200)
-  terminalManager?.resizeTerminal(terminalId, safeCols, safeRows)
+  const size = sanitizePtySize(cols, rows)
+  if (!size) return
+  terminalManager?.resizeTerminal(terminalId, size.cols, size.rows)
 })
 
 ipcMain.on('terminal:close', (_event, terminalId: string) => {
@@ -1736,6 +1753,14 @@ ipcMain.on('app:cancel-close', () => {
   // User cancelled, do nothing
 })
 
+// A focused <webview> guest keeps native keyboard focus; the renderer asks for
+// it back when the user presses into host UI or the browser tab hides. No
+// arguments; only the main window's own renderer may ask.
+ipcMain.on('browser:focus-host', (event) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) return
+  win.webContents.focus()
+})
+
 ipcMain.handle('app:open-crash-log', async () => {
   const logPath = crashLogger.getLogPath()
   try {
@@ -2041,15 +2066,15 @@ app.whenReady().then(async () => {
 
   // Restore sessions once the renderer store is hydrated (with fallback timeout)
   let sessionsRestored = false
-  const doRestore = () => {
+  const doRestore = (size?: unknown) => {
     if (sessionsRestored) return
     sessionsRestored = true
-    restoreSessions().catch((err) => {
+    restoreSessions(parseCreateSize(size) ?? undefined).catch((err) => {
       mainLog.error('Session restoration failed:', err)
     })
   }
-  ipcMain.once('store:hydrated', (_event) => doRestore())
-  setTimeout(doRestore, 3000) // Fallback if hydration signal never arrives
+  ipcMain.once('store:hydrated', (_event, size?: unknown) => doRestore(size))
+  setTimeout(() => doRestore(), 3000) // Fallback if hydration signal never arrives
 
   // Check for updates after app is loaded (with delay to not block UI)
   setTimeout(() => {

@@ -249,9 +249,14 @@ export interface ElectronAPI {
       worktreeId?: string,
       type?: TerminalType,
       resumeSessionId?: string,
-      initialPrompt?: string
+      initialPrompt?: string,
+      /** Initial PTY grid size. Omit to let main use the last size applied to
+       *  a terminal of the same kind (fallback 80x24). */
+      size?: { cols: number; rows: number }
     ) => Promise<string | null>
-    write: (terminalId: string, data: string) => void
+    /** `binary`: `data` is a byte string (xterm onBinary) written to the PTY
+     *  as raw bytes instead of UTF-8. */
+    write: (terminalId: string, data: string, binary?: boolean) => void
     resize: (terminalId: string, cols: number, rows: number) => void
     close: (terminalId: string) => void
     evict: (terminalId: string) => void
@@ -355,12 +360,14 @@ export interface ElectronAPI {
   }
   browser: {
     onShortcut: (callback: (action: string) => void) => Unsubscribe
+    focusHost: () => void
   }
   app: {
     onCloseRequest: (callback: () => void) => Unsubscribe
     confirmClose: () => void
     cancelClose: () => void
-    storeHydrated: () => void
+    /** `size`: estimated chat grid for the PTYs of sessions restored at startup. */
+    storeHydrated: (size?: { cols: number; rows: number }) => void
     syncClaudeTheme: (theme: 'light' | 'dark') => Promise<void>
     setTitleBarOverlay: (
       theme: 'light' | 'dark',

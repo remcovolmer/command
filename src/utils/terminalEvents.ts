@@ -1,4 +1,6 @@
 import { getElectronAPI } from './electron'
+import { terminalPool, type TerminalPool } from './terminalPool'
+import { useProjectStore } from '../stores/projectStore'
 import {
   isValidTerminalState,
   type TerminalState,
@@ -9,7 +11,6 @@ import {
 } from '../types'
 
 type DataCallback = (data: string) => void
-type StateCallback = (state: TerminalState) => void
 type ExitCallback = (code: number) => void
 type TitleCallback = (title: string) => void
 type WorktreeUpdatedCallback = (worktreeId: string) => void
@@ -33,14 +34,37 @@ type EditorOpenBrowserCallback = (data: {
 }) => void
 type SpawnFailedCallback = (event: SpawnFailedEvent) => void
 
+/** Store writes that must happen for every terminal, xterm or not. */
+export interface TerminalEventSink {
+  hasTerminal: (terminalId: string) => boolean
+  updateTerminalState: (terminalId: string, state: TerminalState) => void
+  updateTerminalTitle: (terminalId: string, title: string) => void
+}
+
+export interface TerminalEventDeps {
+  getApi: () => typeof window.electronAPI
+  sink: TerminalEventSink
+  pool: Pick<TerminalPool, 'appendPendingData'>
+}
+
+const storeSink: TerminalEventSink = {
+  hasTerminal: (id) => Boolean(useProjectStore.getState().terminals[id]),
+  updateTerminalState: (id, state) => useProjectStore.getState().updateTerminalState(id, state),
+  updateTerminalTitle: (id, title) => useProjectStore.getState().updateTerminalTitle(id, title),
+}
+
 /**
  * Centralized terminal event manager.
  * Registers IPC listeners once and dispatches to per-terminal callbacks.
  * This prevents memory leaks from registering multiple IPC listeners.
+ *
+ * State and title updates go to the store for EVERY terminal, independent of
+ * whether an xterm is subscribed (restored-but-never-opened and evicted chats
+ * must still show permission/question/done). Data for a known terminal with no
+ * live xterm is parked in the pool and replayed when the xterm (re)opens.
  */
-class TerminalEventManager {
+export class TerminalEventManager {
   private dataCallbacks = new Map<string, DataCallback>()
-  private stateCallbacks = new Map<string, StateCallback>()
   private exitCallbacks = new Map<string, ExitCallback>()
   private titleCallbacks = new Map<string, TitleCallback>()
   private worktreeUpdatedCallbacks = new Map<string, WorktreeUpdatedCallback>()
@@ -55,18 +79,34 @@ class TerminalEventManager {
   private spawnFailedCallbacks: SpawnFailedCallback[] = []
   private initialized = false
   private unsubscribers: Unsubscribe[] = []
+  private deps: TerminalEventDeps
+
+  constructor(deps: Partial<TerminalEventDeps> = {}) {
+    this.deps = {
+      getApi: deps.getApi ?? getElectronAPI,
+      sink: deps.sink ?? storeSink,
+      pool: deps.pool ?? terminalPool,
+    }
+  }
 
   init() {
     if (this.initialized) return
     this.initialized = true
 
-    const api = getElectronAPI()
+    const api = this.deps.getApi()
+    const { sink, pool } = this.deps
 
     // Store unsubscribe functions for cleanup
     this.unsubscribers.push(
       api.terminal.onData((terminalId, data) => {
         const callback = this.dataCallbacks.get(terminalId)
-        if (callback) callback(data)
+        if (callback) {
+          callback(data)
+        } else if (sink.hasTerminal(terminalId)) {
+          // No live xterm (evicted — possibly still in flight before main
+          // processed terminal:evict — or never opened): keep it for replay.
+          pool.appendPendingData(terminalId, data)
+        }
       })
     )
 
@@ -74,8 +114,7 @@ class TerminalEventManager {
       api.terminal.onStateChange((terminalId, state) => {
         // Validate state before dispatching (#004 fix)
         if (isValidTerminalState(state)) {
-          const callback = this.stateCallbacks.get(terminalId)
-          if (callback) callback(state)
+          sink.updateTerminalState(terminalId, state)
         }
       })
     )
@@ -91,6 +130,7 @@ class TerminalEventManager {
       api.terminal.onTitleChange((terminalId, title) => {
         const callback = this.titleCallbacks.get(terminalId)
         if (callback) callback(title)
+        else sink.updateTerminalTitle(terminalId, title)
       })
     )
 
@@ -169,10 +209,13 @@ class TerminalEventManager {
     )
   }
 
+  /**
+   * Attach a live xterm. `onTitle` overrides the default store title update;
+   * state always goes to the store globally (see init()).
+   */
   subscribe(
     terminalId: string,
     onData: DataCallback,
-    onState: StateCallback,
     onExit?: ExitCallback,
     onTitle?: TitleCallback,
     onWorktreeUpdated?: WorktreeUpdatedCallback,
@@ -180,7 +223,6 @@ class TerminalEventManager {
   ) {
     this.init()
     this.dataCallbacks.set(terminalId, onData)
-    this.stateCallbacks.set(terminalId, onState)
     if (onExit) this.exitCallbacks.set(terminalId, onExit)
     if (onTitle) this.titleCallbacks.set(terminalId, onTitle)
     if (onWorktreeUpdated) this.worktreeUpdatedCallbacks.set(terminalId, onWorktreeUpdated)
@@ -189,7 +231,6 @@ class TerminalEventManager {
 
   unsubscribe(terminalId: string) {
     this.dataCallbacks.delete(terminalId)
-    this.stateCallbacks.delete(terminalId)
     this.exitCallbacks.delete(terminalId)
     this.titleCallbacks.delete(terminalId)
     this.worktreeUpdatedCallbacks.delete(terminalId)
@@ -302,7 +343,6 @@ class TerminalEventManager {
     this.unsubscribers.forEach((unsub) => unsub())
     this.unsubscribers = []
     this.dataCallbacks.clear()
-    this.stateCallbacks.clear()
     this.exitCallbacks.clear()
     this.titleCallbacks.clear()
     this.worktreeUpdatedCallbacks.clear()

@@ -64,8 +64,8 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 | Service | Purpose |
 |---------|---------|
 | `TerminalManager.ts` | PTY spawning via node-pty, data routing, session resume, auto-naming |
-| `ClaudeHookWatcher.ts` | Polls `~/.claude/command-center-state.json` every 250ms, maps session states to terminals via BiMap |
-| `HookInstaller.ts` | Injects `claude-state-hook.cjs` into `~/.claude/settings.json` for 6 Claude Code events |
+| `ClaudeHookWatcher.ts` | Polls `~/.claude/command-center-state/` (per-session files) and the legacy `command-center-state.json` every 250ms, maps session states to terminals by terminal ID (cwd fallback) via BiMap |
+| `HookInstaller.ts` | Injects `claude-state-hook.cjs` into `~/.claude/settings.json` for 10 Claude Code events (and the Codex hook into `~/.codex/hooks.json`) |
 | `ProjectPersistence.ts` | JSON file storage in `userData/projects.json`, session persistence for resume |
 | `WorktreeService.ts` | Git worktree CRUD (create, list, remove, has-changes) |
 | `GitService.ts` | Git operations (status, fetch, pull, push, commit log/detail) |
@@ -84,11 +84,11 @@ This is an **Electron + React + TypeScript** desktop app for managing multiple C
 
 This is the core mechanism that powers the attention indicator:
 
-1. `HookInstaller` writes into `~/.claude/settings.json` to register `claude-state-hook.cjs` for events: `PreToolUse`, `Stop`, `SessionStart`, `UserPromptSubmit`, `PermissionRequest`, `Notification`
+1. `HookInstaller` writes into `~/.claude/settings.json` (atomically; never when the file doesn't parse) to register `claude-state-hook.cjs` for events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Notification`, `Stop`, `StopFailure`, `SessionEnd` (all `async` except `SessionEnd`, which must finish before Claude exits)
 2. When Claude Code fires an event, it executes the hook script which reads JSON from stdin
-3. The hook maps events to states and writes atomically to `~/.claude/command-center-state.json`
-4. `ClaudeHookWatcher` polls this file, matches sessions to terminals via a BiMap (session ID ↔ terminal ID), and emits `terminal:state` events
-5. States: `busy` (gray), `permission` (orange), `question` (orange), `done` (green), `stopped` (red)
+3. The hook maps events to states and writes atomically to its own per-session file `~/.claude/command-center-state/<session_id>.json`, including `terminal_id` (the PTY's `COMMAND_CENTER_TERMINAL_ID`). The Codex hook (and older Claude hook scripts) still write the legacy shared `~/.claude/command-center-state.json`
+4. `ClaudeHookWatcher` polls both (dir: stat/mtime every 250ms, deletes files idle >1h). Entries with `terminal_id` map to that terminal only (unregistered IDs such as sidecars are ignored; the most recent session on a terminal ID takes it over, except while the current owner is busy/permission/question with an event in the last 10 minutes — a nested `claude -p` is then only tracked); entries without it fall back to cwd matching, which never takes an ID-owned chat. Mapping is a BiMap (session ID ↔ terminal ID), emitted as `terminal:state` events
+5. States: `busy` (gray), `permission` (orange), `question` (orange), `done` (green), `stopped` (red; also on `SessionEnd` when Claude exits while the shell stays alive)
 
 ### Terminal Pool & LRU Eviction
 
@@ -96,16 +96,19 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 
 - On terminal switch: `touch()` updates LRU order
 - When over limit: evicts least-recently-used terminal (serializes scrollback, destroys xterm DOM)
-- Protected from eviction: `busy`, `permission`, `question` states; active terminal; split-view terminals
+- Protected from eviction: `busy`, `permission`, `question` states; the on-screen chat; sidecar shells (never evicted); chats without a live xterm. No eviction runs while an overlay (overview) covers the chat column
 - Eviction preference: `stopped` terminals first, then oldest by LRU
-- Main process buffers PTY data for evicted terminals (1MB cap); replayed on restore
+- Main process buffers PTY data for evicted terminals (1MB cap); replayed synchronously on restore, or handed to the renderer (parked in the pool) when the PTY exits while evicted. Trimming over the cap preserves DECSET/DECRST mode state (alt screen, mouse, focus, bracketed paste) and never cuts an escape sequence (`shared/ptyBuffer.ts`)
+- Chats of all projects stay mounted (hidden) across project switches and overviews, so only the pool tears xterms down; an unmount of a terminal still in the store goes through eviction (`evictOnUnmount`), never a bare dispose
+- PTY data that reaches the renderer without a live xterm (in flight at eviction, or a never-opened chat) is parked in the pool (1MB cap, same mode-preserving trim) and replayed after the serialized buffer
+- The serialized buffer re-applies what SerializeAddon omits: SGR mouse encoding (`?1006`/`?1016`) and a hidden cursor (`?25l`) — see `src/utils/terminalModes.ts`
 
 ### Data Flow
 
 1. User adds project → `project:add` IPC → `ProjectPersistence` saves to `userData/projects.json`
 2. User creates Chat → `terminal:create` IPC → `TerminalManager` spawns PTY → auto-runs `claude` command (with `--resume <sessionId>` if resuming)
-3. Chat output → `terminal:data` event → `TerminalEventManager` routes to specific `Terminal` component → xterm.js renders
-4. Claude state changes → hook file → `ClaudeHookWatcher` → `terminal:state` event → UI shows attention indicator
+3. Chat output → `terminal:data` event → `TerminalEventManager` routes to specific `Terminal` component → xterm.js renders (no live xterm → parked in `terminalPool` for replay)
+4. Claude state changes → hook file → `ClaudeHookWatcher` → `terminal:state` event → `TerminalEventManager` updates the store for every terminal (xterm or not) → UI shows attention indicator
 5. On app close → `ClaudeHookWatcher.getTerminalSessions()` captures session IDs → persisted for resume on restart
 
 ### Key Patterns
@@ -124,7 +127,7 @@ xterm.js instances are expensive. `TerminalPool` (`src/utils/terminalPool.ts`) l
 - Tailwind CSS for styling (all colors via CSS variables for runtime theming)
 - Zustand for state (no Redux)
 - IPC handlers validate inputs (UUID format, reasonable bounds for cols/rows)
-- **Hotkey Requirement**: Core features and primary workflows should include keyboard shortcuts — peripheral or in-surface tools (e.g. panel-local controls) don't require one. When adding a shortcut: define it in `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG) and the `HotkeyAction` union in `src/types/hotkeys.ts`, register the handler in `src/App.tsx`. Press `Ctrl + /` in-app afterwards to verify the binding and check for conflicts.
+- **Hotkey Requirement**: Core features and primary workflows should include keyboard shortcuts — peripheral or in-surface tools (e.g. panel-local controls) don't require one. When adding a shortcut: define it in `src/utils/hotkeys.ts` (DEFAULT_HOTKEY_CONFIG) and the `HotkeyAction` union in `src/types/hotkeys.ts`, register the handler in `src/App.tsx` (handlers return `true` when they handled the key — only then is it consumed — and `false` to let it reach xterm/Monaco; region-specific actions also get a focus predicate in `HOTKEY_SCOPES`, `src/utils/hotkeyDispatch.ts`). Press `Ctrl + /` in-app afterwards to verify the binding and check for conflicts.
 
 ## Windows Development
 

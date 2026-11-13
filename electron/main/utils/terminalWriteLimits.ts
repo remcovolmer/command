@@ -25,3 +25,21 @@ export function formatOversizeMessage(
     body: `${sizeKb} KB exceeds the ${limitKb} KB terminal input limit. Use a file for larger content.`,
   }
 }
+
+/**
+ * Decide how a validated terminal:write payload reaches node-pty.
+ *
+ * Text input (xterm onData) is a JS string that node-pty encodes as UTF-8.
+ * Binary input (xterm onBinary — legacy X10 mouse reports) is a "binary
+ * string" with one char per byte; it must be written as those raw bytes, or
+ * bytes >= 0x80 (cells beyond column/row 95) get UTF-8 expanded into two.
+ * A binary string with a char above 0xFF is malformed and yields null (drop).
+ * `binary` is untrusted IPC input: only a literal `true` selects the raw path.
+ */
+export function encodePtyInput(data: string, binary: unknown): string | Buffer | null {
+  if (binary !== true) return data
+  for (let i = 0; i < data.length; i++) {
+    if (data.charCodeAt(i) > 0xff) return null
+  }
+  return Buffer.from(data, 'latin1')
+}

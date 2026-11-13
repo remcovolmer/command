@@ -108,7 +108,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       worktreeId?: string,
       type?: TerminalType,
       resumeSessionId?: string,
-      initialPrompt?: string
+      initialPrompt?: string,
+      size?: { cols: number; rows: number }
     ): Promise<string | null> =>
       ipcRenderer.invoke(
         'terminal:create',
@@ -116,11 +117,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         worktreeId,
         type,
         resumeSessionId,
-        initialPrompt
+        initialPrompt,
+        size
       ),
 
-    write: (terminalId: string, data: string): void =>
-      ipcRenderer.send('terminal:write', terminalId, data),
+    write: (terminalId: string, data: string, binary?: boolean): void =>
+      ipcRenderer.send('terminal:write', terminalId, data, binary === true),
 
     resize: (terminalId: string, cols: number, rows: number): void =>
       ipcRenderer.send('terminal:resize', terminalId, cols, rows),
@@ -345,6 +347,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('browser:shortcut', handler)
       return () => ipcRenderer.removeListener('browser:shortcut', handler)
     },
+    // Pull native keyboard focus back from a focused <webview> guest to the host
+    // webContents (the guest keeps OS focus otherwise; see useFocusRecovery).
+    focusHost: (): void => ipcRenderer.send('browser:focus-host'),
   },
 
   // Editor events from CommandServer
@@ -396,7 +401,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     cancelClose: (): void => ipcRenderer.send('app:cancel-close'),
 
-    storeHydrated: (): void => ipcRenderer.send('store:hydrated'),
+    storeHydrated: (size?: { cols: number; rows: number }): void =>
+      ipcRenderer.send('store:hydrated', size),
 
     syncClaudeTheme: (theme: 'light' | 'dark'): Promise<void> =>
       ipcRenderer.invoke('app:sync-claude-theme', theme),

@@ -58,6 +58,7 @@ Landed in three layers:
   - Slow path: split into 512 B chunks with `setImmediate` yield between writes so node-pty's queue can drain.
   - Bracketed-paste markers (`\x1b[200~` / `\x1b[201~`) are never split across chunks. The chunker rewinds the boundary back to before the marker if a naive cut would straddle it, so Claude Code still recognises the full bracketed paste.
   - On Windows only: `\r` bytes inside a bracketed-paste block are stripped before writing, because ConPTY interprets CRLF inconsistently mid-paste and causes swallowed or doubled lines.
+  - Follow-up (2026-11 terminal audit): chunk boundaries also never split a UTF-16 surrogate pair, and all writes to a terminal go through a per-terminal FIFO queue (`TerminalManager.enqueueWrite`). The `setImmediate` yields otherwise let a keystroke typed mid-paste — or a second paste — land inside the first one. The ≤ 512 B fast path still writes synchronously, but only when nothing is queued; a failed write is logged and never wedges the queue.
 - **Visible error on oversize payloads** (`electron/main/index.ts`, `electron/main/utils/terminalWriteLimits.ts`): replaced the silent 1 MB drop with an OS notification ("Paste too large — … KB exceeds the … KB terminal input limit. Use a file for larger content.") plus a console warning.
 
 Unit tests in `test/terminalManager.test.ts` cover: fast path, 513 B / 10 KB round trips, empty payload, marker-straddle boundaries, Windows CRLF stripping inside/outside bracketed-paste blocks, non-Windows \r preservation, and Claude-terminal integration with large pastes. Validation helpers are tested in `test/ipcValidation.test.ts`.
@@ -68,7 +69,7 @@ Unit tests in `test/terminalManager.test.ts` cover: fast path, 513 B / 10 KB rou
 - **Renderer paste flow untouched.** `preventDefault()` + `navigator.clipboard.readText()` + `api.terminal.write(id, text)` in `src/hooks/useXtermInstance.ts` is the correct shape and was already debugged twice (commits `038662c`, `359fea2`).
 - **Upstream Claude Code CLI paste bugs not in scope.** Separate issues tracked at [anthropics/claude-code#5017](https://github.com/anthropics/claude-code/issues/5017), [#13125](https://github.com/anthropics/claude-code/issues/13125), [#24837](https://github.com/anthropics/claude-code/issues/24837). Those are Anthropic-side TUI issues and remain even after this fix.
 - **1 MB cap retained.** Raising the cap invites ConPTY latency regressions. Users pasting more than 1 MB should use a file.
-- **`writeToPty` (ccli/automation entry point) left on the direct `pty.write` path.** Those callers ship small, predictable payloads; adding chunking there would expand blast radius without benefit.
+- **`writeToPty` (ccli/automation entry point) is not separately chunk-tuned.** Those callers ship small, predictable payloads. Since the 2026-11 audit it does share the FIFO write queue, so a ccli command can no longer land inside a paste that is still being chunked.
 
 ## References
 

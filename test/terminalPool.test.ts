@@ -22,6 +22,12 @@ describe('TerminalPool', () => {
     pool = new TerminalPool(3)
   })
 
+  // A terminal with a live (registered) xterm, touched to the front of the LRU.
+  function live(id: string): void {
+    pool.registerCallbacks(id, () => `buf-${id}`, vi.fn())
+    pool.touch(id)
+  }
+
   // --- Constructor & setMaxSize ---
 
   describe('constructor / setMaxSize', () => {
@@ -47,18 +53,18 @@ describe('TerminalPool', () => {
 
   describe('touch', () => {
     test('adds new terminal to front of LRU', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
+      live('a')
+      live('b')
+      live('c')
       // c is most recent, a is least recent
       expect(pool.getActiveCount()).toBe(3)
     })
 
     test('moves existing terminal to front', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
-      pool.touch('a') // move a to front
+      live('a')
+      live('b')
+      live('c')
+      live('a') // move a to front
 
       // a should now be the most recently used
       // Verify by checking eviction candidate: least-recently-used is b
@@ -69,7 +75,7 @@ describe('TerminalPool', () => {
       }
       // With maxSize=3 and 3 terminals, needsEviction is false
       // But let's add a 4th and check candidate
-      pool.touch('d')
+      live('d')
       terminals.d = makeTerminal()
 
       const candidate = pool.getEvictionCandidate(terminals, 'd')
@@ -78,9 +84,9 @@ describe('TerminalPool', () => {
     })
 
     test('is idempotent when terminal is already at front', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('b') // already at front
+      live('a')
+      live('b')
+      live('b') // already at front
       expect(pool.getActiveCount()).toBe(2)
     })
   })
@@ -89,31 +95,31 @@ describe('TerminalPool', () => {
 
   describe('needsEviction', () => {
     test('returns false when under max size', () => {
-      pool.touch('a')
-      pool.touch('b')
+      live('a')
+      live('b')
       expect(pool.needsEviction()).toBe(false)
     })
 
     test('returns false when at max size', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
+      live('a')
+      live('b')
+      live('c')
       expect(pool.needsEviction()).toBe(false)
     })
 
     test('returns true when over max size', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
-      pool.touch('d')
+      live('a')
+      live('b')
+      live('c')
+      live('d')
       expect(pool.needsEviction()).toBe(true)
     })
 
     test('does not count evicted terminals as active', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
-      pool.touch('d')
+      live('a')
+      live('b')
+      live('c')
+      live('d')
 
       // Evict one — needs callbacks registered
       pool.registerCallbacks('a', () => 'buffer', vi.fn())
@@ -129,10 +135,10 @@ describe('TerminalPool', () => {
 
   describe('getEvictionCandidate', () => {
     test('returns least-recently-used terminal', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
-      pool.touch('d')
+      live('a')
+      live('b')
+      live('c')
+      live('d')
 
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal(),
@@ -146,8 +152,8 @@ describe('TerminalPool', () => {
     })
 
     test('excludes active terminal', () => {
-      pool.touch('a')
-      pool.touch('b')
+      live('a')
+      live('b')
 
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal(),
@@ -159,9 +165,9 @@ describe('TerminalPool', () => {
     })
 
     test('excludes protected states (busy, permission, question)', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
+      live('a')
+      live('b')
+      live('c')
 
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal({ state: 'busy' }),
@@ -174,9 +180,9 @@ describe('TerminalPool', () => {
     })
 
     test('prefers stopped terminals over done', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
+      live('a')
+      live('b')
+      live('c')
 
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal({ state: 'done' }),
@@ -189,9 +195,9 @@ describe('TerminalPool', () => {
     })
 
     test('excludes already evicted terminals', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
+      live('a')
+      live('b')
+      live('c')
 
       pool.registerCallbacks('a', () => 'buf', vi.fn())
       pool.evict('a')
@@ -207,9 +213,9 @@ describe('TerminalPool', () => {
     })
 
     test('excludes sidecar (normal) terminals from eviction', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
+      live('a')
+      live('b')
+      live('c')
 
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal({ type: 'normal' }), // sidecar
@@ -222,9 +228,9 @@ describe('TerminalPool', () => {
     })
 
     test('returns null when only sidecar terminals are candidates', () => {
-      pool.touch('a')
-      pool.touch('b')
-      pool.touch('c')
+      live('a')
+      live('b')
+      live('c')
 
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal({ type: 'normal' }),
@@ -237,7 +243,7 @@ describe('TerminalPool', () => {
     })
 
     test('returns null when no candidates available', () => {
-      pool.touch('a')
+      live('a')
       const terminals: Record<string, TerminalSession> = {
         a: makeTerminal(),
       }
@@ -367,6 +373,111 @@ describe('TerminalPool', () => {
 
       const result = pool.evict('a')
       expect(result).toBe(false) // no serializer registered
+    })
+  })
+  // --- unmount while the session still exists (project switch, panel teardown) ---
+
+  describe('evictOnUnmount', () => {
+    test('serializes, marks evicted and destroys the xterm', () => {
+      const cleanup = vi.fn()
+      pool.touch('a')
+      pool.registerCallbacks('a', () => 'screen', cleanup)
+
+      expect(pool.evictOnUnmount('a')).toBe(true)
+      expect(pool.isEvicted('a')).toBe(true)
+      expect(pool.getBuffer('a')).toBe('screen')
+      expect(cleanup).toHaveBeenCalledOnce()
+    })
+
+    test('still evicts (empty screen) when serialization fails, so main buffers output', () => {
+      const cleanup = vi.fn()
+      pool.touch('a')
+      pool.registerCallbacks('a', () => null, cleanup)
+
+      expect(pool.evictOnUnmount('a')).toBe(true)
+      expect(pool.isEvicted('a')).toBe(true)
+      expect(pool.getBuffer('a')).toBe('')
+      expect(cleanup).toHaveBeenCalledOnce()
+    })
+
+    test('is a no-op without a live xterm (never opened or already evicted)', () => {
+      pool.touch('a')
+      expect(pool.evictOnUnmount('a')).toBe(false)
+      expect(pool.isEvicted('a')).toBe(false)
+    })
+
+    test('an unmount-evicted terminal frees its slot for the LRU count', () => {
+      live('a')
+      live('b')
+      live('c')
+      live('d')
+      expect(pool.needsEviction()).toBe(true)
+      pool.evictOnUnmount('a')
+      expect(pool.needsEviction()).toBe(false)
+    })
+  })
+
+  describe('getEvictionCandidate with terminals from several projects', () => {
+    test('skips entries without a live xterm instead of blocking eviction', () => {
+      // 'stale' was touched (e.g. activated in another project) but has no xterm.
+      pool.touch('stale')
+      live('b')
+      live('c')
+      const terminals: Record<string, TerminalSession> = {
+        stale: makeTerminal({ projectId: 'p1' }),
+        b: makeTerminal({ projectId: 'p2' }),
+        c: makeTerminal({ projectId: 'p2' }),
+      }
+      expect(pool.getEvictionCandidate(terminals, 'c')).toBe('b')
+    })
+
+    test('protects busy chats of a non-active project', () => {
+      live('a')
+      live('b')
+      live('c')
+      const terminals: Record<string, TerminalSession> = {
+        a: makeTerminal({ projectId: 'p1', state: 'busy' }),
+        b: makeTerminal({ projectId: 'p1', state: 'permission' }),
+        c: makeTerminal({ projectId: 'p2' }),
+      }
+      expect(pool.getEvictionCandidate(terminals, 'c')).toBeNull()
+    })
+  })
+
+  // --- PTY output that arrives without a live xterm ---
+
+  describe('pending data', () => {
+    test('accumulates and is taken once', () => {
+      pool.appendPendingData('a', 'one ')
+      pool.appendPendingData('a', 'two')
+      expect(pool.takePendingData('a')).toBe('one two')
+      expect(pool.takePendingData('a')).toBe('')
+    })
+
+    test('is bounded to 1MB, keeping the tail from a line boundary', () => {
+      const head = 'x'.repeat(600 * 1024) + '\n'
+      const tail = 'y'.repeat(600 * 1024)
+      pool.appendPendingData('a', head)
+      pool.appendPendingData('a', tail)
+      const data = pool.takePendingData('a')
+      expect(data.length).toBeLessThanOrEqual(1024 * 1024)
+      expect(data.endsWith('y')).toBe(true)
+    })
+
+    test('trimming keeps the mode setup of the discarded prefix', () => {
+      const setup = '\x1b[?1049h\x1b[?1000;1006h'
+      pool.appendPendingData('a', setup + 'x'.repeat(600 * 1024) + '\n')
+      pool.appendPendingData('a', 'y'.repeat(600 * 1024))
+      const data = pool.takePendingData('a')
+      expect(data.startsWith('\x1b[?1049h\x1b[?1000h\x1b[?1006h')).toBe(true)
+      expect(data).not.toContain('x')
+      expect(data.endsWith('y')).toBe(true)
+    })
+
+    test('is dropped when the terminal is removed', () => {
+      pool.appendPendingData('a', 'late')
+      pool.remove('a')
+      expect(pool.takePendingData('a')).toBe('')
     })
   })
 })

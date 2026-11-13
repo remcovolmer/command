@@ -5,13 +5,30 @@ import { SettingsDialog } from './components/Settings/SettingsDialog'
 import { ShortcutsOverlay } from './components/Settings/ShortcutsOverlay'
 import type { TerminalSession } from './types'
 import { getElectronAPI } from './utils/electron'
+import { estimateTerminalGrid } from './utils/terminalGrid'
+import { areChatsVisible, getCloseHotkeyDecision } from './utils/terminalMounting'
 import { useHotkeys, useDialogHotkeys } from './hooks/useHotkeys'
 import { useNotchFeed } from './hooks/useNotchFeed'
 import { fileWatcherEvents } from './utils/fileWatcherEvents'
 import { useThemeResolver } from './hooks/useThemeResolver'
 import { dismissTopmostToast } from './utils/toastRegistry'
 import { DEFAULT_HOTKEY_CONFIG, matchesBinding } from './utils/hotkeys'
-import { emitBrowserShortcut, isBrowserShortcutAction } from './utils/browserShortcutBus'
+import {
+  emitBrowserShortcut,
+  isBrowserShortcutAction,
+  type BrowserShortcutAction,
+} from './utils/browserShortcutBus'
+import {
+  ACTIVE_CHAT_TEXTAREA_SELECTOR,
+  focusActiveChatTerminal,
+  shouldConsumeToastEscape,
+} from './utils/focusRecovery'
+import { useFocusRecovery } from './hooks/useFocusRecovery'
+
+const emitBrowserShortcutHandled = (action: BrowserShortcutAction): boolean => {
+  emitBrowserShortcut(action)
+  return true
+}
 
 function App() {
   const [showCloseDialog, setShowCloseDialog] = useState(false)
@@ -32,14 +49,12 @@ function App() {
 
   // Refocus the active terminal's xterm textarea (e.g. after closing dialogs)
   const refocusActiveTerminal = useCallback(() => {
-    requestAnimationFrame(() => {
-      const terminal = document.querySelector('[data-terminal-active="true"]')
-      if (terminal) {
-        const textarea = terminal.querySelector('.xterm-helper-textarea') as HTMLElement
-        textarea?.focus()
-      }
-    })
+    requestAnimationFrame(() => focusActiveChatTerminal())
   }, [])
+
+  // Generic focus dead-end recovery (focus fell back to <body>), window-focus
+  // restore, webview→host focus handoff and the stray-file-drop guard.
+  useFocusRecovery()
 
   // Use ref to access current value in callback without re-registering listener
   const hasActiveTerminalsRef = useRef(hasActiveTerminals)
@@ -91,106 +106,104 @@ function App() {
   }, [])
 
   // Helper to switch to terminal by index (1-9)
-  const switchToTerminal = useCallback((index: number) => {
+  const switchToTerminal = useCallback((index: number): boolean => {
     const { activeProjectId, getProjectTerminals, setActiveTerminal } = useProjectStore.getState()
-    if (!activeProjectId) return
+    if (!activeProjectId) return false
 
     const projectTerminals = getProjectTerminals(activeProjectId)
-    if (index < projectTerminals.length) {
-      setActiveTerminal(projectTerminals[index].id)
-    }
+    if (index >= projectTerminals.length) return false
+    setActiveTerminal(projectTerminals[index].id)
+    return true
   }, [])
 
   // Shared F2 rename dispatcher. The file explorer wins when it has focus;
-  // otherwise the active sidebar project is renamed. useHotkeys fires only the
-  // first matching handler, so both rename actions point at this one function.
-  const renameFocusedItem = () => {
+  // otherwise the active sidebar project is renamed. Both regions are allowed
+  // by the fileExplorer.rename scope (HOTKEY_SCOPES); elsewhere F2 passes through.
+  const renameFocusedItem = (): boolean => {
     const store = useProjectStore.getState()
     if (document.querySelector('[data-file-explorer]:focus-within')) {
-      if (store.fileExplorerSelectedPath) store.startRename(store.fileExplorerSelectedPath)
-      return
+      if (!store.fileExplorerSelectedPath) return false
+      store.startRename(store.fileExplorerSelectedPath)
+      return true
     }
     if (document.querySelector('[data-sidebar]:focus-within') && store.activeProjectId) {
       store.startProjectRename(store.activeProjectId)
+      return true
     }
+    return false
   }
 
-  // Whether a browser tab is the active content tab. Gates the browser shortcut
-  // handlers below: when no browser is showing, the bindings are absent so
-  // useHotkeys never preventDefaults them and keys like Ctrl+F reach the
-  // terminal/editor. (The webview-focus path is handled in the main process.)
-  const activeIsBrowserTab = useProjectStore((s) => {
-    const chatId = s.activeTerminalId ?? ''
-    const contentId = s.activeContentTabId[chatId]
-    const tab = contentId ? s.editorTabs[contentId] : undefined
-    return tab?.type === 'browser'
-  })
+  // Focus the first focusable control inside a region; false when there is none.
+  const focusFirstIn = (selector: string): boolean => {
+    const focusable = document
+      .querySelector(selector)
+      ?.querySelector<HTMLElement>('button, [tabindex="0"]')
+    if (!focusable) return false
+    focusable.focus()
+    return true
+  }
 
-  // Register all hotkeys
+  // Register all hotkeys. Each handler returns whether it handled the key;
+  // false lets the key reach the focused terminal/editor (see useHotkeys).
   useHotkeys({
     // Navigation
     'nav.previousProject': () => {
       const { activeProjectId, setActiveProject } = useProjectStore.getState()
       const visualOrder = getProjectVisualOrder()
-      if (visualOrder.length === 0) return
+      if (visualOrder.length === 0) return false
 
       const currentIndex = visualOrder.findIndex((p) => p.id === activeProjectId)
       const newIndex = (currentIndex - 1 + visualOrder.length) % visualOrder.length
       setActiveProject(visualOrder[newIndex].id)
+      return true
     },
 
     'nav.nextProject': () => {
       const { activeProjectId, setActiveProject } = useProjectStore.getState()
       const visualOrder = getProjectVisualOrder()
-      if (visualOrder.length === 0) return
+      if (visualOrder.length === 0) return false
 
       const currentIndex = visualOrder.findIndex((p) => p.id === activeProjectId)
       const newIndex = (currentIndex + 1) % visualOrder.length
       setActiveProject(visualOrder[newIndex].id)
+      return true
     },
 
     'nav.previousTerminal': () => {
       const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } =
         useProjectStore.getState()
-      if (!activeProjectId) return
+      if (!activeProjectId) return false
 
       const projectTerminals = getProjectTerminals(activeProjectId)
-      if (projectTerminals.length === 0) return
+      if (projectTerminals.length === 0) return false
 
       const currentIndex = projectTerminals.findIndex((t) => t.id === activeTerminalId)
       const newIndex = (currentIndex - 1 + projectTerminals.length) % projectTerminals.length
       setActiveTerminal(projectTerminals[newIndex].id)
+      return true
     },
 
     'nav.nextTerminal': () => {
       const { activeProjectId, activeTerminalId, getProjectTerminals, setActiveTerminal } =
         useProjectStore.getState()
-      if (!activeProjectId) return
+      if (!activeProjectId) return false
 
       const projectTerminals = getProjectTerminals(activeProjectId)
-      if (projectTerminals.length === 0) return
+      if (projectTerminals.length === 0) return false
 
       const currentIndex = projectTerminals.findIndex((t) => t.id === activeTerminalId)
       const newIndex = (currentIndex + 1) % projectTerminals.length
       setActiveTerminal(projectTerminals[newIndex].id)
+      return true
     },
 
-    'nav.focusSidebar': () => {
-      // Focus the sidebar by finding the first focusable element
-      const sidebar = document.querySelector('[data-sidebar]')
-      if (sidebar) {
-        const focusable = sidebar.querySelector('button, [tabindex="0"]') as HTMLElement
-        focusable?.focus()
-      }
-    },
+    'nav.focusSidebar': () => focusFirstIn('[data-sidebar]'),
 
     'nav.focusTerminal': () => {
-      // Focus the active terminal
-      const terminal = document.querySelector('[data-terminal-active="true"]')
-      if (terminal) {
-        const terminalEl = terminal.querySelector('.xterm-helper-textarea') as HTMLElement
-        terminalEl?.focus()
-      }
+      const textarea = document.querySelector<HTMLElement>(ACTIVE_CHAT_TEXTAREA_SELECTOR)
+      if (!textarea) return false
+      textarea.focus()
+      return true
     },
 
     'nav.focusFileExplorer': () => {
@@ -199,27 +212,23 @@ function App() {
       if (!fileExplorerVisible) {
         setFileExplorerVisible(true)
       }
-      // Focus the file explorer
-      setTimeout(() => {
-        const fileExplorer = document.querySelector('[data-file-explorer]')
-        if (fileExplorer) {
-          const focusable = fileExplorer.querySelector('button, [tabindex="0"]') as HTMLElement
-          focusable?.focus()
-        }
-      }, 50)
+      // Focus the file explorer once it is visible
+      setTimeout(() => focusFirstIn('[data-file-explorer]'), 50)
+      return true
     },
 
     'nav.projectOverview': () => {
       const { activeProjectId, setProjectOverviewVisible } = useProjectStore.getState()
-      if (!activeProjectId) return
+      if (!activeProjectId) return false
       setProjectOverviewVisible(true)
+      return true
     },
 
     // Terminal operations
     'terminal.new': () => {
       const { activeProjectId, getProjectTerminals, addTerminal, projects } =
         useProjectStore.getState()
-      if (!activeProjectId) return
+      if (!activeProjectId) return false
 
       const projectTerminals = getProjectTerminals(activeProjectId)
       if (projectTerminals.length >= MAX_TERMINALS_PER_PROJECT) {
@@ -227,14 +236,21 @@ function App() {
           'Chat Limit',
           `Maximum ${MAX_TERMINALS_PER_PROJECT} chats per project`
         )
-        return
+        return true
       }
 
       // Use the project's default agent for keyboard-created chats.
       const agent = projects.find((p) => p.id === activeProjectId)?.settings?.defaultAgent ?? 'claude'
 
       ;(async () => {
-        const terminalId = await api.terminal.create(activeProjectId, undefined, agent)
+        const terminalId = await api.terminal.create(
+          activeProjectId,
+          undefined,
+          agent,
+          undefined,
+          undefined,
+          estimateTerminalGrid('chat', useProjectStore.getState().activeTerminalId)
+        )
         if (!terminalId) return // spawn-failed event surfaces the error to the user
         const terminal: TerminalSession = {
           id: terminalId,
@@ -247,14 +263,39 @@ function App() {
         }
         addTerminal(terminal)
       })()
+      return true
     },
 
+    // Scoped away from the shell drawer and the browser pane (HOTKEY_SCOPES):
+    // Ctrl+W is delete-word in a sidecar shell. Ctrl+W is also delete-word in
+    // the chat's own input, so a running chat asks first (getCloseHotkeyDecision);
+    // a stopped one closes directly, and one hidden behind an overlay is ignored.
     'terminal.close': () => {
-      const { activeProjectId, activeTerminalId, removeTerminal } = useProjectStore.getState()
-      if (!activeProjectId || !activeTerminalId) return
+      const state = useProjectStore.getState()
+      const { activeProjectId, activeTerminalId, terminals, removeTerminal } = state
+      const chatsVisible = areChatsVisible({
+        automationsOverviewVisible: state.automationsOverviewVisible,
+        projectOverviewVisible: state.projectOverviewVisible,
+        hasActiveProject: state.projects.some((p) => p.id === activeProjectId),
+        projectChatCount: activeProjectId ? state.getProjectTerminals(activeProjectId).length : 0,
+      })
+      const decision = getCloseHotkeyDecision(
+        terminals,
+        activeTerminalId,
+        activeProjectId,
+        chatsVisible
+      )
+      if (decision === 'ignore' || !activeTerminalId) return false
+      if (
+        decision === 'confirm' &&
+        !window.confirm(`Close "${terminals[activeTerminalId].title}"? The running session will end.`)
+      ) {
+        return true // deliberately cancelled: don't let the key reach the chat as delete-word
+      }
 
       api.terminal.close(activeTerminalId)
       removeTerminal(activeTerminalId)
+      return true
     },
 
     // Terminal shortcuts Alt+1-9 (generated handlers)
@@ -263,164 +304,181 @@ function App() {
     ),
 
     // File explorer
-    'fileExplorer.toggle': toggleFileExplorer,
+    'fileExplorer.toggle': () => {
+      toggleFileExplorer()
+      return true
+    },
     'fileExplorer.filesTab': () => {
       setFileExplorerVisible(true)
       setFileExplorerActiveTab('files')
+      return true
     },
     'fileExplorer.gitTab': () => {
       setFileExplorerVisible(true)
       setFileExplorerActiveTab('git')
+      return true
     },
     'fileExplorer.tasksTab': () => {
       setFileExplorerVisible(true)
       setFileExplorerActiveTab('tasks')
+      return true
     },
     'automations.showOverview': () => {
       useProjectStore.getState().setAutomationsOverviewVisible(true)
+      return true
     },
+    // newFile/newFolder/delete/copyPath only fire with focus in the explorer
+    // (HOTKEY_SCOPES), so the explorer is visible by construction.
     'fileExplorer.newFile': () => {
-      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } =
-        useProjectStore.getState()
-      if (!activeProjectId || !fileExplorerVisible) return
+      const { activeProjectId, projects, fileExplorerSelectedPath } = useProjectStore.getState()
       const project = projects.find((p) => p.id === activeProjectId)
-      if (!project) return
+      if (!project) return false
       // Determine parent: selected directory or project root
       const parentPath = fileExplorerSelectedPath ?? project.path
       useProjectStore.getState().startCreate(parentPath, 'file')
+      return true
     },
     'fileExplorer.newFolder': () => {
-      const { activeProjectId, projects, fileExplorerSelectedPath, fileExplorerVisible } =
-        useProjectStore.getState()
-      if (!activeProjectId || !fileExplorerVisible) return
+      const { activeProjectId, projects, fileExplorerSelectedPath } = useProjectStore.getState()
       const project = projects.find((p) => p.id === activeProjectId)
-      if (!project) return
+      if (!project) return false
       const parentPath = fileExplorerSelectedPath ?? project.path
       useProjectStore.getState().startCreate(parentPath, 'directory')
+      return true
     },
     'fileExplorer.rename': renameFocusedItem,
     'fileExplorer.delete': () => {
-      // Only fire when file explorer has focus
-      if (!document.querySelector('[data-file-explorer]:focus-within')) return
       const { fileExplorerSelectedPath, directoryCache } = useProjectStore.getState()
-      if (!fileExplorerSelectedPath) return
+      if (!fileExplorerSelectedPath) return false
       // Find the entry in the cache
       for (const entries of Object.values(directoryCache)) {
         const found = entries.find((e) => e.path === fileExplorerSelectedPath)
         if (found) {
           useProjectStore.getState().setDeletingEntry(found)
-          break
+          return true
         }
       }
+      return false
     },
     'fileExplorer.copyPath': () => {
-      // Only fire when file explorer has focus
-      if (!document.querySelector('[data-file-explorer]:focus-within')) return
       const { fileExplorerSelectedPath } = useProjectStore.getState()
-      if (fileExplorerSelectedPath) {
-        navigator.clipboard.writeText(fileExplorerSelectedPath)
-      }
+      if (!fileExplorerSelectedPath) return false
+      navigator.clipboard.writeText(fileExplorerSelectedPath)
+      return true
     },
 
-    // Git operations
+    // Git operations — scoped to focus within the explorer flyout, and only
+    // while its git tab is showing.
     'git.stageAll': () => {
       const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } =
         useProjectStore.getState()
-      if (fileExplorerActiveTab !== 'git') return
+      if (fileExplorerActiveTab !== 'git') return false
       const project = projects.find((p) => p.id === activeProjectId)
-      if (!project) return
-      const status = gitStatus[activeProjectId!]
-      if (!status) return
+      if (!project) return false
+      const status = gitStatus[project.id]
+      if (!status) return false
       const files = [...status.modified.map((f) => f.path), ...status.untracked.map((f) => f.path)]
       if (files.length > 0) {
         api.git.stageFiles(project.path, files).then(() => {
           // Trigger refresh via the git tab's existing refresh mechanism
         })
       }
+      return true
     },
     'git.unstageAll': () => {
       const { activeProjectId, projects, gitStatus, fileExplorerActiveTab } =
         useProjectStore.getState()
-      if (fileExplorerActiveTab !== 'git') return
+      if (fileExplorerActiveTab !== 'git') return false
       const project = projects.find((p) => p.id === activeProjectId)
-      if (!project) return
-      const status = gitStatus[activeProjectId!]
-      if (!status) return
+      if (!project) return false
+      const status = gitStatus[project.id]
+      if (!status) return false
       const files = status.staged.map((f) => f.path)
       if (files.length > 0) {
         api.git.unstageFiles(project.path, files).then(() => {
           // Refresh handled by file watcher
         })
       }
+      return true
     },
     'git.commit': () => {
       // Focus the commit textarea when git tab is active
       const { fileExplorerActiveTab } = useProjectStore.getState()
-      if (fileExplorerActiveTab !== 'git') return
-      const textarea = document.querySelector('[data-git-commit-input]') as HTMLTextAreaElement
-      textarea?.focus()
+      if (fileExplorerActiveTab !== 'git') return false
+      const textarea = document.querySelector<HTMLTextAreaElement>('[data-git-commit-input]')
+      if (!textarea) return false
+      textarea.focus()
+      return true
     },
     'git.discardAll': () => {
       const { activeProjectId, projects, gitStatus, fileExplorerActiveTab, setDiscardingFiles } =
         useProjectStore.getState()
-      if (fileExplorerActiveTab !== 'git') return
+      if (fileExplorerActiveTab !== 'git') return false
       const project = projects.find((p) => p.id === activeProjectId)
-      if (!project) return
-      const status = gitStatus[activeProjectId!]
-      if (!status) return
+      if (!project) return false
+      const status = gitStatus[project.id]
+      if (!status) return false
       const files = status.modified.map((f) => f.path)
       if (files.length > 0) {
         setDiscardingFiles({ files, isUntracked: false })
       }
+      return true
     },
 
     // Editor
     'editor.closeTab': () => {
       const { activeTerminalId, activeContentTabId, editorTabs } = useProjectStore.getState()
       const tabId = activeContentTabId[activeTerminalId ?? '']
-      if (tabId && editorTabs[tabId]) {
-        closeEditorTab(tabId)
-      }
+      if (!tabId || !editorTabs[tabId]) return false
+      closeEditorTab(tabId)
+      return true
     },
     'editor.nextTab': () => {
       const { editorTabs, activeTerminalId, activeContentTabId, setActiveContentTab } =
         useProjectStore.getState()
       const chatId = activeTerminalId ?? ''
       const tabs = Object.values(editorTabs).filter((t) => t.terminalId === chatId)
-      if (tabs.length === 0) return
+      if (tabs.length === 0) return false
 
       const currentIndex = tabs.findIndex((t) => t.id === activeContentTabId[chatId])
       const nextIndex = (currentIndex + 1) % tabs.length
       setActiveContentTab(tabs[nextIndex].id)
+      return true
     },
     'editor.previousTab': () => {
       const { editorTabs, activeTerminalId, activeContentTabId, setActiveContentTab } =
         useProjectStore.getState()
       const chatId = activeTerminalId ?? ''
       const tabs = Object.values(editorTabs).filter((t) => t.terminalId === chatId)
-      if (tabs.length === 0) return
+      if (tabs.length === 0) return false
 
       const currentIndex = tabs.findIndex((t) => t.id === activeContentTabId[chatId])
       const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
       setActiveContentTab(tabs[prevIndex].id)
+      return true
     },
     'editor.save': () => {
       // Editor save is handled by CodeEditor component via Monaco
       // This is a fallback that triggers the active editor's save
       const event = new CustomEvent('editor-save-request')
       window.dispatchEvent(event)
+      return true
     },
     'browser.open': () => {
       const { activeProjectId, openBrowserTab } = useProjectStore.getState()
-      if (activeProjectId) openBrowserTab(activeProjectId)
+      if (!activeProjectId) return false
+      openBrowserTab(activeProjectId)
+      return true
     },
     'shell.toggle': () => {
       useProjectStore.getState().toggleShellDrawer()
+      return true
     },
 
     // Sidebar
     'sidebar.toggleInactive': () => {
       useProjectStore.getState().toggleInactiveSectionCollapsed()
+      return true
     },
 
     // Toggle collapse of the active project. Binding resolution in useHotkeys
@@ -428,64 +486,74 @@ function App() {
     // this action (same fallback pattern as dialog.dismissTopmostToast).
     'sidebar.toggleProjectCollapse': () => {
       const { activeProjectId, toggleProjectCollapsed } = useProjectStore.getState()
-      if (!activeProjectId) return
+      if (!activeProjectId) return false
       toggleProjectCollapsed(activeProjectId)
+      return true
     },
 
     'sidebar.pinProject': () => {
       const { activeProjectId, togglePinProject } = useProjectStore.getState()
-      if (!activeProjectId) return
+      if (!activeProjectId) return false
       togglePinProject(activeProjectId)
+      return true
     },
 
     'sidebar.toggleInactiveWorktrees': () => {
       const { activeProjectId, toggleInactiveWorktrees } = useProjectStore.getState()
-      if (!activeProjectId) return
+      if (!activeProjectId) return false
       toggleInactiveWorktrees(activeProjectId)
+      return true
     },
 
     'sidebar.toggleProjectType': () => {
       const { activeProjectId, projects, updateProject } = useProjectStore.getState()
-      if (!activeProjectId) return
       const project = projects.find((p) => p.id === activeProjectId)
-      if (!project) return
-      updateProject(activeProjectId, { type: project.type === 'code' ? 'project' : 'code' })
+      if (!project) return false
+      updateProject(project.id, { type: project.type === 'code' ? 'project' : 'code' })
+      return true
     },
 
     // UI & Settings
-    'ui.openSettings': () => setSettingsDialogOpen(true),
-    'ui.toggleTheme': toggleTheme,
-    'ui.showShortcuts': () => setShowShortcuts(true),
+    'ui.openSettings': () => {
+      setSettingsDialogOpen(true)
+      return true
+    },
+    'ui.toggleTheme': () => {
+      toggleTheme()
+      return true
+    },
+    'ui.showShortcuts': () => {
+      setShowShortcuts(true)
+      return true
+    },
     'ui.cycleClaudeMode': () => {
       const { activeProjectId, projects, updateProject } = useProjectStore.getState()
-      if (!activeProjectId) return
       const project = projects.find((p) => p.id === activeProjectId)
-      if (!project) return
+      if (!project) return false
       const currentMode = project.settings?.claudeMode ?? 'chat'
       const modeOrder = ['chat', 'auto', 'full-auto'] as const
       const nextMode = modeOrder[(modeOrder.indexOf(currentMode) + 1) % modeOrder.length]
-      updateProject(activeProjectId, { settings: { ...project.settings, claudeMode: nextMode } })
+      updateProject(project.id, { settings: { ...project.settings, claudeMode: nextMode } })
+      return true
     },
     'ui.toggleUsageIndicator': () => {
       useProjectStore.getState().toggleUsageIndicator()
+      return true
     },
     'ui.toggleNotch': () => {
       useProjectStore.getState().toggleNotchEnabled()
+      return true
     },
 
-    // Browser shortcuts, app-chrome-focus path — registered ONLY when a browser
-    // tab is active, so they don't swallow Ctrl+F (etc.) in the terminal/editor
-    // when no browser is open. When the webview itself has focus these are
+    // Browser shortcuts, app-chrome-focus path — scoped to focus within the
+    // browser pane (HOTKEY_SCOPES), so Ctrl+F (etc.) reach the chat/editor
+    // everywhere else. When the webview guest itself has focus these are
     // intercepted in the main process instead (forwarded via the effect below).
-    ...(activeIsBrowserTab
-      ? {
-          'browser.zoomIn': () => emitBrowserShortcut('browser.zoomIn'),
-          'browser.zoomOut': () => emitBrowserShortcut('browser.zoomOut'),
-          'browser.zoomReset': () => emitBrowserShortcut('browser.zoomReset'),
-          'browser.find': () => emitBrowserShortcut('browser.find'),
-          'browser.hardReload': () => emitBrowserShortcut('browser.hardReload'),
-        }
-      : {}),
+    'browser.zoomIn': () => emitBrowserShortcutHandled('browser.zoomIn'),
+    'browser.zoomOut': () => emitBrowserShortcutHandled('browser.zoomOut'),
+    'browser.zoomReset': () => emitBrowserShortcutHandled('browser.zoomReset'),
+    'browser.find': () => emitBrowserShortcutHandled('browser.find'),
+    'browser.hardReload': () => emitBrowserShortcutHandled('browser.hardReload'),
   })
 
   // Close dialog with Escape
@@ -523,6 +591,9 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!matchesBinding(e, dismissBindingRef.current)) return
       if (!dismissTopmostToast()) return
+      // In a terminal Esc is also Claude Code's interrupt: the toast is gone,
+      // but the key must still reach xterm.
+      if (!shouldConsumeToastEscape(e.target)) return
       // A toast was consumed — stop dialog-close and any other Escape handlers
       // on this same press from firing.
       e.preventDefault()
@@ -536,13 +607,6 @@ function App() {
 
   // Resolve theme preference (system/light/dark) → apply to DOM + sync to Claude Code
   useThemeResolver()
-
-  // Restore terminal focus when window regains focus
-  useEffect(() => {
-    const handleWindowFocus = () => refocusActiveTerminal()
-    window.addEventListener('focus', handleWindowFocus)
-    return () => window.removeEventListener('focus', handleWindowFocus)
-  }, [refocusActiveTerminal])
 
   // Initialize file watcher events (centralized IPC listener)
   useEffect(() => {

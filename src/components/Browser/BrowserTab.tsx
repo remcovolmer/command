@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   RotateCw,
   ArrowRight,
@@ -29,6 +29,7 @@ import {
   DEFAULT_ZOOM,
 } from '../../utils/browserZoom'
 import { describeLoadError, isAbort } from '../../utils/browserLoadError'
+import { releaseWebviewFocus } from '../../utils/focusRecovery'
 import { onBrowserShortcut, type BrowserShortcutAction } from '../../utils/browserShortcutBus'
 import { BrowserOverflowMenu } from './BrowserOverflowMenu'
 import { btnIcon, input as inputCls } from '../ui/controls'
@@ -576,6 +577,21 @@ export function BrowserTab({
     dispatchShortcutRef.current = dispatchShortcut
   })
 
+  // A focused <webview> keeps native keyboard focus even once hidden or gone,
+  // leaving host input dead. Blur it and pull focus back to the host before
+  // the tab hides; useFocusRecovery then lands focus in the active chat.
+  // Layout effects: on unmount the cleanup must run while the node is still
+  // attached (and still document.activeElement).
+  useLayoutEffect(() => {
+    if (!isActive) releaseWebviewFocus(webviewRef.current, getElectronAPI().browser.focusHost)
+  }, [isActive])
+  useLayoutEffect(() => {
+    const wv = webviewRef.current
+    return () => {
+      releaseWebviewFocus(wv, getElectronAPI().browser.focusHost)
+    }
+  }, [])
+
   const iconBtn = `${btnIcon} disabled:hover:bg-transparent disabled:hover:text-fg-muted`
   const modeBtn = (active: boolean) => `${iconBtn} ${active ? 'text-primary bg-raised' : ''}`
 
@@ -583,6 +599,7 @@ export function BrowserTab({
     <div
       className="absolute inset-0 flex flex-col bg-screen"
       style={{ visibility: isActive ? 'visible' : 'hidden' }}
+      data-browser-pane
     >
       <div className="flex items-center gap-1 h-9 px-2 border-b border-border bg-canvas shrink-0">
         <button
