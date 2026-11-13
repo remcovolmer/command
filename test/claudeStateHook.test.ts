@@ -9,7 +9,10 @@ import { tmpdir } from 'os'
 const require = createRequire(import.meta.url)
 const { mapEventToState, shouldSkipWrite, recordState, stateDirFor, INPUT_STATE_GUARD_MS } =
   require('../electron/main/hooks/claude-state-hook.cjs') as {
-    mapEventToState: (data: Record<string, unknown>) => string | null
+    mapEventToState: (
+      data: Record<string, unknown>,
+      current?: { state: string; timestamp?: number }
+    ) => string | null
     shouldSkipWrite: (
       current: { state: string; timestamp: number } | undefined,
       incoming: { state: string; hook_event: string },
@@ -97,16 +100,40 @@ describe('mapEventToState', () => {
     expect(mapEventToState(data)).toBe(expected)
   })
 
-  test('subagent events (agent_id) never report busy, but input requests still surface', () => {
+  describe('subagent events (agent_id)', () => {
     const sub = { agent_id: 'agent-1', agent_type: 'Explore' }
-    expect(mapEventToState({ ...sub, hook_event_name: 'PreToolUse', tool_name: 'Bash' })).toBeNull()
-    expect(
-      mapEventToState({ ...sub, hook_event_name: 'PostToolUse', tool_name: 'Bash' })
-    ).toBeNull()
-    expect(mapEventToState({ ...sub, hook_event_name: 'PermissionRequest' })).toBe('permission')
-    expect(
-      mapEventToState({ ...sub, hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion' })
-    ).toBe('question')
+    const post = { ...sub, hook_event_name: 'PostToolUse', tool_name: 'Bash' }
+    const postFail = { ...sub, hook_event_name: 'PostToolUseFailure', tool_name: 'Bash' }
+
+    test('input requests still surface', () => {
+      expect(mapEventToState({ ...sub, hook_event_name: 'PermissionRequest' })).toBe('permission')
+      expect(
+        mapEventToState({ ...sub, hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion' })
+      ).toBe('question')
+    })
+
+    test('PreToolUse busy stays suppressed, even over a stored input state', () => {
+      const pre = { ...sub, hook_event_name: 'PreToolUse', tool_name: 'Bash' }
+      expect(mapEventToState(pre)).toBeNull()
+      expect(mapEventToState(pre, { state: 'permission' })).toBeNull()
+      expect(mapEventToState(pre, { state: 'question' })).toBeNull()
+    })
+
+    test('PostToolUse(Failure) clears a stored permission/question to busy', () => {
+      expect(mapEventToState(post, { state: 'permission' })).toBe('busy')
+      expect(mapEventToState(post, { state: 'question' })).toBe('busy')
+      expect(mapEventToState(postFail, { state: 'permission' })).toBe('busy')
+      expect(mapEventToState(postFail, { state: 'question' })).toBe('busy')
+    })
+
+    test('PostToolUse(Failure) is suppressed when no input state is stored', () => {
+      for (const ev of [post, postFail]) {
+        expect(mapEventToState(ev)).toBeNull()
+        expect(mapEventToState(ev, { state: 'done' })).toBeNull()
+        expect(mapEventToState(ev, { state: 'busy' })).toBeNull()
+        expect(mapEventToState(ev, { state: 'stopped' })).toBeNull()
+      }
+    })
   })
 
   test('unknown event maps to null', () => {
@@ -289,6 +316,46 @@ describe('recordState (per-session state files)', () => {
       )
     ).toBe('written')
     expect(read(SID_A).state).toBe('busy')
+  })
+
+  test('a subagent permission is cleared by its PostToolUse once the user approves', async () => {
+    let t = 1_000_000
+    const now = () => t
+    const sub = { session_id: SID_A, agent_id: 'agent-1', tool_name: 'Bash' }
+    await recordState(dir, { session_id: SID_A, hook_event_name: 'Stop' }, {}, now)
+    // Subagent noise does not overwrite the main chat's done.
+    t += 100
+    expect(await recordState(dir, { ...sub, hook_event_name: 'PostToolUse' }, {}, now)).toBe(
+      'ignored'
+    )
+    expect(read(SID_A).state).toBe('done')
+    // Subagent asks permission → orange.
+    t += 100
+    await recordState(dir, { ...sub, hook_event_name: 'PermissionRequest' }, {}, now)
+    expect(read(SID_A).state).toBe('permission')
+    // A subagent PreToolUse never clears it.
+    t += INPUT_STATE_GUARD_MS + 1
+    expect(await recordState(dir, { ...sub, hook_event_name: 'PreToolUse' }, {}, now)).toBe(
+      'ignored'
+    )
+    expect(read(SID_A).state).toBe('permission')
+    // User approved → the subagent's PostToolUse clears the dot.
+    expect(await recordState(dir, { ...sub, hook_event_name: 'PostToolUse' }, {}, now)).toBe(
+      'written'
+    )
+    expect(read(SID_A).state).toBe('busy')
+  })
+
+  test('a subagent PostToolUse inside the guard window is still skipped by the guard', async () => {
+    let t = 1_000_000
+    const now = () => t
+    const sub = { session_id: SID_A, agent_id: 'agent-1', tool_name: 'Bash' }
+    await recordState(dir, { ...sub, hook_event_name: 'PermissionRequest' }, {}, now)
+    t += 100
+    expect(await recordState(dir, { ...sub, hook_event_name: 'PostToolUseFailure' }, {}, now)).toBe(
+      'skipped'
+    )
+    expect(read(SID_A).state).toBe('permission')
   })
 
   test('a corrupt existing session file is overwritten, not fatal', async () => {

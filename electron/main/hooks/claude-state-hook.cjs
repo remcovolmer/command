@@ -29,18 +29,29 @@ const INPUT_STATE_GUARD_MS = 2500
 
 const INPUT_STATES = new Set(['question', 'permission'])
 const PER_TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure'])
+const POST_TOOL_EVENTS = new Set(['PostToolUse', 'PostToolUseFailure'])
 
 /**
  * Map a raw Claude Code hook event to a Command terminal state.
  * Returns null when the event should not change state.
+ *
+ * @param {object} data          hook payload
+ * @param {object|undefined} current  the session's stored state entry, if any
  */
-function mapEventToState(data) {
+function mapEventToState(data, current) {
   const state = mapMainEventToState(data)
   // Events fired inside a subagent / in-process teammate carry `agent_id` and
   // share the parent's session_id. Their 'busy' says nothing about the main
   // chat (a background agent keeps calling tools after the main turn's Stop),
   // so only their input requests (permission/question) may change state.
-  if (state === 'busy' && data.agent_id) return null
+  // Exception: a subagent's PostToolUse(Failure) is the only signal that the
+  // permission/question it raised was resolved, so it may clear a stored input
+  // state — otherwise the orange dot sticks after the user approves.
+  if (state === 'busy' && data.agent_id) {
+    const resolvesInput =
+      POST_TOOL_EVENTS.has(data.hook_event_name) && !!current && INPUT_STATES.has(current.state)
+    return resolvesInput ? state : null
+  }
   return state
 }
 
@@ -206,20 +217,26 @@ async function recordState(stateDir, data, env, now = Date.now) {
   if (!data || typeof data.session_id !== 'string' || !UUID_REGEX.test(data.session_id)) {
     return 'ignored'
   }
-  const state = mapEventToState(data)
+  const file = path.join(stateDir, `${data.session_id}.json`)
+  // The stored state is needed to map subagent post-tool events (see mapEventToState).
+  const current = await readSessionState(file)
+  const state = mapEventToState(data, current)
   if (!state) return 'ignored'
 
   const entry = buildStateEntry(data, state, env, now())
-  const file = path.join(stateDir, `${data.session_id}.json`)
 
   // Early skip using the state read at entry (redundant busy / protected input state).
-  if (shouldSkipWrite(await readSessionState(file), entry, now())) return 'skipped'
+  if (shouldSkipWrite(current, entry, now())) return 'skipped'
 
   // For downgrade writes (busy/done) re-read immediately before writing. This catches
   // an input state (question/permission) that ANOTHER hook process of this session
   // wrote after our first read (AskUserQuestion fires several events at once).
   if (state === 'busy' || state === 'done') {
-    if (shouldSkipWrite(await readSessionState(file), entry, now())) return 'skipped'
+    const latest = await readSessionState(file)
+    // A subagent busy is only allowed while an input state is stored; re-check so a
+    // 'done' written in between is not overwritten by subagent noise.
+    if (!mapEventToState(data, latest)) return 'skipped'
+    if (shouldSkipWrite(latest, entry, now())) return 'skipped'
   }
 
   await fs.promises.mkdir(stateDir, { recursive: true })
